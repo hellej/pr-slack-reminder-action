@@ -43,6 +43,10 @@ func main() {
 
 	slackClient := slacknotifier.GetClient(slackBotToken)
 
-	slacknotifier.SendMessage(slackClient, "pr-reminders-test", "Hello from PR Slack Reminder!")
+	slackErr := slacknotifier.SendMessage(slackClient, "pr-reminders-test", "Hello from PR Slack Reminder!")
+
+	if slackErr != nil {
+		log.Fatalf("Error sending message to Slack: %v", slackErr)
+	}
 
 }
