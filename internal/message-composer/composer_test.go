@@ -1,4 +1,4 @@
-package formatter_test
+package composer_test
 
 import "testing"
 
