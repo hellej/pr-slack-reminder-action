@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/githubclient"
 )
@@ -12,18 +13,25 @@ func main() {
 	log.Println("Starting PR Slack Reminder...")
 
 	githubToken := os.Getenv("GITHUB_TOKEN")
-	repo := os.Getenv("GITHUB_REPO")
-	repoOwner := os.Getenv("GITHUB_REPO_OWNER")
+	repository := os.Getenv("GITHUB_REPOSITORY")
 
 	// slackWebhook := os.Getenv("SLACK_WEBHOOK_URL")
 
-	if githubToken == "" {
+	if githubToken == "" || repository == "" {
 		log.Fatal("Missing required environment variables")
 	}
 
 	client := githubclient.GetClient(githubToken)
 
-	prs, _, err := client.PullRequests.List(context.Background(), repoOwner, repo, nil)
+	repoParts := strings.Split(repository, "/")
+
+	if len(repoParts) != 2 {
+		log.Fatalf("Invalid GITHUB_REPOSITORY format: %s", repository)
+	}
+	repoOwner := repoParts[0]
+	repoName := repoParts[1]
+
+	prs, _, err := client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
 
 	if err != nil {
 		log.Fatalf("Error fetching pull requests: %v", err)
