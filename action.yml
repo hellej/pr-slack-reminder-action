@@ -1,6 +1,20 @@
 name: 'PR Slack Reminders'
 description: 'Sends Slack notifications for open and stale PRs'
-inputs: {}
+inputs: {
+  slack-bot-token: {
+    description: 'Slack bot token to send the message via (the bot must be a member of the channel)',
+    required: true,
+  },
+  channel-name: {
+    description: 'Slack channel name to send the message to (e.g. general)',
+    required: false,
+  },
+  channel-id: {
+    description: 'Slack channel ID to send the message to',
+    required: false,
+  },
+
+}
 runs:
   using: 'composite'
   steps:
@@ -13,3 +27,4 @@ runs:
       env:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: ${{ github.repository }}
+        SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}

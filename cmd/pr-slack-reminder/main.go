@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/githubclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/slacknotifier"
 )
 
 func main() {
@@ -14,14 +15,13 @@ func main() {
 
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	repository := os.Getenv("GITHUB_REPOSITORY")
+	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
 
-	// slackWebhook := os.Getenv("SLACK_WEBHOOK_URL")
-
-	if githubToken == "" || repository == "" {
+	if githubToken == "" || repository == "" || slackBotToken == "" {
 		log.Fatal("Missing required environment variables")
 	}
 
-	client := githubclient.GetClient(githubToken)
+	githubClient := githubclient.GetClient(githubToken)
 
 	repoParts := strings.Split(repository, "/")
 
@@ -31,7 +31,7 @@ func main() {
 	repoOwner := repoParts[0]
 	repoName := repoParts[1]
 
-	prs, _, err := client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
+	prs, _, err := githubClient.PullRequests.List(context.Background(), repoOwner, repoName, nil)
 
 	if err != nil {
 		log.Fatalf("Error fetching pull requests: %v", err)
@@ -40,5 +40,9 @@ func main() {
 	for _, pr := range prs {
 		log.Printf("PR: %s, Title: %s", pr.GetHTMLURL(), pr.GetTitle())
 	}
+
+	slackClient := slacknotifier.GetClient(slackBotToken)
+
+	slacknotifier.SendMessage(slackClient, "pr-reminders-test", "Hello from PR Slack Reminder!")
 
 }
