@@ -1,4 +1,4 @@
-package prreminderformatter_test
+package formatter_test
 
 import "testing"
 
