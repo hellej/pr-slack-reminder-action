@@ -1,0 +1,14 @@
+name: 'PR Slack Reminders'
+description: 'Sends Slack notifications for open and stale PRs'
+inputs: {}
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - run: go run ./cmd/pr-slack-reminder
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
