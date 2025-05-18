@@ -11,13 +11,14 @@ import (
 )
 
 func main() {
-	log.Println("Starting PR Slack Reminder...")
+	log.Println("Starting PR Slack reminders action...")
 
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	repository := os.Getenv("GITHUB_REPOSITORY")
 	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
+	slackChannelName := os.Getenv("SLACK_CHANNEL_NAME")
 
-	if githubToken == "" || repository == "" || slackBotToken == "" {
+	if githubToken == "" || repository == "" || slackBotToken == "" || slackChannelName == "" {
 		log.Fatal("Missing required environment variables")
 	}
 
@@ -31,6 +32,7 @@ func main() {
 	repoOwner := repoParts[0]
 	repoName := repoParts[1]
 
+	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
 	prs, _, err := githubClient.PullRequests.List(context.Background(), repoOwner, repoName, nil)
 
 	if err != nil {
@@ -43,7 +45,7 @@ func main() {
 
 	slackClient := slacknotifier.GetClient(slackBotToken)
 
-	slackErr := slacknotifier.SendMessage(slackClient, "pr-reminders-test", "Hello from PR Slack Reminder!")
+	slackErr := slacknotifier.SendMessage(slackClient, slackChannelName, "Hello from PR Slack Reminder!")
 
 	if slackErr != nil {
 		log.Fatalf("Error sending message to Slack: %v", slackErr)

@@ -2,6 +2,7 @@ package slacknotifier
 
 import (
 	"errors"
+	"log"
 
 	"github.com/slack-go/slack"
 )
@@ -13,7 +14,7 @@ func getChannelIDByName(api *slack.Client, channelName string) (string, error) {
 
 	for {
 		result, nextCursor, err := api.GetConversations(&slack.GetConversationsParameters{
-			Limit:           100,
+			Limit:           200,
 			Cursor:          cursor,
 			Types:           []string{"public_channel", "private_channel"},
 			ExcludeArchived: true,
@@ -41,10 +42,15 @@ func GetClient(token string) *slack.Client {
 }
 
 func SendMessage(api *slack.Client, channelName string, message string) error {
+	log.Printf("Finding channel ID by name: %s", channelName)
+
 	channelID, err := getChannelIDByName(api, channelName)
 	if err != nil {
 		return err
 	}
+
+	log.Printf("Sending message to channel (ID): %s", channelID)
+	log.Printf("Message: %s", message)
 
 	_, _, err = api.PostMessage(channelID, slack.MsgOptionText(message, false))
 	if err != nil {
