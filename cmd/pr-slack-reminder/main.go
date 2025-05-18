@@ -23,8 +23,6 @@ func main() {
 
 	client := githubclient.GetClient(githubToken)
 
-	log.Printf("GitHub client created successfully %s", client.BaseURL.String())
-
 	prs, _, err := client.PullRequests.List(context.Background(), repoOwner, repo, nil)
 
 	if err != nil {
