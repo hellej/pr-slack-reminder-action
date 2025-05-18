@@ -12,9 +12,9 @@ inputs: {
   channel-id: {
     description: 'Slack channel ID to send the message to',
     required: false,
-  },
-
+  }
 }
+
 runs:
   using: 'composite'
   steps:
@@ -28,3 +28,4 @@ runs:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
+        SLACK_CHANNEL_NAME: ${{ inputs.channel-name }}

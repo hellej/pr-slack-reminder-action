@@ -35,3 +35,4 @@ jobs:
         
         with:
           slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
+          channel-name: 'pr-reminders-test'
