@@ -41,7 +41,7 @@ func GetClient(token string) *slack.Client {
 	return slack.New(token)
 }
 
-func SendMessage(api *slack.Client, channelName string, blocks *slack.Message) error {
+func SendMessage(api *slack.Client, channelName string, blocks slack.Message) error {
 	log.Printf("Finding channel ID by name: %s", channelName)
 
 	channelID, err := getChannelIDByName(api, channelName)

@@ -5,7 +5,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func ComposeMessage(prs []*github.PullRequest) *slack.Message {
+func ComposeMessage(prs []*github.PullRequest) slack.Message {
 	prList := ""
 
 	for _, pr := range prs {
@@ -23,5 +23,5 @@ func ComposeMessage(prs []*github.PullRequest) *slack.Message {
 		),
 	)
 
-	return &blockMessage
+	return blockMessage
 }
