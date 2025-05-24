@@ -31,6 +31,25 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		}
 
 	})
+
+	t.Run("One new PR, message summary", func(t *testing.T) {
+		aPR := &github.PullRequest{}
+		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 1 day ago
+		aPR.Title = github.Ptr("This is a test PR")
+		aPR.User = &github.User{
+			Login: github.Ptr("testuser"),
+			Name:  github.Ptr("Test User"),
+		}
+		prS := []*github.PullRequest{aPR}
+
+		_, got := composer.ComposeMessage(prS, 24)
+
+		expected := "1 new PRs are waiting for attention"
+		if got != expected {
+			t.Errorf("Expected summary to be %s, got '%s'", expected, got)
+		}
+	})
+
 	t.Run("One new PR", func(t *testing.T) {
 		aPR := &github.PullRequest{}
 		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 1 day ago

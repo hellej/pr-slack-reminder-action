@@ -123,5 +123,5 @@ func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (sla
 		)
 	}
 
-	return slack.NewBlockMessage(blocks...), "some message summary"
+	return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d new PRs are waiting for attention", len(prCategories.NewPRs.PRs))
 }
