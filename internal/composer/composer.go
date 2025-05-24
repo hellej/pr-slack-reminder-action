@@ -34,7 +34,7 @@ func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
-			" ("+getPRCreationTimeText(pr.CreatedAt.Time)+"by "+loginOrName+")", &slack.RichTextSectionTextStyle{}),
+			" "+getPRCreationTimeText(pr.CreatedAt.Time)+"by "+loginOrName, &slack.RichTextSectionTextStyle{}),
 	)
 }
 
