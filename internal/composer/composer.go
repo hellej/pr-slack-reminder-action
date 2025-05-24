@@ -38,7 +38,7 @@ func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	)
 }
 
-func composePRListBlock(openPRs []*github.PullRequest) *slack.RichTextBlock {
+func makePRListBlock(openPRs []*github.PullRequest) *slack.RichTextBlock {
 	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
 		prBlocks = append(prBlocks, composePRBulletPointBlock(pr))
@@ -98,39 +98,48 @@ func getPRCategories(openPRs []*github.PullRequest, oldPRThresholdHours int) PRC
 	return prCategories
 }
 
+func addPRCategoryBlock(blocks []slack.Block, heading string, prs []*github.PullRequest) []slack.Block {
+	return append(blocks, slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", heading, false, false),
+	),
+		makePRListBlock(prs),
+	)
+}
+
+func addNoPRsBlock(blocks []slack.Block) []slack.Block {
+	text := "No open PRs, happy coding! 🎉"
+	return append(blocks,
+		slack.NewRichTextBlock("no_prs_block",
+			slack.NewRichTextSection(
+				slack.NewRichTextSectionTextElement(text, &slack.RichTextSectionTextStyle{}),
+			),
+		),
+	)
+}
+
 func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if len(openPRs) == 0 {
 		text := "No open PRs, happy coding! 🎉"
-		blocks = append(blocks,
-			slack.NewRichTextBlock("no_prs_block",
-				slack.NewRichTextSection(
-					slack.NewRichTextSectionTextElement(text, &slack.RichTextSectionTextStyle{}),
-				),
-			),
-		)
+		blocks = addNoPRsBlock(blocks)
 		return slack.NewBlockMessage(blocks...), text
 	}
 
 	if oldPRThresholdHours == 0 {
-		blocks = append(blocks, slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", fmt.Sprintf("There are %d open PRs 👀", len(openPRs)), false, false),
-		),
-			composePRListBlock(openPRs),
-		)
-		return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d new PRs are waiting for attention", len(openPRs))
+		blocks = addPRCategoryBlock(blocks, fmt.Sprintf("There are %d open PRs 👀", len(openPRs)), openPRs)
+		return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d open PRs are waiting for attention", len(openPRs))
 	}
 
 	prCategories := getPRCategories(openPRs, oldPRThresholdHours)
 
 	if len(prCategories.NewPRs.PRs) > 0 {
-		blocks = append(blocks, slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", prCategories.NewPRs.Heading, false, false),
-		),
-			composePRListBlock(openPRs),
-		)
+		blocks = addPRCategoryBlock(blocks, prCategories.NewPRs.Heading, prCategories.NewPRs.PRs)
 	}
 
-	return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d new PRs are waiting for attention", len(prCategories.NewPRs.PRs))
+	if len(prCategories.OldPRs.PRs) > 0 {
+		blocks = addPRCategoryBlock(blocks, prCategories.OldPRs.Heading, prCategories.OldPRs.PRs)
+	}
+
+	return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d open PRs are waiting for attention", len(openPRs))
 }

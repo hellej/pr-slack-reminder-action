@@ -26,8 +26,9 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		}
 
 		richTextElement := firstBlock.(*slack.RichTextBlock).Elements[0].(*slack.RichTextSection).Elements[0].(*slack.RichTextSectionTextElement)
-		if richTextElement.Text != "No open PRs in the repository, happy coding! 🎉" {
-			t.Errorf("Expected text to be 'No open PRs found', got '%s'", richTextElement.Text)
+		expected := "No open PRs, happy coding! 🎉"
+		if richTextElement.Text != expected {
+			t.Errorf("Expected text to be '%s', got '%s'", expected, richTextElement.Text)
 		}
 
 	})
@@ -44,7 +45,7 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 
 		_, got := composer.ComposeMessage(prS, 24)
 
-		expected := "1 new PRs are waiting for attention"
+		expected := "1 open PRs are waiting for attention"
 		if got != expected {
 			t.Errorf("Expected summary to be %s, got '%s'", expected, got)
 		}
