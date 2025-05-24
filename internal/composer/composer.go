@@ -74,10 +74,10 @@ type PRCategoryHeadings struct {
 }
 
 func getPRCategoryHeadings(oldPRThresholdHours int) PRCategoryHeadings {
-	timeThreholdLabel := getOldPRsThresholdTimeLabel(oldPRThresholdHours)
+	timeThresholdLabel := getOldPRsThresholdTimeLabel(oldPRThresholdHours)
 	return PRCategoryHeadings{
-		NewPRsHeading: "🚀 New PRs since " + timeThreholdLabel + " ago",
-		OldPRsHeading: "⌛️ Old PRs since " + timeThreholdLabel + " ago",
+		NewPRsHeading: "🚀 New PRs since " + timeThresholdLabel + " ago",
+		OldPRsHeading: "⌛️ Old PRs since " + timeThresholdLabel + " ago",
 	}
 }
 

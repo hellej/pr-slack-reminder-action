@@ -23,7 +23,7 @@ func getSettings() Settings {
 		Repository:          utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
 		SlackBotToken:       utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
 		SlackChannelName:    utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
-		OldPRThresholdHours: utilities.GetEnvIntOr("OLD_PR_THRESHOLD_HOURS", 365*24),
+		OldPRThresholdHours: utilities.GetEnvIntOr("OLD_PR_THRESHOLD_HOURS", 0),
 	}
 }
 
