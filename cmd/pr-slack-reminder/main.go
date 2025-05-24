@@ -1,49 +1,44 @@
 package main
 
 import (
-	"context"
 	"log"
-	"os"
-	"strings"
 
-	"github.com/hellej/pr-slack-reminder-action/internal/githubclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/githubhelpers"
 	composer "github.com/hellej/pr-slack-reminder-action/internal/message-composer"
 	"github.com/hellej/pr-slack-reminder-action/internal/slacknotifier"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
+
+type Settings struct {
+	GithubToken         string
+	Repository          string
+	SlackBotToken       string
+	SlackChannelName    string
+	OldPRThresholdHours int
+}
+
+func getSettings() Settings {
+	return Settings{
+		GithubToken:         utilities.GetRequiredEnv("GITHUB_TOKEN"),
+		Repository:          utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
+		SlackBotToken:       utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
+		SlackChannelName:    utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
+		OldPRThresholdHours: utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS", 44),
+	}
+}
 
 func main() {
 	log.Println("Starting PR Slack reminders action...")
 
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	repository := os.Getenv("GITHUB_REPOSITORY")
-	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
-	slackChannelName := os.Getenv("SLACK_CHANNEL_NAME")
+	settings := getSettings()
 
-	if githubToken == "" || repository == "" || slackBotToken == "" || slackChannelName == "" {
-		log.Fatal("Missing required environment variables")
-	}
+	githubClient := githubhelpers.GetClient(settings.GithubToken)
+	slackClient := slacknotifier.GetClient(settings.SlackBotToken)
 
-	githubClient := githubclient.GetClient(githubToken)
-	slackClient := slacknotifier.GetClient(slackBotToken)
-
-	repoParts := strings.Split(repository, "/")
-	if len(repoParts) != 2 {
-		log.Fatalf("Invalid GITHUB_REPOSITORY format: %s", repository)
-	}
-	repoOwner := repoParts[0]
-	repoName := repoParts[1]
-	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
-
-	prs, _, err := githubClient.PullRequests.List(context.Background(), repoOwner, repoName, nil)
-	if err != nil {
-		log.Fatalf("Error fetching pull requests: %v", err)
-	}
-	for _, pr := range prs {
-		log.Printf("PR: %s, Title: %s", pr.GetHTMLURL(), pr.GetTitle())
-	}
+	prs := githubhelpers.FetchOpenPRs(githubClient, settings.Repository)
 
 	blocks, summaryText := composer.ComposeMessage(prs)
-	slackErr := slacknotifier.SendMessage(slackClient, slackChannelName, blocks, summaryText)
+	slackErr := slacknotifier.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
 
 	if slackErr != nil {
 		log.Fatalf("Error sending message to Slack: %v", slackErr)
