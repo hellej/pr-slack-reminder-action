@@ -1,9 +1,29 @@
 package composer
 
 import (
+	"fmt"
+	"math"
+	"time"
+
 	"github.com/google/go-github/v72/github"
 	"github.com/slack-go/slack"
 )
+
+func getPRCreationTimeText(pr *github.PullRequest) string {
+	createdAt := pr.GetCreatedAt()
+	duration := time.Since(createdAt.Time)
+
+	if duration.Hours() >= 24 {
+		days := int(math.Round(duration.Hours())) / 24
+		return fmt.Sprintf("%d days ago ", days)
+	} else if duration.Hours() >= 1 {
+		hours := int(math.Round(duration.Hours()))
+		return fmt.Sprintf("%d hours ago ", hours)
+	} else {
+		minutes := int(math.Round(duration.Minutes()))
+		return fmt.Sprintf("%d minutes ago ", minutes)
+	}
+}
 
 func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	var loginOrName string
@@ -16,7 +36,7 @@ func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
-			" (by "+loginOrName+")", &slack.RichTextSectionTextStyle{}),
+			" ("+getPRCreationTimeText(pr)+"by "+loginOrName+")", &slack.RichTextSectionTextStyle{}),
 	)
 }
 
