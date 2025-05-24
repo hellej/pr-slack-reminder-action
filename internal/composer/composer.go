@@ -115,7 +115,7 @@ func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (sla
 
 	if oldPRThresholdHours == 0 {
 		blocks = append(blocks, slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "Open PRs", false, false),
+			slack.NewTextBlockObject("plain_text", fmt.Sprintf("There are %d open PRs 👀", len(openPRs)), false, false),
 		),
 			composePRListBlock(openPRs),
 		)
