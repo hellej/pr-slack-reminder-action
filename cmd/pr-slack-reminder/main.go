@@ -23,7 +23,7 @@ func getSettings() Settings {
 		Repository:          utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
 		SlackBotToken:       utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
 		SlackChannelName:    utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
-		OldPRThresholdHours: utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS", 44),
+		OldPRThresholdHours: *utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS"),
 	}
 }
 
@@ -36,10 +36,5 @@ func main() {
 
 	prs := githubhelpers.FetchOpenPRs(githubClient, settings.Repository)
 	blocks, summaryText := composer.ComposeMessage(prs)
-	slackErr := slacknotifier.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
-
-	if slackErr != nil {
-		log.Fatalf("Error sending message to Slack: %v", slackErr)
-	}
-
+	slacknotifier.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
 }
