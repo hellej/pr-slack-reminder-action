@@ -102,7 +102,7 @@ func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (sla
 	var blocks []slack.Block
 
 	if len(openPRs) == 0 {
-		text := "No open PRs in the repository, happy coding! 🎉"
+		text := "No open PRs, happy coding! 🎉"
 		blocks = append(blocks,
 			slack.NewRichTextBlock("no_prs_block",
 				slack.NewRichTextSection(
@@ -111,6 +111,15 @@ func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (sla
 			),
 		)
 		return slack.NewBlockMessage(blocks...), text
+	}
+
+	if oldPRThresholdHours == 0 {
+		blocks = append(blocks, slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "Open PRs", false, false),
+		),
+			composePRListBlock(openPRs),
+		)
+		return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d new PRs are waiting for attention", len(openPRs))
 	}
 
 	prCategories := getPRCategories(openPRs, oldPRThresholdHours)
