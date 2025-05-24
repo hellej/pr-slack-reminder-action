@@ -9,10 +9,8 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func getPRCreationTimeText(pr *github.PullRequest) string {
-	createdAt := pr.GetCreatedAt()
-	duration := time.Since(createdAt.Time)
-
+func getPRCreationTimeText(createdAt time.Time) string {
+	duration := time.Since(createdAt)
 	if duration.Hours() >= 24 {
 		days := int(math.Round(duration.Hours())) / 24
 		return fmt.Sprintf("%d days ago ", days)
@@ -36,7 +34,7 @@ func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
-			" ("+getPRCreationTimeText(pr)+"by "+loginOrName+")", &slack.RichTextSectionTextStyle{}),
+			" ("+getPRCreationTimeText(pr.CreatedAt.Time)+"by "+loginOrName+")", &slack.RichTextSectionTextStyle{}),
 	)
 }
 
@@ -54,13 +52,8 @@ func composePRListBlock(openPRs []*github.PullRequest) *slack.RichTextBlock {
 
 }
 
-func ComposeMessage(openPRs []*github.PullRequest) slack.Message {
+func ComposeMessage(openPRs []*github.PullRequest) (slack.Message, string) {
 	var blocks []slack.Block
-
-	prList := ""
-	for _, pr := range openPRs {
-		prList += "" + pr.GetHTMLURL() + "\n"
-	}
 
 	if len(openPRs) > 0 {
 		blocks = append(blocks, slack.NewHeaderBlock(
@@ -70,15 +63,13 @@ func ComposeMessage(openPRs []*github.PullRequest) slack.Message {
 		)
 	} else {
 		blocks = append(blocks,
-			slack.NewSectionBlock(
-				slack.NewTextBlockObject("mrkdwn", "No open PRs since 44 hours ago", false, false),
-				nil,
-				nil,
+			slack.NewRichTextBlock("no_prs_block",
+				slack.NewRichTextSection(
+					slack.NewRichTextSectionTextElement("No new PRs since 44 hours ago", &slack.RichTextSectionTextStyle{}),
+				),
 			),
 		)
 	}
 
-	blockMessage := slack.NewBlockMessage(blocks...)
-
-	return blockMessage
+	return slack.NewBlockMessage(blocks...), "some message summary"
 }

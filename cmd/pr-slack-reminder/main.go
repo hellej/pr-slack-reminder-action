@@ -42,8 +42,8 @@ func main() {
 		log.Printf("PR: %s, Title: %s", pr.GetHTMLURL(), pr.GetTitle())
 	}
 
-	blocks := composer.ComposeMessage(prs)
-	slackErr := slacknotifier.SendMessage(slackClient, slackChannelName, blocks)
+	blocks, summaryText := composer.ComposeMessage(prs)
+	slackErr := slacknotifier.SendMessage(slackClient, slackChannelName, blocks, summaryText)
 
 	if slackErr != nil {
 		log.Fatalf("Error sending message to Slack: %v", slackErr)
