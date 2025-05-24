@@ -49,25 +49,77 @@ func composePRListBlock(openPRs []*github.PullRequest) *slack.RichTextBlock {
 			prBlocks...,
 		),
 	)
-
 }
 
-func ComposeMessage(openPRs []*github.PullRequest) (slack.Message, string) {
+func getOldPRsThresholdTimeLabel(oldPRThresholdHours int) string {
+	if oldPRThresholdHours < 24 {
+		return fmt.Sprintf("%d hours", oldPRThresholdHours)
+	}
+	days := int(math.Round(float64(oldPRThresholdHours / 24)))
+	return fmt.Sprintf("%d days", days)
+}
+
+type PRCategory struct {
+	Heading string
+	PRs     []*github.PullRequest
+}
+
+type PRCategories struct {
+	NewPRs PRCategory
+	OldPRs PRCategory
+}
+type PRCategoryHeadings struct {
+	NewPRsHeading string
+	OldPRsHeading string
+}
+
+func getPRCategoryHeadings(oldPRThresholdHours int) PRCategoryHeadings {
+	timeThreholdLabel := getOldPRsThresholdTimeLabel(oldPRThresholdHours)
+	return PRCategoryHeadings{
+		NewPRsHeading: "🚀 New PRs since " + timeThreholdLabel + " ago",
+		OldPRsHeading: "⌛️ Old PRs since " + timeThreholdLabel + " ago",
+	}
+}
+
+func getPRCategories(openPRs []*github.PullRequest, oldPRThresholdHours int) PRCategories {
+	var prCategories PRCategories
+
+	for _, pr := range openPRs {
+		if pr.GetCreatedAt().After(time.Now().Add(-time.Duration(oldPRThresholdHours) * time.Hour)) {
+			prCategories.NewPRs.PRs = append(prCategories.NewPRs.PRs, pr)
+		} else {
+			prCategories.OldPRs.PRs = append(prCategories.OldPRs.PRs, pr)
+		}
+	}
+
+	headings := getPRCategoryHeadings(oldPRThresholdHours)
+	prCategories.NewPRs.Heading = headings.NewPRsHeading
+	prCategories.OldPRs.Heading = headings.OldPRsHeading
+	return prCategories
+}
+
+func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (slack.Message, string) {
 	var blocks []slack.Block
 
-	if len(openPRs) > 0 {
-		blocks = append(blocks, slack.NewHeaderBlock(
-			slack.NewTextBlockObject("plain_text", "🚀 New PRs since 44 hours ago", false, false),
-		),
-			composePRListBlock(openPRs),
-		)
-	} else {
+	if len(openPRs) == 0 {
+		text := "No open PRs in the repository, happy coding! 🎉"
 		blocks = append(blocks,
 			slack.NewRichTextBlock("no_prs_block",
 				slack.NewRichTextSection(
-					slack.NewRichTextSectionTextElement("No new PRs since 44 hours ago", &slack.RichTextSectionTextStyle{}),
+					slack.NewRichTextSectionTextElement(text, &slack.RichTextSectionTextStyle{}),
 				),
 			),
+		)
+		return slack.NewBlockMessage(blocks...), text
+	}
+
+	prCategories := getPRCategories(openPRs, oldPRThresholdHours)
+
+	if len(prCategories.NewPRs.PRs) > 0 {
+		blocks = append(blocks, slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", prCategories.NewPRs.Heading, false, false),
+		),
+			composePRListBlock(openPRs),
 		)
 	}
 

@@ -39,3 +39,15 @@ func GetEnvInt(name string) *int {
 	}
 	return &parsed
 }
+
+func GetEnvIntOr(name string, fallBack int) int {
+	val := os.Getenv(name)
+	if val == "" {
+		return fallBack
+	}
+	parsed, err := strconv.Atoi(val)
+	if err != nil {
+		log.Fatalf("Error parsing environment variable %s: %v", name, err)
+	}
+	return parsed
+}
