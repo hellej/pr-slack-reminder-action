@@ -5,23 +5,34 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func ComposeMessage(prs []*github.PullRequest) slack.Message {
-	prList := ""
+func ComposeMessage(openPRs []*github.PullRequest) slack.Message {
+	var blocks []slack.Block
 
-	for _, pr := range prs {
+	prList := ""
+	for _, pr := range openPRs {
 		prList += "" + pr.GetHTMLURL() + "\n"
 	}
 
-	blockMessage := slack.NewBlockMessage(
-		slack.NewHeaderBlock(
+	if len(openPRs) > 0 {
+		blocks = append(blocks, slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "🚀 New PRs since 44 hours ago", false, false),
 		),
-		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", prList, false, false),
-			nil,
-			nil,
-		),
-	)
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", prList, false, false),
+				nil,
+				nil,
+			))
+	} else {
+		blocks = append(blocks,
+			slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", "No open PRs since 44 hours ago", false, false),
+				nil,
+				nil,
+			),
+		)
+	}
+
+	blockMessage := slack.NewBlockMessage(blocks...)
 
 	return blockMessage
 }
