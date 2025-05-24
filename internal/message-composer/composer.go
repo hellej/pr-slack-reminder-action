@@ -5,7 +5,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func composePRBulletPointBlock(pr *github.PullRequest) *slack.RichTextSection {
+func composePRBulletPointBlock(pr *github.PullRequest) slack.RichTextElement {
 	var loginOrName string
 	if pr.GetUser().GetName() != "" {
 		loginOrName = pr.GetUser().GetName()
@@ -21,15 +21,14 @@ func composePRBulletPointBlock(pr *github.PullRequest) *slack.RichTextSection {
 }
 
 func composePRListBlock(openPRs []*github.PullRequest) *slack.RichTextBlock {
-	var prBlocks []slack.RichTextSection
+	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
-		prBlocks = append(prBlocks, *composePRBulletPointBlock(pr))
+		prBlocks = append(prBlocks, composePRBulletPointBlock(pr))
 	}
-
 	return slack.NewRichTextBlock(
 		"open_prs",
 		slack.NewRichTextList(slack.RichTextListElementType("bullet"), 0,
-			prBlocks[0], prBlocks[1],
+			prBlocks...,
 		),
 	)
 
