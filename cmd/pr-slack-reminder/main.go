@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
+	composer "github.com/hellej/pr-slack-reminder-action/internal/composer"
 	"github.com/hellej/pr-slack-reminder-action/internal/githubhelpers"
-	composer "github.com/hellej/pr-slack-reminder-action/internal/message-composer"
 	"github.com/hellej/pr-slack-reminder-action/internal/slacknotifier"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -31,12 +31,10 @@ func main() {
 	log.Println("Starting PR Slack reminders action...")
 
 	settings := getSettings()
-
 	githubClient := githubhelpers.GetClient(settings.GithubToken)
 	slackClient := slacknotifier.GetClient(settings.SlackBotToken)
 
 	prs := githubhelpers.FetchOpenPRs(githubClient, settings.Repository)
-
 	blocks, summaryText := composer.ComposeMessage(prs)
 	slackErr := slacknotifier.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
 

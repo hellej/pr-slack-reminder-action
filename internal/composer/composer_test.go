@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-github/v72/github"
 	"github.com/slack-go/slack"
 
-	composer "github.com/hellej/pr-slack-reminder-action/internal/message-composer"
+	composer "github.com/hellej/pr-slack-reminder-action/internal/composer"
 )
 
 func TestComposeSlackBlocksMessage(t *testing.T) {
