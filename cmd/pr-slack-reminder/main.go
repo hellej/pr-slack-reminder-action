@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	composer "github.com/hellej/pr-slack-reminder-action/internal/composer"
+	"github.com/hellej/pr-slack-reminder-action/internal/composer"
 	"github.com/hellej/pr-slack-reminder-action/internal/githubhelpers"
 	"github.com/hellej/pr-slack-reminder-action/internal/slacknotifier"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"

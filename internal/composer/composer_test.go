@@ -31,7 +31,6 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		if richTextElement.Text != expected {
 			t.Errorf("Expected text to be '%s', got '%s'", expected, richTextElement.Text)
 		}
-
 	})
 
 	t.Run("One new PR, message summary", func(t *testing.T) {
