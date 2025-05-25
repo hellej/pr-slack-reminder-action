@@ -10,20 +10,22 @@ import (
 )
 
 type Settings struct {
-	GithubToken         string
-	Repository          string
-	SlackBotToken       string
-	SlackChannelName    string
-	OldPRThresholdHours *int
+	GithubToken                 string
+	Repository                  string
+	SlackBotToken               string
+	SlackChannelName            string
+	OldPRThresholdHours         *int
+	SlackUserIdByGitHubUsername *map[string]string
 }
 
 func getSettings() Settings {
 	return Settings{
-		GithubToken:         utilities.GetRequiredEnv("GITHUB_TOKEN"),
-		Repository:          utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
-		SlackBotToken:       utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
-		SlackChannelName:    utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
-		OldPRThresholdHours: utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS"),
+		GithubToken:                 utilities.GetRequiredEnv("GITHUB_TOKEN"),
+		Repository:                  utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
+		SlackBotToken:               utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
+		SlackChannelName:            utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
+		OldPRThresholdHours:         utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS"),
+		SlackUserIdByGitHubUsername: utilities.GetStringMapping("SLACK_USER_ID_BY_GITHUB_USERNAME"),
 	}
 }
 

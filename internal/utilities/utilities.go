@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func GetEnv(name string, fallback string) string {
@@ -50,4 +51,32 @@ func GetEnvIntOr(name string, fallBack int) int {
 		log.Fatalf("Error parsing environment variable %s: %v", name, err)
 	}
 	return parsed
+}
+
+func GetStringMapping(name string) *map[string]string {
+	mapping := make(map[string]string)
+	val := os.Getenv(name)
+	if val == "" {
+		return &mapping
+	}
+
+	lines := strings.Split(val, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			log.Fatalf("Invalid mapping format for %s: %s", name, line)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key == "" || value == "" {
+			log.Fatalf("Invalid mapping key or value for %s: %s", name, line)
+		}
+		mapping[key] = value
+	}
+
+	return &mapping
 }
