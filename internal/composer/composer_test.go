@@ -13,7 +13,8 @@ import (
 func TestComposeSlackBlocksMessage(t *testing.T) {
 	t.Run("No PRs", func(t *testing.T) {
 		prS := []*github.PullRequest{}
-		message, _ := composer.ComposeMessage(prS, 24)
+		oldPRThresholdHours := 24
+		message, _ := composer.ComposeMessage(prS, &oldPRThresholdHours)
 
 		blockLen := len(message.Blocks.BlockSet)
 		if blockLen != 1 {
@@ -42,9 +43,8 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			Name:  github.Ptr("Test User"),
 		}
 		prS := []*github.PullRequest{aPR}
-
-		_, got := composer.ComposeMessage(prS, 24)
-
+		oldPRThresholdHours := 24
+		_, got := composer.ComposeMessage(prS, &oldPRThresholdHours)
 		expected := "1 open PRs are waiting for attention"
 		if got != expected {
 			t.Errorf("Expected summary to be %s, got '%s'", expected, got)
@@ -59,9 +59,9 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			Login: github.Ptr("testuser"),
 			Name:  github.Ptr("Test User"),
 		}
-
 		prS := []*github.PullRequest{aPR}
-		got, _ := composer.ComposeMessage(prS, 24)
+		oldPRThresholdHours := 24
+		got, _ := composer.ComposeMessage(prS, &oldPRThresholdHours)
 
 		if len(got.Blocks.BlockSet) < 2 {
 			t.Errorf("Expected non-empty blocks, got nil or empty")
@@ -76,8 +76,9 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		if prLinkElement.Text != "This is a test PR" {
 			t.Errorf("Expected text to be 'This is a test PR', got '%s'", prLinkElement.Text)
 		}
-		if prAfterLinkElement.Text != " (3 hours ago by Test User)" {
-			t.Errorf("Expected text to be ' (3 hours ago by Test User)', got '%s'", prAfterLinkElement.Text)
+		expected := " 3 hours ago by Test User"
+		if prAfterLinkElement.Text != expected {
+			t.Errorf("Expected text to be '%s', got '%s'", expected, prAfterLinkElement.Text)
 		}
 	})
 }

@@ -14,7 +14,7 @@ type Settings struct {
 	Repository          string
 	SlackBotToken       string
 	SlackChannelName    string
-	OldPRThresholdHours int
+	OldPRThresholdHours *int
 }
 
 func getSettings() Settings {
@@ -23,7 +23,7 @@ func getSettings() Settings {
 		Repository:          utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
 		SlackBotToken:       utilities.GetRequiredEnv("SLACK_BOT_TOKEN"),
 		SlackChannelName:    utilities.GetRequiredEnv("SLACK_CHANNEL_NAME"),
-		OldPRThresholdHours: utilities.GetEnvIntOr("OLD_PR_THRESHOLD_HOURS", 0),
+		OldPRThresholdHours: utilities.GetEnvInt("OLD_PR_THRESHOLD_HOURS"),
 	}
 }
 

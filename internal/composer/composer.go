@@ -117,7 +117,7 @@ func addNoPRsBlock(blocks []slack.Block) []slack.Block {
 	)
 }
 
-func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (slack.Message, string) {
+func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours *int) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if len(openPRs) == 0 {
@@ -126,12 +126,12 @@ func ComposeMessage(openPRs []*github.PullRequest, oldPRThresholdHours int) (sla
 		return slack.NewBlockMessage(blocks...), text
 	}
 
-	if oldPRThresholdHours == 0 {
+	if oldPRThresholdHours == nil {
 		blocks = addPRCategoryBlock(blocks, fmt.Sprintf("There are %d open PRs 👀", len(openPRs)), openPRs)
 		return slack.NewBlockMessage(blocks...), fmt.Sprintf("%d open PRs are waiting for attention", len(openPRs))
 	}
 
-	prCategories := getPRCategories(openPRs, oldPRThresholdHours)
+	prCategories := getPRCategories(openPRs, *oldPRThresholdHours)
 
 	if len(prCategories.NewPRs.PRs) > 0 {
 		blocks = addPRCategoryBlock(blocks, prCategories.NewPRs.Heading, prCategories.NewPRs.PRs)
