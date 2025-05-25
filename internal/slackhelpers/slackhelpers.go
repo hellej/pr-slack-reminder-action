@@ -1,4 +1,4 @@
-package slacknotifier
+package slackhelpers
 
 import (
 	"errors"
