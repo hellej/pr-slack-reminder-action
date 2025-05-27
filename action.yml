@@ -1,12 +1,12 @@
 name: 'PR Slack Reminders'
-description: 'Sends Slack notifications for open and stale PRs'
+description: 'Sends Slack reminders about open and stale PRs'
 inputs: {
   slack-bot-token: {
     description: 'Slack bot token to send the message via (the bot must be a member of the channel)',
     required: true,
   },
   channel-name: {
-    description: 'Slack channel name to send the message to (e.g. general)',
+    description: 'Slack channel name to send the message to',
     required: false,
   },
   channel-id: {
