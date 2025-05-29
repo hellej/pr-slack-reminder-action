@@ -1,29 +1,31 @@
-// based on:
-// https://full-stack.blend.com/how-we-write-github-actions-in-go/invoke-binary.js
-// which is referenced in:
-// https://full-stack.blend.com/how-we-write-github-actions-in-go.html
+/**
+ * based on:
+ * https://full-stack.blend.com/how-we-write-github-actions-in-go/invoke-binary.js
+ * which is referenced in:
+ * https://full-stack.blend.com/how-we-write-github-actions-in-go.html
+ */
 
 const childProcess = require('child_process')
 const os = require('os')
 const process = require('process')
 
-// const VERSION = 'e9d351bd367300ec85b9ba777812c42be2570a64'
+const VERSION = 'b9be3912c6'
 
 function chooseBinary() {
     const platform = os.platform()
     const arch = os.arch()
 
     if (platform === 'linux' && arch === 'x64') {
-        return `main-linux-amd64`
+        return `dist/main-linux-amd64-${VERSION}`
     }
     if (platform === 'linux' && arch === 'arm64') {
-        return `main-linux-arm64`
+        return `dist/main-linux-arm64-${VERSION}`
     }
     if (platform === 'windows' && arch === 'x64') {
-        return `main-windows-amd64`
+        return `dist/main-windows-amd64-${VERSION}`
     }
     if (platform === 'windows' && arch === 'arm64') {
-        return `main-windows-arm64`
+        return `dist/main-windows-arm64-${VERSION}`
     }
 
     console.error(`Unsupported platform (${platform}) and architecture (${arch})`)
