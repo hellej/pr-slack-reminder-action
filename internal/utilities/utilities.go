@@ -7,30 +7,40 @@ import (
 	"strings"
 )
 
-func GetEnv(name string, fallback string) string {
-	val := os.Getenv(name)
-	if val == "" {
-		return fallback
-	}
-	return val
+func inputNameAsEnv(name string) string {
+	e := strings.ReplaceAll(name, " ", "_")
+	e = strings.ToUpper(e)
+	return "INPUT_" + e
 }
 
-// Logs a fatal error if the environment variable named by 'name' is not set,
-// and exits the program.
-func GetRequiredEnv(name string) string {
-	val := os.Getenv(name)
-	if val == "" {
-		log.Fatalf("Required environment variable not set: %s", name)
+func raiseIfEmpty(value string, name string) string {
+	if value == "" {
+		log.Fatalf("Required input %s is not set", name)
 	}
-	return val
+	return value
 }
 
-// Retrieves the value of the environment variable named by 'name',
-// attempts to parse it as an integer, and returns a pointer to the parsed value.
-// If the environment variable is not set, it returns nil.
-// If parsing fails, the function logs a fatal error and terminates the program.
-func GetEnvInt(name string) *int {
-	val := os.Getenv(name)
+func GetEnv(name string) string {
+	return os.Getenv(name)
+}
+
+func GetEnvRequired(name string) string {
+	return raiseIfEmpty(os.Getenv(name), name)
+}
+
+func GetInput(name string) string {
+	return strings.TrimSpace(GetEnv((inputNameAsEnv(name))))
+}
+
+func GetInputRequired(name string) string {
+	return raiseIfEmpty(GetInput(name), name)
+}
+
+// Retrieves the value of the input, attempts to parse it as an integer,
+// and returns a pointer to the parsed value.
+// Returns nil if the environment variable is not set.
+func GetInputInt(name string) *int {
+	val := GetInput(name)
 	if val == "" {
 		return nil
 	}
@@ -41,19 +51,8 @@ func GetEnvInt(name string) *int {
 	return &parsed
 }
 
-func GetEnvIntOr(name string, fallBack int) int {
-	val := os.Getenv(name)
-	if val == "" {
-		return fallBack
-	}
-	parsed, err := strconv.Atoi(val)
-	if err != nil {
-		log.Fatalf("Error parsing environment variable %s: %v", name, err)
-	}
-	return parsed
-}
-
-func GetStringMapping(name string) *map[string]string {
+func GetStringMapping(inputName string) *map[string]string {
+	name := inputNameAsEnv(inputName)
 	mapping := make(map[string]string)
 	val := os.Getenv(name)
 	if val == "" {

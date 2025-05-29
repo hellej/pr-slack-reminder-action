@@ -13,11 +13,11 @@ type Config struct {
 
 func GetConfig() Config {
 	return Config{
-		GithubToken:                 utilities.GetRequiredEnv("INPUT_GITHUB-TOKEN"),
-		Repository:                  utilities.GetRequiredEnv("GITHUB_REPOSITORY"),
-		SlackBotToken:               utilities.GetRequiredEnv("INPUT_SLACK-BOT-TOKEN"),
-		SlackChannelName:            utilities.GetRequiredEnv("INPUT_SLACK-CHANNEL-NAME"),
-		OldPRThresholdHours:         utilities.GetEnvInt("INPUT_OLD-PR-THRESHOLD-HOURS"),
-		SlackUserIdByGitHubUsername: utilities.GetStringMapping("INPUT_GITHUB-USER-SLACK-USER-ID-MAPPING"),
+		Repository:                  utilities.GetEnvRequired("GITHUB_REPOSITORY"),
+		GithubToken:                 utilities.GetInputRequired("github-token"),
+		SlackBotToken:               utilities.GetInputRequired("slack-bot-token"),
+		SlackChannelName:            utilities.GetInputRequired("slack-channel-name"),
+		OldPRThresholdHours:         utilities.GetInputInt("old-pr-threshold-hours"),
+		SlackUserIdByGitHubUsername: utilities.GetStringMapping("github-user-slack-user-id-mapping"),
 	}
 }
