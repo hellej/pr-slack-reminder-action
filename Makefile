@@ -1,6 +1,9 @@
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder/main.go
 
+test:
+	go test ./...
+
 run:
 	env \
 	'INPUT_GITHUB-TOKEN=$(INPUT_GITHUB_TOKEN)' \
