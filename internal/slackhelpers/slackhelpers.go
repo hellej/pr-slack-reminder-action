@@ -48,7 +48,7 @@ func SendMessage(api *slack.Client, channelName string, blocks slack.Message, su
 		log.Fatalf("Error getting channel ID by name: %v (%v)", channelName, err)
 	}
 
-	log.Printf("Sending message with %v blocks to channel %s", len(blocks.Blocks.BlockSet), channelName)
+	log.Printf("Sending message to channel %s", channelName)
 	_, _, err = api.PostMessage(channelID, slack.MsgOptionBlocks(blocks.Blocks.BlockSet...), slack.MsgOptionText(summaryText, false))
 
 	if err != nil {
