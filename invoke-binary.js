@@ -19,6 +19,12 @@ function chooseBinary() {
     if (platform === 'linux' && arch === 'arm64') {
         return `main-linux-arm64`
     }
+    if (platform === 'windows' && arch === 'x64') {
+        return `main-windows-amd64`
+    }
+    if (platform === 'windows' && arch === 'arm64') {
+        return `main-windows-arm64`
+    }
 
     console.error(`Unsupported platform (${platform}) and architecture (${arch})`)
     process.exit(1)
