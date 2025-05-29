@@ -27,8 +27,6 @@ build-windows-arm64:
 	env GOOS=windows GOARCH=arm64 go build -o main-windows-arm64 $(MAIN_GO)
 
 build-all: 
-	$(MAKE) build-darwin-amd64
-	$(MAKE) build-darwin-arm64
 	$(MAKE) build-linux-amd64
 	$(MAKE) build-linux-arm64
 	$(MAKE) build-windows-amd64
