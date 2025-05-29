@@ -1,5 +1,5 @@
-name: 'PR Slack Reminders'
-description: 'Sends Slack reminders about open and stale PRs'
+name: 'PR Slack Reminder'
+description: 'Sends a Slack reminder about open and stale PRs'
 inputs: {
   github-token: {
     description: 'GitHub token to access the repository',
