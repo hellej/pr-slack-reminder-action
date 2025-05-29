@@ -2,6 +2,7 @@ package slackhelpers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/slack-go/slack"
@@ -41,7 +42,7 @@ func GetClient(token string) *slack.Client {
 	return slack.New(token)
 }
 
-func SendMessage(api *slack.Client, channelName string, blocks slack.Message, summaryText string) {
+func SendMessage(api *slack.Client, channelName string, blocks slack.Message, summaryText string) error {
 	log.Printf("Finding channel ID by name: %s", channelName)
 
 	channelID, err := getChannelIDByName(api, channelName)
@@ -49,12 +50,12 @@ func SendMessage(api *slack.Client, channelName string, blocks slack.Message, su
 		log.Fatalf("Error getting channel ID by name: %v (%v)", channelName, err)
 	}
 
-	log.Printf("Blocks count: %d", len(blocks.Blocks.BlockSet))
-	log.Printf("Sending message to channel (ID): %s", channelID)
+	log.Printf("Sending message with %v blocks to channel: %s", len(blocks.Blocks.BlockSet), channelID)
 
 	_, _, err = api.PostMessage(channelID, slack.MsgOptionBlocks(blocks.Blocks.BlockSet...), slack.MsgOptionText(summaryText, false))
-	if err != nil {
-		log.Fatalf("Error sending message to Slack: %v", err)
-	}
 
+	if err != nil {
+		return fmt.Errorf("failed to send Slack message: %s", err.Error())
+	}
+	return nil
 }

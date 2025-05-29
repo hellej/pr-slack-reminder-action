@@ -30,7 +30,7 @@ func getSettings() Settings {
 	}
 }
 
-func main() {
+func run() error {
 	log.Println("Starting PR Slack reminders action...")
 
 	settings := getSettings()
@@ -40,5 +40,12 @@ func main() {
 	prs := githubhelpers.FetchOpenPRs(githubClient, settings.Repository)
 	content := content.GetContent(prs, settings.OldPRThresholdHours)
 	blocks, summaryText := composer.ComposeMessage(content)
-	slackhelpers.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
+	return slackhelpers.SendMessage(slackClient, settings.SlackChannelName, blocks, summaryText)
+}
+
+func main() {
+	err := run()
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 }
