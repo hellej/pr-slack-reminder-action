@@ -105,9 +105,9 @@ func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content
 		}
 	case oldPRThresholdHours == nil:
 		return Content{
-			MainListHeading: fmt.Sprintf("There are %d open PRs", len(openPRs)),
+			MainListHeading: fmt.Sprintf("🚀 There are %d open PRs", len(openPRs)),
 			MainList:        allPRs,
-			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention", len(openPRs)),
+			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
 		}
 	default:
 		newPRs, oldPRs := getNewAndOldPRs(allPRs, *oldPRThresholdHours)
@@ -117,7 +117,7 @@ func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content
 			OldPRsListHeading: fmt.Sprintf("🚨 Old PRs since %v ago", getOldPRsThresholdTimeLabel(*oldPRThresholdHours)),
 			OldPRsList:        oldPRs,
 		}
-		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention", content.GetPRCount())
+		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention 👀", content.GetPRCount())
 		return content
 	}
 }
