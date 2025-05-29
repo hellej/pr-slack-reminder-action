@@ -1,3 +1,5 @@
-# pr-slack-reminder-action
+# PR Slack Reminder Action
 
-Adding some relevant details here (I really should)
+For now, this project serves as a personal learning playground for Go and GitHub Actions development.
+
+However, the goal is to evolve it into a useful GitHub Action for sending Slack reminders about pull requests in the coming months.
