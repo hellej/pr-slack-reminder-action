@@ -1,3 +1,5 @@
+[![CI](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/ci.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/ci.yml)
+
 # PR Slack Reminder Action
 
 For now, this project serves as a personal learning playground for Go and GitHub Actions development.
