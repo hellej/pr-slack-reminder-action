@@ -7,6 +7,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/content"
 	"github.com/hellej/pr-slack-reminder-action/internal/githubhelpers"
+	"github.com/hellej/pr-slack-reminder-action/internal/parser"
 	"github.com/hellej/pr-slack-reminder-action/internal/slackhelpers"
 )
 
@@ -17,7 +18,9 @@ func run() error {
 	githubClient := githubhelpers.GetClient(config.GithubToken)
 	slackClient := slackhelpers.GetClient(config.SlackBotToken)
 
-	prs := githubhelpers.FetchOpenPRs(githubClient, config.Repository)
+	prs := parser.ParsePRs(
+		githubhelpers.FetchOpenPRs(githubClient, config.Repository),
+	)
 	content := content.GetContent(prs, config.OldPRThresholdHours)
 	blocks, summaryText := composer.ComposeMessage(content)
 	return slackhelpers.SendMessage(slackClient, config.SlackChannelName, blocks, summaryText)

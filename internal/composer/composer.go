@@ -2,10 +2,11 @@ package composer
 
 import (
 	"github.com/hellej/pr-slack-reminder-action/internal/content"
+	"github.com/hellej/pr-slack-reminder-action/internal/parser"
 	"github.com/slack-go/slack"
 )
 
-func composePRBulletPointBlock(pr content.PR) slack.RichTextElement {
+func composePRBulletPointBlock(pr parser.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
@@ -13,7 +14,7 @@ func composePRBulletPointBlock(pr content.PR) slack.RichTextElement {
 	)
 }
 
-func makePRListBlock(openPRs []content.PR) *slack.RichTextBlock {
+func makePRListBlock(openPRs []parser.PR) *slack.RichTextBlock {
 	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
 		prBlocks = append(prBlocks, composePRBulletPointBlock(pr))
@@ -26,7 +27,7 @@ func makePRListBlock(openPRs []content.PR) *slack.RichTextBlock {
 	)
 }
 
-func addPRListBLock(blocks []slack.Block, heading string, prs []content.PR) []slack.Block {
+func addPRListBLock(blocks []slack.Block, heading string, prs []parser.PR) []slack.Block {
 	return append(blocks, slack.NewHeaderBlock(
 		slack.NewTextBlockObject("plain_text", heading, false, false),
 	),

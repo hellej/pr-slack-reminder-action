@@ -9,6 +9,7 @@ import (
 
 	composer "github.com/hellej/pr-slack-reminder-action/internal/composer"
 	"github.com/hellej/pr-slack-reminder-action/internal/content"
+	"github.com/hellej/pr-slack-reminder-action/internal/parser"
 )
 
 func TestComposeSlackBlocksMessage(t *testing.T) {
@@ -36,14 +37,14 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 	})
 
 	t.Run("Message summary", func(t *testing.T) {
-		aPR := content.PR{PullRequest: &github.PullRequest{}}
+		aPR := parser.PR{PullRequest: &github.PullRequest{}}
 		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 1 day ago
 		aPR.Title = github.Ptr("This is a test PR")
 		aPR.User = &github.User{
 			Login: github.Ptr("testuser"),
 			Name:  github.Ptr("Test User"),
 		}
-		prS := []content.PR{aPR}
+		prS := []parser.PR{aPR}
 		content := content.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",
@@ -56,14 +57,14 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 	})
 
 	t.Run("One new PR", func(t *testing.T) {
-		aPR := content.PR{PullRequest: &github.PullRequest{}}
+		aPR := parser.PR{PullRequest: &github.PullRequest{}}
 		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 3 hours ago
 		aPR.Title = github.Ptr("This is a test PR")
 		aPR.User = &github.User{
 			Login: github.Ptr("testuser"),
 			Name:  github.Ptr("Test User"),
 		}
-		prs := []content.PR{aPR}
+		prs := []parser.PR{aPR}
 		content := content.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",

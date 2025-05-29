@@ -5,15 +5,15 @@ import (
 	"math"
 	"time"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/parser"
 )
 
 type Content struct {
 	SummaryText       string
 	MainListHeading   string
-	MainList          []PR
+	MainList          []parser.PR
 	OldPRsListHeading string
-	OldPRsList        []PR
+	OldPRsList        []parser.PR
 	NoPRsText         string
 }
 
@@ -23,50 +23,6 @@ func (c Content) GetPRCount() int16 {
 
 func (c Content) HasPRs() bool {
 	return c.GetPRCount() > 0
-}
-
-type PR struct {
-	*github.PullRequest
-}
-
-func (pr PR) GetAgeUserInfoText() string {
-	return fmt.Sprintf("%s by %s", getPRAgeText(pr.CreatedAt.Time), getPRUserDisplayName(pr.PullRequest))
-
-}
-
-func getPRAgeText(createdAt time.Time) string {
-	duration := time.Since(createdAt)
-	if duration.Hours() >= 24 {
-		days := int(math.Round(duration.Hours())) / 24
-		return fmt.Sprintf("%d days ago", days)
-	} else if duration.Hours() >= 1 {
-		hours := int(math.Round(duration.Hours()))
-		return fmt.Sprintf("%d hours ago", hours)
-	} else {
-		minutes := int(math.Round(duration.Minutes()))
-		return fmt.Sprintf("%d minutes ago", minutes)
-	}
-}
-
-func getPRUserDisplayName(pr *github.PullRequest) string {
-	if pr.GetUser().GetName() != "" {
-		return pr.GetUser().GetName()
-	}
-	return pr.GetUser().GetLogin()
-}
-
-func parsePR(pr *github.PullRequest) PR {
-	return PR{
-		PullRequest: pr,
-	}
-}
-
-func parsePRs(prs []*github.PullRequest) []PR {
-	var parsedPRs []PR
-	for _, pr := range prs {
-		parsedPRs = append(parsedPRs, parsePR(pr))
-	}
-	return parsedPRs
 }
 
 func getOldPRsThresholdTimeLabel(oldPRThresholdHours int) string {
@@ -79,12 +35,12 @@ func getOldPRsThresholdTimeLabel(oldPRThresholdHours int) string {
 
 type PRCategory struct {
 	Heading string
-	PRs     []PR
+	PRs     []parser.PR
 }
 
-func getNewAndOldPRs(openPRs []PR, oldPRThresholdHours int) ([]PR, []PR) {
-	mainList := []PR{}
-	oldPRsList := []PR{}
+func getNewAndOldPRs(openPRs []parser.PR, oldPRThresholdHours int) ([]parser.PR, []parser.PR) {
+	mainList := []parser.PR{}
+	oldPRsList := []parser.PR{}
 
 	for _, pr := range openPRs {
 		if pr.GetCreatedAt().After(time.Now().Add(-time.Duration(oldPRThresholdHours) * time.Hour)) {
@@ -96,9 +52,7 @@ func getNewAndOldPRs(openPRs []PR, oldPRThresholdHours int) ([]PR, []PR) {
 	return mainList, oldPRsList
 }
 
-func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content {
-	allPRs := parsePRs(openPRs)
-
+func GetContent(openPRs []parser.PR, oldPRThresholdHours *int) Content {
 	switch {
 	case len(openPRs) == 0:
 		text := "No open PRs, happy coding! 🎉"
@@ -110,10 +64,10 @@ func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content
 		return Content{
 			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
 			MainListHeading: fmt.Sprintf("🚀 There are %d open PRs", len(openPRs)),
-			MainList:        allPRs,
+			MainList:        openPRs,
 		}
 	default:
-		newPRs, oldPRs := getNewAndOldPRs(allPRs, *oldPRThresholdHours)
+		newPRs, oldPRs := getNewAndOldPRs(openPRs, *oldPRThresholdHours)
 		content := Content{
 			MainListHeading:   "🚀 New open PRs",
 			MainList:          newPRs,
