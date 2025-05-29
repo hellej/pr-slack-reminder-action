@@ -43,15 +43,12 @@ func GetClient(token string) *slack.Client {
 }
 
 func SendMessage(api *slack.Client, channelName string, blocks slack.Message, summaryText string) error {
-	log.Printf("Finding channel ID by name: %s", channelName)
-
 	channelID, err := getChannelIDByName(api, channelName)
 	if err != nil {
 		log.Fatalf("Error getting channel ID by name: %v (%v)", channelName, err)
 	}
 
-	log.Printf("Sending message with %v blocks to channel: %s", len(blocks.Blocks.BlockSet), channelID)
-
+	log.Printf("Sending message with %v blocks to channel %s", len(blocks.Blocks.BlockSet), channelName)
 	_, _, err = api.PostMessage(channelID, slack.MsgOptionBlocks(blocks.Blocks.BlockSet...), slack.MsgOptionText(summaryText, false))
 
 	if err != nil {

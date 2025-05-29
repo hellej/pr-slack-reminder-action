@@ -31,7 +31,7 @@ func getSettings() Settings {
 }
 
 func run() error {
-	log.Println("Starting PR Slack reminders action...")
+	log.Println("Starting PR Slack reminder action")
 
 	settings := getSettings()
 	githubClient := githubhelpers.GetClient(settings.GithubToken)

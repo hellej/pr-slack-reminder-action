@@ -50,8 +50,9 @@ func FetchOpenPRs(client *github.Client, repository string) []*github.PullReques
 	if err != nil {
 		log.Fatalf("Error fetching pull requests: %v", err)
 	}
+	log.Printf("Found %d open pull requests:", len(prs))
 	for _, pr := range prs {
-		log.Printf("PR: %s, Title: %s", pr.GetHTMLURL(), pr.GetTitle())
+		log.Printf("#%v: %s - %s", pr.ID, pr.GetHTMLURL(), pr.GetTitle())
 	}
 
 	return sortPRsByCreatedAt(prs)
