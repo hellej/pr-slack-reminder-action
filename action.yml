@@ -12,6 +12,10 @@ inputs: {
   channel-id: {
     description: 'Slack channel ID to send the message to',
     required: false,
+  },
+  github-user-slack-user-id-mapping: {
+    description: 'Mapping of GitHub usernames to Slack user IDs (e.g., "alice: U08RWPGNCUX\\nbob: U08RWPGNWER")',
+    required: false,
   }
 }
 
@@ -29,3 +33,4 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         SLACK_BOT_TOKEN: ${{ inputs.slack-bot-token }}
         SLACK_CHANNEL_NAME: ${{ inputs.channel-name }}
+        SLACK_USER_IDS_BY_GITHUB_USERS: ${{ inputs.github-user-slack-user-id-mapping }}
