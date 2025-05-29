@@ -3,6 +3,9 @@ name: CD
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'dist/**'
+      - 'invoke-binary.js'
 
 permissions:
   contents: write
@@ -11,6 +14,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +24,31 @@ jobs:
 
       - name: Build
         run: make build-all
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit built binary
+        run: |
+          git add invoke-binary.js dist/
+          git status
+          git commit -m "Update Go action executables [skip ci]" || echo "No changes to commit"
+          git push
+
+  dry-run:
+    name: Dry Run
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+   
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./        
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
+          slack-channel-name: 'pr-reminders-test'
