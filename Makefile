@@ -33,8 +33,11 @@ build-windows-arm64:
 	env GOOS=windows GOARCH=arm64 $(GO_BUILD) -o dist/main-windows-arm64-$(VERSION) $(MAIN_GO)
 
 update-invoke-binary-targets:
-	@echo "Updating invoke binary targets..."
-	@sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js
+	@echo "Updating executable versions to $(VERSION) in invoke-binary.js"
+	@case "$$(uname)" in \
+		Darwin) sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js ;; \
+		*) sed -i "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js ;; \
+	esac
 
 build-all: 
 	$(MAKE) build-linux-amd64
