@@ -9,12 +9,12 @@ import (
 )
 
 type Content struct {
-	NoPRsText         string
 	SummaryText       string
 	MainListHeading   string
 	MainList          []PR
 	OldPRsListHeading string
 	OldPRsList        []PR
+	NoPRsText         string
 }
 
 func (c Content) GetPRCount() int16 {
@@ -26,8 +26,12 @@ func (c Content) HasPRs() bool {
 }
 
 type PR struct {
-	github.PullRequest
-	AgeUserInfoText string
+	*github.PullRequest
+}
+
+func (pr PR) GetAgeUserInfoText() string {
+	return fmt.Sprintf("%s by %s", getPRAgeText(pr.CreatedAt.Time), getPRUserDisplayName(pr.PullRequest))
+
 }
 
 func getPRAgeText(createdAt time.Time) string {
@@ -53,8 +57,7 @@ func getPRUserDisplayName(pr *github.PullRequest) string {
 
 func parsePR(pr *github.PullRequest) PR {
 	return PR{
-		PullRequest:     *pr,
-		AgeUserInfoText: fmt.Sprintf("%s by %s", getPRAgeText(pr.CreatedAt.Time), getPRUserDisplayName(pr)),
+		PullRequest: pr,
 	}
 }
 
@@ -100,14 +103,14 @@ func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content
 	case len(openPRs) == 0:
 		text := "No open PRs, happy coding! 🎉"
 		return Content{
-			NoPRsText:   text,
 			SummaryText: text,
+			NoPRsText:   text,
 		}
 	case oldPRThresholdHours == nil:
 		return Content{
+			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
 			MainListHeading: fmt.Sprintf("🚀 There are %d open PRs", len(openPRs)),
 			MainList:        allPRs,
-			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
 		}
 	default:
 		newPRs, oldPRs := getNewAndOldPRs(allPRs, *oldPRThresholdHours)

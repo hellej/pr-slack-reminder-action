@@ -9,7 +9,7 @@ func composePRBulletPointBlock(pr content.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
-			" "+pr.AgeUserInfoText, &slack.RichTextSectionTextStyle{}),
+			" "+pr.GetAgeUserInfoText(), &slack.RichTextSectionTextStyle{}),
 	)
 }
 
