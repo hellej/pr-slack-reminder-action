@@ -9,12 +9,20 @@ import (
 )
 
 type Content struct {
-	SummaryText       string
 	NoPRsText         string
+	SummaryText       string
 	MainListHeading   string
 	MainList          []PR
 	OldPRsListHeading string
 	OldPRsList        []PR
+}
+
+func (c Content) GetPRCount() int16 {
+	return int16(len(c.MainList) + len(c.OldPRsList))
+}
+
+func (c Content) HasPRs() bool {
+	return c.GetPRCount() > 0
 }
 
 type PR struct {
@@ -26,13 +34,13 @@ func getPRAgeText(createdAt time.Time) string {
 	duration := time.Since(createdAt)
 	if duration.Hours() >= 24 {
 		days := int(math.Round(duration.Hours())) / 24
-		return fmt.Sprintf("%d days ago ", days)
+		return fmt.Sprintf("%d days ago", days)
 	} else if duration.Hours() >= 1 {
 		hours := int(math.Round(duration.Hours()))
-		return fmt.Sprintf("%d hours ago ", hours)
+		return fmt.Sprintf("%d hours ago", hours)
 	} else {
 		minutes := int(math.Round(duration.Minutes()))
-		return fmt.Sprintf("%d minutes ago ", minutes)
+		return fmt.Sprintf("%d minutes ago", minutes)
 	}
 }
 
@@ -71,28 +79,18 @@ type PRCategory struct {
 	PRs     []PR
 }
 
-func getPRCategoryHeadings(oldPRThresholdHours int) (string, string) {
-	timeThresholdLabel := getOldPRsThresholdTimeLabel(oldPRThresholdHours)
-	mainHeading := "🚀 New PRs since " + timeThresholdLabel + " ago"
-	oldPRsHeading := "⌛️ Old PRs since " + timeThresholdLabel + " ago"
-	return mainHeading, oldPRsHeading
+func getNewAndOldPRs(openPRs []PR, oldPRThresholdHours int) ([]PR, []PR) {
+	mainList := []PR{}
+	oldPRsList := []PR{}
 
-}
-
-func getContentWithNewAndOldPRs(openPRs []PR, oldPRThresholdHours int) Content {
-	mainHeading, oldPRsHeading := getPRCategoryHeadings(oldPRThresholdHours)
-	content := Content{
-		MainListHeading:   mainHeading,
-		OldPRsListHeading: oldPRsHeading,
-	}
 	for _, pr := range openPRs {
 		if pr.GetCreatedAt().After(time.Now().Add(-time.Duration(oldPRThresholdHours) * time.Hour)) {
-			content.MainList = append(content.MainList, pr)
+			mainList = append(mainList, pr)
 		} else {
-			content.OldPRsList = append(content.OldPRsList, pr)
+			oldPRsList = append(oldPRsList, pr)
 		}
 	}
-	return content
+	return mainList, oldPRsList
 }
 
 func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content {
@@ -100,17 +98,26 @@ func GetContent(openPRs []*github.PullRequest, oldPRThresholdHours *int) Content
 
 	switch {
 	case len(openPRs) == 0:
+		text := "No open PRs, happy coding! 🎉"
 		return Content{
-			NoPRsText: "No open PRs, happy coding! 🎉",
+			NoPRsText:   text,
+			SummaryText: text,
 		}
 	case oldPRThresholdHours == nil:
 		return Content{
+			MainListHeading: fmt.Sprintf("There are %d open PRs", len(openPRs)),
+			MainList:        allPRs,
 			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention", len(openPRs)),
-			MainListHeading: fmt.Sprintf("There are %d open PRs 👀", len(openPRs)),
 		}
 	default:
-		content := getContentWithNewAndOldPRs(allPRs, *oldPRThresholdHours)
-		content.SummaryText = "%d open PRs are waiting for attention"
+		newPRs, oldPRs := getNewAndOldPRs(allPRs, *oldPRThresholdHours)
+		content := Content{
+			MainListHeading:   "🚀 New open PRs",
+			MainList:          newPRs,
+			OldPRsListHeading: fmt.Sprintf("🚨 Old PRs since %v ago", getOldPRsThresholdTimeLabel(*oldPRThresholdHours)),
+			OldPRsList:        oldPRs,
+		}
+		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention", content.GetPRCount())
 		return content
 	}
 }
