@@ -34,7 +34,7 @@ build-windows-arm64:
 
 update-invoke-binary-targets:
 	@echo "Updating invoke binary targets..."
-	@sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" invoke-binary.js
+	@sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js
 
 build-all: 
 	$(MAKE) build-linux-amd64
