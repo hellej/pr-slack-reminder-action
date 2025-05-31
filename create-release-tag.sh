@@ -1,28 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 ]]; then
-    echo "Usage: $0 [v0|v1|v2|...] [patch|minor|major]"
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 [patch|minor|major]"
     exit 1
 fi
 
-CURRENT_MAJOR_VERSION="$1"
-if [[ ! "$CURRENT_MAJOR_VERSION" =~ ^v[0-9]+$ ]]; then
-    echo "Error: First argument must be a version prefix like v0, v1, v2, etc."
-    exit 1
-fi 
-
-INCREMENT_TYPE="$2"
+INCREMENT_TYPE="$1"
 if [[ "$INCREMENT_TYPE" != "patch" && "$INCREMENT_TYPE" != "minor" && "$INCREMENT_TYPE" != "major" ]]; then
     echo "Error: Argument must be one of: patch, minor, major"
     exit 1
 fi
 
 get_latest_tag() {
-    git tag --list "$1.*.*" | tail -n 1
+    git ls-remote --tags origin | awk '{print $2}' | grep -o 'refs/tags/v[0-9]*\.[0-9]*\.[0-9]*$' | sed 's_refs/tags/v__g' | sort -V | tail -n 1 | awk '{print "v"$1}'
 }
 
-LATEST_TAG=$(get_latest_tag $CURRENT_MAJOR_VERSION)
+LATEST_TAG=$(get_latest_tag)
 echo "Latest tag: $LATEST_TAG"
 
 increment_patch_version() {

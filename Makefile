@@ -1,7 +1,6 @@
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder/main.go
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
-CURRENT_MAJOR_VERSION := $(shell git tag --list "v*.*.*" | tail -n 1 | cut -d. -f1)
 SEMVER =
 
 test:
@@ -54,4 +53,4 @@ release:
 		echo "Usage: make release SEMVER=[patch|minor|major]"; \
 		exit 1; \
 	fi; \
-	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) $(SEMVER)
+	./create-release-tag.sh $(SEMVER)
