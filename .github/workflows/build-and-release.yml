@@ -43,5 +43,6 @@ jobs:
 
       - name: Bump version & create tagged release
         run: |
-          make release SEMVER=${{ github.event.inputs.semver }}
+          echo "SEMVER input: ${{ github.event.inputs.semver }}"
+          make release SEMVER="${{ github.event.inputs.semver }}"
           # git push --tags
