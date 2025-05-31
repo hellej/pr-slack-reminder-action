@@ -39,9 +39,10 @@ update-invoke-binary-targets:
 		*) sed -i "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js ;; \
 	esac
 
-build-all: 
-	$(MAKE) build-linux-amd64
-	$(MAKE) build-linux-arm64
-	$(MAKE) build-windows-amd64
-	$(MAKE) build-windows-arm64
-	$(MAKE) update-invoke-binary-targets
+build-all:
+	rm -rf dist/*
+	make build-linux-amd64
+	make build-linux-arm64
+	# make build-windows-amd64 # TODO enable before v1
+	# make build-windows-arm64 # TODO enable before v1
+	make update-invoke-binary-targets

@@ -1,0 +1,24 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dist/**'
+      - 'invoke-binary.js'
+
+jobs:  
+ dry-run:
+    name: Dry Run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+   
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./        
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
+          slack-channel-name: 'pr-reminders-test'
