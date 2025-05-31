@@ -54,7 +54,26 @@ if [[ "$LATEST_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             NEW_VERSION=$(increment_major_version "$LATEST_TAG")
             ;;
     esac
-    # git tag "$NEW_VERSION"
+    
+    git tag -a "$NEW_VERSION" -m "${NEW_VERSION#v}"
+    
+    V_PREFIX=$(echo "$NEW_VERSION" | grep -o '^v[0-9]\+')
+    if [[ -z "$V_PREFIX" || ! "$V_PREFIX" =~ ^v[0-9]\+$ ]]; then
+        echo "Error: New version does not start with 'v' followed by a number"
+        exit 1
+    fi
+
+    if [[ "$V_PREFIX" == "v0" ]]; then
+        git tag -f -a v1-beta -m "${NEW_VERSION#v}"
+        git push origin v1-beta --force
+        echo "Pushed tag: v1-beta"
+    elif [[ "$V_PREFIX" =~ ^v[1-9] ]]; then
+        git push origin "$NEW_VERSION"
+        git tag -f -a $V_PREFIX -m "${NEW_VERSION#v}"
+        git push origin $V_PREFIX --force
+        echo "Pushed tag: $V_PREFIX"
+    fi
+
     echo "New version: $NEW_VERSION"
 else
     echo "No valid tags found"
