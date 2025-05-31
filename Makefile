@@ -2,6 +2,7 @@ GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder/main.go
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
 CURRENT_MAJOR_VERSION := $(shell git tag --list "v*.*.*" | tail -n 1 | cut -d. -f1)
+SEMVER =
 
 test:
 	go test ./...
@@ -48,11 +49,9 @@ build-all:
 	# make build-windows-arm64 # TODO enable before v1
 	make update-invoke-binary-targets
 
-patch-release:
-	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) patch
-
-minor-release:
-	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) minor
-
-major-release:
-	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) major
+release:
+	@if [ -z "$(SEMVER)" ]; then \
+		echo "Usage: make release SEMVER=[patch|minor|major]"; \
+		exit 1; \
+	fi; \
+	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) $(SEMVER)

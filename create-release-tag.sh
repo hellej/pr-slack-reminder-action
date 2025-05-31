@@ -61,7 +61,6 @@ if [[ "$LATEST_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             ;;
     esac
     # git tag "$NEW_VERSION"
-    # git push --tags
     echo "New version: $NEW_VERSION"
 else
     echo "No valid tags found"

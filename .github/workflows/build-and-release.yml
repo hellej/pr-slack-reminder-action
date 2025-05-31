@@ -40,3 +40,8 @@ jobs:
           git status
           git commit -m "Update action executables" || echo "No changes to commit"
           git push
+
+      - name: Bump version & create tagged release
+        run: |
+          make release SEMVER=${{ github.event.inputs.semver }}
+          # git push --tags
