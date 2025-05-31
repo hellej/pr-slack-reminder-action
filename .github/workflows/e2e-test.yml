@@ -1,4 +1,4 @@
-name: CD
+name: E2E Test Run
 
 on:
   push:
