@@ -1,6 +1,7 @@
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder/main.go
-VERSION := $(shell git rev-parse --short=10 HEAD)
+COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
+CURRENT_MAJOR_VERSION := $(shell git tag --list "v*.*.*" | tail -n 1 | cut -d. -f1)
 
 test:
 	go test ./...
@@ -15,28 +16,28 @@ run:
 	go run $(MAIN_GO)
 
 build-darwin-amd64:
-	env GOOS=darwin GOARCH=amd64 $(GO_BUILD) -o dist/main-darwin-amd64-$(VERSION) $(MAIN_GO)
+	env GOOS=darwin GOARCH=amd64 $(GO_BUILD) -o dist/main-darwin-amd64-$(COMMIT_HASH) $(MAIN_GO)
 
 build-darwin-arm64:
-	env GOOS=darwin GOARCH=arm64 $(GO_BUILD) -o dist/main-darwin-arm64-$(VERSION) $(MAIN_GO)
+	env GOOS=darwin GOARCH=arm64 $(GO_BUILD) -o dist/main-darwin-arm64-$(COMMIT_HASH) $(MAIN_GO)
 
 build-linux-amd64:
-	env GOOS=linux GOARCH=amd64 $(GO_BUILD) -o dist/main-linux-amd64-$(VERSION) $(MAIN_GO)
+	env GOOS=linux GOARCH=amd64 $(GO_BUILD) -o dist/main-linux-amd64-$(COMMIT_HASH) $(MAIN_GO)
 
 build-linux-arm64:
-	env GOOS=linux GOARCH=arm64 $(GO_BUILD) -o dist/main-linux-arm64-$(VERSION) $(MAIN_GO)
+	env GOOS=linux GOARCH=arm64 $(GO_BUILD) -o dist/main-linux-arm64-$(COMMIT_HASH) $(MAIN_GO)
 
 build-windows-amd64:
-	env GOOS=windows GOARCH=amd64 $(GO_BUILD) -o dist/main-windows-amd64-$(VERSION) $(MAIN_GO)
+	env GOOS=windows GOARCH=amd64 $(GO_BUILD) -o dist/main-windows-amd64-$(COMMIT_HASH) $(MAIN_GO)
 
 build-windows-arm64:
-	env GOOS=windows GOARCH=arm64 $(GO_BUILD) -o dist/main-windows-arm64-$(VERSION) $(MAIN_GO)
+	env GOOS=windows GOARCH=arm64 $(GO_BUILD) -o dist/main-windows-arm64-$(COMMIT_HASH) $(MAIN_GO)
 
 update-invoke-binary-targets:
-	@echo "Updating executable versions to $(VERSION) in invoke-binary.js"
+	@echo "Updating executable versions to $(COMMIT_HASH) in invoke-binary.js"
 	@case "$$(uname)" in \
-		Darwin) sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js ;; \
-		*) sed -i "s|^const VERSION = '.*'|const VERSION = '$(VERSION)'|" ./invoke-binary.js ;; \
+		Darwin) sed -i '' "s|^const VERSION = '.*'|const VERSION = '$(COMMIT_HASH)'|" ./invoke-binary.js ;; \
+		*) sed -i "s|^const VERSION = '.*'|const VERSION = '$(COMMIT_HASH)'|" ./invoke-binary.js ;; \
 	esac
 
 build-all:
@@ -46,3 +47,12 @@ build-all:
 	# make build-windows-amd64 # TODO enable before v1
 	# make build-windows-arm64 # TODO enable before v1
 	make update-invoke-binary-targets
+
+patch-release:
+	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) patch
+
+minor-release:
+	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) minor
+
+major-release:
+	./create-release-tag.sh $(CURRENT_MAJOR_VERSION) major
