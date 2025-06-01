@@ -72,7 +72,7 @@ git push --tags
 # https://github.com/actions/toolkit/blob/master/docs/action-versioning.md#recommendations
 
 MAJOR_VERSION=$(echo "$NEW_VERSION" | grep -o '^v[0-9]\+')
-echo "Major version: $MAJOR_VERSION"
+echo "Moving major version tag: $MAJOR_VERSION to $NEW_VERSION"
 
 if [[ ! "$MAJOR_VERSION" =~ ^v[0-9]+$ ]]; then
     echo "Error: New major version tag does not start with 'v' followed by a number"
