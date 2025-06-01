@@ -28,7 +28,7 @@ func (pr PR) GetPRAgeText() string {
 	}
 }
 
-// returns the name of the PR author if available, otherwise the GitHub username
+// Returns the name of the PR author if available, otherwise the GitHub username
 func (pr PR) GetPRUserDisplayName() string {
 	if pr.GetUser().GetName() != "" {
 		return pr.GetUser().GetName()

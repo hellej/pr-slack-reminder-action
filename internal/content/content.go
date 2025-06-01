@@ -63,15 +63,15 @@ func GetContent(openPRs []parser.PR, oldPRThresholdHours *int) Content {
 	case oldPRThresholdHours == nil:
 		return Content{
 			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
-			MainListHeading: fmt.Sprintf("🚀 There are %d open PRs", len(openPRs)),
+			MainListHeading: fmt.Sprintf("There are %d open PRs", len(openPRs)),
 			MainList:        openPRs,
 		}
 	default:
 		newPRs, oldPRs := getNewAndOldPRs(openPRs, *oldPRThresholdHours)
 		content := Content{
-			MainListHeading:   "🚀 New open PRs",
+			MainListHeading:   fmt.Sprintf("There are %d open PRs", len(openPRs)),
 			MainList:          newPRs,
-			OldPRsListHeading: fmt.Sprintf("🚨 Old PRs since %v ago", getOldPRsThresholdTimeLabel(*oldPRThresholdHours)),
+			OldPRsListHeading: fmt.Sprintf("🚨 PRs older than %v", getOldPRsThresholdTimeLabel(*oldPRThresholdHours)),
 			OldPRsList:        oldPRs,
 		}
 		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention 👀", content.GetPRCount())
