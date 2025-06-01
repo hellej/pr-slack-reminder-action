@@ -9,8 +9,8 @@ on:
       - 'invoke-binary.js'
 
 jobs:  
- dry-run:
-    name: Dry Run
+ test-run:
+    name: Test Run
     runs-on: ubuntu-latest
     permissions:
       contents: read
