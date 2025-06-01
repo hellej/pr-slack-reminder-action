@@ -10,10 +10,12 @@ import (
 
 type PR struct {
 	*github.PullRequest
+	// Slack user ID of the author or empty string if not available
+	GetAuthorSlackUserId func() (string, bool)
 }
 
-func getPRAgeText(createdAt time.Time) string {
-	duration := time.Since(createdAt)
+func (pr PR) GetPRAgeText() string {
+	duration := time.Since(pr.CreatedAt.Time)
 	if duration.Hours() >= 24 {
 		days := int(math.Round(duration.Hours())) / 24
 		return fmt.Sprintf("%d days ago", days)
@@ -26,27 +28,39 @@ func getPRAgeText(createdAt time.Time) string {
 	}
 }
 
-func getPRUserDisplayName(pr *github.PullRequest) string {
+// returns the name of the PR author if available, otherwise the GitHub username
+func (pr PR) GetPRUserDisplayName() string {
 	if pr.GetUser().GetName() != "" {
 		return pr.GetUser().GetName()
 	}
 	return pr.GetUser().GetLogin()
 }
 
-func (pr PR) GetAgeUserInfoText() string {
-	return fmt.Sprintf("%s by %s", getPRAgeText(pr.CreatedAt.Time), getPRUserDisplayName(pr.PullRequest))
-}
-
-func parsePR(pr *github.PullRequest) PR {
-	return PR{
-		PullRequest: pr,
+func getAuthorSlackUserId(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
+	return func() (string, bool) {
+		gitHubUsername := pr.GetUser().GetLogin()
+		if gitHubUsername == "" {
+			return "", false
+		}
+		slackUserId, ok := (*slackUserIdByGitHubUsername)[pr.GetUser().GetLogin()]
+		if !ok {
+			return "", false
+		}
+		return slackUserId, true
 	}
 }
 
-func ParsePRs(prs []*github.PullRequest) []PR {
+func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
+	return PR{
+		PullRequest:          pr,
+		GetAuthorSlackUserId: getAuthorSlackUserId(pr, slackUserIdByGitHubUsername),
+	}
+}
+
+func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string]string) []PR {
 	var parsedPRs []PR
 	for _, pr := range prs {
-		parsedPRs = append(parsedPRs, parsePR(pr))
+		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
 	}
 	return parsedPRs
 }

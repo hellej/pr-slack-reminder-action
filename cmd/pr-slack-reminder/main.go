@@ -20,6 +20,7 @@ func run() error {
 
 	prs := parser.ParsePRs(
 		githubhelpers.FetchOpenPRs(githubClient, config.Repository),
+		config.SlackUserIdByGitHubUsername,
 	)
 	content := content.GetContent(prs, config.OldPRThresholdHours)
 	blocks, summaryText := composer.ComposeMessage(content)

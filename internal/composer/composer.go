@@ -6,11 +6,26 @@ import (
 	"github.com/slack-go/slack"
 )
 
+func getUserNameElement(pr parser.PR) slack.RichTextSectionElement {
+	authorSlackUserID, ok := pr.GetAuthorSlackUserId()
+	if ok {
+		return slack.NewRichTextSectionUserElement(
+			authorSlackUserID, &slack.RichTextSectionTextStyle{},
+		)
+	}
+	return slack.NewRichTextSectionTextElement(
+		pr.GetPRUserDisplayName(), &slack.RichTextSectionTextStyle{},
+	)
+}
+
 func composePRBulletPointBlock(pr parser.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
-			" "+pr.GetAgeUserInfoText(), &slack.RichTextSectionTextStyle{}),
+			" "+pr.GetPRAgeText(), &slack.RichTextSectionTextStyle{}),
+		slack.NewRichTextSectionTextElement(
+			" by ", &slack.RichTextSectionTextStyle{}),
+		getUserNameElement(pr),
 	)
 }
 

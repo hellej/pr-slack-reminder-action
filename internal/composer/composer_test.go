@@ -44,6 +44,9 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			Login: github.Ptr("testuser"),
 			Name:  github.Ptr("Test User"),
 		}
+		aPR.GetAuthorSlackUserId = func() (string, bool) {
+			return "U12345678", true
+		}
 		prS := []parser.PR{aPR}
 		content := content.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
@@ -64,6 +67,10 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			Login: github.Ptr("testuser"),
 			Name:  github.Ptr("Test User"),
 		}
+		mockSlackUserID := "U12345678"
+		aPR.GetAuthorSlackUserId = func() (string, bool) {
+			return mockSlackUserID, true
+		}
 		prs := []parser.PR{aPR}
 		content := content.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
@@ -81,13 +88,22 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		}
 		prBulletPointTextElements := got.Msg.Blocks.BlockSet[1].(*slack.RichTextBlock).Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection).Elements
 		prLinkElement := prBulletPointTextElements[0].(*slack.RichTextSectionLinkElement)
-		prAfterLinkElement := prBulletPointTextElements[1].(*slack.RichTextSectionTextElement)
+		prAgeElement := prBulletPointTextElements[1].(*slack.RichTextSectionTextElement)
+		prBeforeUserElement := prBulletPointTextElements[2].(*slack.RichTextSectionTextElement)
+		prUserElement := prBulletPointTextElements[3].(*slack.RichTextSectionUserElement)
 		if prLinkElement.Text != *aPR.Title {
 			t.Errorf("Expected text to be '%s', got '%s'", *aPR.Title, prLinkElement.Text)
 		}
-		expected := " 3 hours ago by Test User"
-		if prAfterLinkElement.Text != expected {
-			t.Errorf("Expected text to be '%s', got '%s'", expected, prAfterLinkElement.Text)
+		expectedAgeText := " 3 hours ago"
+		if prAgeElement.Text != expectedAgeText {
+			t.Errorf("Expected text to be '%s', got '%s'", expectedAgeText, prAgeElement.Text)
+		}
+		expectedBeforeUserText := " by "
+		if prBeforeUserElement.Text != expectedBeforeUserText {
+			t.Errorf("Expected text to be '%s', got '%s'", expectedBeforeUserText, prAgeElement.Text)
+		}
+		if prUserElement.UserID != mockSlackUserID {
+			t.Errorf("Expected text to be '%s', got '%s'", mockSlackUserID, prUserElement.UserID)
 		}
 	})
 }
