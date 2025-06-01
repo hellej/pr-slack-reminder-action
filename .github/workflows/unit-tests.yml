@@ -18,7 +18,17 @@ jobs:
           go-version: '1.24'
 
       - name: Run unit tests
-        run: make test
+        run: make test-with-coverage
+
+      - name: Calculate and display total coverage
+        id: coverage_total
+        run: |
+          echo "TOTAL_COVERAGE=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+          go tool cover -func=coverage.out
+
+      - name: Print Total Coverage (for verification)
+        run: |
+          echo "Overall project coverage: ${{ steps.coverage_total.outputs.TOTAL_COVERAGE }}"
 
       - name: Build
         run: make build-linux-amd64
