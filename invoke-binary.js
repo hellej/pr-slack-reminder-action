@@ -21,12 +21,13 @@ function chooseBinary() {
     if (platform === 'linux' && arch === 'arm64') {
         return `dist/main-linux-arm64-${VERSION}`
     }
-    if (platform === 'windows' && arch === 'x64') {
-        return `dist/main-windows-amd64-${VERSION}`
-    }
-    if (platform === 'windows' && arch === 'arm64') {
-        return `dist/main-windows-arm64-${VERSION}`
-    }
+    // TODO: enable before v1
+    // if (platform === 'windows' && arch === 'x64') {
+    //     return `dist/main-windows-amd64-${VERSION}`
+    // }
+    // if (platform === 'windows' && arch === 'arm64') {
+    //     return `dist/main-windows-arm64-${VERSION}`
+    // }
 
     console.error(`Unsupported platform (${platform}) and architecture (${arch})`)
     process.exit(1)
