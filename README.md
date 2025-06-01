@@ -1,4 +1,4 @@
-[![CI](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/unit-tests.yml) [![Build & Release](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/build-and-release.yml)
+[![CI](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/unit-tests.yml) [![Build](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/build.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/build.yml) [![Release](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/release.yml/badge.svg)](https://github.com/hellej/pr-slack-reminder-action/actions/workflows/release.yml)
 
 # PR Slack Reminder Action
 
