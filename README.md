@@ -4,4 +4,4 @@
 
 For now, this project serves as a personal learning playground for Go and GitHub Actions development.
 
-However, the goal is to evolve it into a useful GitHub Action for sending Slack reminders about pull requests in the coming months.
+However, the goal for the coming months is still to evolve it into an actually useful GitHub Action for sending Slack reminders about Pull Requests that are at risk of getting stale.
