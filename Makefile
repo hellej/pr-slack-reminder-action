@@ -12,6 +12,9 @@ test-with-coverage:
 	$(TEST) -coverprofile=coverage.out -covermode=atomic
 	go tool cover -func=coverage.out
 
+publish-code-coverage:
+	goveralls -coverprofile=coverage.out -service=github
+
 run:
 	env \
 	'INPUT_GITHUB-TOKEN=$(INPUT_GITHUB_TOKEN)' \
