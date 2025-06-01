@@ -42,40 +42,50 @@ increment_major_version() {
     echo "v${major_num}.0.0"
 }
 
-if [[ "$LATEST_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    case "$INCREMENT_TYPE" in
-        patch)
-            NEW_VERSION=$(increment_patch_version "$LATEST_TAG")
-            ;;
-        minor)
-            NEW_VERSION=$(increment_minor_version "$LATEST_TAG")
-            ;;
-        major)
-            NEW_VERSION=$(increment_major_version "$LATEST_TAG")
-            ;;
-    esac
-    
-    git tag -a "$NEW_VERSION" -m "${NEW_VERSION#v}"
-    
-    V_PREFIX=$(echo "$NEW_VERSION" | grep -o '^v[0-9]\+')
-    if [[ -z "$V_PREFIX" || ! "$V_PREFIX" =~ ^v[0-9]\+$ ]]; then
-        echo "Error: New version does not start with 'v' followed by a number"
-        exit 1
-    fi
-
-    if [[ "$V_PREFIX" == "v0" ]]; then
-        git tag -f -a v1-beta -m "${NEW_VERSION#v}"
-        git push origin v1-beta --force
-        echo "Pushed tag: v1-beta"
-    elif [[ "$V_PREFIX" =~ ^v[1-9] ]]; then
-        git push origin "$NEW_VERSION"
-        git tag -f -a $V_PREFIX -m "${NEW_VERSION#v}"
-        git push origin $V_PREFIX --force
-        echo "Pushed tag: $V_PREFIX"
-    fi
-
-    echo "New version: $NEW_VERSION"
-else
-    echo "No valid tags found"
+if [[ ! "$LATEST_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: No valid tags found"
     exit 1
+fi
+
+case "$INCREMENT_TYPE" in
+    patch)
+        NEW_VERSION=$(increment_patch_version "$LATEST_TAG")
+        ;;
+    minor)
+        NEW_VERSION=$(increment_minor_version "$LATEST_TAG")
+        ;;
+    major)
+        NEW_VERSION=$(increment_major_version "$LATEST_TAG")
+        ;;
+esac
+
+if [[ ! "$NEW_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: New version is invalid: $NEW_VERSION (not vX.X.X)"
+    exit 1
+fi
+
+echo "New version: $NEW_VERSION"
+git tag -a "$NEW_VERSION" -m "${NEW_VERSION#v}"
+git push --tags
+
+# Below we also move the major version tag to the new version as suggested in
+# https://github.com/actions/toolkit/blob/master/docs/action-versioning.md#recommendations
+
+MAJOR_VERSION=$(echo "$NEW_VERSION" | grep -o '^v[0-9]\+')
+echo "Major version: $MAJOR_VERSION"
+
+if [[ ! "$MAJOR_VERSION" =~ ^v[0-9]+$ ]]; then
+    echo "Error: New major version tag does not start with 'v' followed by a number"
+    exit 1
+fi
+
+if [[ "$MAJOR_VERSION" == "v0" ]]; then
+    TAG="v1-beta"
+    git tag -f -a $TAG -m "${NEW_VERSION#v}"
+    git push origin $TAG --force
+    echo "Pushed tag: $TAG"
+else
+    git tag -f -a $MAJOR_VERSION -m "${NEW_VERSION#v}"
+    git push origin $MAJOR_VERSION --force
+    echo "Pushed tag: $MAJOR_VERSION"
 fi

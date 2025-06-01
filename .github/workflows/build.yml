@@ -1,24 +1,13 @@
-name: Build & Release
+name: Build
 
-on:
-  workflow_dispatch:
-    inputs:
-      semver:
-        description: 'Whether to bump major, minor, or patch version'
-        required: true
-        type: choice
-        options:
-        - patch
-        - minor
-        - major
+on: workflow_dispatch
 
 permissions:
   contents: write
   pull-requests: read
 
 jobs:
-  build-and-release:
-    name: build & tag release
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -48,9 +37,3 @@ jobs:
           git status
           git commit -m "Update action executables" || echo "No changes to commit"
           git push
-
-      - name: Bump version & create tagged release
-        run: |
-          echo "SEMVER input: ${{ github.event.inputs.semver }}"
-          make release SEMVER="${{ github.event.inputs.semver }}"
-          git push --tags

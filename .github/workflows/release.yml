@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      semver:
+        description: 'Whether to bump major, minor, or patch version'
+        required: true
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: create release tag
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump version & create tagged release
+        run: |
+          echo "SEMVER input: ${{ github.event.inputs.semver }}"
+          make release SEMVER="${{ github.event.inputs.semver }}"
