@@ -20,6 +20,14 @@ jobs:
       - name: Run unit tests
         run: make test-with-coverage
 
+      - name: Install goveralls
+        run: go install github.com/mattn/goveralls@v0.0.12
+      
+      - name: Send coverage
+        env:
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: make publish-code-coverage
+
       - name: Calculate and display total coverage
         id: coverage_total
         run: |
