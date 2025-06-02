@@ -23,3 +23,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
           slack-channel-name: 'pr-reminders-test'
+          github-user-slack-user-id-mapping: |
+            hellej: U08SZJTJF0U
+            bob: U08EVPGNWER
