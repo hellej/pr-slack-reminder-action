@@ -32,7 +32,7 @@ func run() error {
 		githubhelpers.FetchOpenPRs(githubClient, config.Repository),
 		config.SlackUserIdByGitHubUsername,
 	)
-	content := content.GetContent(prs, config.OldPRThresholdHours)
+	content := content.GetContent(prs, config.ContentInputs)
 	blocks, summaryText := composer.ComposeMessage(content)
 	return slackhelpers.SendMessage(slackClient, config.SlackChannelID, blocks, summaryText)
 }

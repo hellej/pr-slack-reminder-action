@@ -3,8 +3,11 @@ package content
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/parser"
 )
 
@@ -52,7 +55,11 @@ func getNewAndOldPRs(openPRs []parser.PR, oldPRThresholdHours int) ([]parser.PR,
 	return mainList, oldPRsList
 }
 
-func GetContent(openPRs []parser.PR, oldPRThresholdHours *int) Content {
+func formatMainListHeading(heading string, prCount int) string {
+	return strings.ReplaceAll(heading, "<pr_count>", strconv.Itoa(prCount))
+}
+
+func GetContent(openPRs []parser.PR, contentInputs config.ContentInputs) Content {
 	switch {
 	case len(openPRs) == 0:
 		text := "No open PRs, happy coding! 🎉"
@@ -60,18 +67,18 @@ func GetContent(openPRs []parser.PR, oldPRThresholdHours *int) Content {
 			SummaryText: text,
 			NoPRsText:   text,
 		}
-	case oldPRThresholdHours == nil:
+	case contentInputs.OldPRThresholdHours == nil:
 		return Content{
 			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
-			MainListHeading: fmt.Sprintf("There are %d open PRs", len(openPRs)),
+			MainListHeading: formatMainListHeading(contentInputs.MainListHeading, len(openPRs)),
 			MainList:        openPRs,
 		}
 	default:
-		newPRs, oldPRs := getNewAndOldPRs(openPRs, *oldPRThresholdHours)
+		newPRs, oldPRs := getNewAndOldPRs(openPRs, *contentInputs.OldPRThresholdHours)
 		content := Content{
-			MainListHeading:   fmt.Sprintf("There are %d open PRs", len(openPRs)),
+			MainListHeading:   formatMainListHeading(contentInputs.MainListHeading, len(openPRs)),
 			MainList:          newPRs,
-			OldPRsListHeading: fmt.Sprintf("🚨 PRs older than %v", getOldPRsThresholdTimeLabel(*oldPRThresholdHours)),
+			OldPRsListHeading: fmt.Sprintf("🚨 PRs older than %v", getOldPRsThresholdTimeLabel(*contentInputs.OldPRThresholdHours)),
 			OldPRsList:        oldPRs,
 		}
 		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention 👀", content.GetPRCount())

@@ -20,6 +20,15 @@ inputs: {
   github-user-slack-user-id-mapping: {
     description: 'Mapping of GitHub usernames to Slack user IDs (e.g., "alice: U08RWPGNCUX\\nbob: U08RWPGNWER")',
     required: false,
+  },
+  main-list-heading: {
+    description: 'Main heading of the message to send',
+    required: false,
+    default: 'There are <pr_count> open PRs 🚀',
+  },
+  old-prs-list-heading: {
+    description: 'Heading for the list of old PRs (right under the main heading)',
+    required: false,
   }
 }
 
