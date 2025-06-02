@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/composer"
@@ -18,13 +19,22 @@ func run() error {
 	githubClient := githubhelpers.GetClient(config.GithubToken)
 	slackClient := slackhelpers.GetClient(config.SlackBotToken)
 
+	if config.SlackChannelID == "" {
+		log.Println("Slack channel ID is not set, resolving it by name")
+		channelID, err := slackhelpers.GetChannelIDByName(slackClient, config.SlackChannelName)
+		if err != nil {
+			return fmt.Errorf("error getting channel ID by name: %v", err)
+		}
+		config.SlackChannelID = channelID
+	}
+
 	prs := parser.ParsePRs(
 		githubhelpers.FetchOpenPRs(githubClient, config.Repository),
 		config.SlackUserIdByGitHubUsername,
 	)
 	content := content.GetContent(prs, config.OldPRThresholdHours)
 	blocks, summaryText := composer.ComposeMessage(content)
-	return slackhelpers.SendMessage(slackClient, config.SlackChannelName, blocks, summaryText)
+	return slackhelpers.SendMessage(slackClient, config.SlackChannelID, blocks, summaryText)
 }
 
 func main() {

@@ -10,7 +10,7 @@ import (
 
 var ErrChannelNotFound = errors.New("channel not found")
 
-func getChannelIDByName(api *slack.Client, channelName string) (string, error) {
+func GetChannelIDByName(api *slack.Client, channelName string) (string, error) {
 	channels, cursor := []slack.Channel{}, ""
 
 	for {
@@ -42,17 +42,15 @@ func GetClient(token string) *slack.Client {
 	return slack.New(token)
 }
 
-func SendMessage(api *slack.Client, channelName string, blocks slack.Message, summaryText string) error {
-	channelID, err := getChannelIDByName(api, channelName)
+func SendMessage(api *slack.Client, channelID string, blocks slack.Message, summaryText string) error {
+	_, _, err := api.PostMessage(
+		channelID,
+		slack.MsgOptionBlocks(blocks.Blocks.BlockSet...),
+		slack.MsgOptionText(summaryText, false),
+	)
 	if err != nil {
-		log.Fatalf("Error getting channel ID by name: %v (%v)", channelName, err)
+		return fmt.Errorf("failed to send Slack message: %v", err)
 	}
-
-	log.Printf("Sending message to channel \"%s\"", channelName)
-	_, _, err = api.PostMessage(channelID, slack.MsgOptionBlocks(blocks.Blocks.BlockSet...), slack.MsgOptionText(summaryText, false))
-
-	if err != nil {
-		return fmt.Errorf("failed to send Slack message: %s", err.Error())
-	}
+	log.Printf("Sent message to Slack channel: %s", channelID)
 	return nil
 }
