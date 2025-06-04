@@ -29,6 +29,10 @@ inputs: {
   old-prs-list-heading: {
     description: 'Heading for the list of old PRs (right under the main heading)',
     required: false,
+  },
+  no-prs-message: {
+    description: 'Message to send when there are no open PRs',
+    required: false,
   }
 }
 

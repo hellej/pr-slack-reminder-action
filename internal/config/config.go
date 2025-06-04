@@ -3,6 +3,7 @@ package config
 import "github.com/hellej/pr-slack-reminder-action/internal/utilities"
 
 type ContentInputs struct {
+	NoPRsMessage        string
 	MainListHeading     string
 	OldPRsListHeading   string
 	OldPRThresholdHours *int
@@ -27,6 +28,7 @@ func GetConfig() Config {
 		SlackChannelID:              utilities.GetInput("slack-channel-id"),
 		SlackUserIdByGitHubUsername: utilities.GetStringMapping("github-user-slack-user-id-mapping"),
 		ContentInputs: ContentInputs{
+			NoPRsMessage:        utilities.GetInput("no-prs-message"),
 			MainListHeading:     utilities.GetInput("main-list-heading"),
 			OldPRsListHeading:   utilities.GetInput("old-prs-list-heading"),
 			OldPRThresholdHours: utilities.GetInputInt("old-pr-threshold-hours"),

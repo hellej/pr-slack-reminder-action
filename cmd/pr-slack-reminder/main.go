@@ -33,6 +33,10 @@ func run() error {
 		config.SlackUserIdByGitHubUsername,
 	)
 	content := content.GetContent(prs, config.ContentInputs)
+	if !content.HasPRs() && content.SummaryText == "" {
+		log.Println("No PRs found and no message configured for this case, exiting")
+		return nil
+	}
 	blocks, summaryText := composer.ComposeMessage(content)
 	return slackhelpers.SendMessage(slackClient, config.SlackChannelID, blocks, summaryText)
 }

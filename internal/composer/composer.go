@@ -64,7 +64,7 @@ func ComposeMessage(content content.Content) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if !content.HasPRs() {
-		blocks = addNoPRsBlock(blocks, content.NoPRsText)
+		blocks = addNoPRsBlock(blocks, content.SummaryText)
 		return slack.NewBlockMessage(blocks...), content.SummaryText
 	}
 

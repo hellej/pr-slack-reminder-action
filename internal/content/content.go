@@ -17,7 +17,6 @@ type Content struct {
 	MainList          []parser.PR
 	OldPRsListHeading string
 	OldPRsList        []parser.PR
-	NoPRsText         string
 }
 
 func (c Content) GetPRCount() int16 {
@@ -62,10 +61,8 @@ func formatMainListHeading(heading string, prCount int) string {
 func GetContent(openPRs []parser.PR, contentInputs config.ContentInputs) Content {
 	switch {
 	case len(openPRs) == 0:
-		text := "No open PRs, happy coding! 🎉"
 		return Content{
-			SummaryText: text,
-			NoPRsText:   text,
+			SummaryText: contentInputs.NoPRsMessage,
 		}
 	case contentInputs.OldPRThresholdHours == nil:
 		return Content{

@@ -31,8 +31,8 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		}
 
 		richTextElement := firstBlock.(*slack.RichTextBlock).Elements[0].(*slack.RichTextSection).Elements[0].(*slack.RichTextSectionTextElement)
-		if richTextElement.Text != content.NoPRsText {
-			t.Errorf("Expected text to be '%s', got '%s'", content.NoPRsText, richTextElement.Text)
+		if richTextElement.Text != content.SummaryText {
+			t.Errorf("Expected text to be '%s', got '%s'", content.SummaryText, richTextElement.Text)
 		}
 	})
 

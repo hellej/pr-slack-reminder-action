@@ -43,17 +43,28 @@ func sortPRsByCreatedAt(prs []*github.PullRequest) []*github.PullRequest {
 	return prs
 }
 
-func FetchOpenPRs(client *github.Client, repository string) []*github.PullRequest {
-	repoOwner, repoName := parseOwnerAndRepo(repository)
-	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
-	prs, _, err := client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
-	if err != nil {
-		log.Fatalf("Error fetching pull requests: %v", err)
+func logFoundPRs(prs []*github.PullRequest) []*github.PullRequest {
+	if len(prs) == 0 {
+		log.Println("No open pull requests found")
+	} else {
+		log.Printf("Found %d open pull requests:", len(prs))
 	}
-	log.Printf("Found %d open pull requests:", len(prs))
 	for _, pr := range prs {
 		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
 	}
+	return prs
+}
 
-	return sortPRsByCreatedAt(prs)
+func FetchOpenPRs(client *github.Client, repository string) []*github.PullRequest {
+	repoOwner, repoName := parseOwnerAndRepo(repository)
+	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
+	prs, response, err := client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
+	if err != nil {
+		if response != nil && response.StatusCode == 404 {
+			log.Fatalf("Repository %s/%s not found. Check the repository name and permissions.", repoOwner, repoName)
+		} else {
+			log.Fatalf("Error fetching pull requests: %v", err)
+		}
+	}
+	return logFoundPRs(sortPRsByCreatedAt(prs))
 }
