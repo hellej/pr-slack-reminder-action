@@ -102,7 +102,7 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 func Test2PRsFound(t *testing.T) {
 	setTestEnvironment(t, "", "alice: U12345678")
 	pr1 := &github.PullRequest{
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
 		Title:     github.Ptr("This is a test PR"),
 		User: &github.User{
 			Login: github.Ptr("stitch"),
@@ -110,21 +110,28 @@ func Test2PRsFound(t *testing.T) {
 		},
 	}
 	pr2 := &github.PullRequest{
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-10 * time.Hour)},
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
 		Title:     github.Ptr("This is another test PR"),
 		User: &github.User{
 			Login: github.Ptr("alice"),
 			Name:  github.Ptr("Alice"),
 		},
 	}
-	prs := []*github.PullRequest{pr1, pr2}
+	pr3 := &github.PullRequest{
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-25 * time.Hour)},
+		Title:     github.Ptr("This is another test PR"),
+		User: &github.User{
+			Login: github.Ptr("bob"),
+		},
+	}
+	prs := []*github.PullRequest{pr1, pr2, pr3}
 	getGitHubClient := makeMockGitHubClientGetter(prs)
 	mockSlackClient := mockSlackClient{}
 	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	expectedSummary := "2 open PRs are waiting for attention 👀"
+	expectedSummary := "3 open PRs are waiting for attention 👀"
 	if mockSlackClient.sentMessage.summaryText != expectedSummary {
 		t.Errorf(
 			"Expected summary to be %v, but got: %v",

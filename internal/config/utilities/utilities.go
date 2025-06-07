@@ -13,9 +13,9 @@ func inputNameAsEnv(name string) string {
 	return "INPUT_" + e
 }
 
-func raiseIfEmpty(value string, name string) string {
+func panicIfEmpty(value string, name string) string {
 	if value == "" {
-		log.Fatalf("Required input %s is not set", name)
+		log.Panicf("Required input %s is not set", name)
 	}
 	return value
 }
@@ -25,7 +25,7 @@ func GetEnv(name string) string {
 }
 
 func GetEnvRequired(name string) string {
-	return raiseIfEmpty(os.Getenv(name), name)
+	return panicIfEmpty(os.Getenv(name), name)
 }
 
 func GetInput(name string) string {
@@ -33,7 +33,7 @@ func GetInput(name string) string {
 }
 
 func GetInputRequired(name string) string {
-	return raiseIfEmpty(GetInput(name), name)
+	return panicIfEmpty(GetInput(name), name)
 }
 
 // Retrieves the value of the input, attempts to parse it as an integer,
@@ -46,12 +46,12 @@ func GetInputInt(name string) *int {
 	}
 	parsed, err := strconv.Atoi(val)
 	if err != nil {
-		log.Fatalf("Error parsing environment variable %s: %v", name, err)
+		log.Panicf("Error parsing environment variable %s: %v", name, err)
 	}
 	return &parsed
 }
 
-func GetStringMapping(inputName string) *map[string]string {
+func GetInputMapping(inputName string) *map[string]string {
 	name := inputNameAsEnv(inputName)
 	mapping := make(map[string]string)
 	val := os.Getenv(name)
@@ -69,14 +69,14 @@ func GetStringMapping(inputName string) *map[string]string {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		parts := strings.SplitN(line, ":", 2)
+		parts := strings.SplitN(line, ":", -1)
 		if len(parts) != 2 {
-			log.Fatalf("Invalid mapping format for %s: %s", name, line)
+			log.Panicf("Invalid mapping format for %s: %s", name, line)
 		}
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 		if key == "" || value == "" {
-			log.Fatalf("Invalid mapping key or value for %s: %s", name, line)
+			log.Panicf("Invalid mapping key or value for %s: %s", name, line)
 		}
 		mapping[key] = value
 	}

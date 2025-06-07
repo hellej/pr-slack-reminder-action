@@ -44,7 +44,7 @@ func GetConfig() Config {
 		SlackBotToken:               utilities.GetInputRequired("slack-bot-token"),
 		SlackChannelName:            utilities.GetInput("slack-channel-name"),
 		SlackChannelID:              utilities.GetInput("slack-channel-id"),
-		SlackUserIdByGitHubUsername: utilities.GetStringMapping("github-user-slack-user-id-mapping"),
+		SlackUserIdByGitHubUsername: utilities.GetInputMapping("github-user-slack-user-id-mapping"),
 		ContentInputs: ContentInputs{
 			NoPRsMessage:        utilities.GetInput("no-prs-message"),
 			MainListHeading:     utilities.GetInputRequired("main-list-heading"),
