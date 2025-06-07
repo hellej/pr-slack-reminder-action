@@ -1,4 +1,4 @@
-package composer_test
+package messagebuilder_test
 
 import (
 	"testing"
@@ -7,18 +7,18 @@ import (
 	"github.com/google/go-github/v72/github"
 	"github.com/slack-go/slack"
 
-	composer "github.com/hellej/pr-slack-reminder-action/internal/composer"
-	"github.com/hellej/pr-slack-reminder-action/internal/content"
-	"github.com/hellej/pr-slack-reminder-action/internal/parser"
+	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
+	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
+	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
 )
 
 func TestComposeSlackBlocksMessage(t *testing.T) {
 	t.Run("No PRs", func(t *testing.T) {
-		content := content.Content{
+		content := messagecontent.Content{
 			SummaryText: "No open PRs, happy coding! 🎉",
 		}
 
-		message, _ := composer.ComposeMessage(content)
+		message, _ := messagebuilder.ComposeMessage(content)
 
 		blockLen := len(message.Blocks.BlockSet)
 		if blockLen != 1 {
@@ -37,7 +37,7 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 	})
 
 	t.Run("Message summary", func(t *testing.T) {
-		aPR := parser.PR{PullRequest: &github.PullRequest{}}
+		aPR := prparser.PR{PullRequest: &github.PullRequest{}}
 		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 1 day ago
 		aPR.Title = github.Ptr("This is a test PR")
 		aPR.User = &github.User{
@@ -47,20 +47,20 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		aPR.GetAuthorSlackUserId = func() (string, bool) {
 			return "U12345678", true
 		}
-		prS := []parser.PR{aPR}
-		content := content.Content{
+		prS := []prparser.PR{aPR}
+		content := messagecontent.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",
 			MainList:        prS,
 		}
-		_, got := composer.ComposeMessage(content)
+		_, got := messagebuilder.ComposeMessage(content)
 		if got != content.SummaryText {
 			t.Errorf("Expected summary to be '%s', got '%s'", content.SummaryText, got)
 		}
 	})
 
 	t.Run("One new PR", func(t *testing.T) {
-		aPR := parser.PR{PullRequest: &github.PullRequest{}}
+		aPR := prparser.PR{PullRequest: &github.PullRequest{}}
 		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 3 hours ago
 		aPR.Title = github.Ptr("This is a test PR")
 		aPR.User = &github.User{
@@ -71,13 +71,13 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		aPR.GetAuthorSlackUserId = func() (string, bool) {
 			return mockSlackUserID, true
 		}
-		prs := []parser.PR{aPR}
-		content := content.Content{
+		prs := []prparser.PR{aPR}
+		content := messagecontent.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",
 			MainList:        prs,
 		}
-		got, _ := composer.ComposeMessage(content)
+		got, _ := messagebuilder.ComposeMessage(content)
 
 		if len(got.Blocks.BlockSet) < 2 {
 			t.Errorf("Expected non-empty blocks, got nil or empty")

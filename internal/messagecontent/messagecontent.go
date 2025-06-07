@@ -1,4 +1,4 @@
-package content
+package messagecontent
 
 import (
 	"fmt"
@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/parser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
 )
 
 type Content struct {
 	SummaryText       string
 	MainListHeading   string
-	MainList          []parser.PR
+	MainList          []prparser.PR
 	OldPRsListHeading string
-	OldPRsList        []parser.PR
+	OldPRsList        []prparser.PR
 }
 
 func (c Content) GetPRCount() int16 {
@@ -37,12 +37,12 @@ func getOldPRsThresholdTimeLabel(oldPRThresholdHours int) string {
 
 type PRCategory struct {
 	Heading string
-	PRs     []parser.PR
+	PRs     []prparser.PR
 }
 
-func getNewAndOldPRs(openPRs []parser.PR, oldPRThresholdHours int) ([]parser.PR, []parser.PR) {
-	mainList := []parser.PR{}
-	oldPRsList := []parser.PR{}
+func getNewAndOldPRs(openPRs []prparser.PR, oldPRThresholdHours int) ([]prparser.PR, []prparser.PR) {
+	mainList := []prparser.PR{}
+	oldPRsList := []prparser.PR{}
 
 	for _, pr := range openPRs {
 		if pr.GetCreatedAt().After(time.Now().Add(-time.Duration(oldPRThresholdHours) * time.Hour)) {
@@ -58,7 +58,7 @@ func formatMainListHeading(heading string, prCount int) string {
 	return strings.ReplaceAll(heading, "<pr_count>", strconv.Itoa(prCount))
 }
 
-func GetContent(openPRs []parser.PR, contentInputs config.ContentInputs) Content {
+func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Content {
 	switch {
 	case len(openPRs) == 0:
 		return Content{

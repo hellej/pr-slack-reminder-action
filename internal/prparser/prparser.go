@@ -1,4 +1,4 @@
-package parser
+package prparser
 
 import (
 	"fmt"

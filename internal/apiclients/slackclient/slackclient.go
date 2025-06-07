@@ -1,4 +1,4 @@
-package slackhelpers
+package slackclient
 
 import (
 	"errors"

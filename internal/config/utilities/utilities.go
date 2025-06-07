@@ -58,8 +58,12 @@ func GetStringMapping(inputName string) *map[string]string {
 	if val == "" {
 		return &mapping
 	}
-
-	lines := strings.Split(val, "\n")
+	separator := "\n"
+	if strings.Contains(val, ";") {
+		// for more convenient local testing
+		separator = ";"
+	}
+	lines := strings.Split(val, separator)
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {

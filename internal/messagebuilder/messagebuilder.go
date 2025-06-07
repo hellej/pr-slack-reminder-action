@@ -1,12 +1,12 @@
-package composer
+package messagebuilder
 
 import (
-	"github.com/hellej/pr-slack-reminder-action/internal/content"
-	"github.com/hellej/pr-slack-reminder-action/internal/parser"
+	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
+	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
 	"github.com/slack-go/slack"
 )
 
-func getUserNameElement(pr parser.PR) slack.RichTextSectionElement {
+func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
 	authorSlackUserID, ok := pr.GetAuthorSlackUserId()
 	if ok {
 		return slack.NewRichTextSectionUserElement(
@@ -18,7 +18,7 @@ func getUserNameElement(pr parser.PR) slack.RichTextSectionElement {
 	)
 }
 
-func composePRBulletPointBlock(pr parser.PR) slack.RichTextElement {
+func composePRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
@@ -29,7 +29,7 @@ func composePRBulletPointBlock(pr parser.PR) slack.RichTextElement {
 	)
 }
 
-func makePRListBlock(openPRs []parser.PR) *slack.RichTextBlock {
+func makePRListBlock(openPRs []prparser.PR) *slack.RichTextBlock {
 	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
 		prBlocks = append(prBlocks, composePRBulletPointBlock(pr))
@@ -42,7 +42,7 @@ func makePRListBlock(openPRs []parser.PR) *slack.RichTextBlock {
 	)
 }
 
-func addPRListBLock(blocks []slack.Block, heading string, prs []parser.PR) []slack.Block {
+func addPRListBLock(blocks []slack.Block, heading string, prs []prparser.PR) []slack.Block {
 	return append(blocks, slack.NewHeaderBlock(
 		slack.NewTextBlockObject("plain_text", heading, false, false),
 	),
@@ -60,7 +60,7 @@ func addNoPRsBlock(blocks []slack.Block, noPRsText string) []slack.Block {
 	)
 }
 
-func ComposeMessage(content content.Content) (slack.Message, string) {
+func ComposeMessage(content messagecontent.Content) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if !content.HasPRs() {
