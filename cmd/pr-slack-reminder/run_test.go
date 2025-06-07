@@ -125,9 +125,10 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 	}
 }
 
-func Test2PRsFound(t *testing.T) {
+func Test3PRsFound(t *testing.T) {
 	setTestEnvironment(t, "", "alice: U12345678")
 	pr1 := &github.PullRequest{
+		Number:    github.Ptr(1),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
 		Title:     github.Ptr("This is a test PR"),
 		User: &github.User{
@@ -136,6 +137,7 @@ func Test2PRsFound(t *testing.T) {
 		},
 	}
 	pr2 := &github.PullRequest{
+		Number:    github.Ptr(2),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
 		Title:     github.Ptr("This is another test PR"),
 		User: &github.User{
@@ -144,6 +146,7 @@ func Test2PRsFound(t *testing.T) {
 		},
 	}
 	pr3 := &github.PullRequest{
+		Number:    github.Ptr(3),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-25 * time.Hour)},
 		Title:     github.Ptr("This is another test PR"),
 		User: &github.User{

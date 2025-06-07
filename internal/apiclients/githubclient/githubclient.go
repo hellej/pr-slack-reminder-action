@@ -3,7 +3,6 @@ package githubclient
 import (
 	"context"
 	"log"
-	"slices"
 	"strings"
 
 	"github.com/google/go-github/v72/github"
@@ -32,7 +31,7 @@ func (c client) FetchOpenPRs(repository string) []*github.PullRequest {
 			log.Fatalf("Error fetching pull requests: %v", err)
 		}
 	}
-	return logFoundPRs(sortPRsByCreatedAt(prs))
+	return prs
 }
 
 func parseOwnerAndRepo(repository string) (string, string) {
@@ -44,35 +43,4 @@ func parseOwnerAndRepo(repository string) (string, string) {
 	repoName := repoParts[1]
 
 	return repoOwner, repoName
-}
-
-func sortPRsByCreatedAt(prs []*github.PullRequest) []*github.PullRequest {
-	slices.SortFunc(prs, func(a, b *github.PullRequest) int {
-		if a.GetCreatedAt().After(b.GetCreatedAt().Time) {
-			return -1
-		}
-		if a.GetCreatedAt().Before(b.GetCreatedAt().Time) {
-			return 1
-		}
-		if a.GetUpdatedAt().After(b.GetUpdatedAt().Time) {
-			return -1
-		}
-		if a.GetUpdatedAt().Before(b.GetUpdatedAt().Time) {
-			return 1
-		}
-		return 0
-	})
-	return prs
-}
-
-func logFoundPRs(prs []*github.PullRequest) []*github.PullRequest {
-	if len(prs) == 0 {
-		log.Println("No open pull requests found")
-	} else {
-		log.Printf("Found %d open pull requests:", len(prs))
-	}
-	for _, pr := range prs {
-		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
-	}
-	return prs
 }

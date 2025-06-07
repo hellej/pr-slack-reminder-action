@@ -2,7 +2,9 @@ package prparser
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/google/go-github/v72/github"
@@ -36,6 +38,14 @@ func (pr PR) GetPRUserDisplayName() string {
 	return pr.GetUser().GetLogin()
 }
 
+func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string]string) []PR {
+	var parsedPRs []PR
+	for _, pr := range prs {
+		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
+	}
+	return logFoundPRs(sortPRsByCreatedAt(parsedPRs))
+}
+
 func getAuthorSlackUserId(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
 	return func() (string, bool) {
 		gitHubUsername := pr.GetUser().GetLogin()
@@ -57,10 +67,33 @@ func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]str
 	}
 }
 
-func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string]string) []PR {
-	var parsedPRs []PR
-	for _, pr := range prs {
-		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
+func sortPRsByCreatedAt(prs []PR) []PR {
+	slices.SortFunc(prs, func(a, b PR) int {
+		if a.GetCreatedAt().After(b.GetCreatedAt().Time) {
+			return -1
+		}
+		if a.GetCreatedAt().Before(b.GetCreatedAt().Time) {
+			return 1
+		}
+		if a.GetUpdatedAt().After(b.GetUpdatedAt().Time) {
+			return -1
+		}
+		if a.GetUpdatedAt().Before(b.GetUpdatedAt().Time) {
+			return 1
+		}
+		return 0
+	})
+	return prs
+}
+
+func logFoundPRs(prs []PR) []PR {
+	if len(prs) == 0 {
+		log.Println("No open pull requests found")
+	} else {
+		log.Printf("Found %d open pull requests:", len(prs))
 	}
-	return parsedPRs
+	for _, pr := range prs {
+		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
+	}
+	return prs
 }
