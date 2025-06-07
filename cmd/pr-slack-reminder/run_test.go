@@ -48,31 +48,62 @@ func makeMockGitHubClientGetterWithPRService(prService mockPullRequestsService) 
 }
 
 type SentMessage struct {
-	channelID   string
-	blocks      slack.Message
-	summaryText string
+	Request   string
+	ChannelID string
+	Blocks    slack.Message
+	Text      string
 }
 
-type mockSlackClient struct {
-	sentMessage SentMessage
+type GetConversationsResponse struct {
+	channels []slack.Channel
+	cursor   string
+	err      error
 }
 
-func (c mockSlackClient) GetChannelIDByName(channelName string) (string, error) {
-	return "C12345678", nil
+type mockSlackAPI struct {
+	getConversationsResponse GetConversationsResponse
+	SentMessage              SentMessage
 }
 
-func (c *mockSlackClient) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
-	c.sentMessage = SentMessage{
-		channelID:   channelID,
-		blocks:      blocks,
-		summaryText: summaryText,
+func (m mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
+	if m.getConversationsResponse.err != nil {
+		return nil, "", m.getConversationsResponse.err
 	}
-	return nil
+	return m.getConversationsResponse.channels, m.getConversationsResponse.cursor, nil
 }
 
-func asSlackClientGetter(client *mockSlackClient) func(token string) slackclient.Client {
+func (m *mockSlackAPI) PostMessage(
+	channelID string, options ...slack.MsgOption,
+) (string, string, error) {
+	request, values, _ := slack.UnsafeApplyMsgOptions("", "", "", options...)
+	m.SentMessage.Request = request
+	m.SentMessage.ChannelID = channelID
+	m.SentMessage.Text = values["text"][0]
+	return "1234567890.123456", "C12345678", nil
+}
+
+func getMockSlackAPI() *mockSlackAPI {
+	return &mockSlackAPI{
+		getConversationsResponse: GetConversationsResponse{
+			channels: []slack.Channel{
+				{
+					GroupConversation: slack.GroupConversation{
+						Name: "some-channel-name",
+						Conversation: slack.Conversation{
+							ID: "C12345678",
+						},
+					},
+				},
+			},
+			cursor: "",
+			err:    nil,
+		},
+	}
+}
+
+func makeSlackClientGetter(client *mockSlackAPI) func(token string) slackclient.Client {
 	return func(token string) slackclient.Client {
-		return client
+		return slackclient.NewClient(client)
 	}
 }
 
@@ -114,7 +145,7 @@ func TestWithMissingSlackInputs(t *testing.T) {
 	}()
 	main.Run(
 		makeMockGitHubClientGetter([]*github.PullRequest{}),
-		asSlackClientGetter(&mockSlackClient{}),
+		makeSlackClientGetter(getMockSlackAPI()),
 	)
 	t.Errorf("Test failed, panic was expected")
 }
@@ -136,7 +167,7 @@ func TestWithInvalidRepoInput(t *testing.T) {
 	}()
 	main.Run(
 		makeMockGitHubClientGetter([]*github.PullRequest{}),
-		asSlackClientGetter(&mockSlackClient{}),
+		makeSlackClientGetter(getMockSlackAPI()),
 	)
 	t.Errorf("Test failed, panic was expected")
 }
@@ -167,7 +198,7 @@ func TestPRFetchError(t *testing.T) {
 				mockError: errors.New("Unable to fetch PRs"),
 			},
 		),
-		asSlackClientGetter(&mockSlackClient{}),
+		makeSlackClientGetter(getMockSlackAPI()),
 	)
 	t.Errorf("Test failed, panic was expected")
 }
@@ -175,13 +206,13 @@ func TestPRFetchError(t *testing.T) {
 func TestNoPRsFoundWithoutMessage(t *testing.T) {
 	setTestEnvironment(t, "", "", "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
-	mockSlackClient := mockSlackClient{}
-	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
+	mockSlackClient := getMockSlackAPI()
+	err := main.Run(getGitHubClient, makeSlackClientGetter(mockSlackClient))
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	if mockSlackClient.sentMessage.summaryText != "" {
-		t.Errorf("Expected no message to be sent, but got: %v", mockSlackClient.sentMessage.summaryText)
+	if mockSlackClient.SentMessage.Text != "" {
+		t.Errorf("Expected no message to be sent, but got: %v", mockSlackClient.SentMessage.Text)
 	}
 }
 
@@ -189,16 +220,16 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 	noPRsFoundMessage := "No PRs found, happy coding!"
 	setTestEnvironment(t, "", noPRsFoundMessage, "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
-	mockSlackClient := mockSlackClient{}
-	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
+	mockSlackClient := getMockSlackAPI()
+	err := main.Run(getGitHubClient, makeSlackClientGetter(mockSlackClient))
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	if mockSlackClient.sentMessage.summaryText != noPRsFoundMessage {
+	if mockSlackClient.SentMessage.Text != noPRsFoundMessage {
 		t.Errorf(
 			"Expected summary to be %v, but got: %v",
 			noPRsFoundMessage,
-			mockSlackClient.sentMessage.summaryText,
+			mockSlackClient.SentMessage.Text,
 		)
 	}
 }
@@ -233,17 +264,17 @@ func Test3PRsFound(t *testing.T) {
 	}
 	prs := []*github.PullRequest{pr1, pr2, pr3}
 	getGitHubClient := makeMockGitHubClientGetter(prs)
-	mockSlackClient := mockSlackClient{}
-	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
+	mockSlackClient := getMockSlackAPI()
+	err := main.Run(getGitHubClient, makeSlackClientGetter(mockSlackClient))
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 	expectedSummary := "3 open PRs are waiting for attention 👀"
-	if mockSlackClient.sentMessage.summaryText != expectedSummary {
+	if mockSlackClient.SentMessage.Text != expectedSummary {
 		t.Errorf(
 			"Expected summary to be %v, but got: %v",
 			expectedSummary,
-			mockSlackClient.sentMessage.summaryText,
+			mockSlackClient.SentMessage.Text,
 		)
 	}
 }

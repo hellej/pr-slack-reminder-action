@@ -9,7 +9,7 @@ import (
 
 func main() {
 	log.Println("Starting PR Slack reminder action")
-	err := Run(githubclient.GetAuthenticatedClient, slackclient.GetClient)
+	err := Run(githubclient.GetAuthenticatedClient, slackclient.GetAuthenticatedClient)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

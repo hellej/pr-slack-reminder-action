@@ -13,19 +13,28 @@ type Client interface {
 	SendMessage(channelID string, blocks slack.Message, summaryText string) error
 }
 
+type slackAPI interface {
+	GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error)
+	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
+}
+
 type client struct {
-	client *slack.Client
+	slackAPI slackAPI
 }
 
-func GetClient(token string) Client {
-	return client{client: slack.New(token)}
+func NewClient(slackAPI slackAPI) Client {
+	return &client{slackAPI: slackAPI}
 }
 
-func (c client) GetChannelIDByName(channelName string) (string, error) {
+func GetAuthenticatedClient(token string) Client {
+	return NewClient(slack.New(token))
+}
+
+func (c *client) GetChannelIDByName(channelName string) (string, error) {
 	channels, cursor := []slack.Channel{}, ""
 
 	for {
-		result, nextCursor, err := c.client.GetConversations(&slack.GetConversationsParameters{
+		result, nextCursor, err := c.slackAPI.GetConversations(&slack.GetConversationsParameters{
 			Limit:           200,
 			Cursor:          cursor,
 			Types:           []string{"public_channel", "private_channel"},
@@ -50,7 +59,7 @@ func (c client) GetChannelIDByName(channelName string) (string, error) {
 }
 
 func (c client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
-	_, _, err := c.client.PostMessage(
+	_, _, err := c.slackAPI.PostMessage(
 		channelID,
 		slack.MsgOptionBlocks(blocks.Blocks.BlockSet...),
 		slack.MsgOptionText(summaryText, false),
