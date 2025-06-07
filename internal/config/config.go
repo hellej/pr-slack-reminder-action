@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
 )
@@ -53,7 +54,7 @@ func GetConfig() Config {
 		},
 	}
 	if config.SlackChannelID == "" && config.SlackChannelName == "" {
-		panic("Either slack-channel-id or slack-channel-name must be set")
+		log.Panic("Either slack-channel-id or slack-channel-name must be set")
 	}
 	return config
 }

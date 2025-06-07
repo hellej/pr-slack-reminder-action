@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +67,31 @@ func setTestEnvironment(t *testing.T, noPrsMessage string, githubUserSlackIdMapp
 	if noPrsMessage != "" {
 		t.Setenv("INPUT_NO-PRS-MESSAGE", noPrsMessage)
 	}
+}
+
+func TestWithMissingSlackInputs(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
+	t.Setenv("INPUT_GITHUB-TOKEN", "SOME_TOKEN")
+	t.Setenv("INPUT_SLACK-BOT-TOKEN", "SOME_TOKEN")
+	t.Setenv("INPUT_MAIN-LIST-HEADING", "There are <pr_count> open PRs 🚀")
+
+	defer func() {
+		if r := recover(); r != nil {
+			err, ok := r.(string)
+			if !ok {
+				t.Errorf("Expected panic value to be string, got: %T", r)
+				return
+			}
+			if !strings.Contains(err, "Either slack-channel-id or slack-channel-name must be set") {
+				t.Errorf("Test failed, expected panic with specific message, got: %v", err)
+			}
+		}
+	}()
+	main.Run(
+		makeMockGitHubClientGetter([]*github.PullRequest{}),
+		asSlackClientGetter(&mockSlackClient{}),
+	)
+	t.Errorf("Test failed, panic was expected")
 }
 
 func TestNoPRsFoundWithoutMessage(t *testing.T) {
