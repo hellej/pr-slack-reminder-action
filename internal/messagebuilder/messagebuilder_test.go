@@ -18,7 +18,7 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			SummaryText: "No open PRs, happy coding! 🎉",
 		}
 
-		message, _ := messagebuilder.ComposeMessage(content)
+		message, _ := messagebuilder.BuildMessage(content)
 
 		blockLen := len(message.Blocks.BlockSet)
 		if blockLen != 1 {
@@ -53,7 +53,7 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			MainListHeading: "🚀 New PRs since 1 days ago",
 			MainList:        prS,
 		}
-		_, got := messagebuilder.ComposeMessage(content)
+		_, got := messagebuilder.BuildMessage(content)
 		if got != content.SummaryText {
 			t.Errorf("Expected summary to be '%s', got '%s'", content.SummaryText, got)
 		}
@@ -77,7 +77,7 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 			MainListHeading: "🚀 New PRs since 1 days ago",
 			MainList:        prs,
 		}
-		got, _ := messagebuilder.ComposeMessage(content)
+		got, _ := messagebuilder.BuildMessage(content)
 
 		if len(got.Blocks.BlockSet) < 2 {
 			t.Errorf("Expected non-empty blocks, got nil or empty")

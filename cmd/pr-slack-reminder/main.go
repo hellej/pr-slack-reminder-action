@@ -38,7 +38,7 @@ func run() error {
 		log.Println("No PRs found and no message configured for this case, exiting")
 		return nil
 	}
-	blocks, summaryText := messagebuilder.ComposeMessage(content)
+	blocks, summaryText := messagebuilder.BuildMessage(content)
 	return slackClient.SendMessage(config.SlackChannelID, blocks, summaryText)
 }
 

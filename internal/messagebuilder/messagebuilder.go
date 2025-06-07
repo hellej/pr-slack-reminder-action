@@ -18,7 +18,7 @@ func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
 	)
 }
 
-func composePRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
+func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
@@ -32,7 +32,7 @@ func composePRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 func makePRListBlock(openPRs []prparser.PR) *slack.RichTextBlock {
 	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
-		prBlocks = append(prBlocks, composePRBulletPointBlock(pr))
+		prBlocks = append(prBlocks, buildPRBulletPointBlock(pr))
 	}
 	return slack.NewRichTextBlock(
 		"open_prs",
@@ -60,7 +60,7 @@ func addNoPRsBlock(blocks []slack.Block, noPRsText string) []slack.Block {
 	)
 }
 
-func ComposeMessage(content messagecontent.Content) (slack.Message, string) {
+func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if !content.HasPRs() {
