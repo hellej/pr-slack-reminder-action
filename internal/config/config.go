@@ -55,6 +55,5 @@ func GetConfig() Config {
 	if config.SlackChannelID == "" && config.SlackChannelName == "" {
 		panic("Either slack-channel-id or slack-channel-name must be set")
 	}
-
 	return config
 }

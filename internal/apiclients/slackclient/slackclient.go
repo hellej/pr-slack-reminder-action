@@ -8,15 +8,20 @@ import (
 	"github.com/slack-go/slack"
 )
 
-type Client struct {
+type Client interface {
+	GetChannelIDByName(channelName string) (string, error)
+	SendMessage(channelID string, blocks slack.Message, summaryText string) error
+}
+
+type client struct {
 	client *slack.Client
 }
 
 func GetClient(token string) Client {
-	return Client{client: slack.New(token)}
+	return client{client: slack.New(token)}
 }
 
-func (c Client) GetChannelIDByName(channelName string) (string, error) {
+func (c client) GetChannelIDByName(channelName string) (string, error) {
 	channels, cursor := []slack.Channel{}, ""
 
 	for {
@@ -44,7 +49,7 @@ func (c Client) GetChannelIDByName(channelName string) (string, error) {
 	return "", errors.New("channel not found")
 }
 
-func (c Client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
+func (c client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
 	_, _, err := c.client.PostMessage(
 		channelID,
 		slack.MsgOptionBlocks(blocks.Blocks.BlockSet...),

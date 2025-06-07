@@ -9,15 +9,19 @@ import (
 	"github.com/google/go-github/v72/github"
 )
 
-type Client struct {
+type Client interface {
+	FetchOpenPRs(repository string) []*github.PullRequest
+}
+
+type client struct {
 	client *github.Client
 }
 
 func GetClient(token string) Client {
-	return Client{client: github.NewClient(nil).WithAuthToken(token)}
+	return client{client: github.NewClient(nil).WithAuthToken(token)}
 }
 
-func (c Client) FetchOpenPRs(repository string) []*github.PullRequest {
+func (c client) FetchOpenPRs(repository string) []*github.PullRequest {
 	repoOwner, repoName := parseOwnerAndRepo(repository)
 	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
 	prs, response, err := c.client.PullRequests.List(context.Background(), repoOwner, repoName, nil)

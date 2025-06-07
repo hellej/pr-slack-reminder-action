@@ -1,6 +1,6 @@
 TEST=go test ./...
 GO_BUILD=go build -ldflags="-s -w"
-MAIN_GO=./cmd/pr-slack-reminder/main.go
+MAIN_GO=./cmd/pr-slack-reminder
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
 SEMVER =
 
@@ -9,7 +9,7 @@ test:
 	$(TEST)
 
 test-with-coverage:
-	$(TEST) -coverprofile=coverage.out -covermode=atomic
+	$(TEST) -coverprofile=coverage.out -covermode=atomic -coverpkg=./... 
 	go tool cover -func=coverage.out
 
 publish-code-coverage:
