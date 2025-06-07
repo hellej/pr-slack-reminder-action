@@ -22,7 +22,7 @@ func run() error {
 
 	if config.SlackChannelID == "" {
 		log.Println("Slack channel ID is not set, resolving it by name")
-		channelID, err := slackclient.GetChannelIDByName(slackClient, config.SlackChannelName)
+		channelID, err := slackClient.GetChannelIDByName(config.SlackChannelName)
 		if err != nil {
 			return fmt.Errorf("error getting channel ID by name: %v", err)
 		}
@@ -30,7 +30,7 @@ func run() error {
 	}
 
 	prs := prparser.ParsePRs(
-		githubclient.FetchOpenPRs(githubClient, config.Repository),
+		githubClient.FetchOpenPRs(config.Repository),
 		config.SlackUserIdByGitHubUsername,
 	)
 	content := messagecontent.GetContent(prs, config.ContentInputs)
@@ -39,7 +39,7 @@ func run() error {
 		return nil
 	}
 	blocks, summaryText := messagebuilder.ComposeMessage(content)
-	return slackclient.SendMessage(slackClient, config.SlackChannelID, blocks, summaryText)
+	return slackClient.SendMessage(config.SlackChannelID, blocks, summaryText)
 }
 
 func main() {

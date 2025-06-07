@@ -8,13 +8,19 @@ import (
 	"github.com/slack-go/slack"
 )
 
-var ErrChannelNotFound = errors.New("channel not found")
+type Client struct {
+	client *slack.Client
+}
 
-func GetChannelIDByName(api *slack.Client, channelName string) (string, error) {
+func GetClient(token string) Client {
+	return Client{client: slack.New(token)}
+}
+
+func (c Client) GetChannelIDByName(channelName string) (string, error) {
 	channels, cursor := []slack.Channel{}, ""
 
 	for {
-		result, nextCursor, err := api.GetConversations(&slack.GetConversationsParameters{
+		result, nextCursor, err := c.client.GetConversations(&slack.GetConversationsParameters{
 			Limit:           200,
 			Cursor:          cursor,
 			Types:           []string{"public_channel", "private_channel"},
@@ -35,15 +41,11 @@ func GetChannelIDByName(api *slack.Client, channelName string) (string, error) {
 			return ch.ID, nil
 		}
 	}
-	return "", ErrChannelNotFound
+	return "", errors.New("channel not found")
 }
 
-func GetClient(token string) *slack.Client {
-	return slack.New(token)
-}
-
-func SendMessage(api *slack.Client, channelID string, blocks slack.Message, summaryText string) error {
-	_, _, err := api.PostMessage(
+func (c Client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
+	_, _, err := c.client.PostMessage(
 		channelID,
 		slack.MsgOptionBlocks(blocks.Blocks.BlockSet...),
 		slack.MsgOptionText(summaryText, false),

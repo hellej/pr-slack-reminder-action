@@ -9,8 +9,26 @@ import (
 	"github.com/google/go-github/v72/github"
 )
 
-func GetClient(token string) *github.Client {
-	return github.NewClient(nil).WithAuthToken(token)
+type Client struct {
+	client *github.Client
+}
+
+func GetClient(token string) Client {
+	return Client{client: github.NewClient(nil).WithAuthToken(token)}
+}
+
+func (c Client) FetchOpenPRs(repository string) []*github.PullRequest {
+	repoOwner, repoName := parseOwnerAndRepo(repository)
+	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
+	prs, response, err := c.client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
+	if err != nil {
+		if response != nil && response.StatusCode == 404 {
+			log.Fatalf("Repository %s/%s not found. Check the repository name and permissions.", repoOwner, repoName)
+		} else {
+			log.Fatalf("Error fetching pull requests: %v", err)
+		}
+	}
+	return logFoundPRs(sortPRsByCreatedAt(prs))
 }
 
 func parseOwnerAndRepo(repository string) (string, string) {
@@ -53,18 +71,4 @@ func logFoundPRs(prs []*github.PullRequest) []*github.PullRequest {
 		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
 	}
 	return prs
-}
-
-func FetchOpenPRs(client *github.Client, repository string) []*github.PullRequest {
-	repoOwner, repoName := parseOwnerAndRepo(repository)
-	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
-	prs, response, err := client.PullRequests.List(context.Background(), repoOwner, repoName, nil)
-	if err != nil {
-		if response != nil && response.StatusCode == 404 {
-			log.Fatalf("Repository %s/%s not found. Check the repository name and permissions.", repoOwner, repoName)
-		} else {
-			log.Fatalf("Error fetching pull requests: %v", err)
-		}
-	}
-	return logFoundPRs(sortPRsByCreatedAt(prs))
 }
