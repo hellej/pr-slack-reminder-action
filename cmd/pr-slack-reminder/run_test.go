@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v72/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
@@ -53,21 +54,22 @@ func asSlackClientGetter(client *mockSlackClient) func(token string) slackclient
 	}
 }
 
-func setTestEnvironment(t *testing.T, noPrsMessage string) {
+func setTestEnvironment(t *testing.T, noPrsMessage string, githubUserSlackIdMapping string) {
 	t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
 	t.Setenv("INPUT_GITHUB-TOKEN", "SOME_TOKEN")
 	t.Setenv("INPUT_SLACK-BOT-TOKEN", "SOME_TOKEN")
 	t.Setenv("INPUT_SLACK-CHANNEL-NAME", "some-channel-name")
-	t.Setenv("INPUT_GITHUB-USER-SLACK-USER-ID-MAPPING", "someuser: USOMEID")
 	t.Setenv("INPUT_MAIN-LIST-HEADING", "There are <pr_count> open PRs 🚀")
+	if githubUserSlackIdMapping != "" {
+		t.Setenv("INPUT_GITHUB-USER-SLACK-USER-ID-MAPPING", githubUserSlackIdMapping)
+	}
 	if noPrsMessage != "" {
 		t.Setenv("INPUT_NO-PRS-MESSAGE", noPrsMessage)
 	}
-
 }
 
 func TestNoPRsFoundWithoutMessage(t *testing.T) {
-	setTestEnvironment(t, "")
+	setTestEnvironment(t, "", "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
 	mockSlackClient := mockSlackClient{}
 	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
@@ -81,7 +83,7 @@ func TestNoPRsFoundWithoutMessage(t *testing.T) {
 
 func TestNoPRsFoundWithMessage(t *testing.T) {
 	noPRsFoundMessage := "No PRs found, happy coding!"
-	setTestEnvironment(t, noPRsFoundMessage)
+	setTestEnvironment(t, noPRsFoundMessage, "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
 	mockSlackClient := mockSlackClient{}
 	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
@@ -92,6 +94,41 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 		t.Errorf(
 			"Expected summary to be %v, but got: %v",
 			noPRsFoundMessage,
+			mockSlackClient.sentMessage.summaryText,
+		)
+	}
+}
+
+func Test2PRsFound(t *testing.T) {
+	setTestEnvironment(t, "", "alice: U12345678")
+	pr1 := &github.PullRequest{
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+		Title:     github.Ptr("This is a test PR"),
+		User: &github.User{
+			Login: github.Ptr("stitch"),
+			Name:  github.Ptr("Stitch"),
+		},
+	}
+	pr2 := &github.PullRequest{
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-10 * time.Hour)},
+		Title:     github.Ptr("This is another test PR"),
+		User: &github.User{
+			Login: github.Ptr("alice"),
+			Name:  github.Ptr("Alice"),
+		},
+	}
+	prs := []*github.PullRequest{pr1, pr2}
+	getGitHubClient := makeMockGitHubClientGetter(prs)
+	mockSlackClient := mockSlackClient{}
+	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	expectedSummary := "2 open PRs are waiting for attention 👀"
+	if mockSlackClient.sentMessage.summaryText != expectedSummary {
+		t.Errorf(
+			"Expected summary to be %v, but got: %v",
+			expectedSummary,
 			mockSlackClient.sentMessage.summaryText,
 		)
 	}
