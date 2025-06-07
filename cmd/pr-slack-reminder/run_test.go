@@ -1,6 +1,9 @@
 package main_test
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -12,17 +15,35 @@ import (
 	"github.com/slack-go/slack"
 )
 
-type mockGitHubClient struct {
-	prs []*github.PullRequest
+type mockPullRequestsService struct {
+	mockPRs      []*github.PullRequest
+	mockResponse *github.Response
+	mockError    error
 }
 
-func (c mockGitHubClient) FetchOpenPRs(repository string) []*github.PullRequest {
-	return c.prs
+func (m *mockPullRequestsService) List(
+	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
+) ([]*github.PullRequest, *github.Response, error) {
+	return m.mockPRs, m.mockResponse, m.mockError
 }
 
 func makeMockGitHubClientGetter(prs []*github.PullRequest) func(token string) githubclient.Client {
 	return func(token string) githubclient.Client {
-		return mockGitHubClient{prs: prs}
+		return githubclient.NewClient(&mockPullRequestsService{
+			mockPRs: prs,
+			mockResponse: &github.Response{
+				Response: &http.Response{
+					StatusCode: 200,
+				},
+			},
+			mockError: nil,
+		})
+	}
+}
+
+func makeMockGitHubClientGetterWithPRService(prService mockPullRequestsService) func(token string) githubclient.Client {
+	return func(token string) githubclient.Client {
+		return githubclient.NewClient(&prService)
 	}
 }
 
@@ -55,8 +76,12 @@ func asSlackClientGetter(client *mockSlackClient) func(token string) slackclient
 	}
 }
 
-func setTestEnvironment(t *testing.T, noPrsMessage string, githubUserSlackIdMapping string) {
-	t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
+func setTestEnvironment(t *testing.T, repository string, noPrsMessage string, githubUserSlackIdMapping string) {
+	if repository != "" {
+		t.Setenv("GITHUB_REPOSITORY", repository)
+	} else {
+		t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
+	}
 	t.Setenv("INPUT_GITHUB-TOKEN", "SOME_TOKEN")
 	t.Setenv("INPUT_SLACK-BOT-TOKEN", "SOME_TOKEN")
 	t.Setenv("INPUT_SLACK-CHANNEL-NAME", "some-channel-name")
@@ -94,8 +119,61 @@ func TestWithMissingSlackInputs(t *testing.T) {
 	t.Errorf("Test failed, panic was expected")
 }
 
+func TestWithInvalidRepoInput(t *testing.T) {
+	setTestEnvironment(t, "invalid/repo/name", "", "")
+
+	defer func() {
+		if r := recover(); r != nil {
+			err, ok := r.(string)
+			if !ok {
+				t.Errorf("Expected panic value to be string, got: %T", r)
+				return
+			}
+			if !strings.Contains(err, "Invalid GITHUB_REPOSITORY format: invalid/repo/name") {
+				t.Errorf("Test failed, expected panic with specific message, got: %v", err)
+			}
+		}
+	}()
+	main.Run(
+		makeMockGitHubClientGetter([]*github.PullRequest{}),
+		asSlackClientGetter(&mockSlackClient{}),
+	)
+	t.Errorf("Test failed, panic was expected")
+}
+
+func TestPRFetchError(t *testing.T) {
+	setTestEnvironment(t, "", "", "")
+	defer func() {
+		if r := recover(); r != nil {
+			err, ok := r.(string)
+			if !ok {
+				t.Errorf("Expected panic value to be string, got: %T", r)
+				return
+			}
+			if !strings.Contains(err, "Repository test-org/test-repo not found") {
+				t.Errorf("Test failed, expected panic with specific message, got: %v", err)
+			}
+		}
+	}()
+	main.Run(
+		makeMockGitHubClientGetterWithPRService(
+			mockPullRequestsService{
+				mockPRs: []*github.PullRequest{},
+				mockResponse: &github.Response{
+					Response: &http.Response{
+						StatusCode: 404,
+					},
+				},
+				mockError: errors.New("Unable to fetch PRs"),
+			},
+		),
+		asSlackClientGetter(&mockSlackClient{}),
+	)
+	t.Errorf("Test failed, panic was expected")
+}
+
 func TestNoPRsFoundWithoutMessage(t *testing.T) {
-	setTestEnvironment(t, "", "")
+	setTestEnvironment(t, "", "", "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
 	mockSlackClient := mockSlackClient{}
 	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
@@ -109,7 +187,7 @@ func TestNoPRsFoundWithoutMessage(t *testing.T) {
 
 func TestNoPRsFoundWithMessage(t *testing.T) {
 	noPRsFoundMessage := "No PRs found, happy coding!"
-	setTestEnvironment(t, noPRsFoundMessage, "")
+	setTestEnvironment(t, "", noPRsFoundMessage, "")
 	getGitHubClient := makeMockGitHubClientGetter([]*github.PullRequest{})
 	mockSlackClient := mockSlackClient{}
 	err := main.Run(getGitHubClient, asSlackClientGetter(&mockSlackClient))
@@ -126,7 +204,7 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 }
 
 func Test3PRsFound(t *testing.T) {
-	setTestEnvironment(t, "", "alice: U12345678")
+	setTestEnvironment(t, "", "", "alice: U12345678")
 	pr1 := &github.PullRequest{
 		Number:    github.Ptr(1),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
