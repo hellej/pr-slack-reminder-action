@@ -68,20 +68,11 @@ func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]str
 }
 
 func sortPRsByCreatedAt(prs []PR) []PR {
-	slices.SortFunc(prs, func(a, b PR) int {
-		if a.GetCreatedAt().After(b.GetCreatedAt().Time) {
-			return -1
+	slices.SortStableFunc(prs, func(a, b PR) int {
+		if !a.GetCreatedAt().Time.Equal(b.GetCreatedAt().Time) {
+			return b.GetCreatedAt().Time.Compare(a.GetCreatedAt().Time)
 		}
-		if a.GetCreatedAt().Before(b.GetCreatedAt().Time) {
-			return 1
-		}
-		if a.GetUpdatedAt().After(b.GetUpdatedAt().Time) {
-			return -1
-		}
-		if a.GetUpdatedAt().Before(b.GetUpdatedAt().Time) {
-			return 1
-		}
-		return 0
+		return b.GetUpdatedAt().Time.Compare(a.GetUpdatedAt().Time)
 	})
 	return prs
 }
