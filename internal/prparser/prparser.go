@@ -46,6 +46,21 @@ func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string
 	return logFoundPRs(sortPRsByCreatedAt(parsedPRs))
 }
 
+func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
+	if slackUserIdByGitHubUsername == nil {
+		return PR{
+			PullRequest: pr,
+			GetAuthorSlackUserId: func() (string, bool) {
+				return "", false
+			},
+		}
+	}
+	return PR{
+		PullRequest:          pr,
+		GetAuthorSlackUserId: getAuthorSlackUserId(pr, slackUserIdByGitHubUsername),
+	}
+}
+
 func getAuthorSlackUserId(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
 	return func() (string, bool) {
 		gitHubUsername := pr.GetUser().GetLogin()
@@ -57,13 +72,6 @@ func getAuthorSlackUserId(pr *github.PullRequest, slackUserIdByGitHubUsername *m
 			return "", false
 		}
 		return slackUserId, true
-	}
-}
-
-func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
-	return PR{
-		PullRequest:          pr,
-		GetAuthorSlackUserId: getAuthorSlackUserId(pr, slackUserIdByGitHubUsername),
 	}
 }
 

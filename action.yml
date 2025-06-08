@@ -11,7 +11,7 @@ inputs: {
   },
   slack-channel-name: {
     description: 'Slack channel name to send the message to',
-    required: true,
+    required: false,
   },
   slack-channel-id: {
     description: 'Slack channel ID to send the message to',
@@ -29,6 +29,11 @@ inputs: {
   old-prs-list-heading: {
     description: 'Heading for the list of old PRs (right under the main heading)',
     required: false,
+  },
+  old-pr-threshold-hours: {
+    description: 'Threshold in hours to consider a PR as old (if used, also old-prs-list-heading must be set)',
+    required: false,
+    type: number,
   },
   no-prs-message: {
     description: 'Message to send when there are no open PRs',

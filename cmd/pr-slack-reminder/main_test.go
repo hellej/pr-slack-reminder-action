@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-github/v72/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
+	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
@@ -138,8 +139,10 @@ func TestNoPRsFoundWithMessage(t *testing.T) {
 	}
 }
 
-func TestWith3PRsFound(t *testing.T) {
-	setTestEnvironment(t, "", "", "alice: U12345678")
+func TestWith3PRsFoundWithMinimalConfig(t *testing.T) {
+	config := testhelpers.GetDefaultConfigMinimal()
+	testhelpers.SetTestEnvironment(t, config, nil)
+
 	pr1 := &github.PullRequest{
 		Number:    github.Ptr(1),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
@@ -160,7 +163,54 @@ func TestWith3PRsFound(t *testing.T) {
 	}
 	pr3 := &github.PullRequest{
 		Number:    github.Ptr(3),
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-25 * time.Hour)},
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
+		Title:     github.Ptr("This is another test PR"),
+		User: &github.User{
+			Login: github.Ptr("bob"),
+		},
+	}
+	prs := []*github.PullRequest{pr1, pr2, pr3}
+	getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(prs, 200, nil)
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(nil, nil, nil)
+	err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI))
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	expectedSummary := "3 open PRs are waiting for attention 👀"
+	if mockSlackAPI.SentMessage.Text != expectedSummary {
+		t.Errorf(
+			"Expected summary to be %v, but got: %v",
+			expectedSummary,
+			mockSlackAPI.SentMessage.Text,
+		)
+	}
+}
+
+func TestWith3PRsFoundWithFullConfig(t *testing.T) {
+	c := testhelpers.GetDefaultConfigFull()
+	testhelpers.SetTestEnvironment(t, c, &map[string]any{config.InputOldPRThresholdHours: 12})
+
+	pr1 := &github.PullRequest{
+		Number:    github.Ptr(1),
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
+		Title:     github.Ptr("This is a test PR"),
+		User: &github.User{
+			Login: github.Ptr("stitch"),
+			Name:  github.Ptr("Stitch"),
+		},
+	}
+	pr2 := &github.PullRequest{
+		Number:    github.Ptr(2),
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+		Title:     github.Ptr("This is another test PR"),
+		User: &github.User{
+			Login: github.Ptr("alice"),
+			Name:  github.Ptr("Alice"),
+		},
+	}
+	pr3 := &github.PullRequest{
+		Number:    github.Ptr(3),
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
 		Title:     github.Ptr("This is another test PR"),
 		User: &github.User{
 			Login: github.Ptr("bob"),

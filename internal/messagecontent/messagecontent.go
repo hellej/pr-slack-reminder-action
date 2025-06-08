@@ -2,7 +2,6 @@ package messagecontent
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -25,14 +24,6 @@ func (c Content) GetPRCount() int16 {
 
 func (c Content) HasPRs() bool {
 	return c.GetPRCount() > 0
-}
-
-func getOldPRsThresholdTimeLabel(oldPRThresholdHours int) string {
-	if oldPRThresholdHours < 24 {
-		return fmt.Sprintf("%d hours", oldPRThresholdHours)
-	}
-	days := int(math.Round(float64(oldPRThresholdHours / 24)))
-	return fmt.Sprintf("%d days", days)
 }
 
 type PRCategory struct {
@@ -75,7 +66,7 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 		content := Content{
 			MainListHeading:   formatMainListHeading(contentInputs.MainListHeading, len(openPRs)),
 			MainList:          newPRs,
-			OldPRsListHeading: fmt.Sprintf("🚨 PRs older than %v", getOldPRsThresholdTimeLabel(*contentInputs.OldPRThresholdHours)),
+			OldPRsListHeading: contentInputs.OldPRsListHeading,
 			OldPRsList:        oldPRs,
 		}
 		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention 👀", content.GetPRCount())
