@@ -16,7 +16,10 @@ func Run(
 	getGitHubClient func(token string) githubclient.Client,
 	getSlackClient func(token string) slackclient.Client,
 ) error {
-	config := config.GetConfig()
+	config, err := config.GetConfig()
+	if err != nil {
+		return fmt.Errorf("configuration error: %v", err)
+	}
 	config.Print()
 	githubClient := getGitHubClient(config.GithubToken)
 	slackClient := getSlackClient(config.SlackBotToken)

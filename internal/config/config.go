@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
 )
@@ -51,7 +50,7 @@ func (c Config) Print() {
 	fmt.Println(string(asJson))
 }
 
-func GetConfig() Config {
+func GetConfig() (Config, error) {
 	config := Config{
 		Repository:                  utilities.GetEnvRequired(EnvGithubRepository),
 		GithubToken:                 utilities.GetInputRequired(InputGithubToken),
@@ -67,10 +66,14 @@ func GetConfig() Config {
 		},
 	}
 	if config.SlackChannelID == "" && config.SlackChannelName == "" {
-		log.Panic("Either slack-channel-id or slack-channel-name must be set")
+		return Config{}, fmt.Errorf(
+			"either %s or %s must be set", InputSlackChannelID, InputSlackChannelName,
+		)
 	}
 	if config.ContentInputs.OldPRThresholdHours != nil && config.ContentInputs.OldPRsListHeading == "" {
-		log.Panic("If old-pr-threshold-hours is set, old-prs-list-heading must also be set")
+		return Config{}, fmt.Errorf(
+			"if %s is set, %s must also be set", InputOldPRThresholdHours, InputOldPRsListHeading,
+		)
 	}
-	return config
+	return config, nil
 }

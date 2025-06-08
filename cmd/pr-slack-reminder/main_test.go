@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,20 +33,42 @@ func setTestEnvironment(t *testing.T, repository string, noPrsMessage string, gi
 }
 
 func TestWithMissingSlackInputs(t *testing.T) {
-	t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
-	t.Setenv("INPUT_GITHUB-TOKEN", "SOME_TOKEN")
-	t.Setenv("INPUT_SLACK-BOT-TOKEN", "SOME_TOKEN")
-	t.Setenv("INPUT_MAIN-LIST-HEADING", "There are <pr_count> open PRs 🚀")
-
-	defer func() {
-		testhelpers.AssertPanicStringContains(
-			t, recover(), "Either slack-channel-id or slack-channel-name must be set",
-		)
-	}()
-	main.Run(
+	c := testhelpers.GetDefaultConfigMinimal()
+	testhelpers.SetTestEnvironment(
+		t, c,
+		&map[string]any{
+			config.InputSlackChannelID:   "",
+			config.InputSlackChannelName: "",
+		},
+	)
+	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil),
 		mockslackclient.MakeSlackClientGetter(nil),
 	)
+	expectedError := "configuration error: either slack-channel-id or slack-channel-name must be set"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error: %v, got: %v", expectedError, err)
+	}
+}
+
+func TestWithOldPRsThresholdButNoHeading(t *testing.T) {
+	c := testhelpers.GetDefaultConfigMinimal()
+	testhelpers.SetTestEnvironment(
+		t, c,
+		&map[string]any{
+			config.InputOldPRThresholdHours: 10,
+			config.InputOldPRsListHeading:   nil,
+		},
+	)
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil),
+		mockslackclient.MakeSlackClientGetter(nil),
+	)
+	expectedError := "configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error: %v, got: %v", expectedError, err)
+	}
 }
 
 func TestWithInvalidRepoInput(t *testing.T) {
