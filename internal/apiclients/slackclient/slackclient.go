@@ -42,7 +42,7 @@ func (c *client) GetChannelIDByName(channelName string) (string, error) {
 			ExcludeArchived: true,
 		})
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%v (check permissions and token)", err)
 		}
 		channels = append(channels, result...)
 		if nextCursor == "" {

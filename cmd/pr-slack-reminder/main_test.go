@@ -92,6 +92,34 @@ func TestNoPRsFoundWithoutMessage(t *testing.T) {
 	}
 }
 
+func TestUnableToGetChannelID(t *testing.T) {
+	setTestEnvironment(t, "", "No PRs found, happy coding!", "")
+	getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil)
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(nil, errors.New("Unable to get channels"), nil)
+	err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI))
+	expectedError := "error getting channel ID by name: Unable to get channels (check permissions and token)"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error message '%v', got: %v", expectedError, err.Error())
+	}
+}
+
+func TestChannelNotFound(t *testing.T) {
+	setTestEnvironment(t, "", "No PRs found, happy coding!", "")
+	getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil)
+	mockSlackChannels := []*mockslackclient.SlackChannel{
+		{
+			ID:   "C32345678",
+			Name: "not-the-channel-name-provided-in-input",
+		},
+	}
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockSlackChannels, nil, nil)
+	err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI))
+	expectedError := "error getting channel ID by name: channel not found"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error message '%v', got: %v", expectedError, err.Error())
+	}
+}
+
 func TestNoPRsFoundWithMessage(t *testing.T) {
 	noPRsFoundMessage := "No PRs found, happy coding!"
 	setTestEnvironment(t, "", noPRsFoundMessage, "")

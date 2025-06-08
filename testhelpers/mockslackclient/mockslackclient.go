@@ -16,12 +16,12 @@ func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclien
 }
 
 func GetMockSlackAPI(
-	slackChannels []SlackChannel,
+	slackChannels []*SlackChannel,
 	findChannelError error,
 	postMessageError error,
 ) *MockSlackAPI {
 	if slackChannels == nil {
-		slackChannels = []SlackChannel{
+		slackChannels = []*SlackChannel{
 			{ID: "C12345678", Name: "some-channel-name"},
 		}
 	}
