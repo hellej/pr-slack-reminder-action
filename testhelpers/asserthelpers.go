@@ -1,11 +1,11 @@
-package testutils
+package testhelpers
 
 import (
 	"strings"
 	"testing"
 )
 
-func AssertIsPanic(t *testing.T, r interface{}) {
+func AssertIsPanic(t *testing.T, r any) {
 	t.Helper()
 	if r == nil {
 		t.Errorf("Test failed, expected panic but got nil")
@@ -14,7 +14,7 @@ func AssertIsPanic(t *testing.T, r interface{}) {
 	}
 }
 
-func AssertPanicStringContains(t *testing.T, r interface{}, expectedSubstring string) {
+func AssertPanicStringContains(t *testing.T, r any, expectedSubstring string) {
 	t.Helper()
 	AssertIsPanic(t, r)
 	panicMsg, ok := r.(string)
