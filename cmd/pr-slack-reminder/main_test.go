@@ -84,14 +84,9 @@ func TestWithInvalidRepoInput(t *testing.T) {
 	)
 }
 
-func TestPRFetchError(t *testing.T) {
-	defer func() {
-		testhelpers.AssertPanicStringContains(
-			t, recover(), "Repository test-org/test-repo not found. Check the repository name and permissions",
-		)
-	}()
+func TestPRFetchRepoNotFoundError(t *testing.T) {
 	setTestEnvironment(t, "test-org/test-repo", "", "")
-	main.Run(
+	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(
 			[]*github.PullRequest{},
 			404,
@@ -99,6 +94,26 @@ func TestPRFetchError(t *testing.T) {
 		),
 		mockslackclient.MakeSlackClientGetter(nil),
 	)
+	expectedError := "repository test-org/test-repo not found - check the repository name and permissions"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error: %v, got: %v", expectedError, err)
+	}
+}
+
+func TestPRFetchError(t *testing.T) {
+	setTestEnvironment(t, "test-org/test-repo", "", "")
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(
+			[]*github.PullRequest{},
+			500,
+			errors.New("unable to fetch PRs"),
+		),
+		mockslackclient.MakeSlackClientGetter(nil),
+	)
+	expectedError := "error fetching pull requests from test-org/test-repo: unable to fetch PRs"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error: %v, got: %v", expectedError, err)
+	}
 }
 
 func TestNoPRsFoundWithoutMessage(t *testing.T) {

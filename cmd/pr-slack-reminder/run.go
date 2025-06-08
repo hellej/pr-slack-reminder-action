@@ -33,11 +33,12 @@ func Run(
 		config.SlackChannelID = channelID
 	}
 
-	prs := prparser.ParsePRs(
-		githubClient.FetchOpenPRs(config.Repository),
-		config.SlackUserIdByGitHubUsername,
-	)
-	content := messagecontent.GetContent(prs, config.ContentInputs)
+	prs, err := githubClient.FetchOpenPRs(config.Repository)
+	if err != nil {
+		return err
+	}
+	parsedPRs := prparser.ParsePRs(prs, config.SlackUserIdByGitHubUsername)
+	content := messagecontent.GetContent(parsedPRs, config.ContentInputs)
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("No PRs found and no message configured for this case, exiting")
 		return nil

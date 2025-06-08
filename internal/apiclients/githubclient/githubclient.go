@@ -2,6 +2,7 @@ package githubclient
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type Client interface {
-	FetchOpenPRs(repository string) []*github.PullRequest
+	FetchOpenPRs(repository string) ([]*github.PullRequest, error)
 }
 
 type githubPullRequestsService interface {
@@ -29,18 +30,22 @@ func GetAuthenticatedClient(token string) Client {
 	return NewClient(ghClient.PullRequests)
 }
 
-func (c *client) FetchOpenPRs(repository string) []*github.PullRequest {
+func (c *client) FetchOpenPRs(repository string) ([]*github.PullRequest, error) {
 	repoOwner, repoName := parseOwnerAndRepo(repository)
 	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
 	prs, response, err := c.prsService.List(context.Background(), repoOwner, repoName, nil)
 	if err != nil {
 		if response != nil && response.StatusCode == 404 {
-			log.Panicf("Repository %s/%s not found. Check the repository name and permissions.", repoOwner, repoName)
+			return nil, fmt.Errorf(
+				"repository %s/%s not found - check the repository name and permissions",
+				repoOwner,
+				repoName,
+			)
 		} else {
-			log.Panicf("Error fetching pull requests: %v", err)
+			return nil, fmt.Errorf("error fetching pull requests from %s/%s: %v", repoOwner, repoName, err)
 		}
 	}
-	return prs
+	return prs, nil
 }
 
 func parseOwnerAndRepo(repository string) (string, string) {
