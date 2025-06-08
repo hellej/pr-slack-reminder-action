@@ -13,21 +13,22 @@ type Client interface {
 	SendMessage(channelID string, blocks slack.Message, summaryText string) error
 }
 
-type slackAPI interface {
+func GetAuthenticatedClient(token string) Client {
+	return NewClient(slack.New(token))
+}
+
+func NewClient(slackAPI SlackAPI) Client {
+	return &client{slackAPI: slackAPI}
+}
+
+// represents the Slack API methods relevant to us from github.com/slack-go/slack
+type SlackAPI interface {
 	GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error)
 	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
 }
 
 type client struct {
-	slackAPI slackAPI
-}
-
-func NewClient(slackAPI slackAPI) Client {
-	return &client{slackAPI: slackAPI}
-}
-
-func GetAuthenticatedClient(token string) Client {
-	return NewClient(slack.New(token))
+	slackAPI SlackAPI
 }
 
 func (c *client) GetChannelIDByName(channelName string) (string, error) {
@@ -58,7 +59,7 @@ func (c *client) GetChannelIDByName(channelName string) (string, error) {
 	return "", errors.New("channel not found")
 }
 
-func (c client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
+func (c *client) SendMessage(channelID string, blocks slack.Message, summaryText string) error {
 	_, _, err := c.slackAPI.PostMessage(
 		channelID,
 		slack.MsgOptionBlocks(blocks.Blocks.BlockSet...),

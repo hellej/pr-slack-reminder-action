@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
+	"github.com/hellej/pr-slack-reminder-action/internal/testutils"
 )
 
 func TestReadInput(t *testing.T) {
@@ -21,12 +22,9 @@ func TestReadInput(t *testing.T) {
 
 func TestReadInputRequired(t *testing.T) {
 	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Test passed, panic was caught!")
-		}
+		testutils.AssertIsPanic(t, recover())
 	}()
 	utilities.GetInputRequired("test")
-	t.Errorf("Test failed, panic was expected")
 }
 
 func TestReadInputIntOk(t *testing.T) {
@@ -39,16 +37,11 @@ func TestReadInputIntOk(t *testing.T) {
 }
 
 func TestReadInputIntInvalid(t *testing.T) {
-	t.Setenv("INPUT_TEST", "a")
-
 	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Test passed, panic was caught!")
-		}
+		testutils.AssertIsPanic(t, recover())
 	}()
-
+	t.Setenv("INPUT_TEST", "a")
 	utilities.GetInputInt("test")
-	t.Errorf("Test failed, panic was expected")
 }
 
 func TestReadStringMapping(t *testing.T) {
@@ -68,27 +61,17 @@ func TestReadStringMapping(t *testing.T) {
 }
 
 func TestReadInputMappingInvalid1(t *testing.T) {
-	t.Setenv("INPUT_TEST", "a:b;c")
-
 	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Test passed, panic was caught!")
-		}
+		testutils.AssertIsPanic(t, recover())
 	}()
-
+	t.Setenv("INPUT_TEST", "a:b;c")
 	utilities.GetInputMapping("test")
-	t.Errorf("Test failed, panic was expected")
 }
 
 func TestReadInputMappingInvalid2(t *testing.T) {
-	t.Setenv("INPUT_TEST", " ;a:b;c: ")
-
 	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Test passed, panic was caught!")
-		}
+		testutils.AssertIsPanic(t, recover())
 	}()
-
+	t.Setenv("INPUT_TEST", " ;a:b;c: ")
 	utilities.GetInputMapping("test")
-	t.Errorf("Test failed, panic was expected")
 }
