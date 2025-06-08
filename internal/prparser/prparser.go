@@ -47,7 +47,7 @@ func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string
 }
 
 func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
-	if slackUserIdByGitHubUsername == nil {
+	if slackUserIdByGitHubUsername == nil || len(*slackUserIdByGitHubUsername) == 0 {
 		return PR{
 			PullRequest: pr,
 			GetAuthorSlackUserId: func() (string, bool) {

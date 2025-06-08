@@ -69,7 +69,6 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 		}
 	}
 	if value == nil {
-		t.Setenv(inputNameAsEnv(inputName), "")
 		return
 	}
 	switch v := value.(type) {
