@@ -19,6 +19,7 @@ type TestPRs struct {
 	PR1 *github.PullRequest
 	PR2 *github.PullRequest
 	PR3 *github.PullRequest
+	PR4 *github.PullRequest
 }
 
 func getTestPRs() TestPRs {
@@ -31,7 +32,6 @@ func getTestPRs() TestPRs {
 			Name:  github.Ptr("Stitch"),
 		},
 	}
-
 	pr2 := &github.PullRequest{
 		Number:    github.Ptr(2),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
@@ -41,7 +41,6 @@ func getTestPRs() TestPRs {
 			Name:  github.Ptr("Alice"),
 		},
 	}
-
 	pr3 := &github.PullRequest{
 		Number:    github.Ptr(3),
 		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
@@ -50,12 +49,21 @@ func getTestPRs() TestPRs {
 			Login: github.Ptr("bob"),
 		},
 	}
+	pr4 := &github.PullRequest{
+		Number:    github.Ptr(3),
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
+		Title:     github.Ptr("This is another test PR"),
+		User: &github.User{
+			Name: github.Ptr("Jim"),
+		},
+	}
 
 	return TestPRs{
-		PRs: []*github.PullRequest{pr1, pr2, pr3},
+		PRs: []*github.PullRequest{pr1, pr2, pr3, pr4},
 		PR1: pr1,
 		PR2: pr2,
 		PR3: pr3,
+		PR4: pr4,
 	}
 }
 
@@ -72,6 +80,14 @@ func TestScenarios(t *testing.T) {
 		expectedErrorMsg   *string
 		expectedSummary    *string
 	}{
+		{
+			name:   "unset required inputs",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputSlackBotToken: nil,
+			},
+			expectedErrorMsg: testhelpers.AsPointer("configuration error: required input slack-bot-token is not set"),
+		},
 		{
 			name:   "missing Slack inputs",
 			config: testhelpers.GetDefaultConfigMinimal(),
@@ -140,20 +156,17 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: testhelpers.AsPointer("error getting channel ID by name: unable to get channels (check permissions and token)"),
 		},
 		{
-			name:             "minimal config with 3 PRs",
-			config:           testhelpers.GetDefaultConfigMinimal(),
-			configOverrides:  nil,
-			prs:              getTestPRs().PRs,
-			expectedErrorMsg: nil,
-			expectedSummary:  testhelpers.AsPointer("3 open PRs are waiting for attention 👀"),
+			name:            "minimal config with 4 PRs",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			prs:             getTestPRs().PRs,
+			expectedSummary: testhelpers.AsPointer("4 open PRs are waiting for attention 👀"),
 		},
 		{
-			name:             "full config with 3 PRs including old PRs",
-			config:           testhelpers.GetDefaultConfigFull(),
-			configOverrides:  &map[string]any{config.InputOldPRThresholdHours: 12},
-			prs:              getTestPRs().PRs,
-			expectedErrorMsg: nil,
-			expectedSummary:  testhelpers.AsPointer("3 open PRs are waiting for attention 👀"),
+			name:            "full config with 4 PRs including old PRs",
+			config:          testhelpers.GetDefaultConfigFull(),
+			configOverrides: &map[string]any{config.InputOldPRThresholdHours: 12},
+			prs:             getTestPRs().PRs,
+			expectedSummary: testhelpers.AsPointer("4 open PRs are waiting for attention 👀"),
 		},
 	}
 
