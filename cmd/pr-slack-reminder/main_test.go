@@ -59,7 +59,7 @@ func getTestPRs() TestPRs {
 	}
 }
 
-func TestRunScenarios(t *testing.T) {
+func TestScenarios(t *testing.T) {
 	testCases := []struct {
 		name               string
 		config             config.Config
