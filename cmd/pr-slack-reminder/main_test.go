@@ -14,45 +14,6 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
 )
 
-func TestWithMissingSlackInputs(t *testing.T) {
-	c := testhelpers.GetDefaultConfigMinimal()
-	testhelpers.SetTestEnvironment(
-		t, c,
-		&map[string]any{
-			config.InputSlackChannelID:   "",
-			config.InputSlackChannelName: "",
-		},
-	)
-	err := main.Run(
-		mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil),
-		mockslackclient.MakeSlackClientGetter(nil),
-	)
-	expectedError := "configuration error: either slack-channel-id or slack-channel-name must be set"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error: %v, got: %v", expectedError, err)
-	}
-}
-
-func TestWithOldPRsThresholdButNoHeading(t *testing.T) {
-	c := testhelpers.GetDefaultConfigMinimal()
-	testhelpers.SetTestEnvironment(
-		t, c,
-		&map[string]any{
-			config.InputOldPRThresholdHours: 10,
-			config.InputOldPRsListHeading:   nil,
-		},
-	)
-
-	err := main.Run(
-		mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil),
-		mockslackclient.MakeSlackClientGetter(nil),
-	)
-	expectedError := "configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error: %v, got: %v", expectedError, err)
-	}
-}
-
 type TestPRs struct {
 	PRs []*github.PullRequest
 	PR1 *github.PullRequest
@@ -111,6 +72,24 @@ func TestRunScenarios(t *testing.T) {
 		expectedErrorMsg   *string
 		expectedSummary    *string
 	}{
+		{
+			name:   "missing Slack inputs",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputSlackChannelID:   "",
+				config.InputSlackChannelName: "",
+			},
+			expectedErrorMsg: testhelpers.AsPointer("configuration error: either slack-channel-id or slack-channel-name must be set"),
+		},
+		{
+			name:   "old PRs threshold hours but no heading",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputOldPRThresholdHours: 10,
+				config.InputOldPRsListHeading:   nil,
+			},
+			expectedErrorMsg: testhelpers.AsPointer("configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set"),
+		},
 		{
 			name:             "invalid repository input",
 			config:           testhelpers.GetDefaultConfigMinimal(),
