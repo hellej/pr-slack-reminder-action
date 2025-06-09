@@ -48,7 +48,7 @@ func GetDefaultConfigMinimal() config.Config {
 	}
 }
 
-func setEnvFromConfig(t *testing.T, c config.Config, overrides *map[string]interface{}) {
+func setEnvFromConfig(t *testing.T, c config.Config, overrides *map[string]any) {
 	t.Setenv(config.EnvGithubRepository, c.Repository)
 	setInputEnv(t, overrides, config.InputGithubToken, c.GithubToken)
 	setInputEnv(t, overrides, config.InputSlackBotToken, c.SlackBotToken)
