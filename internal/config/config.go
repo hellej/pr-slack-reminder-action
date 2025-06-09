@@ -51,18 +51,29 @@ func (c Config) Print() {
 }
 
 func GetConfig() (Config, error) {
+	repository, err1 := utilities.GetEnvRequired(EnvGithubRepository)
+	githubToken, err2 := utilities.GetInputRequired(InputGithubToken)
+	slackToken, err3 := utilities.GetInputRequired(InputSlackBotToken)
+	mainListHeading, err4 := utilities.GetInputRequired(InputMainListHeading)
+	oldPRsThresholdHours, err5 := utilities.GetInputInt(InputOldPRThresholdHours)
+	slackUserIdByGitHubUsername, err6 := utilities.GetInputMapping(InputSlackUserIdByGitHubUsername)
+
+	if err := selectNonNilError(err1, err2, err3, err4, err5, err6); err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
-		Repository:                  utilities.GetEnvRequired(EnvGithubRepository),
-		GithubToken:                 utilities.GetInputRequired(InputGithubToken),
-		SlackBotToken:               utilities.GetInputRequired(InputSlackBotToken),
+		Repository:                  repository,
+		GithubToken:                 githubToken,
+		SlackBotToken:               slackToken,
 		SlackChannelName:            utilities.GetInput(InputSlackChannelName),
 		SlackChannelID:              utilities.GetInput(InputSlackChannelID),
-		SlackUserIdByGitHubUsername: utilities.GetInputMapping(InputSlackUserIdByGitHubUsername),
+		SlackUserIdByGitHubUsername: slackUserIdByGitHubUsername,
 		ContentInputs: ContentInputs{
 			NoPRsMessage:        utilities.GetInput(InputNoPRsMessage),
-			MainListHeading:     utilities.GetInputRequired(InputMainListHeading),
+			MainListHeading:     mainListHeading,
 			OldPRsListHeading:   utilities.GetInput(InputOldPRsListHeading),
-			OldPRThresholdHours: utilities.GetInputInt(InputOldPRThresholdHours),
+			OldPRThresholdHours: oldPRsThresholdHours,
 		},
 	}
 	if config.SlackChannelID == "" && config.SlackChannelName == "" {
@@ -76,4 +87,13 @@ func GetConfig() (Config, error) {
 		)
 	}
 	return config, nil
+}
+
+func selectNonNilError(errs ...error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
-	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 func TestReadInput(t *testing.T) {
@@ -21,15 +20,15 @@ func TestReadInput(t *testing.T) {
 }
 
 func TestReadInputRequired(t *testing.T) {
-	defer func() {
-		testhelpers.AssertIsPanic(t, recover())
-	}()
-	utilities.GetInputRequired("test")
+	_, err := utilities.GetInputRequired("test")
+	if err == nil {
+		t.Errorf("Expected error for missing required input, got nil")
+	}
 }
 
 func TestReadInputIntOk(t *testing.T) {
 	t.Setenv("INPUT_TEST", "1")
-	value := utilities.GetInputInt("test")
+	value, _ := utilities.GetInputInt("test")
 	expected := 1
 	if *value != expected {
 		t.Errorf("Expected '%d', got '%v'", expected, value)
@@ -37,16 +36,20 @@ func TestReadInputIntOk(t *testing.T) {
 }
 
 func TestReadInputIntInvalid(t *testing.T) {
-	defer func() {
-		testhelpers.AssertIsPanic(t, recover())
-	}()
 	t.Setenv("INPUT_TEST", "a")
-	utilities.GetInputInt("test")
+	_, err := utilities.GetInputInt("test")
+	if err == nil {
+		t.Errorf("Expected error for invalid int input, got nil")
+	}
+	expectedError := "error parsing input test as integer: strconv.Atoi: parsing \"a\": invalid syntax"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error %v, got '%v'", expectedError, err)
+	}
 }
 
 func TestReadStringMapping(t *testing.T) {
 	t.Setenv("INPUT_TEST", "a:b;c:d")
-	mapping := utilities.GetInputMapping("test")
+	mapping, _ := utilities.GetInputMapping("test")
 	expected := map[string]string{"a": "b", "c": "d"}
 
 	for key, expected := range expected {
@@ -59,19 +62,18 @@ func TestReadStringMapping(t *testing.T) {
 		}
 	}
 }
-
 func TestReadInputMappingInvalid1(t *testing.T) {
-	defer func() {
-		testhelpers.AssertIsPanic(t, recover())
-	}()
 	t.Setenv("INPUT_TEST", "a:b;c")
-	utilities.GetInputMapping("test")
+	_, err := utilities.GetInputMapping("test")
+	if err == nil {
+		t.Errorf("Expected error for invalid mapping input, got nil")
+	}
 }
 
 func TestReadInputMappingInvalid2(t *testing.T) {
-	defer func() {
-		testhelpers.AssertIsPanic(t, recover())
-	}()
 	t.Setenv("INPUT_TEST", " ;a:b;c: ")
-	utilities.GetInputMapping("test")
+	_, err := utilities.GetInputMapping("test")
+	if err == nil {
+		t.Errorf("Expected error for invalid mapping input, got nil")
+	}
 }

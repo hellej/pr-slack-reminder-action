@@ -49,7 +49,7 @@ func GetDefaultConfigMinimal() config.Config {
 }
 
 func setEnvFromConfig(t *testing.T, c config.Config, overrides *map[string]any) {
-	t.Setenv(config.EnvGithubRepository, c.Repository)
+	setInputEnv(t, overrides, config.EnvGithubRepository, c.Repository)
 	setInputEnv(t, overrides, config.InputGithubToken, c.GithubToken)
 	setInputEnv(t, overrides, config.InputSlackBotToken, c.SlackBotToken)
 	setInputEnv(t, overrides, config.InputSlackChannelName, c.SlackChannelName)
@@ -71,6 +71,12 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 	if value == nil {
 		return
 	}
+
+	envName := inputNameAsEnv(inputName)
+	if inputName == config.EnvGithubRepository {
+		envName = inputName
+	}
+
 	switch v := value.(type) {
 	case *map[string]string:
 		strValue = mappingAsString(v)
@@ -80,14 +86,14 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 		strValue = strconv.Itoa(v)
 	case *int:
 		if v == nil {
-			t.Setenv(inputNameAsEnv(inputName), "")
+			t.Setenv(envName, "")
 			return
 		}
 		strValue = strconv.Itoa(*v)
 	default:
 		t.Fatalf("unsupported value type for setInputEnv: %T", value)
 	}
-	t.Setenv(inputNameAsEnv(inputName), strValue)
+	t.Setenv(envName, strValue)
 }
 
 func mappingAsString(mapping *map[string]string) string {

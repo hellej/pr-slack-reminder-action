@@ -14,24 +14,6 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
 )
 
-func setTestEnvironment(t *testing.T, repository string, noPrsMessage string, githubUserSlackIdMapping string) {
-	if repository != "" {
-		t.Setenv("GITHUB_REPOSITORY", repository)
-	} else {
-		t.Setenv("GITHUB_REPOSITORY", "test-org/test-repo")
-	}
-	t.Setenv("INPUT_GITHUB-TOKEN", "SOME_TOKEN")
-	t.Setenv("INPUT_SLACK-BOT-TOKEN", "SOME_TOKEN")
-	t.Setenv("INPUT_SLACK-CHANNEL-NAME", "some-channel-name")
-	t.Setenv("INPUT_MAIN-LIST-HEADING", "There are <pr_count> open PRs 🚀")
-	if githubUserSlackIdMapping != "" {
-		t.Setenv("INPUT_GITHUB-USER-SLACK-USER-ID-MAPPING", githubUserSlackIdMapping)
-	}
-	if noPrsMessage != "" {
-		t.Setenv("INPUT_NO-PRS-MESSAGE", noPrsMessage)
-	}
-}
-
 func TestWithMissingSlackInputs(t *testing.T) {
 	c := testhelpers.GetDefaultConfigMinimal()
 	testhelpers.SetTestEnvironment(
@@ -69,19 +51,6 @@ func TestWithOldPRsThresholdButNoHeading(t *testing.T) {
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error: %v, got: %v", expectedError, err)
 	}
-}
-
-func TestWithInvalidRepoInput(t *testing.T) {
-	defer func() {
-		testhelpers.AssertPanicStringContains(
-			t, recover(), "Invalid GITHUB_REPOSITORY format: invalid/repo/name",
-		)
-	}()
-	setTestEnvironment(t, "invalid/repo/name", "", "")
-	main.Run(
-		mockgithubclient.MakeMockGitHubClientGetter([]*github.PullRequest{}, 200, nil),
-		mockslackclient.MakeSlackClientGetter(nil),
-	)
 }
 
 type TestPRs struct {
@@ -142,6 +111,12 @@ func TestRunScenarios(t *testing.T) {
 		expectedErrorMsg   *string
 		expectedSummary    *string
 	}{
+		{
+			name:             "invalid repository input",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			configOverrides:  &map[string]any{config.EnvGithubRepository: "invalid/repo/name"},
+			expectedErrorMsg: testhelpers.AsPointer("error parsing repository name invalid/repo/name: invalid GITHUB_REPOSITORY format: invalid/repo/name"),
+		},
 		{
 			name:            "no PRs found with message",
 			config:          testhelpers.GetDefaultConfigMinimal(),

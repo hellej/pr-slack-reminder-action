@@ -31,7 +31,10 @@ func GetAuthenticatedClient(token string) Client {
 }
 
 func (c *client) FetchOpenPRs(repository string) ([]*github.PullRequest, error) {
-	repoOwner, repoName := parseOwnerAndRepo(repository)
+	repoOwner, repoName, err := parseOwnerAndRepo(repository)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing repository name %s: %v", repository, err)
+	}
 	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
 	prs, response, err := c.prsService.List(context.Background(), repoOwner, repoName, nil)
 	if err != nil {
@@ -48,13 +51,13 @@ func (c *client) FetchOpenPRs(repository string) ([]*github.PullRequest, error) 
 	return prs, nil
 }
 
-func parseOwnerAndRepo(repository string) (string, string) {
+func parseOwnerAndRepo(repository string) (string, string, error) {
 	repoParts := strings.Split(repository, "/")
 	if len(repoParts) != 2 {
-		log.Panicf("Invalid GITHUB_REPOSITORY format: %s", repository)
+		return "", "", fmt.Errorf("invalid GITHUB_REPOSITORY format: %s", repository)
 	}
 	repoOwner := repoParts[0]
 	repoName := repoParts[1]
 
-	return repoOwner, repoName
+	return repoOwner, repoName, nil
 }
