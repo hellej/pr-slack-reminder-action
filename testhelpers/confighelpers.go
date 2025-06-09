@@ -61,7 +61,7 @@ func setEnvFromConfig(t *testing.T, c config.Config, overrides *map[string]any) 
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
 }
 
-func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName string, value interface{}) {
+func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName string, value any) {
 	var strValue string
 	if overrides != nil {
 		if overrideValue, ok := (*overrides)[inputName]; ok {
