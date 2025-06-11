@@ -33,21 +33,22 @@ func GetAuthenticatedClient(token string) Client {
 func (c *client) FetchOpenPRs(repositories []string) ([]*github.PullRequest, error) {
 	allPRs := []*github.PullRequest{}
 	for _, repository := range repositories {
-		prs, err := c.fetchOpenPRsForRepository(repository)
+		repoOwner, repoName, err := parseOwnerAndRepo(repository)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing repository name %s: %v", repository, err)
+		}
+		log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
+		prs, err := c.fetchOpenPRsForRepository(repoOwner, repoName)
 		if err != nil {
 			return nil, err
 		}
+		logFoundPRs(prs)
 		allPRs = append(allPRs, prs...)
 	}
 	return allPRs, nil
 }
 
-func (c *client) fetchOpenPRsForRepository(repository string) ([]*github.PullRequest, error) {
-	repoOwner, repoName, err := parseOwnerAndRepo(repository)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing repository name %s: %v", repository, err)
-	}
-	log.Printf("Fetching PRs from repository: %s/%s", repoOwner, repoName)
+func (c *client) fetchOpenPRsForRepository(repoOwner string, repoName string) ([]*github.PullRequest, error) {
 	prs, response, err := c.prsService.List(context.Background(), repoOwner, repoName, nil)
 	if err != nil {
 		if response != nil && response.StatusCode == 404 {
@@ -72,4 +73,15 @@ func parseOwnerAndRepo(repository string) (string, string, error) {
 	repoName := repoParts[1]
 
 	return repoOwner, repoName, nil
+}
+
+func logFoundPRs(prs []*github.PullRequest) {
+	if len(prs) == 0 {
+		log.Println("No open pull requests found")
+	} else {
+		log.Printf("Found %d open pull requests:", len(prs))
+	}
+	for _, pr := range prs {
+		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
+	}
 }

@@ -2,7 +2,6 @@ package prparser
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"slices"
 	"time"
@@ -43,7 +42,7 @@ func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string
 	for _, pr := range prs {
 		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
 	}
-	return logFoundPRs(sortPRsByCreatedAt(parsedPRs))
+	return sortPRsByCreatedAt(parsedPRs)
 }
 
 func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
@@ -82,17 +81,5 @@ func sortPRsByCreatedAt(prs []PR) []PR {
 		}
 		return b.GetUpdatedAt().Time.Compare(a.GetUpdatedAt().Time)
 	})
-	return prs
-}
-
-func logFoundPRs(prs []PR) []PR {
-	if len(prs) == 0 {
-		log.Println("No open pull requests found")
-	} else {
-		log.Printf("Found %d open pull requests:", len(prs))
-	}
-	for _, pr := range prs {
-		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
-	}
 	return prs
 }
