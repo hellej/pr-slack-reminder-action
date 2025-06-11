@@ -67,10 +67,12 @@ func (m *MockSlackAPI) PostMessage(
 	channelID string, options ...slack.MsgOption,
 ) (string, string, error) {
 	request, values, _ := slack.UnsafeApplyMsgOptions("", "", "", options...)
-	m.SentMessage.Request = request
-	m.SentMessage.ChannelID = channelID
-	m.SentMessage.Text = values["text"][0]
-	return "1234567890.123456", "C12345678", nil
+	if m.postMessageResponse.Err == nil {
+		m.SentMessage.Request = request
+		m.SentMessage.ChannelID = channelID
+		m.SentMessage.Text = values["text"][0]
+	}
+	return "", "", m.postMessageResponse.Err
 }
 
 type SlackChannel struct {

@@ -77,6 +77,7 @@ func TestScenarios(t *testing.T) {
 		prs                []*github.PullRequest
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
+		sendMessageError   error
 		expectedErrorMsg   *string
 		expectedSummary    *string
 	}{
@@ -156,6 +157,13 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: testhelpers.AsPointer("error getting channel ID by name: unable to get channels (check permissions and token)"),
 		},
 		{
+			name:             "unable to send Slack message",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			prs:              getTestPRs().PRs,
+			sendMessageError: errors.New("error in sending Slack message"),
+			expectedErrorMsg: testhelpers.AsPointer("failed to send Slack message: error in sending Slack message"),
+		},
+		{
 			name:            "minimal config with 4 PRs",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			prs:             getTestPRs().PRs,
@@ -178,7 +186,7 @@ func TestScenarios(t *testing.T) {
 				tc.fetchPRsStatus = 200
 			}
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(tc.prs, tc.fetchPRsStatus, tc.fetchPRsError)
-			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, nil)
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, tc.sendMessageError)
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
 			err := main.Run(getGitHubClient, getSlackClient)
 
