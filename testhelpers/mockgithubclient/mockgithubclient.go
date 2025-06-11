@@ -32,8 +32,17 @@ func (m *mockPullRequestsService) List(
 	return m.mockPRs, m.mockResponse, m.mockError
 }
 
+func (m *mockPullRequestsService) ListReviews(
+	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
+) ([]*github.PullRequestReview, *github.Response, error) {
+	return m.mockReviews, m.mockReviewsResponse, m.mockReviewsError
+}
+
 type mockPullRequestsService struct {
-	mockPRs      []*github.PullRequest
-	mockResponse *github.Response
-	mockError    error
+	mockPRs             []*github.PullRequest
+	mockResponse        *github.Response
+	mockError           error
+	mockReviews         []*github.PullRequestReview
+	mockReviewsResponse *github.Response
+	mockReviewsError    error
 }

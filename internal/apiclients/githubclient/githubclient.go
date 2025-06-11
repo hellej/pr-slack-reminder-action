@@ -11,11 +11,12 @@ import (
 )
 
 type Client interface {
-	FetchOpenPRs(repositories []string) ([]*github.PullRequest, error)
+	FetchOpenPRs(repositories []string) ([]PR, error)
 }
 
 type githubPullRequestsService interface {
 	List(ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+	ListReviews(ctx context.Context, owner string, repo string, number int, opts *github.ListOptions) ([]*github.PullRequestReview, *github.Response, error)
 }
 
 type client struct {
@@ -31,12 +32,18 @@ func GetAuthenticatedClient(token string) Client {
 	return NewClient(ghClient.PullRequests)
 }
 
+type PR struct {
+	*github.PullRequest
+	CommentedByUsers []string
+	ApprovedByUsers  []string
+}
+
 // Returns an error if fetching PRs from any repository fails (and cancels other requests).
 //
 // The wait group & cancellation logic could be refactored to use errgroup package for more
 // concise implementation. However, the current implementation also serves as learning material
 // so we can save the refactoring for later...
-func (c *client) FetchOpenPRs(repositories []string) ([]*github.PullRequest, error) {
+func (c *client) FetchOpenPRs(repositories []string) ([]PR, error) {
 	log.Printf("Fetching open pull requests for repositories: %v", repositories)
 
 	parsedRepos, err := parseRepositoryNames(repositories)
@@ -47,8 +54,7 @@ func (c *client) FetchOpenPRs(repositories []string) ([]*github.PullRequest, err
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var wg sync.WaitGroup
-	apiResultChannel := make(chan FetchPRsResult, len(repositories))
-	allPRs := []*github.PullRequest{}
+	apiResultChannel := make(chan PRsOfRepoResult, len(repositories))
 
 	for _, ownerAndRepo := range parsedRepos {
 		wg.Add(1)
@@ -69,28 +75,40 @@ func (c *client) FetchOpenPRs(repositories []string) ([]*github.PullRequest, err
 		close(apiResultChannel)
 	}()
 
-	for results := range apiResultChannel {
-		if results.err != nil {
-			return nil, results.err
+	successfulResults := []PRsOfRepoResult{}
+	for result := range apiResultChannel {
+		if result.err != nil {
+			return nil, result.err
 		} else {
-			allPRs = append(allPRs, results.prs...)
+			successfulResults = append(successfulResults, result)
 		}
 	}
 
-	return allPRs, nil
+	return c.AddReviewerInfoToPRs(successfulResults), nil
 }
 
-type FetchPRsResult struct {
-	prs []*github.PullRequest
-	err error
+type PRsOfRepoResult struct {
+	prs        []*github.PullRequest
+	repository string
+	owner      string
+	err        error
 }
 
-func (c *client) fetchOpenPRsForRepository(ctx context.Context, repoOwner string, repoName string) FetchPRsResult {
+func (r PRsOfRepoResult) GetPRCount() int {
+	if r.prs != nil {
+		return len(r.prs)
+	}
+	return 0
+}
+
+func (c *client) fetchOpenPRsForRepository(ctx context.Context, repoOwner string, repoName string) PRsOfRepoResult {
 	prs, response, err := c.prsService.List(ctx, repoOwner, repoName, nil)
 	if err != nil {
 		if response != nil && response.StatusCode == 404 {
-			return FetchPRsResult{
-				prs: nil,
+			return PRsOfRepoResult{
+				prs:        nil,
+				owner:      repoOwner,
+				repository: repoName,
 				err: fmt.Errorf(
 					"repository %s/%s not found - check the repository name and permissions",
 					repoOwner,
@@ -98,13 +116,18 @@ func (c *client) fetchOpenPRsForRepository(ctx context.Context, repoOwner string
 				)}
 
 		} else {
-			return FetchPRsResult{
+			return PRsOfRepoResult{
 				prs: nil,
 				err: fmt.Errorf("error fetching pull requests from %s/%s: %v", repoOwner, repoName, err),
 			}
 		}
 	}
-	return FetchPRsResult{prs: prs, err: nil}
+	return PRsOfRepoResult{
+		prs:        prs,
+		owner:      repoOwner,
+		repository: repoName,
+		err:        nil,
+	}
 }
 
 func parseRepositoryNames(repositories []string) ([]OwnerAndRepo, error) {
@@ -139,5 +162,89 @@ func logFoundPRs(repository string, prs []*github.PullRequest) {
 	log.Printf("Found %d open pull requests in repository %s:", len(prs), repository)
 	for _, pr := range prs {
 		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
+	}
+}
+
+func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
+	log.Printf("Fetching pull request reviewers for PRs")
+
+	totalPRCount := 0
+	for _, result := range prResults {
+		totalPRCount += result.GetPRCount()
+	}
+
+	resultChannel := make(chan FetchReviewsResult, totalPRCount)
+	allPRs := []PR{}
+	var wg sync.WaitGroup
+
+	for _, result := range prResults {
+		for _, pullRequest := range result.prs {
+			wg.Add(1)
+			go func(owner string, repo string, pr *github.PullRequest) {
+				defer wg.Done()
+				reviews, response, err := c.prsService.ListReviews(context.Background(), owner, repo, *pr.Number, nil)
+				if err != nil {
+					err = fmt.Errorf(
+						"error fetching reviews for pull request %s/%s#%d: %v/%v",
+						owner,
+						repo,
+						*pr.Number,
+						response.Status,
+						err,
+					)
+				}
+				prWithReviews := FetchReviewsResult{
+					pr:      pr,
+					reviews: reviews,
+					repo:    repo,
+					err:     err,
+				}
+				resultChannel <- prWithReviews
+
+			}(result.owner, result.repository, pullRequest)
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChannel)
+	}()
+
+	for result := range resultChannel {
+		result.PrintResult()
+		if result.err != nil {
+			allPRs = append(allPRs, PR{
+				PullRequest:      result.pr,
+				CommentedByUsers: []string{},
+				ApprovedByUsers:  []string{},
+			})
+		} else {
+			allPRs = append(allPRs, PR{
+				PullRequest:      result.pr,
+				CommentedByUsers: []string{},
+				ApprovedByUsers:  []string{},
+			}) // TODO process reviews to extract these ^
+		}
+	}
+
+	return allPRs
+
+}
+
+type FetchReviewsResult struct {
+	pr      *github.PullRequest
+	reviews []*github.PullRequestReview
+	repo    string
+	err     error
+}
+
+func (r FetchReviewsResult) PrintResult() {
+	if r.err != nil {
+		log.Printf("Unable to fetch reviews for PR #%d: %v", r.pr.GetNumber(), r.err)
+	} else {
+		log.Printf("Found %d reviews for PR %v/%d", len(r.reviews), r.repo, r.pr.GetNumber())
+	}
+	for _, review := range r.reviews {
+		log.Printf("Review by %s: %s", review.GetUser().GetLogin(), *review.State)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v72/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 )
 
 type PR struct {
@@ -37,7 +38,7 @@ func (pr PR) GetPRUserDisplayName() string {
 	return pr.GetUser().GetLogin()
 }
 
-func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string]string) []PR {
+func ParsePRs(prs []githubclient.PR, slackUserIdByGitHubUsername *map[string]string) []PR {
 	var parsedPRs []PR
 	for _, pr := range prs {
 		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
@@ -45,22 +46,22 @@ func ParsePRs(prs []*github.PullRequest, slackUserIdByGitHubUsername *map[string
 	return sortPRsByCreatedAt(parsedPRs)
 }
 
-func parsePR(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) PR {
+func parsePR(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) PR {
 	if slackUserIdByGitHubUsername == nil || len(*slackUserIdByGitHubUsername) == 0 {
 		return PR{
-			PullRequest: pr,
+			PullRequest: pr.PullRequest,
 			GetAuthorSlackUserId: func() (string, bool) {
 				return "", false
 			},
 		}
 	}
 	return PR{
-		PullRequest:          pr,
+		PullRequest:          pr.PullRequest,
 		GetAuthorSlackUserId: getAuthorSlackUserId(pr, slackUserIdByGitHubUsername),
 	}
 }
 
-func getAuthorSlackUserId(pr *github.PullRequest, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
+func getAuthorSlackUserId(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
 	return func() (string, bool) {
 		gitHubUsername := pr.GetUser().GetLogin()
 		if gitHubUsername == "" {
