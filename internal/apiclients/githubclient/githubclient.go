@@ -36,10 +36,18 @@ func GetAuthenticatedClient(token string) Client {
 type PR struct {
 	*github.PullRequest
 	Repository       string
-	CommentedByUsers []string
+	CommentedByUsers []string // reviewers who commented the PR but did not approve it
 	ApprovedByUsers  []string
 }
 
+func (pr PR) GetUsername() string {
+	if pr.GetUser() != nil {
+		return pr.GetUser().GetLogin()
+	}
+	return ""
+}
+
+// FetchOpenPRs fetches open pull requests from the provided repositories.
 // Returns an error if fetching PRs from any repository fails (and cancels other requests).
 //
 // The wait group & cancellation logic could be refactored to use errgroup package for more

@@ -6,12 +6,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/google/go-github/v72/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 )
 
 type PR struct {
-	*github.PullRequest
+	*githubclient.PR
 	// Slack user ID of the author or empty string if not available
 	GetAuthorSlackUserId func() (string, bool)
 }
@@ -35,7 +34,7 @@ func (pr PR) GetPRUserDisplayName() string {
 	if pr.GetUser().GetName() != "" {
 		return pr.GetUser().GetName()
 	}
-	return pr.GetUser().GetLogin()
+	return pr.GetUsername()
 }
 
 func ParsePRs(prs []githubclient.PR, slackUserIdByGitHubUsername *map[string]string) []PR {
@@ -49,21 +48,21 @@ func ParsePRs(prs []githubclient.PR, slackUserIdByGitHubUsername *map[string]str
 func parsePR(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) PR {
 	if slackUserIdByGitHubUsername == nil || len(*slackUserIdByGitHubUsername) == 0 {
 		return PR{
-			PullRequest: pr.PullRequest,
+			PR: &pr,
 			GetAuthorSlackUserId: func() (string, bool) {
 				return "", false
 			},
 		}
 	}
 	return PR{
-		PullRequest:          pr.PullRequest,
+		PR:                   &pr,
 		GetAuthorSlackUserId: getAuthorSlackUserId(pr, slackUserIdByGitHubUsername),
 	}
 }
 
 func getAuthorSlackUserId(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) func() (string, bool) {
 	return func() (string, bool) {
-		gitHubUsername := pr.GetUser().GetLogin()
+		gitHubUsername := pr.GetUsername()
 		if gitHubUsername == "" {
 			return "", false
 		}

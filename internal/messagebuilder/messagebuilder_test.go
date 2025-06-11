@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-github/v72/github"
 	"github.com/slack-go/slack"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
@@ -37,21 +38,11 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 	})
 
 	t.Run("Message summary", func(t *testing.T) {
-		aPR := prparser.PR{PullRequest: &github.PullRequest{}}
-		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 1 day ago
-		aPR.Title = github.Ptr("This is a test PR")
-		aPR.User = &github.User{
-			Login: github.Ptr("testuser"),
-			Name:  github.Ptr("Test User"),
-		}
-		aPR.GetAuthorSlackUserId = func() (string, bool) {
-			return "U12345678", true
-		}
-		prS := []prparser.PR{aPR}
+		testPRs := getTestPRs()
 		content := messagecontent.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",
-			MainList:        prS,
+			MainList:        testPRs.PRs,
 		}
 		_, got := messagebuilder.BuildMessage(content)
 		if got != content.SummaryText {
@@ -60,22 +51,12 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 	})
 
 	t.Run("One new PR", func(t *testing.T) {
-		aPR := prparser.PR{PullRequest: &github.PullRequest{}}
-		aPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)} // 3 hours ago
-		aPR.Title = github.Ptr("This is a test PR")
-		aPR.User = &github.User{
-			Login: github.Ptr("testuser"),
-			Name:  github.Ptr("Test User"),
-		}
-		mockSlackUserID := "U12345678"
-		aPR.GetAuthorSlackUserId = func() (string, bool) {
-			return mockSlackUserID, true
-		}
-		prs := []prparser.PR{aPR}
+		testPRs := getTestPRs()
+
 		content := messagecontent.Content{
 			SummaryText:     "1 open PRs are waiting for attention 👀",
 			MainListHeading: "🚀 New PRs since 1 days ago",
-			MainList:        prs,
+			MainList:        testPRs.PRs,
 		}
 		got, _ := messagebuilder.BuildMessage(content)
 
@@ -91,8 +72,8 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		prAgeElement := prBulletPointTextElements[1].(*slack.RichTextSectionTextElement)
 		prBeforeUserElement := prBulletPointTextElements[2].(*slack.RichTextSectionTextElement)
 		prUserElement := prBulletPointTextElements[3].(*slack.RichTextSectionUserElement)
-		if prLinkElement.Text != *aPR.Title {
-			t.Errorf("Expected text to be '%s', got '%s'", *aPR.Title, prLinkElement.Text)
+		if prLinkElement.Text != *testPRs.PR1.Title {
+			t.Errorf("Expected text to be '%s', got '%s'", *testPRs.PR1.Title, prLinkElement.Text)
 		}
 		expectedAgeText := " 3 hours ago"
 		if prAgeElement.Text != expectedAgeText {
@@ -102,8 +83,37 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		if prBeforeUserElement.Text != expectedBeforeUserText {
 			t.Errorf("Expected text to be '%s', got '%s'", expectedBeforeUserText, prAgeElement.Text)
 		}
-		if prUserElement.UserID != mockSlackUserID {
-			t.Errorf("Expected text to be '%s', got '%s'", mockSlackUserID, prUserElement.UserID)
+		if prUserElement.UserID != testPRs.PR1SlackUserID {
+			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1SlackUserID, prUserElement.UserID)
 		}
 	})
+}
+
+type TestPRs struct {
+	PRs            []prparser.PR
+	PR1            prparser.PR
+	PR1SlackUserID string
+}
+
+func getTestPRs() TestPRs {
+	pr1 := prparser.PR{
+		PR: &githubclient.PR{
+			PullRequest: &github.PullRequest{
+				CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)}, // 1 day ago
+				Title:     github.Ptr("This is a test PR"),
+				User: &github.User{
+					Login: github.Ptr("testuser"),
+					Name:  github.Ptr("Test User"),
+				},
+			},
+		},
+	}
+	pr1.GetAuthorSlackUserId = func() (string, bool) {
+		return "U12345678", true
+	}
+	return TestPRs{
+		PRs:            []prparser.PR{pr1},
+		PR1:            pr1,
+		PR1SlackUserID: "U12345678",
+	}
 }
