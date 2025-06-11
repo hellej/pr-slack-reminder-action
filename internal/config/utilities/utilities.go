@@ -68,12 +68,12 @@ func GetInputList(name string) []string {
 	return lines
 }
 
-func GetInputMapping(inputName string) (*map[string]string, error) {
+func GetInputMapping(inputName string) (map[string]string, error) {
 	name := inputNameAsEnv(inputName)
 	mapping := make(map[string]string)
 	val := os.Getenv(name)
 	if val == "" {
-		return &mapping, nil
+		return mapping, nil
 	}
 	separator := "\n"
 	if strings.Contains(val, ";") {
@@ -98,5 +98,5 @@ func GetInputMapping(inputName string) (*map[string]string, error) {
 		mapping[key] = value
 	}
 
-	return &mapping, nil
+	return mapping, nil
 }

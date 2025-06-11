@@ -83,16 +83,15 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		if prBeforeUserElement.Text != expectedBeforeUserText {
 			t.Errorf("Expected text to be '%s', got '%s'", expectedBeforeUserText, prAgeElement.Text)
 		}
-		if prUserElement.UserID != testPRs.PR1SlackUserID {
-			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1SlackUserID, prUserElement.UserID)
+		if prUserElement.UserID != testPRs.PR1.AuthorInfo.SlackUserID {
+			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1.AuthorInfo.SlackUserID, prUserElement.UserID)
 		}
 	})
 }
 
 type TestPRs struct {
-	PRs            []prparser.PR
-	PR1            prparser.PR
-	PR1SlackUserID string
+	PRs []prparser.PR
+	PR1 prparser.PR
 }
 
 func getTestPRs() TestPRs {
@@ -108,12 +107,12 @@ func getTestPRs() TestPRs {
 			},
 		},
 	}
-	pr1.GetAuthorSlackUserId = func() (string, bool) {
-		return "U12345678", true
+	pr1.AuthorInfo = prparser.Collaborator{
+		GitHubName:  "Test User",
+		SlackUserID: "U12345678",
 	}
 	return TestPRs{
-		PRs:            []prparser.PR{pr1},
-		PR1:            pr1,
-		PR1SlackUserID: "U12345678",
+		PRs: []prparser.PR{pr1},
+		PR1: pr1,
 	}
 }

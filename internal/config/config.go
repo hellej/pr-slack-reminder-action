@@ -36,7 +36,7 @@ type Config struct {
 	repositories                []string
 	SlackChannelName            string
 	SlackChannelID              string
-	SlackUserIdByGitHubUsername *map[string]string
+	SlackUserIdByGitHubUsername map[string]string
 	ContentInputs               ContentInputs
 }
 

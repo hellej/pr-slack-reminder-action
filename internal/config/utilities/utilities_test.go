@@ -53,7 +53,7 @@ func TestReadStringMapping(t *testing.T) {
 	expected := map[string]string{"a": "b", "c": "d"}
 
 	for key, expected := range expected {
-		value, exists := (*mapping)[key]
+		value, exists := (mapping)[key]
 		if !exists {
 			t.Errorf("Expected key '%s' to exist in mapping", key)
 		}

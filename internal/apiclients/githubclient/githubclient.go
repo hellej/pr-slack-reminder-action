@@ -47,6 +47,16 @@ func (pr PR) GetUsername() string {
 	return ""
 }
 
+func (pr PR) GetAuthorNameOrUsername() string {
+	if pr.GetUser() != nil {
+		if pr.GetUser().GetName() != "" {
+			return pr.GetUser().GetName()
+		}
+		return pr.GetUser().GetLogin()
+	}
+	return ""
+}
+
 // FetchOpenPRs fetches open pull requests from the provided repositories.
 // Returns an error if fetching PRs from any repository fails (and cancels other requests).
 //

@@ -34,7 +34,7 @@ func GetDefaultConfigFull() TestConfig {
 			GithubToken:                 "SOME_TOKEN",
 			SlackBotToken:               "SOME_TOKEN",
 			SlackChannelName:            "some-channel-name",
-			SlackUserIdByGitHubUsername: &slackUserIdByGithubUsername,
+			SlackUserIdByGitHubUsername: slackUserIdByGithubUsername,
 			ContentInputs: config.ContentInputs{
 				NoPRsMessage:        "No open PRs found.",
 				MainListHeading:     "There are <pr_count> open PRs 🚀",
@@ -92,6 +92,8 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 	switch v := value.(type) {
 	case *map[string]string:
 		strValue = mappingAsString(v)
+	case map[string]string:
+		strValue = mappingAsString(&v)
 	case string:
 		strValue = v
 	case []string:

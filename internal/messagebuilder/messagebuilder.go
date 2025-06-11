@@ -7,14 +7,14 @@ import (
 )
 
 func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
-	authorSlackUserID, ok := pr.GetAuthorSlackUserId()
-	if ok {
+
+	if pr.AuthorInfo.SlackUserID != "" {
 		return slack.NewRichTextSectionUserElement(
-			authorSlackUserID, &slack.RichTextSectionTextStyle{},
+			pr.AuthorInfo.SlackUserID, &slack.RichTextSectionTextStyle{},
 		)
 	}
 	return slack.NewRichTextSectionTextElement(
-		pr.GetPRUserDisplayName(), &slack.RichTextSectionTextStyle{},
+		pr.GetAuthorNameOrUsername(), &slack.RichTextSectionTextStyle{},
 	)
 }
 
