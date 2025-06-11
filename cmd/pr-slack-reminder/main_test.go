@@ -20,12 +20,14 @@ type TestPRs struct {
 	PR2 *github.PullRequest
 	PR3 *github.PullRequest
 	PR4 *github.PullRequest
+	PR5 *github.PullRequest
 }
 
 func getTestPRs() TestPRs {
+	now := time.Now()
 	pr1 := &github.PullRequest{
 		Number:    github.Ptr(1),
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
+		CreatedAt: &github.Timestamp{Time: now.Add(-5 * time.Minute)},
 		Title:     github.Ptr("This is a test PR"),
 		User: &github.User{
 			Login: github.Ptr("stitch"),
@@ -34,36 +36,46 @@ func getTestPRs() TestPRs {
 	}
 	pr2 := &github.PullRequest{
 		Number:    github.Ptr(2),
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
-		Title:     github.Ptr("This is another test PR"),
+		CreatedAt: &github.Timestamp{Time: now.Add(-3 * time.Hour)},
+		Title:     github.Ptr("This PR was created 3 hours ago and contains important changes"),
 		User: &github.User{
 			Login: github.Ptr("alice"),
 			Name:  github.Ptr("Alice"),
 		},
 	}
 	pr3 := &github.PullRequest{
-		Number:    github.Ptr(3),
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
-		Title:     github.Ptr("This is another test PR"),
+		Number:    github.Ptr(2),
+		CreatedAt: &github.Timestamp{Time: now.Add(-3 * time.Hour)},
+		Title:     github.Ptr("This PR has the same time as PR2 but a longer title"),
 		User: &github.User{
-			Login: github.Ptr("bob"),
+			Login: github.Ptr("alice"),
+			Name:  github.Ptr("Alice"),
 		},
 	}
 	pr4 := &github.PullRequest{
 		Number:    github.Ptr(3),
-		CreatedAt: &github.Timestamp{Time: time.Now().Add(-26 * time.Hour)},
-		Title:     github.Ptr("This is another test PR"),
+		CreatedAt: &github.Timestamp{Time: now.Add(-26 * time.Hour)},
+		Title:     github.Ptr("This PR is getting old and needs attention"),
+		User: &github.User{
+			Login: github.Ptr("bob"),
+		},
+	}
+	pr5 := &github.PullRequest{
+		Number:    github.Ptr(3),
+		CreatedAt: &github.Timestamp{Time: now.Add(-48 * time.Hour)},
+		Title:     github.Ptr("This is a big PR that no one dares to review"),
 		User: &github.User{
 			Name: github.Ptr("Jim"),
 		},
 	}
 
 	return TestPRs{
-		PRs: []*github.PullRequest{pr1, pr2, pr3, pr4},
+		PRs: []*github.PullRequest{pr1, pr2, pr3, pr4, pr5},
 		PR1: pr1,
 		PR2: pr2,
 		PR3: pr3,
 		PR4: pr4,
+		PR5: pr5,
 	}
 }
 
@@ -164,17 +176,17 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: testhelpers.AsPointer("failed to send Slack message: error in sending Slack message"),
 		},
 		{
-			name:            "minimal config with 4 PRs",
+			name:            "minimal config with 5 PRs",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			prs:             getTestPRs().PRs,
-			expectedSummary: testhelpers.AsPointer("4 open PRs are waiting for attention 👀"),
+			expectedSummary: testhelpers.AsPointer("5 open PRs are waiting for attention 👀"),
 		},
 		{
-			name:            "full config with 4 PRs including old PRs",
+			name:            "full config with 5 PRs including old PRs",
 			config:          testhelpers.GetDefaultConfigFull(),
 			configOverrides: &map[string]any{config.InputOldPRThresholdHours: 12},
 			prs:             getTestPRs().PRs,
-			expectedSummary: testhelpers.AsPointer("4 open PRs are waiting for attention 👀"),
+			expectedSummary: testhelpers.AsPointer("5 open PRs are waiting for attention 👀"),
 		},
 	}
 
