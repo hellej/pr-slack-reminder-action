@@ -51,6 +51,23 @@ func GetInputInt(name string) (*int, error) {
 	return &parsed, nil
 }
 
+func GetInputList(name string) []string {
+	val := GetInput(name)
+	if val == "" {
+		return []string{}
+	}
+	separator := "\n"
+	if strings.Contains(val, ";") {
+		// for more convenient local testing
+		separator = ";"
+	}
+	lines := strings.Split(val, separator)
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(line)
+	}
+	return lines
+}
+
 func GetInputMapping(inputName string) (*map[string]string, error) {
 	name := inputNameAsEnv(inputName)
 	mapping := make(map[string]string)

@@ -82,7 +82,7 @@ func getTestPRs() TestPRs {
 func TestScenarios(t *testing.T) {
 	testCases := []struct {
 		name               string
-		config             config.Config
+		config             testhelpers.TestConfig
 		configOverrides    *map[string]any
 		fetchPRsStatus     int
 		fetchPRsError      error

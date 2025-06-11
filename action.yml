@@ -17,6 +17,10 @@ inputs: {
     description: 'Slack channel ID to send the message to',
     required: false,
   },
+  github-repositories: {
+    description: 'Line break separated list of GitHub repositories to check for open PRs - if not provided, the the repository of the current workflow run will be used',
+    required: false,
+  },
   github-user-slack-user-id-mapping: {
     description: 'Mapping of GitHub usernames to Slack user IDs (e.g., "alice: U08RWPGNCUX\\nbob: U08RWPGNWER")',
     required: false,

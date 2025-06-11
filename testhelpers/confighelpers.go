@@ -8,12 +8,18 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 )
 
-func SetTestEnvironment(t *testing.T, c config.Config, overrides *map[string]any) {
+func SetTestEnvironment(t *testing.T, c TestConfig, overrides *map[string]any) {
 	t.Helper()
 	setEnvFromConfig(t, c, overrides)
 }
 
-func GetDefaultConfigFull() config.Config {
+type TestConfig struct {
+	Repository   string
+	Repositories []string
+	config.Config
+}
+
+func GetDefaultConfigFull() TestConfig {
 	oldPRsThresholdHours := 48
 	slackUserIdByGithubUsername := map[string]string{
 		"testuser": "U1234567890",
@@ -21,35 +27,41 @@ func GetDefaultConfigFull() config.Config {
 		"bob":      "U3234567890",
 	}
 
-	return config.Config{
-		Repository:                  "test-org/test-repo",
-		GithubToken:                 "SOME_TOKEN",
-		SlackBotToken:               "SOME_TOKEN",
-		SlackChannelName:            "some-channel-name",
-		SlackUserIdByGitHubUsername: &slackUserIdByGithubUsername,
-		ContentInputs: config.ContentInputs{
-			NoPRsMessage:        "No open PRs found.",
-			MainListHeading:     "There are <pr_count> open PRs 🚀",
-			OldPRsListHeading:   "Old PRs 🚨",
-			OldPRThresholdHours: &oldPRsThresholdHours,
+	return TestConfig{
+		Repository:   "test-org/test-repo",
+		Repositories: []string{"test-org/test-repo"},
+		Config: config.Config{
+			GithubToken:                 "SOME_TOKEN",
+			SlackBotToken:               "SOME_TOKEN",
+			SlackChannelName:            "some-channel-name",
+			SlackUserIdByGitHubUsername: &slackUserIdByGithubUsername,
+			ContentInputs: config.ContentInputs{
+				NoPRsMessage:        "No open PRs found.",
+				MainListHeading:     "There are <pr_count> open PRs 🚀",
+				OldPRsListHeading:   "Old PRs 🚨",
+				OldPRThresholdHours: &oldPRsThresholdHours,
+			},
 		},
 	}
 }
 
-func GetDefaultConfigMinimal() config.Config {
-	return config.Config{
-		Repository:       "test-org/test-repo",
-		GithubToken:      "SOME_TOKEN",
-		SlackBotToken:    "SOME_TOKEN",
-		SlackChannelName: "some-channel-name",
-		ContentInputs: config.ContentInputs{
-			MainListHeading: "There are <pr_count> open PRs 🚀",
+func GetDefaultConfigMinimal() TestConfig {
+	return TestConfig{
+		Repository: "test-org/test-repo",
+		Config: config.Config{
+			GithubToken:      "SOME_TOKEN",
+			SlackBotToken:    "SOME_TOKEN",
+			SlackChannelName: "some-channel-name",
+			ContentInputs: config.ContentInputs{
+				MainListHeading: "There are <pr_count> open PRs 🚀",
+			},
 		},
 	}
 }
 
-func setEnvFromConfig(t *testing.T, c config.Config, overrides *map[string]any) {
+func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.EnvGithubRepository, c.Repository)
+	setInputEnv(t, overrides, config.InputGithubRepositories, c.Repositories)
 	setInputEnv(t, overrides, config.InputGithubToken, c.GithubToken)
 	setInputEnv(t, overrides, config.InputSlackBotToken, c.SlackBotToken)
 	setInputEnv(t, overrides, config.InputSlackChannelName, c.SlackChannelName)
@@ -82,6 +94,8 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 		strValue = mappingAsString(v)
 	case string:
 		strValue = v
+	case []string:
+		strValue = listAsString(v)
 	case int:
 		strValue = strconv.Itoa(v)
 	case *int:
@@ -94,6 +108,20 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 		t.Fatalf("unsupported value type for setInputEnv: %T", value)
 	}
 	t.Setenv(envName, strValue)
+}
+
+func listAsString(list []string) string {
+	if list == nil {
+		return ""
+	}
+	asString := ""
+	for _, item := range list {
+		if asString != "" {
+			asString += ";"
+		}
+		asString += item
+	}
+	return asString
 }
 
 func mappingAsString(mapping *map[string]string) string {

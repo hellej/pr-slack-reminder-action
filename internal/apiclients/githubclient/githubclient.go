@@ -10,7 +10,7 @@ import (
 )
 
 type Client interface {
-	FetchOpenPRs(repository string) ([]*github.PullRequest, error)
+	FetchOpenPRs(repositories []string) ([]*github.PullRequest, error)
 }
 
 type githubPullRequestsService interface {
@@ -30,7 +30,19 @@ func GetAuthenticatedClient(token string) Client {
 	return NewClient(ghClient.PullRequests)
 }
 
-func (c *client) FetchOpenPRs(repository string) ([]*github.PullRequest, error) {
+func (c *client) FetchOpenPRs(repositories []string) ([]*github.PullRequest, error) {
+	allPRs := []*github.PullRequest{}
+	for _, repository := range repositories {
+		prs, err := c.fetchOpenPRsForRepository(repository)
+		if err != nil {
+			return nil, err
+		}
+		allPRs = append(allPRs, prs...)
+	}
+	return allPRs, nil
+}
+
+func (c *client) fetchOpenPRsForRepository(repository string) ([]*github.PullRequest, error) {
 	repoOwner, repoName, err := parseOwnerAndRepo(repository)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing repository name %s: %v", repository, err)

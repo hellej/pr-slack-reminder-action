@@ -9,6 +9,7 @@ import (
 
 const (
 	EnvGithubRepository              string = "GITHUB_REPOSITORY"
+	InputGithubRepositories          string = "github-repositories"
 	InputGithubToken                 string = "github-token"
 	InputSlackBotToken               string = "slack-bot-token"
 	InputSlackChannelName            string = "slack-channel-name"
@@ -30,11 +31,19 @@ type ContentInputs struct {
 type Config struct {
 	GithubToken                 string
 	SlackBotToken               string
-	Repository                  string
+	repository                  string
+	repositories                []string
 	SlackChannelName            string
 	SlackChannelID              string
 	SlackUserIdByGitHubUsername *map[string]string
 	ContentInputs               ContentInputs
+}
+
+func (c Config) GetGithubRepositories() []string {
+	if len(c.repositories) > 0 {
+		return c.repositories
+	}
+	return []string{c.repository}
 }
 
 func (c Config) Print() {
@@ -63,7 +72,8 @@ func GetConfig() (Config, error) {
 	}
 
 	config := Config{
-		Repository:                  repository,
+		repository:                  repository,
+		repositories:                utilities.GetInputList(InputGithubRepositories),
 		GithubToken:                 githubToken,
 		SlackBotToken:               slackToken,
 		SlackChannelName:            utilities.GetInput(InputSlackChannelName),
