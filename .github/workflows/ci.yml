@@ -20,6 +20,9 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: Check action inputs
+        run: go run .github/scripts/check_inputs.go
+
       - name: Run unit tests
         run: make test-with-coverage
         
