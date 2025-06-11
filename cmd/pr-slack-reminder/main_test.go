@@ -123,7 +123,7 @@ func TestScenarios(t *testing.T) {
 			name:             "invalid repository input",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.EnvGithubRepository: "invalid/repo/name"},
-			expectedErrorMsg: testhelpers.AsPointer("error parsing repository name invalid/repo/name: invalid GITHUB_REPOSITORY format: invalid/repo/name"),
+			expectedErrorMsg: testhelpers.AsPointer("unable to parse repository input: invalid owner/repository format: invalid/repo/name"),
 		},
 		{
 			name:            "no PRs found with message",
