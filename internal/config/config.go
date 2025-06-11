@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
 )
@@ -55,8 +56,9 @@ func (c Config) Print() {
 		copy.SlackBotToken = "XXXXX"
 	}
 	asJson, _ := json.MarshalIndent(copy, "", "  ")
-	fmt.Println("Configuration:")
-	fmt.Println(string(asJson))
+	log.Print("Configuration:")
+	log.Printf("repositories: %s", copy.GetGithubRepositories())
+	log.Println(string(asJson))
 }
 
 func GetConfig() (Config, error) {
