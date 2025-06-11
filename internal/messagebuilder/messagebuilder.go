@@ -18,14 +18,89 @@ func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
 	)
 }
 
+func getReviewersElements(pr prparser.PR) []slack.RichTextSectionElement {
+	var elements []slack.RichTextSectionElement
+	approverCount := len(pr.Approvers)
+	commenterCount := len(pr.Commenters)
+
+	if approverCount == 0 && commenterCount == 0 {
+		return append(
+			elements, slack.NewRichTextSectionTextElement(
+				" (no reviews)", &slack.RichTextSectionTextStyle{},
+			),
+		)
+	}
+
+	reviewerTextPrefix := " (reviewed by "
+	if len(pr.Approvers) > 0 {
+		reviewerTextPrefix = " (approved by "
+	}
+	elements = append(elements, slack.NewRichTextSectionTextElement(
+		reviewerTextPrefix, &slack.RichTextSectionTextStyle{},
+	))
+
+	for idx, approver := range pr.Approvers {
+		if approver.SlackUserID != "" {
+			elements = append(elements, slack.NewRichTextSectionUserElement(
+				approver.SlackUserID, &slack.RichTextSectionTextStyle{},
+			))
+		} else {
+			elements = append(elements, slack.NewRichTextSectionTextElement(
+				approver.GitHubName, &slack.RichTextSectionTextStyle{},
+			))
+		}
+		if idx > 0 && idx < approverCount-1 {
+			elements = append(elements, slack.NewRichTextSectionTextElement(
+				", ", &slack.RichTextSectionTextStyle{},
+			))
+		}
+	}
+
+	if commenterCount == 0 {
+		return append(elements, slack.NewRichTextSectionTextElement(
+			")", &slack.RichTextSectionTextStyle{},
+		))
+	}
+
+	if reviewerTextPrefix == " (approved by " {
+		elements = append(elements, slack.NewRichTextSectionTextElement(
+			"- reviewed by ", &slack.RichTextSectionTextStyle{},
+		))
+	}
+
+	for idx, commenter := range pr.Commenters {
+		if commenter.SlackUserID != "" {
+			elements = append(elements, slack.NewRichTextSectionUserElement(
+				commenter.SlackUserID, &slack.RichTextSectionTextStyle{},
+			))
+		} else {
+			elements = append(elements, slack.NewRichTextSectionTextElement(
+				commenter.GitHubName, &slack.RichTextSectionTextStyle{},
+			))
+		}
+		if idx > 0 && idx < commenterCount-1 {
+			elements = append(elements, slack.NewRichTextSectionTextElement(
+				", ", &slack.RichTextSectionTextStyle{},
+			))
+		}
+	}
+
+	return append(elements, slack.NewRichTextSectionTextElement(
+		")", &slack.RichTextSectionTextStyle{},
+	))
+}
+
 func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
-	return slack.NewRichTextSection(
+	titleAgeAndAuthorElements := []slack.RichTextSectionElement{
 		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true}),
 		slack.NewRichTextSectionTextElement(
 			" "+pr.GetPRAgeText(), &slack.RichTextSectionTextStyle{}),
 		slack.NewRichTextSectionTextElement(
 			" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
+	}
+	return slack.NewRichTextSection(
+		append(titleAgeAndAuthorElements, getReviewersElements(pr)...)...,
 	)
 }
 

@@ -12,8 +12,8 @@ import (
 type PR struct {
 	*githubclient.PR
 	AuthorInfo Collaborator
-	Approvers  []Collaborator
-	Commenters []Collaborator
+	Approvers  []Collaborator // Users who have approved the PR at least once
+	Commenters []Collaborator // Users who have commented on the PR but did not approve it
 }
 
 type Collaborator struct {

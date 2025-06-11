@@ -279,7 +279,7 @@ func (r FetchReviewsResult) AsPR() PR {
 	return PR{
 		PullRequest:      r.pr,
 		Repository:       r.repository,
-		CommentedByUsers: approvedByUsers,
-		ApprovedByUsers:  commentedByUsers,
+		CommentedByUsers: commentedByUsers,
+		ApprovedByUsers:  approvedByUsers,
 	}
 }
