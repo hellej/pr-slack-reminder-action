@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 
@@ -34,6 +35,7 @@ func GetAuthenticatedClient(token string) Client {
 
 type PR struct {
 	*github.PullRequest
+	Repository       string
 	CommentedByUsers []string
 	ApprovedByUsers  []string
 }
@@ -43,10 +45,10 @@ type PR struct {
 // The wait group & cancellation logic could be refactored to use errgroup package for more
 // concise implementation. However, the current implementation also serves as learning material
 // so we can save the refactoring for later...
-func (c *client) FetchOpenPRs(repositories []string) ([]PR, error) {
-	log.Printf("Fetching open pull requests for repositories: %v", repositories)
+func (c *client) FetchOpenPRs(repositoryPaths []string) ([]PR, error) {
+	log.Printf("Fetching open pull requests for repositories: %v", repositoryPaths)
 
-	parsedRepos, err := parseRepositoryNames(repositories)
+	parsedRepos, err := parseRepositoryNames(repositoryPaths)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse repository input: %v", err)
 	}
@@ -54,7 +56,7 @@ func (c *client) FetchOpenPRs(repositories []string) ([]PR, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var wg sync.WaitGroup
-	apiResultChannel := make(chan PRsOfRepoResult, len(repositories))
+	apiResultChannel := make(chan PRsOfRepoResult, len(repositoryPaths))
 
 	for _, ownerAndRepo := range parsedRepos {
 		wg.Add(1)
@@ -174,7 +176,6 @@ func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 	}
 
 	resultChannel := make(chan FetchReviewsResult, totalPRCount)
-	allPRs := []PR{}
 	var wg sync.WaitGroup
 
 	for _, result := range prResults {
@@ -194,10 +195,10 @@ func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 					)
 				}
 				prWithReviews := FetchReviewsResult{
-					pr:      pr,
-					reviews: reviews,
-					repo:    repo,
-					err:     err,
+					pr:         pr,
+					reviews:    reviews,
+					repository: repo,
+					err:        err,
 				}
 				resultChannel <- prWithReviews
 
@@ -210,41 +211,57 @@ func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 		close(resultChannel)
 	}()
 
+	allPRs := []PR{}
 	for result := range resultChannel {
 		result.PrintResult()
-		if result.err != nil {
-			allPRs = append(allPRs, PR{
-				PullRequest:      result.pr,
-				CommentedByUsers: []string{},
-				ApprovedByUsers:  []string{},
-			})
-		} else {
-			allPRs = append(allPRs, PR{
-				PullRequest:      result.pr,
-				CommentedByUsers: []string{},
-				ApprovedByUsers:  []string{},
-			}) // TODO process reviews to extract these ^
-		}
+		allPRs = append(allPRs, result.AsPR())
 	}
-
 	return allPRs
-
 }
 
 type FetchReviewsResult struct {
-	pr      *github.PullRequest
-	reviews []*github.PullRequestReview
-	repo    string
-	err     error
+	pr         *github.PullRequest
+	reviews    []*github.PullRequestReview
+	repository string
+	err        error
 }
 
 func (r FetchReviewsResult) PrintResult() {
 	if r.err != nil {
 		log.Printf("Unable to fetch reviews for PR #%d: %v", r.pr.GetNumber(), r.err)
 	} else {
-		log.Printf("Found %d reviews for PR %v/%d", len(r.reviews), r.repo, r.pr.GetNumber())
+		log.Printf("Found %d reviews for PR %v/%d", len(r.reviews), r.repository, r.pr.GetNumber())
 	}
 	for _, review := range r.reviews {
 		log.Printf("Review by %s: %s", review.GetUser().GetLogin(), *review.State)
+	}
+}
+
+func (r FetchReviewsResult) AsPR() PR {
+	approvedByUsers := []string{}
+	commentedByUsers := []string{}
+
+	for _, review := range r.reviews {
+		user := review.GetUser().GetLogin()
+		if user == "" {
+			continue
+		}
+		if review.GetState() == "APPROVED" {
+			if !slices.Contains(approvedByUsers, user) {
+				approvedByUsers = append(approvedByUsers, user)
+			}
+		} else {
+			if !slices.Contains(commentedByUsers, user) && !slices.Contains(approvedByUsers, user) {
+				// Only add to commentedByUsers if the user has not already approved
+				commentedByUsers = append(commentedByUsers, user)
+			}
+		}
+	}
+
+	return PR{
+		PullRequest:      r.pr,
+		Repository:       r.repository,
+		CommentedByUsers: approvedByUsers,
+		ApprovedByUsers:  commentedByUsers,
 	}
 }
