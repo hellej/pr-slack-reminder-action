@@ -192,9 +192,17 @@ func TestScenarios(t *testing.T) {
 				*getTestPRs().PR1.Number: {
 					{
 						ID:    github.Ptr(int64(1)),
-						Body:  github.Ptr("This is a review for PR1"),
+						Body:  github.Ptr("LGTM ✅"),
 						User:  &github.User{Login: github.Ptr("reviewer1")},
 						State: github.Ptr("APPROVED"),
+					},
+				},
+				*getTestPRs().PR2.Number: {
+					{
+						ID:    github.Ptr(int64(2)),
+						Body:  github.Ptr("LGTM, just a few comments..."),
+						User:  &github.User{Login: github.Ptr("reviewer2")},
+						State: github.Ptr("COMMENTED"),
 					},
 				},
 			},
