@@ -42,7 +42,11 @@ inputs: {
   no-prs-message: {
     description: 'Message to send when there are no open PRs',
     required: false,
-  }
+  },
+  filters: {
+    description: 'e.g. {"authors": ["alice", "bob"], "labels": ["bug", "enhancement"], "labels-ignore": ["wip"]}',
+    required: false,
+  },
 }
 
 runs:
