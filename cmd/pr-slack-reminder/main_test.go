@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -224,12 +225,28 @@ func TestScenarios(t *testing.T) {
 					mockSlackAPI.SentMessage.Text,
 				)
 			}
-			if tc.expectedErrorMsg == "" {
-				for _, pr := range tc.prs {
-					if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
-						t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
-					}
+			if tc.expectedErrorMsg != "" {
+				return
+			}
+			for _, pr := range tc.prs {
+				if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
+					t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
 				}
+			}
+			expectedHeading := ""
+			if len(tc.prs) > 0 {
+				expectedHeading = strings.ReplaceAll(tc.config.ContentInputs.MainListHeading, "<pr_count>", strconv.Itoa(len(tc.prs)))
+			}
+			if expectedHeading != "" && !mockSlackAPI.SentMessage.Blocks.ContainsHeading(expectedHeading) {
+				t.Errorf(
+					"Expected PR list heading '%s' to be included in the Slack message", expectedHeading,
+				)
+			}
+			if len(tc.prs) != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
+				t.Errorf(
+					"Expected %v PRs to be included in the message (was %v)",
+					len(tc.prs), mockSlackAPI.SentMessage.Blocks.GetPRCount(),
+				)
 			}
 		})
 	}

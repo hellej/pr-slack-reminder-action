@@ -3,32 +3,32 @@ package mockslackclient
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
+// A data model for Blocks that were sent to Slack API.
+// Provides a helper function for tests for checking if a specific PR title is present in the blocks.
 type BlocksWrapper struct {
 	Blocks []Block `json:"blocks"`
 }
 
-func (b BlocksWrapper) GetHeaderTexts() (string, string) {
-	var firstHeader string
-	var secondHeader string
-	for blockIdx, block := range b.Blocks {
-		if block.Type == "header" && block.Text != nil {
-			if blockIdx == 0 {
-				firstHeader = block.Text.Text
-			} else {
-				secondHeader = block.Text.Text
-			}
-		}
-	}
-	return firstHeader, secondHeader
+type PRList struct {
+	Heading     string
+	PRListItems []string
 }
 
-func (b BlocksWrapper) GetPRItemTexts() []string {
-	var prTexts []string
+func (b BlocksWrapper) GetPRLists() []PRList {
+	prLists := []PRList{}
+
+	currentHeading := ""
 	for _, block := range b.Blocks {
-		if block.Type == "rich_text" && block.Elements != nil {
+		if block.Type == "header" && block.Text != nil {
+			currentHeading = block.Text.Text
+		}
+		var prList PRList
+		if currentHeading != "" && block.Type == "rich_text" && block.Elements != nil {
+			prList.Heading = currentHeading
 			var richTextLists []RichTextList // we're expecting an array of one
 			err := json.Unmarshal(block.Elements, &richTextLists)
 			if err != nil {
@@ -45,21 +45,43 @@ func (b BlocksWrapper) GetPRItemTexts() []string {
 						prText += element.Text
 					}
 				}
-				prTexts = append(prTexts, prText)
+				prList.PRListItems = append(prList.PRListItems, prText)
 			}
 
 		}
+		if prList.Heading != "" || len(prList.PRListItems) > 0 {
+			prLists = append(prLists, prList)
+		}
 	}
-	return prTexts
+	return prLists
 }
 
 func (b BlocksWrapper) ContainsPRTitle(title string) bool {
-	for _, item := range b.GetPRItemTexts() {
-		if strings.Contains(item, title) {
+	for _, item := range b.GetPRLists() {
+		if slices.ContainsFunc(item.PRListItems, func(value string) bool {
+			return strings.Contains(value, title)
+		}) {
 			return true
 		}
 	}
 	return false
+}
+
+func (b BlocksWrapper) ContainsHeading(heading string) bool {
+	for _, item := range b.GetPRLists() {
+		if item.Heading == heading {
+			return true
+		}
+	}
+	return false
+}
+
+func (b BlocksWrapper) GetPRCount() int {
+	var count int
+	for _, item := range b.GetPRLists() {
+		count += len(item.PRListItems)
+	}
+	return count
 }
 
 type Block struct {
