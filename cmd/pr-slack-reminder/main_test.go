@@ -88,6 +88,7 @@ func TestScenarios(t *testing.T) {
 		fetchPRsStatus     int
 		fetchPRsError      error
 		prs                []*github.PullRequest
+		reviewsByPRNumber  map[int][]*github.PullRequestReview
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
 		sendMessageError   error
@@ -187,6 +188,16 @@ func TestScenarios(t *testing.T) {
 			config:          testhelpers.GetDefaultConfigFull(),
 			configOverrides: &map[string]any{config.InputOldPRThresholdHours: 12},
 			prs:             getTestPRs().PRs,
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				*getTestPRs().PR1.Number: {
+					{
+						ID:    github.Ptr(int64(1)),
+						Body:  github.Ptr("This is a review for PR1"),
+						User:  &github.User{Login: github.Ptr("reviewer1")},
+						State: github.Ptr("APPROVED"),
+					},
+				},
+			},
 			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
 	}
@@ -197,7 +208,9 @@ func TestScenarios(t *testing.T) {
 			if tc.fetchPRsStatus == 0 {
 				tc.fetchPRsStatus = 200
 			}
-			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(tc.prs, tc.fetchPRsStatus, tc.fetchPRsError)
+			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(
+				tc.prs, tc.fetchPRsStatus, tc.fetchPRsError, tc.reviewsByPRNumber,
+			)
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, tc.sendMessageError)
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
 			err := main.Run(getGitHubClient, getSlackClient)

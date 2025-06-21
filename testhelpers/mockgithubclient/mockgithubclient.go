@@ -10,18 +10,20 @@ import (
 
 func MakeMockGitHubClientGetter(
 	prs []*github.PullRequest,
-	responseStatus int,
-	err error,
+	listPRsResponseStatus int,
+	listPRsErr error,
+	reviewsByPRNumber map[int][]*github.PullRequestReview,
 ) func(token string) githubclient.Client {
 	return func(token string) githubclient.Client {
 		return githubclient.NewClient(&mockPullRequestsService{
 			mockPRs: prs,
 			mockResponse: &github.Response{
 				Response: &http.Response{
-					StatusCode: responseStatus,
+					StatusCode: listPRsResponseStatus,
 				},
 			},
-			mockError: err,
+			mockReviewsByPRNumber: reviewsByPRNumber,
+			mockError:             listPRsErr,
 		})
 	}
 }
@@ -35,14 +37,15 @@ func (m *mockPullRequestsService) List(
 func (m *mockPullRequestsService) ListReviews(
 	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
 ) ([]*github.PullRequestReview, *github.Response, error) {
-	return m.mockReviews, m.mockReviewsResponse, m.mockReviewsError
+	reviews := m.mockReviewsByPRNumber[number]
+	return reviews, m.mockReviewsResponse, m.mockReviewsError
 }
 
 type mockPullRequestsService struct {
-	mockPRs             []*github.PullRequest
-	mockResponse        *github.Response
-	mockError           error
-	mockReviews         []*github.PullRequestReview
-	mockReviewsResponse *github.Response
-	mockReviewsError    error
+	mockPRs               []*github.PullRequest
+	mockReviewsByPRNumber map[int][]*github.PullRequestReview
+	mockResponse          *github.Response
+	mockError             error
+	mockReviewsResponse   *github.Response
+	mockReviewsError      error
 }
