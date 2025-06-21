@@ -67,10 +67,22 @@ func (m *MockSlackAPI) PostMessage(
 	channelID string, options ...slack.MsgOption,
 ) (string, string, error) {
 	request, values, _ := slack.UnsafeApplyMsgOptions("", "", "", options...)
+
+	var sentBlocks BlocksWrapper
+	var err error
+	if blocks, ok := values["blocks"]; ok && len(blocks) > 0 {
+		sentBlocks, err = ParseBlocks([]byte(blocks[0]))
+	}
+
+	if err != nil {
+		panic("Failed to parse sent blocks in mock Slack API: " + err.Error())
+	}
+
 	if m.postMessageResponse.Err == nil {
 		m.SentMessage.Request = request
 		m.SentMessage.ChannelID = channelID
 		m.SentMessage.Text = values["text"][0]
+		m.SentMessage.Blocks = sentBlocks
 	}
 	return "", "", m.postMessageResponse.Err
 }
@@ -92,10 +104,10 @@ type PostMessageResponse struct {
 	Err       error
 }
 
-// to allow storing and asserting the request in tests
+// To allow storing and asserting the request in tests
 type SentMessage struct {
 	Request   string
 	ChannelID string
-	Blocks    slack.Message
+	Blocks    BlocksWrapper
 	Text      string
 }

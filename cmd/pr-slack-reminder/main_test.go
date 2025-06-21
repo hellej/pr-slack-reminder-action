@@ -90,8 +90,8 @@ func TestScenarios(t *testing.T) {
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
 		sendMessageError   error
-		expectedErrorMsg   *string
-		expectedSummary    *string
+		expectedErrorMsg   string
+		expectedSummary    string
 	}{
 		{
 			name:   "unset required inputs",
@@ -99,7 +99,7 @@ func TestScenarios(t *testing.T) {
 			configOverrides: &map[string]any{
 				config.InputSlackBotToken: nil,
 			},
-			expectedErrorMsg: testhelpers.AsPointer("configuration error: required input slack-bot-token is not set"),
+			expectedErrorMsg: "configuration error: required input slack-bot-token is not set",
 		},
 		{
 			name:   "missing Slack inputs",
@@ -108,7 +108,7 @@ func TestScenarios(t *testing.T) {
 				config.InputSlackChannelID:   "",
 				config.InputSlackChannelName: "",
 			},
-			expectedErrorMsg: testhelpers.AsPointer("configuration error: either slack-channel-id or slack-channel-name must be set"),
+			expectedErrorMsg: "configuration error: either slack-channel-id or slack-channel-name must be set",
 		},
 		{
 			name:   "old PRs threshold hours but no heading",
@@ -117,38 +117,38 @@ func TestScenarios(t *testing.T) {
 				config.InputOldPRThresholdHours: 10,
 				config.InputOldPRsListHeading:   nil,
 			},
-			expectedErrorMsg: testhelpers.AsPointer("configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set"),
+			expectedErrorMsg: "configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set",
 		},
 		{
 			name:             "invalid repository input",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.EnvGithubRepository: "invalid/repo/name"},
-			expectedErrorMsg: testhelpers.AsPointer("unable to parse repository input: invalid owner/repository format: invalid/repo/name"),
+			expectedErrorMsg: "unable to parse repository input: invalid owner/repository format: invalid/repo/name",
 		},
 		{
 			name:            "no PRs found with message",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputNoPRsMessage: "No PRs found, happy coding! 🎉"},
-			expectedSummary: testhelpers.AsPointer("No PRs found, happy coding! 🎉"),
+			expectedSummary: "No PRs found, happy coding! 🎉",
 		},
 		{
 			name:            "no PRs found without message",
 			config:          testhelpers.GetDefaultConfigMinimal(),
-			expectedSummary: nil, // no message should be sent
+			expectedSummary: "", // no message should be sent
 		},
 		{
 			name:             "repo not found",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			fetchPRsStatus:   404,
 			fetchPRsError:    errors.New("repository not found"),
-			expectedErrorMsg: testhelpers.AsPointer("repository test-org/test-repo not found - check the repository name and permissions"),
+			expectedErrorMsg: "repository test-org/test-repo not found - check the repository name and permissions",
 		},
 		{
 			name:             "unable to fetch PRs",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			fetchPRsStatus:   500,
 			fetchPRsError:    errors.New("unable to fetch PRs"),
-			expectedErrorMsg: testhelpers.AsPointer("error fetching pull requests from test-org/test-repo: unable to fetch PRs"),
+			expectedErrorMsg: "error fetching pull requests from test-org/test-repo: unable to fetch PRs",
 		},
 		{
 			name:            "no Slack channel found",
@@ -160,38 +160,37 @@ func TestScenarios(t *testing.T) {
 					Name: "not-the-channel-name-provided-in-input",
 				},
 			},
-			expectedErrorMsg: testhelpers.AsPointer("error getting channel ID by name: channel not found"),
+			expectedErrorMsg: "error getting channel ID by name: channel not found",
 		},
 		{
 			name:             "unable to fetch Slack channel(s)",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			findChannelError: errors.New("unable to get channels"),
-			expectedErrorMsg: testhelpers.AsPointer("error getting channel ID by name: unable to get channels (check permissions and token)"),
+			expectedErrorMsg: "error getting channel ID by name: unable to get channels (check permissions and token)",
 		},
 		{
 			name:             "unable to send Slack message",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			prs:              getTestPRs().PRs,
 			sendMessageError: errors.New("error in sending Slack message"),
-			expectedErrorMsg: testhelpers.AsPointer("failed to send Slack message: error in sending Slack message"),
+			expectedErrorMsg: "failed to send Slack message: error in sending Slack message",
 		},
 		{
 			name:            "minimal config with 5 PRs",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			prs:             getTestPRs().PRs,
-			expectedSummary: testhelpers.AsPointer("5 open PRs are waiting for attention 👀"),
+			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
 		{
 			name:            "full config with 5 PRs including old PRs",
 			config:          testhelpers.GetDefaultConfigFull(),
 			configOverrides: &map[string]any{config.InputOldPRThresholdHours: 12},
 			prs:             getTestPRs().PRs,
-			expectedSummary: testhelpers.AsPointer("5 open PRs are waiting for attention 👀"),
+			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 			if tc.fetchPRsStatus == 0 {
@@ -202,28 +201,35 @@ func TestScenarios(t *testing.T) {
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
 			err := main.Run(getGitHubClient, getSlackClient)
 
-			if tc.expectedErrorMsg == nil && err != nil {
+			if tc.expectedErrorMsg == "" && err != nil {
 				t.Errorf("Expected no error, got: %v", err)
 			}
-			if tc.expectedErrorMsg != nil && err == nil {
-				t.Errorf("Expected error: %v, got no error", *tc.expectedErrorMsg)
+			if tc.expectedErrorMsg != "" && err == nil {
+				t.Errorf("Expected error: %v, got no error", tc.expectedErrorMsg)
 			}
-			if tc.expectedErrorMsg != nil && err != nil && !strings.Contains(err.Error(), *tc.expectedErrorMsg) {
+			if tc.expectedErrorMsg != "" && err != nil && !strings.Contains(err.Error(), tc.expectedErrorMsg) {
 				t.Errorf(
 					"Expected error message '%v', got: %v",
-					*tc.expectedErrorMsg,
+					tc.expectedErrorMsg,
 					err.Error(),
 				)
 			}
-			if tc.expectedSummary == nil && mockSlackAPI.SentMessage.Text != "" {
+			if tc.expectedSummary == "" && mockSlackAPI.SentMessage.Text != "" {
 				t.Errorf("Expected no summary message, but got: %v", mockSlackAPI.SentMessage.Text)
 			}
-			if tc.expectedSummary != nil && mockSlackAPI.SentMessage.Text != *tc.expectedSummary {
+			if tc.expectedSummary != "" && mockSlackAPI.SentMessage.Text != tc.expectedSummary {
 				t.Errorf(
 					"Expected summary to be %v, but got: %v",
-					*tc.expectedSummary,
+					tc.expectedSummary,
 					mockSlackAPI.SentMessage.Text,
 				)
+			}
+			if tc.expectedErrorMsg == "" {
+				for _, pr := range tc.prs {
+					if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
+						t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
+					}
+				}
 			}
 		})
 	}
