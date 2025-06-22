@@ -24,8 +24,20 @@ type TestPRs struct {
 	PR5 *github.PullRequest
 }
 
-func getTestPRs() TestPRs {
+type GetTestPRsOptions struct {
+	Labels []string
+}
+
+func getTestPRs(args GetTestPRsOptions) TestPRs {
 	now := time.Now()
+	var githubLabels []*github.Label
+	for _, label := range args.Labels {
+		githubLabels = append(githubLabels, &github.Label{
+			Name: &label,
+		})
+
+	}
+
 	pr1 := &github.PullRequest{
 		Number:    github.Ptr(1),
 		CreatedAt: &github.Timestamp{Time: now.Add(-5 * time.Minute)},
@@ -34,6 +46,7 @@ func getTestPRs() TestPRs {
 			Login: github.Ptr("stitch"),
 			Name:  github.Ptr("Stitch"),
 		},
+		Labels: githubLabels,
 	}
 	pr2 := &github.PullRequest{
 		Number:    github.Ptr(2),
@@ -43,6 +56,7 @@ func getTestPRs() TestPRs {
 			Login: github.Ptr("alice"),
 			Name:  github.Ptr("Alice"),
 		},
+		Labels: githubLabels,
 	}
 	pr3 := &github.PullRequest{
 		Number:    github.Ptr(2),
@@ -52,6 +66,7 @@ func getTestPRs() TestPRs {
 			Login: github.Ptr("alice"),
 			Name:  github.Ptr("Alice"),
 		},
+		Labels: githubLabels,
 	}
 	pr4 := &github.PullRequest{
 		Number:    github.Ptr(3),
@@ -60,6 +75,7 @@ func getTestPRs() TestPRs {
 		User: &github.User{
 			Login: github.Ptr("bob"),
 		},
+		Labels: githubLabels,
 	}
 	pr5 := &github.PullRequest{
 		Number:    github.Ptr(3),
@@ -68,6 +84,7 @@ func getTestPRs() TestPRs {
 		User: &github.User{
 			Name: github.Ptr("Jim"),
 		},
+		Labels: githubLabels,
 	}
 
 	return TestPRs{
@@ -82,12 +99,14 @@ func getTestPRs() TestPRs {
 
 func TestScenarios(t *testing.T) {
 	testCases := []struct {
-		name               string
-		config             testhelpers.TestConfig
-		configOverrides    *map[string]any
-		fetchPRsStatus     int
-		fetchPRsError      error
-		prs                []*github.PullRequest
+		name            string
+		config          testhelpers.TestConfig
+		configOverrides *map[string]any
+		fetchPRsStatus  int
+		fetchPRsError   error
+		prs             []*github.PullRequest
+		// Expected number of PRs included in the Slack message (after filters etc)
+		expectedPRCount    int
 		reviewsByPRNumber  map[int][]*github.PullRequestReview
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
@@ -134,6 +153,12 @@ func TestScenarios(t *testing.T) {
 			expectedSummary: "No PRs found, happy coding! 🎉",
 		},
 		{
+			name:             "invalid global filters input",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"invalid\": \"json\"}"},
+			expectedErrorMsg: "configuration error: unable to parse filters from {\"invalid\": \"json\"}: json: unknown field \"invalid\"",
+		},
+		{
 			name:            "no PRs found without message",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			expectedSummary: "", // no message should be sent
@@ -153,9 +178,8 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: "error fetching pull requests from test-org/test-repo: unable to fetch PRs",
 		},
 		{
-			name:            "no Slack channel found",
-			config:          testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{config.InputNoPRsMessage: "No PRs found, happy coding! 🎉"},
+			name:   "no Slack channel found",
+			config: testhelpers.GetDefaultConfigMinimal(),
 			foundSlackChannels: []*mockslackclient.SlackChannel{
 				{
 					ID:   "C32345678",
@@ -173,23 +197,35 @@ func TestScenarios(t *testing.T) {
 		{
 			name:             "unable to send Slack message",
 			config:           testhelpers.GetDefaultConfigMinimal(),
-			prs:              getTestPRs().PRs,
+			prs:              getTestPRs(GetTestPRsOptions{}).PRs,
 			sendMessageError: errors.New("error in sending Slack message"),
 			expectedErrorMsg: "failed to send Slack message: error in sending Slack message",
 		},
 		{
 			name:            "minimal config with 5 PRs",
 			config:          testhelpers.GetDefaultConfigMinimal(),
-			prs:             getTestPRs().PRs,
+			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
+			expectedPRCount: len(getTestPRs(GetTestPRsOptions{}).PRs),
 			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
 		{
-			name:            "full config with 5 PRs including old PRs",
-			config:          testhelpers.GetDefaultConfigFull(),
-			configOverrides: &map[string]any{config.InputOldPRThresholdHours: 12},
-			prs:             getTestPRs().PRs,
+			name:            "all PRs filtered out by labels",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]"},
+			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
+			expectedSummary: "", // no message should be sent
+		},
+		{
+			name:   "full config with 5 PRs including old PRs",
+			config: testhelpers.GetDefaultConfigFull(),
+			configOverrides: &map[string]any{
+				config.InputOldPRThresholdHours: 12,
+				config.InputGlobalFilters:       "{\"labels\": [\"feature\", \"fix\"]}",
+			},
+			prs:             getTestPRs(GetTestPRsOptions{Labels: []string{"feature"}}).PRs,
+			expectedPRCount: len(getTestPRs(GetTestPRsOptions{}).PRs),
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
-				*getTestPRs().PR1.Number: {
+				*getTestPRs(GetTestPRsOptions{}).PR1.Number: {
 					{
 						ID:    github.Ptr(int64(1)),
 						Body:  github.Ptr("LGTM ✅"),
@@ -197,7 +233,7 @@ func TestScenarios(t *testing.T) {
 						State: github.Ptr("APPROVED"),
 					},
 				},
-				*getTestPRs().PR2.Number: {
+				*getTestPRs(GetTestPRsOptions{}).PR2.Number: {
 					{
 						ID:    github.Ptr(int64(2)),
 						Body:  github.Ptr("LGTM, just a few comments..."),
@@ -263,7 +299,7 @@ func TestScenarios(t *testing.T) {
 					"Expected PR list heading '%s' to be included in the Slack message", expectedHeading,
 				)
 			}
-			if len(tc.prs) != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
+			if tc.expectedPRCount != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
 				t.Errorf(
 					"Expected %v PRs to be included in the message (was %v)",
 					len(tc.prs), mockSlackAPI.SentMessage.Blocks.GetPRCount(),

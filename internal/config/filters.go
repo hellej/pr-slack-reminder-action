@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -19,8 +20,10 @@ func GetFiltersFromInput(input string) (Filters, error) {
 		return Filters{}, nil
 	}
 
+	dec := json.NewDecoder(bytes.NewReader([]byte(rawFilters)))
+	dec.DisallowUnknownFields()
 	var filters Filters
-	err := json.Unmarshal([]byte(rawFilters), &filters)
+	err := dec.Decode(&filters)
 	if err != nil {
 		return Filters{}, fmt.Errorf("unable to parse %v from %v: %v", input, rawFilters, err)
 	}

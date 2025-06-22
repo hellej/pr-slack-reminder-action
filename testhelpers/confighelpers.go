@@ -14,9 +14,11 @@ func SetTestEnvironment(t *testing.T, c TestConfig, overrides *map[string]any) {
 }
 
 type TestConfig struct {
+	config.Config
 	Repository   string
 	Repositories []string
-	config.Config
+	// GlobalFilters as a JSON string (instead of config.Filters struct)
+	GlobalFiltersRaw string
 }
 
 func GetDefaultConfigFull() TestConfig {
@@ -28,8 +30,6 @@ func GetDefaultConfigFull() TestConfig {
 	}
 
 	return TestConfig{
-		Repository:   "test-org/test-repo",
-		Repositories: []string{"test-org/test-repo"},
 		Config: config.Config{
 			GithubToken:                 "SOME_TOKEN",
 			SlackBotToken:               "SOME_TOKEN",
@@ -42,6 +42,9 @@ func GetDefaultConfigFull() TestConfig {
 				OldPRThresholdHours: &oldPRsThresholdHours,
 			},
 		},
+		Repository:       "test-org/test-repo",
+		Repositories:     []string{"test-org/test-repo"},
+		GlobalFiltersRaw: "{\"labels\": [\"feature\", \"fix\"], \"authors\": [\"alice\", \"stitch\"]}",
 	}
 }
 
@@ -71,6 +74,7 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputMainListHeading, c.ContentInputs.MainListHeading)
 	setInputEnv(t, overrides, config.InputOldPRsListHeading, c.ContentInputs.OldPRsListHeading)
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
+	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
 }
 
 func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName string, value any) {
