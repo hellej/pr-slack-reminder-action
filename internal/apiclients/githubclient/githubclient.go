@@ -67,11 +67,16 @@ func (pr PR) GetAuthorNameOrUsername() string {
 	return ""
 }
 
-func (pr PR) IsMatch(filters config.Filters) bool {
+func (pr PR) isMatch(filters config.Filters) bool {
 	if len(filters.Labels) > 0 {
 		if !slices.ContainsFunc(pr.Labels, func(l *github.Label) bool {
 			return slices.Contains(filters.Labels, l.GetName())
 		}) {
+			return false
+		}
+	}
+	if len(filters.Authors) > 0 {
+		if !slices.Contains(filters.Authors, pr.GetUsername()) {
 			return false
 		}
 	}
@@ -205,7 +210,7 @@ func parseOwnerAndRepo(repository string) (string, string, error) {
 func filterPRs(prs []PR, filters config.Filters) []PR {
 	filtered := make([]PR, 0, len(prs))
 	for _, pr := range prs {
-		if pr.IsMatch(filters) {
+		if pr.isMatch(filters) {
 			filtered = append(filtered, pr)
 		}
 	}

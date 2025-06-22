@@ -209,9 +209,16 @@ func TestScenarios(t *testing.T) {
 			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
 		{
-			name:            "all PRs filtered out by labels",
+			name:            "all PRs filtered out by authors",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]}"},
+			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
+			expectedSummary: "", // no message should be sent
+		},
+		{
+			name:            "all PRs filtered out by labels",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"authors\": [\"lilo\"]}"},
 			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
 			expectedSummary: "", // no message should be sent
 		},
