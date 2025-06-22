@@ -33,7 +33,7 @@ func Run(
 		config.SlackChannelID = channelID
 	}
 
-	prs, err := githubClient.FetchOpenPRs(config.GetGithubRepositories())
+	prs, err := githubClient.FetchOpenPRs(config.GetGithubRepositories(), config.GlobalFilters)
 	if err != nil {
 		return err
 	}

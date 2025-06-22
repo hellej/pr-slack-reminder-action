@@ -9,15 +9,24 @@ import (
 	"sync"
 
 	"github.com/google/go-github/v72/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/config"
 )
 
 type Client interface {
-	FetchOpenPRs(repositories []string) ([]PR, error)
+	FetchOpenPRs(repositories []string, filters config.Filters) ([]PR, error)
 }
 
 type githubPullRequestsService interface {
-	List(ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
-	ListReviews(ctx context.Context, owner string, repo string, number int, opts *github.ListOptions) ([]*github.PullRequestReview, *github.Response, error)
+	List(
+		ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
+	) (
+		[]*github.PullRequest, *github.Response, error,
+	)
+	ListReviews(
+		ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
+	) (
+		[]*github.PullRequestReview, *github.Response, error,
+	)
 }
 
 type client struct {
@@ -35,6 +44,7 @@ func GetAuthenticatedClient(token string) Client {
 
 type PR struct {
 	*github.PullRequest
+	// Repository name (just the name, no owner)
 	Repository       string
 	CommentedByUsers []string // reviewers who commented the PR but did not approve it
 	ApprovedByUsers  []string
@@ -57,13 +67,25 @@ func (pr PR) GetAuthorNameOrUsername() string {
 	return ""
 }
 
+func (pr PR) IsMatch(filters config.Filters) bool {
+	if len(filters.Labels) > 0 {
+		if !slices.ContainsFunc(pr.Labels, func(l *github.Label) bool {
+			return slices.Contains(filters.Labels, l.GetName())
+		}) {
+			return false
+		}
+	}
+	return true
+
+}
+
 // FetchOpenPRs fetches open pull requests from the provided repositories.
 // Returns an error if fetching PRs from any repository fails (and cancels other requests).
 //
 // The wait group & cancellation logic could be refactored to use errgroup package for more
 // concise implementation. However, the current implementation also serves as learning material
 // so we can save the refactoring for later...
-func (c *client) FetchOpenPRs(repositoryPaths []string) ([]PR, error) {
+func (c *client) FetchOpenPRs(repositoryPaths []string, filters config.Filters) ([]PR, error) {
 	log.Printf("Fetching open pull requests for repositories: %v", repositoryPaths)
 
 	parsedRepos, err := parseRepositoryNames(repositoryPaths)
@@ -104,7 +126,7 @@ func (c *client) FetchOpenPRs(repositoryPaths []string) ([]PR, error) {
 		}
 	}
 
-	return c.AddReviewerInfoToPRs(successfulResults), nil
+	return filterPRs(c.addReviewerInfoToPRs(successfulResults), filters), nil
 }
 
 type PRsOfRepoResult struct {
@@ -121,7 +143,9 @@ func (r PRsOfRepoResult) GetPRCount() int {
 	return 0
 }
 
-func (c *client) fetchOpenPRsForRepository(ctx context.Context, repoOwner string, repoName string) PRsOfRepoResult {
+func (c *client) fetchOpenPRsForRepository(
+	ctx context.Context, repoOwner string, repoName string,
+) PRsOfRepoResult {
 	prs, response, err := c.prsService.List(ctx, repoOwner, repoName, nil)
 	if err != nil {
 		if response != nil && response.StatusCode == 404 {
@@ -178,6 +202,16 @@ func parseOwnerAndRepo(repository string) (string, string, error) {
 	return repoOwner, repoName, nil
 }
 
+func filterPRs(prs []PR, filters config.Filters) []PR {
+	filtered := make([]PR, 0, len(prs))
+	for _, pr := range prs {
+		if pr.IsMatch(filters) {
+			filtered = append(filtered, pr)
+		}
+	}
+	return filtered
+}
+
 func logFoundPRs(repository string, prs []*github.PullRequest) {
 	log.Printf("Found %d open pull requests in repository %s:", len(prs), repository)
 	for _, pr := range prs {
@@ -185,7 +219,7 @@ func logFoundPRs(repository string, prs []*github.PullRequest) {
 	}
 }
 
-func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
+func (c *client) addReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 	log.Printf("Fetching pull request reviewers for PRs")
 
 	totalPRCount := 0
@@ -231,20 +265,21 @@ func (c *client) AddReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 
 	allPRs := []PR{}
 	for result := range resultChannel {
-		result.PrintResult()
-		allPRs = append(allPRs, result.AsPR())
+		result.printResult()
+		allPRs = append(allPRs, result.asPR())
 	}
 	return allPRs
 }
 
 type FetchReviewsResult struct {
-	pr         *github.PullRequest
-	reviews    []*github.PullRequestReview
+	pr      *github.PullRequest
+	reviews []*github.PullRequestReview
+	// Repository name (just the name, no owner)
 	repository string
 	err        error
 }
 
-func (r FetchReviewsResult) PrintResult() {
+func (r FetchReviewsResult) printResult() {
 	if r.err != nil {
 		log.Printf("Unable to fetch reviews for PR #%d: %v", r.pr.GetNumber(), r.err)
 	} else {
@@ -255,7 +290,7 @@ func (r FetchReviewsResult) PrintResult() {
 	}
 }
 
-func (r FetchReviewsResult) AsPR() PR {
+func (r FetchReviewsResult) asPR() PR {
 	approvedByUsers := []string{}
 	commentedByUsers := []string{}
 

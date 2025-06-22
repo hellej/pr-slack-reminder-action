@@ -211,7 +211,7 @@ func TestScenarios(t *testing.T) {
 		{
 			name:            "all PRs filtered out by labels",
 			config:          testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]"},
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]}"},
 			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
 			expectedSummary: "", // no message should be sent
 		},
@@ -285,14 +285,18 @@ func TestScenarios(t *testing.T) {
 			if tc.expectedErrorMsg != "" {
 				return
 			}
-			for _, pr := range tc.prs {
-				if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
-					t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
+			if tc.expectedPRCount > 0 {
+				for _, pr := range tc.prs {
+					if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
+						t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
+					}
 				}
 			}
 			expectedHeading := ""
-			if len(tc.prs) > 0 {
-				expectedHeading = strings.ReplaceAll(tc.config.ContentInputs.MainListHeading, "<pr_count>", strconv.Itoa(len(tc.prs)))
+			if tc.expectedPRCount > 0 {
+				expectedHeading = strings.ReplaceAll(
+					tc.config.ContentInputs.MainListHeading, "<pr_count>", strconv.Itoa(tc.expectedPRCount),
+				)
 			}
 			if expectedHeading != "" && !mockSlackAPI.SentMessage.Blocks.ContainsHeading(expectedHeading) {
 				t.Errorf(
@@ -302,7 +306,7 @@ func TestScenarios(t *testing.T) {
 			if tc.expectedPRCount != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
 				t.Errorf(
 					"Expected %v PRs to be included in the message (was %v)",
-					len(tc.prs), mockSlackAPI.SentMessage.Blocks.GetPRCount(),
+					tc.expectedPRCount, mockSlackAPI.SentMessage.Blocks.GetPRCount(),
 				)
 			}
 		})
