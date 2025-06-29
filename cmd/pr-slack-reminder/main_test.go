@@ -141,10 +141,16 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: "configuration error: if old-pr-threshold-hours is set, old-prs-list-heading must also be set",
 		},
 		{
-			name:             "invalid repository input",
+			name:             "invalid repository input 1",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.EnvGithubRepository: "invalid/repo/name"},
-			expectedErrorMsg: "unable to parse repository input: invalid owner/repository format: invalid/repo/name",
+			expectedErrorMsg: "configuration error: invalid repositories input: invalid owner/repository format: invalid/repo/name",
+		},
+		{
+			name:             "invalid repository input 2",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			configOverrides:  &map[string]any{config.EnvGithubRepository: "invalid/"},
+			expectedErrorMsg: "configuration error: invalid repositories input: owner or repository name cannot be empty in: invalid/",
 		},
 		{
 			name:            "no PRs found with message",

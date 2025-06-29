@@ -34,19 +34,12 @@ type Config struct {
 	GithubToken                 string
 	SlackBotToken               string
 	repository                  string
-	repositories                []string
+	Repositories                []Repository
 	SlackChannelName            string
 	SlackChannelID              string
 	SlackUserIdByGitHubUsername map[string]string
 	ContentInputs               ContentInputs
 	GlobalFilters               Filters
-}
-
-func (c Config) GetGithubRepositories() []string {
-	if len(c.repositories) > 0 {
-		return c.repositories
-	}
-	return []string{c.repository}
 }
 
 func (c Config) Print() {
@@ -59,7 +52,6 @@ func (c Config) Print() {
 	}
 	asJson, _ := json.MarshalIndent(copy, "", "  ")
 	log.Print("Configuration:")
-	log.Printf("repositories: %s", copy.GetGithubRepositories())
 	log.Println(string(asJson))
 }
 
@@ -76,9 +68,22 @@ func GetConfig() (Config, error) {
 		return Config{}, err
 	}
 
+	repositoryPaths := utilities.GetInputList(InputGithubRepositories)
+	if len(repositoryPaths) == 0 {
+		repositoryPaths = []string{repository}
+	}
+	repositories := make([]Repository, len(repositoryPaths))
+	for i, repoPath := range repositoryPaths {
+		repo, err := parseRepository(repoPath)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid repositories input: %v", err)
+		}
+		repositories[i] = repo
+	}
+
 	config := Config{
 		repository:                  repository,
-		repositories:                utilities.GetInputList(InputGithubRepositories),
+		Repositories:                repositories,
 		GithubToken:                 githubToken,
 		SlackBotToken:               slackToken,
 		SlackChannelName:            utilities.GetInput(InputSlackChannelName),

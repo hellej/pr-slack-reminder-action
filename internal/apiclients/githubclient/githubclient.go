@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"slices"
-	"strings"
 	"sync"
 
 	"github.com/google/go-github/v72/github"
@@ -13,7 +11,7 @@ import (
 )
 
 type Client interface {
-	FetchOpenPRs(repositories []string, filters config.Filters) ([]PR, error)
+	FetchOpenPRs(repositories []config.Repository, filters config.Filters) ([]PR, error)
 }
 
 type githubPullRequestsService interface {
@@ -42,79 +40,31 @@ func GetAuthenticatedClient(token string) Client {
 	return NewClient(ghClient.PullRequests)
 }
 
-type PR struct {
-	*github.PullRequest
-	// Repository name (just the name, no owner)
-	Repository       string
-	CommentedByUsers []string // reviewers who commented the PR but did not approve it
-	ApprovedByUsers  []string
-}
-
-func (pr PR) GetUsername() string {
-	if pr.GetUser() != nil {
-		return pr.GetUser().GetLogin()
-	}
-	return ""
-}
-
-func (pr PR) GetAuthorNameOrUsername() string {
-	if pr.GetUser() != nil {
-		if pr.GetUser().GetName() != "" {
-			return pr.GetUser().GetName()
-		}
-		return pr.GetUser().GetLogin()
-	}
-	return ""
-}
-
-func (pr PR) isMatch(filters config.Filters) bool {
-	if len(filters.Labels) > 0 {
-		if !slices.ContainsFunc(pr.Labels, func(l *github.Label) bool {
-			return slices.Contains(filters.Labels, l.GetName())
-		}) {
-			return false
-		}
-	}
-	if len(filters.Authors) > 0 {
-		if !slices.Contains(filters.Authors, pr.GetUsername()) {
-			return false
-		}
-	}
-	return true
-
-}
-
-// FetchOpenPRs fetches open pull requests from the provided repositories.
 // Returns an error if fetching PRs from any repository fails (and cancels other requests).
 //
 // The wait group & cancellation logic could be refactored to use errgroup package for more
 // concise implementation. However, the current implementation also serves as learning material
 // so we can save the refactoring for later...
-func (c *client) FetchOpenPRs(repositoryPaths []string, filters config.Filters) ([]PR, error) {
-	log.Printf("Fetching open pull requests for repositories: %v", repositoryPaths)
-
-	parsedRepos, err := parseRepositoryNames(repositoryPaths)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse repository input: %v", err)
-	}
+func (c *client) FetchOpenPRs(repositories []config.Repository, filters config.Filters) ([]PR, error) {
+	log.Printf("Fetching open pull requests for repositories: %v", repositories)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var wg sync.WaitGroup
-	apiResultChannel := make(chan PRsOfRepoResult, len(repositoryPaths))
+	apiResultChannel := make(chan PRsOfRepoResult, len(repositories))
 
-	for _, ownerAndRepo := range parsedRepos {
+	for _, repo := range repositories {
 		wg.Add(1)
-		go func(r OwnerAndRepo) {
+		go func(r config.Repository) {
 			defer wg.Done()
-			apiResult := c.fetchOpenPRsForRepository(ctx, r.Owner, r.Repo)
+			apiResult := c.fetchOpenPRsForRepository(ctx, r.Owner, r.Name)
 			apiResultChannel <- apiResult
 			if apiResult.err != nil {
 				cancel()
 			} else {
-				logFoundPRs(r.Repo, apiResult.prs)
+				logFoundPRs(r.Path, apiResult.prs)
 			}
-		}(ownerAndRepo)
+		}(repo)
 	}
 
 	go func() {
@@ -132,20 +82,6 @@ func (c *client) FetchOpenPRs(repositoryPaths []string, filters config.Filters) 
 	}
 
 	return filterPRs(c.addReviewerInfoToPRs(successfulResults), filters), nil
-}
-
-type PRsOfRepoResult struct {
-	prs        []*github.PullRequest
-	repository string
-	owner      string
-	err        error
-}
-
-func (r PRsOfRepoResult) GetPRCount() int {
-	if r.prs != nil {
-		return len(r.prs)
-	}
-	return 0
 }
 
 func (c *client) fetchOpenPRsForRepository(
@@ -177,44 +113,6 @@ func (c *client) fetchOpenPRsForRepository(
 		repository: repoName,
 		err:        nil,
 	}
-}
-
-func parseRepositoryNames(repositories []string) ([]OwnerAndRepo, error) {
-	results := make([]OwnerAndRepo, len(repositories))
-	for i, repository := range repositories {
-		repoOwner, repoName, err := parseOwnerAndRepo(repository)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = OwnerAndRepo{Owner: repoOwner, Repo: repoName}
-	}
-	return results, nil
-}
-
-type OwnerAndRepo struct {
-	Owner string
-	Repo  string
-}
-
-func parseOwnerAndRepo(repository string) (string, string, error) {
-	repoParts := strings.Split(repository, "/")
-	if len(repoParts) != 2 {
-		return "", "", fmt.Errorf("invalid owner/repository format: %s", repository)
-	}
-	repoOwner := repoParts[0]
-	repoName := repoParts[1]
-
-	return repoOwner, repoName, nil
-}
-
-func filterPRs(prs []PR, filters config.Filters) []PR {
-	filtered := make([]PR, 0, len(prs))
-	for _, pr := range prs {
-		if pr.isMatch(filters) {
-			filtered = append(filtered, pr)
-		}
-	}
-	return filtered
 }
 
 func logFoundPRs(repository string, prs []*github.PullRequest) {
@@ -274,52 +172,4 @@ func (c *client) addReviewerInfoToPRs(prResults []PRsOfRepoResult) []PR {
 		allPRs = append(allPRs, result.asPR())
 	}
 	return allPRs
-}
-
-type FetchReviewsResult struct {
-	pr      *github.PullRequest
-	reviews []*github.PullRequestReview
-	// Repository name (just the name, no owner)
-	repository string
-	err        error
-}
-
-func (r FetchReviewsResult) printResult() {
-	if r.err != nil {
-		log.Printf("Unable to fetch reviews for PR #%d: %v", r.pr.GetNumber(), r.err)
-	} else {
-		log.Printf("Found %d reviews for PR %v/%d", len(r.reviews), r.repository, r.pr.GetNumber())
-	}
-	for _, review := range r.reviews {
-		log.Printf("Review by %s: %s", review.GetUser().GetLogin(), *review.State)
-	}
-}
-
-func (r FetchReviewsResult) asPR() PR {
-	approvedByUsers := []string{}
-	commentedByUsers := []string{}
-
-	for _, review := range r.reviews {
-		user := review.GetUser().GetLogin()
-		if user == "" {
-			continue
-		}
-		if review.GetState() == "APPROVED" {
-			if !slices.Contains(approvedByUsers, user) {
-				approvedByUsers = append(approvedByUsers, user)
-			}
-		} else {
-			if !slices.Contains(commentedByUsers, user) && !slices.Contains(approvedByUsers, user) {
-				// Only add to commentedByUsers if the user has not already approved
-				commentedByUsers = append(commentedByUsers, user)
-			}
-		}
-	}
-
-	return PR{
-		PullRequest:      r.pr,
-		Repository:       r.repository,
-		CommentedByUsers: commentedByUsers,
-		ApprovedByUsers:  approvedByUsers,
-	}
 }
