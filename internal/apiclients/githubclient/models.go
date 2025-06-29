@@ -60,6 +60,11 @@ func (pr PR) isMatch(filters config.Filters) bool {
 			return false
 		}
 	}
+	if len(filters.AuthorsIgnore) > 0 {
+		if slices.Contains(filters.AuthorsIgnore, pr.GetUsername()) {
+			return false
+		}
+	}
 	return true
 }
 

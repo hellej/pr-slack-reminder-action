@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,103 +16,155 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
 )
 
-type TestPRs struct {
-	PRs []*github.PullRequest
-	PR1 *github.PullRequest
-	PR2 *github.PullRequest
-	PR3 *github.PullRequest
-	PR4 *github.PullRequest
-	PR5 *github.PullRequest
+type GetTestPROptions struct {
+	Number      int
+	Title       string
+	AuthorLogin string
+	AuthorName  string
+	Labels      []string
+	AgeHours    float32
+}
+
+var now = time.Now()
+
+func getTestPR(options GetTestPROptions) *github.PullRequest {
+	if options.Number == 0 {
+		options.Number = testhelpers.RandomPositiveInt()
+	}
+
+	title := options.Title
+	if title == "" {
+		title = testhelpers.RandomString(10)
+	}
+
+	login := options.AuthorLogin
+	if login == "" {
+		login = testhelpers.RandomString(10)
+	}
+	name := options.AuthorName
+	if name == "" {
+		name = strings.ToTitle(login)
+	}
+
+	var githubLabels []*github.Label
+	if len(options.Labels) == 0 {
+		options.Labels = []string{testhelpers.RandomString(10)}
+	}
+	for _, label := range options.Labels {
+		githubLabels = append(githubLabels, &github.Label{
+			Name: &label,
+		})
+	}
+
+	if options.AgeHours == 0.0 {
+		options.AgeHours = 5.0 // Default to 5 hours if not specified
+	}
+	prTime := now.Add(-time.Duration(options.AgeHours) * time.Hour)
+
+	return &github.PullRequest{
+		Number: &options.Number,
+		Title:  &title,
+		User: &github.User{
+			Login: &login,
+			Name:  &name,
+		},
+		Labels:    githubLabels,
+		CreatedAt: &github.Timestamp{Time: prTime},
+	}
 }
 
 type GetTestPRsOptions struct {
 	Labels []string
 }
 
-func getTestPRs(args GetTestPRsOptions) TestPRs {
-	now := time.Now()
-	var githubLabels []*github.Label
-	for _, label := range args.Labels {
-		githubLabels = append(githubLabels, &github.Label{
-			Name: &label,
-		})
+type TestPRs struct {
+	PRNumbers []int
+	PRs       []*github.PullRequest
+	PR1       *github.PullRequest
+	PR2       *github.PullRequest
+	PR3       *github.PullRequest
+	PR4       *github.PullRequest
+	PR5       *github.PullRequest
+}
 
-	}
-
-	pr1 := &github.PullRequest{
-		Number:    github.Ptr(1),
-		CreatedAt: &github.Timestamp{Time: now.Add(-5 * time.Minute)},
-		Title:     github.Ptr("This is a test PR"),
-		User: &github.User{
-			Login: github.Ptr("stitch"),
-			Name:  github.Ptr("Stitch"),
-		},
-		Labels: githubLabels,
-	}
-	pr2 := &github.PullRequest{
-		Number:    github.Ptr(2),
-		CreatedAt: &github.Timestamp{Time: now.Add(-3 * time.Hour)},
-		Title:     github.Ptr("This PR was created 3 hours ago and contains important changes"),
-		User: &github.User{
-			Login: github.Ptr("alice"),
-			Name:  github.Ptr("Alice"),
-		},
-		Labels: githubLabels,
-	}
-	pr3 := &github.PullRequest{
-		Number:    github.Ptr(2),
-		CreatedAt: &github.Timestamp{Time: now.Add(-3 * time.Hour)},
-		Title:     github.Ptr("This PR has the same time as PR2 but a longer title"),
-		User: &github.User{
-			Login: github.Ptr("alice"),
-			Name:  github.Ptr("Alice"),
-		},
-		Labels: githubLabels,
-	}
-	pr4 := &github.PullRequest{
-		Number:    github.Ptr(3),
-		CreatedAt: &github.Timestamp{Time: now.Add(-26 * time.Hour)},
-		Title:     github.Ptr("This PR is getting old and needs attention"),
-		User: &github.User{
-			Login: github.Ptr("bob"),
-		},
-		Labels: githubLabels,
-	}
-	pr5 := &github.PullRequest{
-		Number:    github.Ptr(3),
-		CreatedAt: &github.Timestamp{Time: now.Add(-48 * time.Hour)},
-		Title:     github.Ptr("This is a big PR that no one dares to review"),
-		User: &github.User{
-			Name: github.Ptr("Jim"),
-		},
-		Labels: githubLabels,
-	}
+func getTestPRs(options GetTestPRsOptions) TestPRs {
+	pr1 := getTestPR(GetTestPROptions{
+		Number:      1,
+		Title:       "This is a test PR",
+		AuthorLogin: "stitch",
+		AuthorName:  "Stitch",
+		Labels:      options.Labels,
+		AgeHours:    0.083, // 5 minutes
+	})
+	pr2 := getTestPR(GetTestPROptions{
+		Number:      2,
+		Title:       "This PR was created 3 hours ago and contains important changes",
+		AuthorLogin: "alice",
+		AuthorName:  "Alice",
+		Labels:      options.Labels,
+		AgeHours:    3,
+	})
+	pr3 := getTestPR(GetTestPROptions{
+		Number:      3,
+		Title:       "This PR has the same time as PR2 but a longer title",
+		AuthorLogin: "alice",
+		AuthorName:  "Alice",
+		Labels:      options.Labels,
+		AgeHours:    3,
+	})
+	pr4 := getTestPR(GetTestPROptions{
+		Number:      4,
+		Title:       "This PR is getting old and needs attention",
+		AuthorLogin: "bob",
+		Labels:      options.Labels,
+		AgeHours:    26,
+	})
+	pr5 := getTestPR(GetTestPROptions{
+		Number:     5,
+		Title:      "This is a big PR that no one dares to review",
+		AuthorName: "Jim",
+		Labels:     options.Labels,
+		AgeHours:   48,
+	})
 
 	return TestPRs{
-		PRs: []*github.PullRequest{pr1, pr2, pr3, pr4, pr5},
-		PR1: pr1,
-		PR2: pr2,
-		PR3: pr3,
-		PR4: pr4,
-		PR5: pr5,
+		PRNumbers: []int{1, 2, 3, 4, 5},
+		PRs:       []*github.PullRequest{pr1, pr2, pr3, pr4, pr5},
+		PR1:       pr1,
+		PR2:       pr2,
+		PR3:       pr3,
+		PR4:       pr4,
+		PR5:       pr5,
 	}
+}
+
+func filterPRsByNumbers(
+	prs []*github.PullRequest,
+	numbers []int,
+) []*github.PullRequest {
+	var filteredPRs []*github.PullRequest
+	for _, pr := range prs {
+		if slices.Contains(numbers, *pr.Number) {
+			filteredPRs = append(filteredPRs, pr)
+		}
+	}
+	return filteredPRs
 }
 
 func TestScenarios(t *testing.T) {
 	testCases := []struct {
-		name            string
-		config          testhelpers.TestConfig
-		configOverrides *map[string]any
-		fetchPRsStatus  int
-		fetchPRsError   error
-		prs             []*github.PullRequest
-		// Expected number of PRs included in the Slack message (after filters etc)
-		expectedPRCount    int
+		name               string
+		config             testhelpers.TestConfig
+		configOverrides    *map[string]any
+		fetchPRsStatus     int
+		fetchPRsError      error
+		prs                []*github.PullRequest
 		reviewsByPRNumber  map[int][]*github.PullRequestReview
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
 		sendMessageError   error
 		expectedErrorMsg   string
+		expectedPRNumbers  []int
 		expectedSummary    string
 	}{
 		{
@@ -159,10 +212,16 @@ func TestScenarios(t *testing.T) {
 			expectedSummary: "No PRs found, happy coding! 🎉",
 		},
 		{
-			name:             "invalid global filters input",
+			name:             "invalid global filters input 1",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"invalid\": \"json\"}"},
 			expectedErrorMsg: "configuration error: unable to parse filters from {\"invalid\": \"json\"}: json: unknown field \"invalid\"",
+		},
+		{
+			name:             "invalid global filters input 2",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"authors\": [\"alice\"], \"authors-ignore\": [\"bob\"]}"},
+			expectedErrorMsg: "configuration error: invalid value in input: filters, error: cannot use both authors and authors-ignore filters at the same time",
 		},
 		{
 			name:            "no PRs found without message",
@@ -208,11 +267,11 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: "failed to send Slack message: error in sending Slack message",
 		},
 		{
-			name:            "minimal config with 5 PRs",
-			config:          testhelpers.GetDefaultConfigMinimal(),
-			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
-			expectedPRCount: len(getTestPRs(GetTestPRsOptions{}).PRs),
-			expectedSummary: "5 open PRs are waiting for attention 👀",
+			name:              "minimal config with 5 PRs",
+			config:            testhelpers.GetDefaultConfigMinimal(),
+			prs:               getTestPRs(GetTestPRsOptions{}).PRs,
+			expectedPRNumbers: getTestPRs(GetTestPRsOptions{}).PRNumbers,
+			expectedSummary:   "5 open PRs are waiting for attention 👀",
 		},
 		{
 			name:            "all PRs filtered out by authors",
@@ -220,6 +279,17 @@ func TestScenarios(t *testing.T) {
 			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]}"},
 			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
 			expectedSummary: "", // no message should be sent
+		},
+		{
+			name:            "PRs by user filtered out",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"authors-ignore\": [\"alice\"]}"},
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, AuthorLogin: "alice", Title: "PR by Alice"}),
+				getTestPR(GetTestPROptions{Number: 2, AuthorLogin: "bob", Title: "PR by Bob"}),
+			},
+			expectedPRNumbers: []int{2},
+			expectedSummary:   "1 open PR is waiting for attention 👀",
 		},
 		{
 			name:            "all PRs filtered out by labels",
@@ -235,8 +305,8 @@ func TestScenarios(t *testing.T) {
 				config.InputOldPRThresholdHours: 12,
 				config.InputGlobalFilters:       "{\"labels\": [\"feature\", \"fix\"]}",
 			},
-			prs:             getTestPRs(GetTestPRsOptions{Labels: []string{"feature"}}).PRs,
-			expectedPRCount: len(getTestPRs(GetTestPRsOptions{}).PRs),
+			prs:               getTestPRs(GetTestPRsOptions{Labels: []string{"feature"}}).PRs,
+			expectedPRNumbers: getTestPRs(GetTestPRsOptions{}).PRNumbers,
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				*getTestPRs(GetTestPRsOptions{}).PR1.Number: {
 					{
@@ -298,28 +368,32 @@ func TestScenarios(t *testing.T) {
 			if tc.expectedErrorMsg != "" {
 				return
 			}
-			if tc.expectedPRCount > 0 {
-				for _, pr := range tc.prs {
+			expectedPRs := filterPRsByNumbers(tc.prs, tc.expectedPRNumbers)
+			if len(expectedPRs) != len(tc.expectedPRNumbers) {
+				t.Errorf("Test config error: test PRs do not contain all PRs by expectedPRNumbers")
+			}
+			if len(expectedPRs) > 0 {
+				for _, pr := range expectedPRs {
 					if !mockSlackAPI.SentMessage.Blocks.ContainsPRTitle(*pr.Title) {
 						t.Errorf("Expected PR title '%s' to be in the sent message blocks", *pr.Title)
 					}
 				}
 			}
+			if len(expectedPRs) != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
+				t.Errorf(
+					"Expected %v PRs to be included in the message (was %v)",
+					len(expectedPRs), mockSlackAPI.SentMessage.Blocks.GetPRCount(),
+				)
+			}
 			expectedHeading := ""
-			if tc.expectedPRCount > 0 {
+			if len(expectedPRs) > 0 {
 				expectedHeading = strings.ReplaceAll(
-					tc.config.ContentInputs.MainListHeading, "<pr_count>", strconv.Itoa(tc.expectedPRCount),
+					tc.config.ContentInputs.MainListHeading, "<pr_count>", strconv.Itoa(len(expectedPRs)),
 				)
 			}
 			if expectedHeading != "" && !mockSlackAPI.SentMessage.Blocks.ContainsHeading(expectedHeading) {
 				t.Errorf(
 					"Expected PR list heading '%s' to be included in the Slack message", expectedHeading,
-				)
-			}
-			if tc.expectedPRCount != mockSlackAPI.SentMessage.Blocks.GetPRCount() {
-				t.Errorf(
-					"Expected %v PRs to be included in the message (was %v)",
-					tc.expectedPRCount, mockSlackAPI.SentMessage.Blocks.GetPRCount(),
 				)
 			}
 		})

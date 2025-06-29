@@ -18,8 +18,8 @@ type Content struct {
 	OldPRsList        []prparser.PR
 }
 
-func (c Content) GetPRCount() int16 {
-	return int16(len(c.MainList) + len(c.OldPRsList))
+func (c Content) GetPRCount() int {
+	return len(c.MainList) + len(c.OldPRsList)
 }
 
 func (c Content) HasPRs() bool {
@@ -45,8 +45,15 @@ func getNewAndOldPRs(openPRs []prparser.PR, oldPRThresholdHours int) ([]prparser
 	return mainList, oldPRsList
 }
 
-func formatMainListHeading(heading string, prCount int) string {
+func formatListHeading(heading string, prCount int) string {
 	return strings.ReplaceAll(heading, "<pr_count>", strconv.Itoa(prCount))
+}
+
+func getSummaryText(prCount int) string {
+	if prCount == 1 {
+		return "1 open PR is waiting for attention 👀"
+	}
+	return fmt.Sprintf("%d open PRs are waiting for attention 👀", prCount)
 }
 
 func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Content {
@@ -57,19 +64,18 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 		}
 	case contentInputs.OldPRThresholdHours == nil:
 		return Content{
-			SummaryText:     fmt.Sprintf("%d open PRs are waiting for attention 👀", len(openPRs)),
-			MainListHeading: formatMainListHeading(contentInputs.MainListHeading, len(openPRs)),
+			SummaryText:     getSummaryText(len(openPRs)),
+			MainListHeading: formatListHeading(contentInputs.MainListHeading, len(openPRs)),
 			MainList:        openPRs,
 		}
 	default:
 		newPRs, oldPRs := getNewAndOldPRs(openPRs, *contentInputs.OldPRThresholdHours)
-		content := Content{
-			MainListHeading:   formatMainListHeading(contentInputs.MainListHeading, len(openPRs)),
+		return Content{
+			SummaryText:       getSummaryText(len(newPRs) + len(oldPRs)),
+			MainListHeading:   formatListHeading(contentInputs.MainListHeading, len(openPRs)),
 			MainList:          newPRs,
-			OldPRsListHeading: contentInputs.OldPRsListHeading,
+			OldPRsListHeading: formatListHeading(contentInputs.OldPRsListHeading, len(oldPRs)),
 			OldPRsList:        oldPRs,
 		}
-		content.SummaryText = fmt.Sprintf("%d open PRs are waiting for attention 👀", content.GetPRCount())
-		return content
 	}
 }
