@@ -86,7 +86,7 @@ func GetInputMapping(inputName string) (map[string]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		parts := strings.SplitN(line, ":", -1)
+		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid mapping format for %s: %s", inputName, line)
 		}

@@ -19,6 +19,9 @@ type TestConfig struct {
 	Repositories []string
 	// GlobalFilters as a JSON string (instead of config.Filters struct)
 	GlobalFiltersRaw string
+	// GlobalFilters as a JSON string (instead of config.Filters struct)
+	// e.g. "test-repo: {\"labels\": [\"feature\", \"fix\"]}"
+	RepositoryFiltersRaw string
 }
 
 func GetDefaultConfigFull() TestConfig {
@@ -75,6 +78,7 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputOldPRsListHeading, c.ContentInputs.OldPRsListHeading)
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
 	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
+	setInputEnv(t, overrides, config.InputRepositoryFilters, c.RepositoryFiltersRaw)
 }
 
 func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName string, value any) {

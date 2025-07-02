@@ -22,8 +22,7 @@ func (f Filters) validate() error {
 	return nil
 }
 
-func GetFiltersFromInput(input string) (Filters, error) {
-	rawFilters := utilities.GetInput(input)
+func parseFilters(rawFilters string) (Filters, error) {
 	if rawFilters == "" {
 		return Filters{}, nil
 	}
@@ -33,12 +32,41 @@ func GetFiltersFromInput(input string) (Filters, error) {
 	var filters Filters
 	err := dec.Decode(&filters)
 	if err != nil {
-		return Filters{}, fmt.Errorf("unable to parse %v from %v: %v", input, rawFilters, err)
+		return Filters{}, fmt.Errorf("unable to parse filters from %v: %v", rawFilters, err)
 	}
 	err = filters.validate()
 	if err != nil {
-		return Filters{}, fmt.Errorf("invalid value in input: %v, error: %v", input, err)
+		return Filters{}, fmt.Errorf("invalid filters: %v, error: %v", rawFilters, err)
 	}
 
 	return filters, nil
+}
+
+func GetGlobalFiltersFromInput(input string) (Filters, error) {
+	filters, err := parseFilters(utilities.GetInput(input))
+	if err != nil {
+		return Filters{}, fmt.Errorf("error reading input %s: %w", input, err)
+	}
+	return filters, nil
+}
+
+func GetRepositoryFiltersFromInput(input string) (map[string]Filters, error) {
+	rawFiltersByRepo, err := utilities.GetInputMapping(input)
+	if err != nil {
+		return nil, fmt.Errorf("error reading input %s: %w", input, err)
+	}
+	if len(rawFiltersByRepo) == 0 {
+		return make(map[string]Filters), nil
+	}
+
+	filtersByRepo := make(map[string]Filters, len(rawFiltersByRepo))
+	for repo, rawFilters := range rawFiltersByRepo {
+		filters, err := parseFilters(rawFilters)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing filters for repository %s: %w", repo, err)
+		}
+		filtersByRepo[repo] = filters
+	}
+
+	return filtersByRepo, nil
 }

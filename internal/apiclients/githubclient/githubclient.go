@@ -11,7 +11,11 @@ import (
 )
 
 type Client interface {
-	FetchOpenPRs(repositories []config.Repository, filters config.Filters) ([]PR, error)
+	FetchOpenPRs(
+		repositories []config.Repository,
+		globalFilters config.Filters,
+		repositoryFilters map[string]config.Filters,
+	) ([]PR, error)
 }
 
 type githubPullRequestsService interface {
@@ -45,7 +49,11 @@ func GetAuthenticatedClient(token string) Client {
 // The wait group & cancellation logic could be refactored to use errgroup package for more
 // concise implementation. However, the current implementation also serves as learning material
 // so we can save the refactoring for later...
-func (c *client) FetchOpenPRs(repositories []config.Repository, filters config.Filters) ([]PR, error) {
+func (c *client) FetchOpenPRs(
+	repositories []config.Repository,
+	globalFilters config.Filters,
+	repositoryFilters map[string]config.Filters,
+) ([]PR, error) {
 	log.Printf("Fetching open pull requests for repositories: %v", repositories)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,7 +89,11 @@ func (c *client) FetchOpenPRs(repositories []config.Repository, filters config.F
 		}
 	}
 
-	return filterPRs(c.addReviewerInfoToPRs(successfulResults), filters), nil
+	return filterPRs(
+		c.addReviewerInfoToPRs(successfulResults),
+		globalFilters,
+		repositoryFilters,
+	), nil
 }
 
 func (c *client) fetchOpenPRsForRepository(

@@ -10,13 +10,15 @@ import (
 
 func MakeMockGitHubClientGetter(
 	prs []*github.PullRequest,
+	prsByRepo map[string][]*github.PullRequest,
 	listPRsResponseStatus int,
 	listPRsErr error,
 	reviewsByPRNumber map[int][]*github.PullRequestReview,
 ) func(token string) githubclient.Client {
 	return func(token string) githubclient.Client {
 		return githubclient.NewClient(&mockPullRequestsService{
-			mockPRs: prs,
+			mockPRs:       prs,
+			mockPRsByRepo: prsByRepo,
 			mockResponse: &github.Response{
 				Response: &http.Response{
 					StatusCode: listPRsResponseStatus,
@@ -31,6 +33,9 @@ func MakeMockGitHubClientGetter(
 func (m *mockPullRequestsService) List(
 	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
 ) ([]*github.PullRequest, *github.Response, error) {
+	if m.mockPRsByRepo != nil {
+		return m.mockPRsByRepo[repo], m.mockResponse, m.mockError
+	}
 	return m.mockPRs, m.mockResponse, m.mockError
 }
 
@@ -43,6 +48,7 @@ func (m *mockPullRequestsService) ListReviews(
 
 type mockPullRequestsService struct {
 	mockPRs               []*github.PullRequest
+	mockPRsByRepo         map[string][]*github.PullRequest
 	mockReviewsByPRNumber map[int][]*github.PullRequestReview
 	mockResponse          *github.Response
 	mockError             error

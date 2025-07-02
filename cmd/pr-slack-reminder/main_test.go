@@ -140,12 +140,20 @@ func getTestPRs(options GetTestPRsOptions) TestPRs {
 
 func filterPRsByNumbers(
 	prs []*github.PullRequest,
+	prsByRepo map[string][]*github.PullRequest,
 	numbers []int,
 ) []*github.PullRequest {
 	var filteredPRs []*github.PullRequest
 	for _, pr := range prs {
 		if slices.Contains(numbers, *pr.Number) {
 			filteredPRs = append(filteredPRs, pr)
+		}
+	}
+	for _, prList := range prsByRepo {
+		for _, pr := range prList {
+			if slices.Contains(numbers, *pr.Number) {
+				filteredPRs = append(filteredPRs, pr)
+			}
 		}
 	}
 	return filteredPRs
@@ -159,6 +167,7 @@ func TestScenarios(t *testing.T) {
 		fetchPRsStatus     int
 		fetchPRsError      error
 		prs                []*github.PullRequest
+		prsByRepo          map[string][]*github.PullRequest
 		reviewsByPRNumber  map[int][]*github.PullRequestReview
 		foundSlackChannels []*mockslackclient.SlackChannel
 		findChannelError   error
@@ -215,13 +224,13 @@ func TestScenarios(t *testing.T) {
 			name:             "invalid global filters input 1",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"invalid\": \"json\"}"},
-			expectedErrorMsg: "configuration error: unable to parse filters from {\"invalid\": \"json\"}: json: unknown field \"invalid\"",
+			expectedErrorMsg: "configuration error: error reading input filters: unable to parse filters from {\"invalid\": \"json\"}: json: unknown field \"invalid\"",
 		},
 		{
 			name:             "invalid global filters input 2",
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"authors\": [\"alice\"], \"authors-ignore\": [\"bob\"]}"},
-			expectedErrorMsg: "configuration error: invalid value in input: filters, error: cannot use both authors and authors-ignore filters at the same time",
+			expectedErrorMsg: "configuration error: error reading input filters: invalid filters: {\"authors\": [\"alice\"], \"authors-ignore\": [\"bob\"]}, error: cannot use both authors and authors-ignore filters at the same time",
 		},
 		{
 			name:            "no PRs found without message",
@@ -299,6 +308,21 @@ func TestScenarios(t *testing.T) {
 			expectedSummary: "", // no message should be sent
 		},
 		{
+			name:            "PRs by user in one repo filtered",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputRepositoryFilters: "repo1: {\"authors-ignore\": [\"alice\"]}"},
+			prsByRepo: map[string][]*github.PullRequest{
+				"repo1": {
+					getTestPR(GetTestPROptions{Number: 1, AuthorLogin: "alice", Title: "The PR by Alice that should be included"}),
+				},
+				"repo2": {
+					getTestPR(GetTestPROptions{Number: 2, AuthorLogin: "alice", Title: "PR by Alice that should be excluded"}),
+				},
+			},
+			expectedPRNumbers: []int{2},
+			expectedSummary:   "1 open PR is waiting for attention 👀",
+		},
+		{
 			name:   "full config with 5 PRs including old PRs",
 			config: testhelpers.GetDefaultConfigFull(),
 			configOverrides: &map[string]any{
@@ -336,7 +360,7 @@ func TestScenarios(t *testing.T) {
 				tc.fetchPRsStatus = 200
 			}
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(
-				tc.prs, tc.fetchPRsStatus, tc.fetchPRsError, tc.reviewsByPRNumber,
+				tc.prs, tc.prsByRepo, tc.fetchPRsStatus, tc.fetchPRsError, tc.reviewsByPRNumber,
 			)
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, tc.sendMessageError)
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
@@ -368,7 +392,7 @@ func TestScenarios(t *testing.T) {
 			if tc.expectedErrorMsg != "" {
 				return
 			}
-			expectedPRs := filterPRsByNumbers(tc.prs, tc.expectedPRNumbers)
+			expectedPRs := filterPRsByNumbers(tc.prs, tc.prsByRepo, tc.expectedPRNumbers)
 			if len(expectedPRs) != len(tc.expectedPRNumbers) {
 				t.Errorf("Test config error: test PRs do not contain all PRs by expectedPRNumbers")
 			}
