@@ -316,10 +316,10 @@ func TestScenarios(t *testing.T) {
 			},
 			prsByRepo: map[string][]*github.PullRequest{
 				"repo1": {
-					getTestPR(GetTestPROptions{Number: 1, AuthorLogin: "alice", Title: "The PR by Alice that should be included"}),
+					getTestPR(GetTestPROptions{Number: 1, AuthorLogin: "alice", Title: "The PR by Alice that should be excluded"}),
 				},
 				"repo2": {
-					getTestPR(GetTestPROptions{Number: 2, AuthorLogin: "alice", Title: "PR by Alice that should be excluded"}),
+					getTestPR(GetTestPROptions{Number: 2, AuthorLogin: "alice", Title: "PR by Alice that should be included"}),
 				},
 			},
 			expectedPRNumbers: []int{2},
