@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"cmp"
 	"errors"
 	"slices"
 	"strconv"
@@ -28,23 +29,10 @@ type GetTestPROptions struct {
 var now = time.Now()
 
 func getTestPR(options GetTestPROptions) *github.PullRequest {
-	if options.Number == 0 {
-		options.Number = testhelpers.RandomPositiveInt()
-	}
-
-	title := options.Title
-	if title == "" {
-		title = testhelpers.RandomString(10)
-	}
-
-	login := options.AuthorLogin
-	if login == "" {
-		login = testhelpers.RandomString(10)
-	}
-	name := options.AuthorName
-	if name == "" {
-		name = strings.ToTitle(login)
-	}
+	number := cmp.Or(options.Number, testhelpers.RandomPositiveInt())
+	title := cmp.Or(options.Title, testhelpers.RandomString(10))
+	authorLogin := cmp.Or(options.AuthorLogin, testhelpers.RandomString(10))
+	authorName := cmp.Or(options.AuthorName, strings.ToTitle(authorLogin))
 
 	var githubLabels []*github.Label
 	if len(options.Labels) == 0 {
@@ -55,18 +43,16 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 			Name: &label,
 		})
 	}
-
-	if options.AgeHours == 0.0 {
-		options.AgeHours = 5.0 // Default to 5 hours if not specified
-	}
-	prTime := now.Add(-time.Duration(options.AgeHours) * time.Hour)
+	prTime := now.Add(-time.Duration(
+		cmp.Or(options.AgeHours, float32(5.0))) * time.Hour,
+	)
 
 	return &github.PullRequest{
-		Number: &options.Number,
+		Number: &number,
 		Title:  &title,
 		User: &github.User{
-			Login: &login,
-			Name:  &name,
+			Login: &authorLogin,
+			Name:  &authorName,
 		},
 		Labels:    githubLabels,
 		CreatedAt: &github.Timestamp{Time: prTime},
@@ -74,7 +60,8 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 }
 
 type GetTestPRsOptions struct {
-	Labels []string
+	Labels     []string
+	AuthorUser string
 }
 
 type TestPRs struct {
@@ -91,40 +78,41 @@ func getTestPRs(options GetTestPRsOptions) TestPRs {
 	pr1 := getTestPR(GetTestPROptions{
 		Number:      1,
 		Title:       "This is a test PR",
-		AuthorLogin: "stitch",
-		AuthorName:  "Stitch",
+		AuthorLogin: cmp.Or(options.AuthorUser, "stitch"),
+		AuthorName:  cmp.Or(options.AuthorUser, "Stitch"),
 		Labels:      options.Labels,
 		AgeHours:    0.083, // 5 minutes
 	})
 	pr2 := getTestPR(GetTestPROptions{
 		Number:      2,
 		Title:       "This PR was created 3 hours ago and contains important changes",
-		AuthorLogin: "alice",
-		AuthorName:  "Alice",
+		AuthorLogin: cmp.Or(options.AuthorUser, "alice"),
+		AuthorName:  cmp.Or(options.AuthorUser, "Alice"),
 		Labels:      options.Labels,
 		AgeHours:    3,
 	})
 	pr3 := getTestPR(GetTestPROptions{
 		Number:      3,
 		Title:       "This PR has the same time as PR2 but a longer title",
-		AuthorLogin: "alice",
-		AuthorName:  "Alice",
+		AuthorLogin: cmp.Or(options.AuthorUser, "alice"),
+		AuthorName:  cmp.Or(options.AuthorUser, "Alice"),
 		Labels:      options.Labels,
 		AgeHours:    3,
 	})
 	pr4 := getTestPR(GetTestPROptions{
 		Number:      4,
 		Title:       "This PR is getting old and needs attention",
-		AuthorLogin: "bob",
+		AuthorLogin: cmp.Or(options.AuthorUser, "bob"),
 		Labels:      options.Labels,
 		AgeHours:    26,
 	})
 	pr5 := getTestPR(GetTestPROptions{
-		Number:     5,
-		Title:      "This is a big PR that no one dares to review",
-		AuthorName: "Jim",
-		Labels:     options.Labels,
-		AgeHours:   48,
+		Number:      5,
+		Title:       "This is a big PR that no one dares to review",
+		AuthorLogin: cmp.Or(options.AuthorUser, ""), // to cover the case where username is not set
+		AuthorName:  cmp.Or(options.AuthorUser, "Jim"),
+		Labels:      options.Labels,
+		AgeHours:    48,
 	})
 
 	return TestPRs{
@@ -283,14 +271,21 @@ func TestScenarios(t *testing.T) {
 			expectedSummary:   "5 open PRs are waiting for attention 👀",
 		},
 		{
-			name:            "all PRs filtered out by authors",
+			name:            "all PRs filtered out by labels (by inclusion)",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"]}"},
 			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
 			expectedSummary: "", // no message should be sent
 		},
 		{
-			name:            "PRs by user filtered out",
+			name:            "all PRs filtered out by labels (by exclusion)",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"labels-ignore\": [\"label-to-ignore\"]}"},
+			prs:             getTestPRs(GetTestPRsOptions{Labels: []string{"label-to-ignore"}}).PRs,
+			expectedSummary: "", // no message should be sent
+		},
+		{
+			name:            "PRs by one user filtered out",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"authors-ignore\": [\"alice\"]}"},
 			prs: []*github.PullRequest{
@@ -301,10 +296,17 @@ func TestScenarios(t *testing.T) {
 			expectedSummary:   "1 open PR is waiting for attention 👀",
 		},
 		{
-			name:            "all PRs filtered out by labels",
+			name:            "all PRs filtered out by users (by inclusion)",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"authors\": [\"lilo\"]}"},
 			prs:             getTestPRs(GetTestPRsOptions{}).PRs,
+			expectedSummary: "", // no message should be sent
+		},
+		{
+			name:            "all PRs filtered out by users (by exclusion)",
+			config:          testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{config.InputGlobalFilters: "{\"authors-ignore\": [\"lilo\"]}"},
+			prs:             getTestPRs(GetTestPRsOptions{AuthorUser: "lilo"}).PRs,
 			expectedSummary: "", // no message should be sent
 		},
 		{
@@ -359,11 +361,9 @@ func TestScenarios(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
-			if tc.fetchPRsStatus == 0 {
-				tc.fetchPRsStatus = 200
-			}
+
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(
-				tc.prs, tc.prsByRepo, tc.fetchPRsStatus, tc.fetchPRsError, tc.reviewsByPRNumber,
+				tc.prs, tc.prsByRepo, cmp.Or(tc.fetchPRsStatus, 200), tc.fetchPRsError, tc.reviewsByPRNumber,
 			)
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, tc.sendMessageError)
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
