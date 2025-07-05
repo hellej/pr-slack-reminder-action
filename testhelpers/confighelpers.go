@@ -19,8 +19,8 @@ type TestConfig struct {
 	Repositories []string
 	// GlobalFilters as a JSON string (instead of config.Filters struct)
 	GlobalFiltersRaw string
-	// GlobalFilters as a JSON string (instead of config.Filters struct)
-	// e.g. "test-repo: {\"labels\": [\"feature\", \"fix\"]}"
+	// RepositoryFilters as a JSON string
+	// e.g. "test-repo: {\"labels\": [\"feature\", \"fix\"]}; test-repo2: {\"authors-ignore\": [\"alice\"]}"
 	RepositoryFiltersRaw string
 }
 

@@ -58,8 +58,7 @@ func GetInputList(name string) []string {
 	}
 	separator := "\n"
 	if strings.Contains(val, ";") {
-		// for more convenient local testing
-		separator = ";"
+		separator = ";" // for more convenient local testing
 	}
 	lines := strings.Split(val, separator)
 	for i, line := range lines {

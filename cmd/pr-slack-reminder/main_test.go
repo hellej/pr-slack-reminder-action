@@ -308,9 +308,12 @@ func TestScenarios(t *testing.T) {
 			expectedSummary: "", // no message should be sent
 		},
 		{
-			name:            "PRs by user in one repo filtered",
-			config:          testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{config.InputRepositoryFilters: "repo1: {\"authors-ignore\": [\"alice\"]}"},
+			name:   "PRs by user in one repo filtered",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRepositoryFilters:  "repo1: {\"authors-ignore\": [\"alice\"]}",
+				config.InputGithubRepositories: "some-org/repo1; some-org/repo2",
+			},
 			prsByRepo: map[string][]*github.PullRequest{
 				"repo1": {
 					getTestPR(GetTestPROptions{Number: 1, AuthorLogin: "alice", Title: "The PR by Alice that should be included"}),
