@@ -1,6 +1,7 @@
 package githubclient
 
 import (
+	"cmp"
 	"log"
 	"slices"
 
@@ -26,25 +27,9 @@ type PR struct {
 	*github.PullRequest
 	// Repository name (just the name, no owner)
 	Repository       string
-	CommentedByUsers []string // reviewers who commented the PR but did not approve it
-	ApprovedByUsers  []string
-}
-
-func (pr PR) GetUsername() string {
-	if pr.GetUser() != nil {
-		return pr.GetUser().GetLogin()
-	}
-	return ""
-}
-
-func (pr PR) GetAuthorNameOrUsername() string {
-	if pr.GetUser() != nil {
-		if pr.GetUser().GetName() != "" {
-			return pr.GetUser().GetName()
-		}
-		return pr.GetUser().GetLogin()
-	}
-	return ""
+	Author           Collaborator
+	CommentedByUsers []Collaborator // reviewers who commented the PR but did not approve it
+	ApprovedByUsers  []Collaborator
 }
 
 func (pr PR) isMatch(filters config.Filters) bool {
@@ -56,7 +41,7 @@ func (pr PR) isMatch(filters config.Filters) bool {
 		}
 	}
 	if len(filters.AuthorsIgnore) > 0 {
-		if slices.Contains(filters.AuthorsIgnore, pr.GetUsername()) {
+		if slices.Contains(filters.AuthorsIgnore, pr.Author.Login) {
 			return false
 		}
 	}
@@ -68,7 +53,7 @@ func (pr PR) isMatch(filters config.Filters) bool {
 		}
 	}
 	if len(filters.Authors) > 0 {
-		if !slices.Contains(filters.Authors, pr.GetUsername()) {
+		if !slices.Contains(filters.Authors, pr.Author.Login) {
 			return false
 		}
 	}
@@ -90,27 +75,60 @@ func (r FetchReviewsResult) printResult() {
 		log.Printf("Found %d reviews for PR %v/%d", len(r.reviews), r.repository, r.pr.GetNumber())
 	}
 	for _, review := range r.reviews {
-		log.Printf("Review by %s: %s", review.GetUser().GetLogin(), *review.State)
+		log.Printf(
+			"Review by %s (name: %s): %s",
+			review.GetUser().GetLogin(),
+			review.GetUser().GetName(),
+			*review.State,
+		)
 	}
 }
 
+type Collaborator struct {
+	Login string // GitHub username
+	Name  string // GitHub name if available
+}
+
+func NewCollaboratorFromUser(user *github.User) Collaborator {
+	return Collaborator{
+		Login: user.GetLogin(),
+		Name:  user.GetName(),
+	}
+}
+
+// Returns the GitHub name if available, otherwise login.
+func (c Collaborator) GetGitHubName() string {
+	return cmp.Or(c.Name, c.Login)
+}
+
 func (r FetchReviewsResult) asPR() PR {
-	approvedByUsers := []string{}
-	commentedByUsers := []string{}
+	approvedByUsers := []Collaborator{}
+	commentedByUsers := []Collaborator{}
 
 	for _, review := range r.reviews {
-		user := review.GetUser().GetLogin()
-		if user == "" {
+		login := review.GetUser().GetLogin()
+		if login == "" {
 			continue
 		}
 		if review.GetState() == "APPROVED" {
-			if !slices.Contains(approvedByUsers, user) {
-				approvedByUsers = append(approvedByUsers, user)
+			if !slices.ContainsFunc(approvedByUsers, func(c Collaborator) bool {
+				return c.Login == login
+			}) {
+				approvedByUsers = append(
+					approvedByUsers, NewCollaboratorFromUser(review.GetUser()),
+				)
 			}
+
 		} else {
-			if !slices.Contains(commentedByUsers, user) && !slices.Contains(approvedByUsers, user) {
+			if !slices.ContainsFunc(commentedByUsers, func(c Collaborator) bool {
+				return c.Login == login
+			}) && !slices.ContainsFunc(approvedByUsers, func(c Collaborator) bool {
 				// Only add to commentedByUsers if the user has not already approved
-				commentedByUsers = append(commentedByUsers, user)
+				return c.Login == login
+			}) {
+				commentedByUsers = append(
+					commentedByUsers, NewCollaboratorFromUser(review.GetUser()),
+				)
 			}
 		}
 	}
@@ -118,6 +136,7 @@ func (r FetchReviewsResult) asPR() PR {
 	return PR{
 		PullRequest:      r.pr,
 		Repository:       r.repository,
+		Author:           NewCollaboratorFromUser(r.pr.GetUser()),
 		CommentedByUsers: commentedByUsers,
 		ApprovedByUsers:  approvedByUsers,
 	}

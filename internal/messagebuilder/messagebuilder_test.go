@@ -83,8 +83,8 @@ func TestComposeSlackBlocksMessage(t *testing.T) {
 		if prBeforeUserElement.Text != expectedBeforeUserText {
 			t.Errorf("Expected text to be '%s', got '%s'", expectedBeforeUserText, prAgeElement.Text)
 		}
-		if prUserElement.UserID != testPRs.PR1.AuthorInfo.SlackUserID {
-			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1.AuthorInfo.SlackUserID, prUserElement.UserID)
+		if prUserElement.UserID != testPRs.PR1.Author.SlackUserID {
+			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1.Author.SlackUserID, prUserElement.UserID)
 		}
 	})
 }
@@ -107,8 +107,10 @@ func getTestPRs() TestPRs {
 			},
 		},
 	}
-	pr1.AuthorInfo = prparser.Collaborator{
-		GitHubName:  "Test User",
+	pr1.Author = prparser.Collaborator{
+		Collaborator: &githubclient.Collaborator{
+			Login: "Test User",
+		},
 		SlackUserID: "U12345678",
 	}
 	return TestPRs{

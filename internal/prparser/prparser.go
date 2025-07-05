@@ -11,14 +11,21 @@ import (
 
 type PR struct {
 	*githubclient.PR
-	AuthorInfo Collaborator
+	Author     Collaborator
 	Approvers  []Collaborator // Users who have approved the PR at least once
 	Commenters []Collaborator // Users who have commented on the PR but did not approve it
 }
 
 type Collaborator struct {
-	GitHubName  string // GitHub name if available, otherwise username
+	*githubclient.Collaborator
 	SlackUserID string // empty string if not available
+}
+
+func NewCollaborator(c *githubclient.Collaborator, slackUserId string) Collaborator {
+	return Collaborator{
+		Collaborator: c,
+		SlackUserID:  slackUserId,
+	}
 }
 
 func (pr PR) GetPRAgeText() string {
@@ -38,50 +45,29 @@ func (pr PR) GetPRAgeText() string {
 func ParsePRs(prs []githubclient.PR, slackUserIdByGitHubUsername map[string]string) []PR {
 	var parsedPRs []PR
 	for _, pr := range prs {
-		parsedPRs = append(parsedPRs, parsePR(pr, &slackUserIdByGitHubUsername))
+		parsedPRs = append(parsedPRs, parsePR(pr, slackUserIdByGitHubUsername))
 	}
 	return sortPRsByCreatedAt(parsedPRs)
 }
 
-func parsePR(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) PR {
-	if slackUserIdByGitHubUsername == nil || len(*slackUserIdByGitHubUsername) == 0 {
-		return PR{
-			PR:         &pr,
-			AuthorInfo: Collaborator{GitHubName: pr.GetUser().GetName()},
-		}
-	}
+func parsePR(pr githubclient.PR, slackUserIdByGitHubUsername map[string]string) PR {
 	return PR{
 		PR:         &pr,
-		AuthorInfo: getAuthorInfo(pr, slackUserIdByGitHubUsername),
-		Approvers:  getCollaborators(pr, pr.ApprovedByUsers, slackUserIdByGitHubUsername),
-		Commenters: getCollaborators(pr, pr.CommentedByUsers, slackUserIdByGitHubUsername),
+		Author:     NewCollaborator(&pr.Author, slackUserIdByGitHubUsername[pr.Author.Login]),
+		Approvers:  withSlackUserIds(pr.ApprovedByUsers, slackUserIdByGitHubUsername),
+		Commenters: withSlackUserIds(pr.CommentedByUsers, slackUserIdByGitHubUsername),
 	}
 }
 
-func getAuthorInfo(pr githubclient.PR, slackUserIdByGitHubUsername *map[string]string) Collaborator {
-	authorInfo := Collaborator{
-		GitHubName: pr.GetAuthorNameOrUsername(),
-	}
-	if slackUserIdByGitHubUsername == nil || len(*slackUserIdByGitHubUsername) == 0 {
-		return authorInfo
-	}
-	authorInfo.SlackUserID = (*slackUserIdByGitHubUsername)[pr.GetUsername()]
-	return authorInfo
-}
-
-func getCollaborators(
-	pr githubclient.PR,
-	usernames []string,
-	slackUserIdByGitHubUsername *map[string]string,
+func withSlackUserIds(
+	collaborators []githubclient.Collaborator,
+	slackUserIdByGitHubUsername map[string]string,
 ) []Collaborator {
-	slackUserIds := make([]Collaborator, len(usernames))
-	for i, username := range usernames {
-		slackUserIds[i] = Collaborator{
-			GitHubName:  pr.GetAuthorNameOrUsername(),
-			SlackUserID: (*slackUserIdByGitHubUsername)[username],
-		}
+	result := make([]Collaborator, len(collaborators))
+	for i, c := range collaborators {
+		result[i] = NewCollaborator(&c, slackUserIdByGitHubUsername[c.Login])
 	}
-	return slackUserIds
+	return result
 }
 
 func sortPRsByCreatedAt(prs []PR) []PR {

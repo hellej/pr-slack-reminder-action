@@ -130,7 +130,7 @@ func (c *client) fetchOpenPRsForRepository(
 func logFoundPRs(repository string, prs []*github.PullRequest) {
 	log.Printf("Found %d open pull requests in repository %s:", len(prs), repository)
 	for _, pr := range prs {
-		log.Printf("#%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
+		log.Printf("  #%v: %s \"%s\"", *pr.Number, pr.GetHTMLURL(), pr.GetTitle())
 	}
 }
 
