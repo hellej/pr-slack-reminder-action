@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
 	log.Println("Starting PR Slack reminder action")
 	err := Run(githubclient.GetAuthenticatedClient, slackclient.GetAuthenticatedClient)
 	if err != nil {
