@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/utilities"
 )
@@ -18,6 +19,12 @@ type Filters struct {
 func (f Filters) validate() error {
 	if len(f.Authors) > 0 && len(f.AuthorsIgnore) > 0 {
 		return fmt.Errorf("cannot use both authors and authors-ignore filters at the same time")
+	}
+
+	if slices.ContainsFunc(f.Labels, func(author string) bool {
+		return slices.Contains(f.LabelsIgnore, author)
+	}) {
+		return fmt.Errorf("labels filter cannot contain labels that are in labels-ignore filter")
 	}
 	return nil
 }

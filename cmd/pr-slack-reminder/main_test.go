@@ -221,6 +221,12 @@ func TestScenarios(t *testing.T) {
 			expectedErrorMsg: "configuration error: error reading input filters: invalid filters: {\"authors\": [\"alice\"], \"authors-ignore\": [\"bob\"]}, error: cannot use both authors and authors-ignore filters at the same time",
 		},
 		{
+			name:             "invalid global filters input: conflicting labels and labels-ignore",
+			config:           testhelpers.GetDefaultConfigMinimal(),
+			configOverrides:  &map[string]any{config.InputGlobalFilters: "{\"labels\": [\"infra\"], \"labels-ignore\": [\"infra\"]}"},
+			expectedErrorMsg: "configuration error: error reading input filters: invalid filters: {\"labels\": [\"infra\"], \"labels-ignore\": [\"infra\"]}, error: labels filter cannot contain labels that are in labels-ignore filter",
+		},
+		{
 			name:            "no PRs found without message",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			expectedSummary: "", // no message should be sent
