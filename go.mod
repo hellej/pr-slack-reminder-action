@@ -6,7 +6,7 @@ require (
 	github.com/google/go-github/v72 v72.0.0
 	github.com/slack-go/slack v0.17.3
 	golang.org/x/sync v0.17.0
-	golang.org/x/text v0.28.0
+	golang.org/x/text v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
