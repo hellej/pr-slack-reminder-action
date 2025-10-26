@@ -79,6 +79,24 @@ func MapWithErrorToIter[T any, V any](items []T, mapper func(T) (V, error)) iter
 	}
 }
 
+// FlatMap flattens a slice of slices into a single slice, preserving order.
+func FlatMap[T any](items [][]T) []T {
+	return slices.Collect(FlatMapToIter(items))
+}
+
+// FlatMapToIter flattens a slice of slices into an iterator that yields each element.
+func FlatMapToIter[T any](items [][]T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for _, slice := range items {
+			for _, item := range slice {
+				if !yield(item) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // Unique returns a new slice with duplicate elements removed, preserving the order of first occurrence.
 // For comparable types, it uses a map for O(n) performance.
 func Unique[T comparable](items []T) []T {

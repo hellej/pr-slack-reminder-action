@@ -28,3 +28,6 @@ go.work.sum
 .DS_Store
 .local
 .vscode
+
+# state from "post" run-mode
+.pr-slack-reminder/state.json

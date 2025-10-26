@@ -310,3 +310,81 @@ func TestUniqueFunc(t *testing.T) {
 		})
 	}
 }
+
+func TestFlatMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		items    [][]int
+		expected []int
+	}{
+		{
+			name:     "flatten multiple slices",
+			items:    [][]int{{1, 2}, {3, 4}, {5, 6}},
+			expected: []int{1, 2, 3, 4, 5, 6},
+		},
+		{
+			name:     "flatten with empty slices",
+			items:    [][]int{{1, 2}, {}, {3, 4}},
+			expected: []int{1, 2, 3, 4},
+		},
+		{
+			name:     "flatten single slice",
+			items:    [][]int{{1, 2, 3}},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "flatten all empty slices",
+			items:    [][]int{{}, {}, {}},
+			expected: []int{},
+		},
+		{
+			name:     "flatten empty input",
+			items:    [][]int{},
+			expected: []int{},
+		},
+		{
+			name:     "flatten single empty slice",
+			items:    [][]int{{}},
+			expected: []int{},
+		},
+		{
+			name:     "flatten with nil slice",
+			items:    [][]int{{1, 2}, nil, {3, 4}},
+			expected: []int{1, 2, 3, 4},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FlatMap(tt.items)
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("FlatMap() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFlatMapWithStrings(t *testing.T) {
+	items := [][]string{
+		{"hello", "world"},
+		{"foo", "bar"},
+		{},
+		{"baz"},
+	}
+	expected := []string{"hello", "world", "foo", "bar", "baz"}
+
+	result := FlatMap(items)
+	if !slices.Equal(result, expected) {
+		t.Errorf("FlatMap() = %v, expected %v", result, expected)
+	}
+}
+
+func TestFlatMapToIter(t *testing.T) {
+	items := [][]int{{1, 2}, {3, 4}, {5}}
+	expected := []int{1, 2, 3, 4, 5}
+
+	result := slices.Collect(FlatMapToIter(items))
+	if !slices.Equal(result, expected) {
+		t.Errorf("FlatMapToIter() collected = %v, expected %v", result, expected)
+	}
+}

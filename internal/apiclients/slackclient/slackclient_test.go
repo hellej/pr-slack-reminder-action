@@ -2,6 +2,7 @@ package slackclient_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/slack-go/slack"
@@ -162,4 +163,88 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 
 func (m *mockSlackAPI) PostMessage(channelID string, options ...slack.MsgOption) (string, string, error) {
 	return "timestamp", channelID, nil
+}
+
+func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, options ...slack.MsgOption) (string, string, string, error) {
+	return channelID, timestamp, "updated_timestamp", nil
+}
+
+func TestSendMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		channelID     string
+		summaryText   string
+		expectedError string
+	}{
+		{
+			name:        "successful message send",
+			channelID:   "C12345",
+			summaryText: "Test summary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAPI := &mockSlackAPI{}
+			client := slackclient.NewClient(mockAPI)
+
+			blocks := slack.NewBlockMessage()
+
+			_, err := client.SendMessage(tt.channelID, blocks, tt.summaryText)
+
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Fatalf("Expected error %q, got nil", tt.expectedError)
+				}
+				if !strings.Contains(err.Error(), tt.expectedError) {
+					t.Fatalf("Expected error to contain %q, got %q", tt.expectedError, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected no error, got %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		channelID     string
+		messageTS     string
+		summaryText   string
+		expectedError string
+	}{
+		{
+			name:        "successful message update",
+			channelID:   "C12345",
+			messageTS:   "1234567890.123456",
+			summaryText: "Updated summary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAPI := &mockSlackAPI{}
+			client := slackclient.NewClient(mockAPI)
+
+			blocks := slack.NewBlockMessage()
+
+			err := client.UpdateMessage(tt.channelID, tt.messageTS, blocks, tt.summaryText)
+
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Fatalf("Expected error %q, got nil", tt.expectedError)
+				}
+				if !strings.Contains(err.Error(), tt.expectedError) {
+					t.Fatalf("Expected error to contain %q, got %q", tt.expectedError, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected no error, got %v", err)
+				}
+			}
+		})
+	}
 }

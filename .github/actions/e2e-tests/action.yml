@@ -1,4 +1,4 @@
-name: 'Run E2E Tests'
+Ename: 'Run E2E Tests'
 description: 'Run end-to-end tests using the built action'
 
 inputs:
@@ -35,13 +35,16 @@ runs:
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
-          hellej/github-notifications-test-repo-2
+          hellej/pr-slack-reminder-test-repo-2
         github-user-slack-user-id-mapping: |
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
         old-pr-threshold-hours: 48
+        pr-link-repo-prefixes: |
+          hellej/pr-slack-reminder-test-repo-1: 'TR1 / '
+          hellej/pr-slack-reminder-test-repo-2: test-repo-2/
 
-    - name: Advanced E2E test with filters
+    - name: Advanced E2E test with filters and repo prefixes
       uses: ./
       with:
         github-token: ${{ inputs.github-token }}

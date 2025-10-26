@@ -9,7 +9,6 @@ import (
 
 func TestRepositoryString(t *testing.T) {
 	repo := models.Repository{
-		Path:  "test-org/test-repo",
 		Owner: "test-org",
 		Name:  "test-repo",
 	}
@@ -30,7 +29,6 @@ func TestParseRepository_Valid(t *testing.T) {
 			name:           "standard repository path",
 			repositoryPath: "octocat/Hello-World",
 			expectedRepo: models.Repository{
-				Path:  "octocat/Hello-World",
 				Owner: "octocat",
 				Name:  "Hello-World",
 			},
@@ -39,7 +37,6 @@ func TestParseRepository_Valid(t *testing.T) {
 			name:           "repository with numbers",
 			repositoryPath: "org123/repo456",
 			expectedRepo: models.Repository{
-				Path:  "org123/repo456",
 				Owner: "org123",
 				Name:  "repo456",
 			},
@@ -48,7 +45,6 @@ func TestParseRepository_Valid(t *testing.T) {
 			name:           "repository with hyphens and underscores",
 			repositoryPath: "my-org/my_repo-name",
 			expectedRepo: models.Repository{
-				Path:  "my-org/my_repo-name",
 				Owner: "my-org",
 				Name:  "my_repo-name",
 			},
@@ -61,8 +57,8 @@ func TestParseRepository_Valid(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Expected no error, got: %v", err)
 			}
-			if repo.Path != tc.expectedRepo.Path {
-				t.Errorf("Expected repository path '%s', got '%s'", tc.expectedRepo.Path, repo.Path)
+			if repo.GetPath() != tc.expectedRepo.GetPath() {
+				t.Errorf("Expected repository path '%s', got '%s'", tc.expectedRepo.GetPath(), repo.GetPath())
 			}
 			if repo.Owner != tc.expectedRepo.Owner {
 				t.Errorf("Expected repository owner '%s', got '%s'", tc.expectedRepo.Owner, repo.Owner)

@@ -6,19 +6,21 @@ import (
 )
 
 type Repository struct {
-	// Path is the full path to the repository, e.g. "owner/repo"
-	Path  string
 	Owner string
 	Name  string
 }
 
+// GetPath returns the full path to the repository, e.g. "owner/repo"
+func (r Repository) GetPath() string {
+	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
+}
+
 func (r Repository) String() string {
-	return r.Path
+	return r.GetPath()
 }
 
 func NewRepository(owner, name string) Repository {
 	return Repository{
-		Path:  fmt.Sprintf("%s/%s", owner, name),
 		Owner: owner,
 		Name:  name,
 	}
@@ -37,7 +39,6 @@ func ParseRepository(repository string) (Repository, error) {
 	}
 
 	return Repository{
-		Path:  repository,
 		Owner: repoOwner,
 		Name:  repoName,
 	}, nil

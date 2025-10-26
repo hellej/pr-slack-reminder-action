@@ -4,11 +4,15 @@
 
 This GitHub Action sends a friendly Slack reminder about open Pull Requests. The Slack message contains a list of PRs with (optional) highlighting for the old ones.
 
-> ⚠️ **Beta Version Notice**: This action is currently in beta (`v1-beta`). While functional and tested, the API may change before the stable `v1` release planned for November 2025.
+> ⚠️ **Beta version notice**: This action is currently in beta (`v1-beta`). While functional and tested, the API may change before the stable `v1` release planned for November 2025.
+
+### Example Output
+
+<img src="docs/examples/example_1.png" alt="Example Slack message" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
 ## GitHub's Built-in vs This Action
 
-You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which can work well in many situations.
+You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
 
 **When to use GitHub's built-in reminders:**
 
@@ -21,13 +25,14 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 
 **What's special about this action:**
 
-- Monitor up to 50 repositories
+- Monitor up to 30 repositories
 - Highlight old PRs that need attention (with optional age threshold input)
+- Concise review status info for each PR with emojis (incl. approvers & commenters)
+- More customizable message content (e.g. custom heading and prefixes for PR links by repository)
 - Global and repository specific filters
+- Anyone can set this up (no need to be a GitHub team maintainer)
 - No need for official GitHub team setup
-- Anyone can set this up (no need to be GitHub team maintainer)
 - No need for perfect CODEOWNERS files to get reminded about the right PRs
-- More customizable Slack message content
 
 ## Getting Started
 
@@ -95,7 +100,7 @@ jobs:
 
 #### 3. Advanced Setup with Filtering
 
-Full-featured setup with repository-specific filters and prefixes.
+Full-featured setup with repository-specific filters and repository prefixes.
 
 ```yaml
 name: PR Reminder
@@ -124,10 +129,10 @@ jobs:
           main-list-heading: "<pr_count> PRs need your attention!"
           no-prs-message: "No PRs pending! Happy coding!"
           old-pr-threshold-hours: 24
-          repository-prefixes: |
-            web-app: 🌐
-            api-service: 📡
-            mobile-app: 📞
+          pr-link-repo-prefixes: |
+            web-app: 'WA / '
+            api-service: 'API / '
+            mobile-app: 'MA / '
           filters: |
             {
               "labels-ignore": ["draft", "wip"],
@@ -145,16 +150,19 @@ jobs:
 | ----------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                    |
 | `slack-bot-token`                   | ✅       | Slack bot token for sending messages<br>Example: `${{ secrets.SLACK_BOT_TOKEN }}`                               |
+| `mode`                              | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                        |
+| `state-file-path`                   | ❌       | Path to state file used to persist message ID in order to later update it                                       |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)<br>Example: `dev-team`                                      |
 | `slack-channel-id`                  | ❌       | Slack channel ID (use this OR `slack-channel-name`)<br>Example: `C1234567890`                                   |
-| `github-repositories`               | ❌       | Repositories to monitor (defaults to current repo)<br>Example:<br>`owner/repo1`<br>`owner/repo2`                |
+| `github-repositories`               | ❌       | Repositories to monitor (max 30) - defaults to current repo<br>Example:<br>`owner/repo1`<br>`owner/repo2`       |
+| `filters`                           | ❌       | Global filters (JSON)<br>Example:<br>`{"authors": ["alice"], "labels-ignore": ["wip"]}`                         |
+| `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"authors-ignore": ["bot"]}` |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`           |
 | `main-list-heading`                 | ❌       | Message heading (`<pr_count>` gets replaced)<br>Example: `There are <pr_count> open PRs 💫`                     |
 | `no-prs-message`                    | ❌       | Message when no PRs are found (if not set, no empty message gets sent)<br>Example: `All caught up! 🎉`          |
-| `old-pr-threshold-hours`            | ❌       | Duration in hours after which PRs are highlighted as old<br>Example: `48`                                       |
-| `repository-prefixes`               | ❌       | Repository specific prefixes to display before PR titles<br>Example:<br>`repo1: 🚀`<br>`repo2: 📦`              |
-| `filters`                           | ❌       | Global filters (JSON)<br>Example:<br>`{"authors": ["alice"], "labels-ignore": ["wip"]}`                         |
-| `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"authors-ignore": ["bot"]}` |
+| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text)<br>Example: `48`    |
+| `group-by-repository`               | ❌       | Group PRs by repository with repository headings. When enabled (`true`), main-list-heading is ignored.          |
+| `pr-link-repo-prefixes`             | ❌       | Repository aliases to display as prefixes in PR link texts. Useful if group-by-repository is `false`.<br>Example:<br>`repo1: 'R1 / '`<br>`repo2: 'R2 / '`<br>(without quotes the trailing whitespace is omitted) |
 
 ### Filter Options
 

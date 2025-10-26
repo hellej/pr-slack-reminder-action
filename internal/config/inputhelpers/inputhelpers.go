@@ -35,6 +35,21 @@ func GetInput(name string) string {
 	return strings.TrimSpace(GetEnv((inputNameAsEnv(name))))
 }
 
+// GetInputOr returns the input value if set, otherwise returns the provided default.
+// An explicitly set empty string overrides the default (returns empty).
+func GetInputOr(name string, defaultValue string) string {
+	val := GetInput(name)
+	if val == "" {
+		// Distinguish between unset and intentionally empty:
+		// If the variable name exists in the environment but is empty, empty it is.
+		if _, exists := os.LookupEnv(inputNameAsEnv(name)); exists {
+			return ""
+		}
+		return defaultValue
+	}
+	return val
+}
+
 func GetInputRequired(name string) (string, error) {
 	return withErrorIfEmpty(GetInput(name), name)
 }
@@ -116,4 +131,22 @@ func GetInputMapping(inputName string) (map[string]string, error) {
 	}
 
 	return mapping, nil
+}
+
+func removeLeadingAndTrailingQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
+// removes leading and trailing quotes from all values in the provided map.
+func UnquoteValues(m map[string]string) map[string]string {
+	result := make(map[string]string, len(m))
+	for key, value := range m {
+		result[key] = removeLeadingAndTrailingQuotes(value)
+	}
+	return result
 }

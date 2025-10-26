@@ -61,7 +61,7 @@ func groupPRsByRepositories(openPRs []prparser.PR) []PRsOfRepository {
 	repoMap := make(map[string]models.Repository)
 
 	for _, pr := range openPRs {
-		repoKey := pr.Repository.Path
+		repoKey := pr.Repository.GetPath()
 		prsByRepo[repoKey] = append(prsByRepo[repoKey], pr)
 		repoMap[repoKey] = pr.Repository
 	}
@@ -76,8 +76,8 @@ func groupPRsByRepositories(openPRs []prparser.PR) []PRsOfRepository {
 		repo := repoMap[repoKey]
 		return PRsOfRepository{
 			HeadingPrefix:       "Open PRs in ",
-			RepositoryLinkLabel: repo.Path,
-			RepositoryLink:      fmt.Sprintf("https://github.com/%s/pulls", repo.Path),
+			RepositoryLinkLabel: repo.GetPath(),
+			RepositoryLink:      fmt.Sprintf("https://github.com/%s/pulls", repo.GetPath()),
 			PRs:                 prsByRepo[repoKey],
 		}
 	})

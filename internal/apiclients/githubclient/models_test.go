@@ -2,8 +2,6 @@ package githubclient
 
 import (
 	"testing"
-
-	"github.com/google/go-github/v72/github"
 )
 
 func TestCollaboratorGetGitHubName(t *testing.T) {
@@ -38,48 +36,3 @@ func TestCollaboratorGetGitHubName(t *testing.T) {
 		})
 	}
 }
-
-func TestPRsOfRepoResultGetPRCount(t *testing.T) {
-	tests := []struct {
-		name     string
-		result   PRsOfRepoResult
-		expected int
-	}{
-		{
-			name: "has PRs",
-			result: PRsOfRepoResult{
-				prs: []*github.PullRequest{
-					{Number: github.Ptr(1)},
-					{Number: github.Ptr(2)},
-				},
-			},
-			expected: 2,
-		},
-		{
-			name: "no PRs",
-			result: PRsOfRepoResult{
-				prs: []*github.PullRequest{},
-			},
-			expected: 0,
-		},
-		{
-			name: "nil PRs slice",
-			result: PRsOfRepoResult{
-				prs: nil,
-			},
-			expected: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tt.result.GetPRCount()
-			if result != tt.expected {
-				t.Errorf("GetPRCount() = %d, expected %d", result, tt.expected)
-			}
-		})
-	}
-}
-
-// Note: asPR() is a private method, so we test it indirectly through the public
-// FetchOpenPRs method in githubclient_test.go instead of testing implementation details here.

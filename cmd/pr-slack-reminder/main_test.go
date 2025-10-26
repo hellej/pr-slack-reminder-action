@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"math"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/google/go-github/v72/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
@@ -158,22 +160,22 @@ func filterPRsByNumbers(
 
 func TestScenarios(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		config                   testhelpers.TestConfig
-		configOverrides          *map[string]any
-		fetchPRsStatus           int
-		fetchPRsError            error
-		prs                      []*github.PullRequest
-		prsByRepo                map[string][]*github.PullRequest
-		timelineEventsByPRNumber map[int][]*github.Timeline
-		foundSlackChannels       []*mockslackclient.SlackChannel
-		findChannelError         error
-		sendMessageError         error
-		expectedErrorMsg         string
-		expectedPRNumbers        []int
-		expectedPRItemTexts      []string
-		expectedSummary          string
-		expectedHeadings         []string // For group-by-repository mode to check repository headings
+		name                string
+		config              testhelpers.TestConfig
+		configOverrides     *map[string]any
+		fetchPRsStatus      int
+		fetchPRsError       error
+		prs                 []*github.PullRequest
+		prsByRepo           map[string][]*github.PullRequest
+		reviewsByPRNumber   map[int][]*github.PullRequestReview
+		foundSlackChannels  []*mockslackclient.SlackChannel
+		findChannelError    error
+		sendMessageError    error
+		expectedErrorMsg    string
+		expectedPRNumbers   []int
+		expectedPRItemTexts []string
+		expectedSummary     string
+		expectedHeadings    []string // For group-by-repository mode to check repository headings
 	}{
 		{
 			name:   "unset required inputs",
@@ -210,13 +212,13 @@ func TestScenarios(t *testing.T) {
 			configOverrides: &map[string]any{
 				config.InputGithubRepositories: func() string {
 					var repos []string
-					for i := 1; i <= 51; i++ {
+					for i := 1; i <= 31; i++ {
 						repos = append(repos, "org"+strconv.Itoa(i)+"/repo"+strconv.Itoa(i))
 					}
 					return strings.Join(repos, "\n")
 				}(),
 			},
-			expectedErrorMsg: "configuration error: too many repositories: maximum of 50 repositories allowed, got 51",
+			expectedErrorMsg: "configuration error: too many repositories: maximum of 30 repositories allowed, got 31",
 		},
 		{
 			name:            "no PRs found with message",
@@ -424,15 +426,16 @@ func TestScenarios(t *testing.T) {
 			configOverrides: &map[string]any{
 				config.InputOldPRThresholdHours: 12,
 				config.InputGlobalFilters:       "{\"labels\": [\"feature\", \"fix\"]}",
+				config.InputPRLinkRepoPrefixes:  "test-repo: 'TR / '",
 			},
 			prs:               getTestPRs(GetTestPRsOptions{Labels: []string{"feature"}}).PRs,
 			expectedPRNumbers: getTestPRs(GetTestPRsOptions{}).PRNumbers,
 			expectedPRItemTexts: []string{
-				"🔧 This is a test PR 5 minutes ago by Stitch",
-				"🔧 This PR was created 3 hours ago and contains important changes 3 hours ago by U2234567890",
-				"🔧 This PR has the same time as PR2 but a longer title 3 hours ago by U2234567890",
-				"🔧 This PR is getting old and needs attention 🚨 1 days old by U3234567890",
-				"🔧 This is a big PR that no one dares to review 🚨 2 days old by Jim",
+				"TR / This is a test PR 5 minutes ago by Stitch",
+				"TR / This PR was created 3 hours ago and contains important changes 3 hours ago by U2234567890",
+				"TR / This PR has the same time as PR2 but a longer title 3 hours ago by U2234567890",
+				"TR / This PR is getting old and needs attention 🚨 1 days old by U3234567890",
+				"TR / This is a big PR that no one dares to review 🚨 2 days old by Jim",
 			},
 			expectedSummary: "5 open PRs are waiting for attention 👀",
 		},
@@ -503,23 +506,23 @@ func TestScenarios(t *testing.T) {
 				"PR 3 2 days ago by Alice (💬 reviewer3)",
 				"PR 4 5 hours ago by Jim (✅ reviewer2 / 💬 reviewer3)",
 			},
-			timelineEventsByPRNumber: map[int][]*github.Timeline{
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				*getTestPRs(GetTestPRsOptions{}).PR1.Number: {
-					mockgithubclient.NewReview(1, "approved", "reviewer1", "", "LGTM 🙏🏻"),
-					mockgithubclient.NewReview(2, "approved", "reviewer2", "", "LGTM 🚀"),
+					mockgithubclient.NewReview(1, "APPROVED", "reviewer1", "", "LGTM 🙏🏻"),
+					mockgithubclient.NewReview(2, "APPROVED", "reviewer2", "", "LGTM 🚀"),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR2.Number: {
-					mockgithubclient.NewReview(3, "commented", "reviewer1", "", "LGTM, just a few comments..."),
-					mockgithubclient.NewReview(4, "commented", "reviewer2", "", "Looks good but..."),
+					mockgithubclient.NewReview(3, "COMMENTED", "reviewer1", "", "LGTM, just a few comments..."),
+					mockgithubclient.NewReview(4, "COMMENTED", "reviewer2", "", "Looks good but..."),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR3.Number: {
-					mockgithubclient.NewReview(5, "commented", "reviewer3", "", "Splendid work! Just a few questions..."),
+					mockgithubclient.NewReview(5, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR4.Number: {
-					mockgithubclient.NewReview(6, "commented", "reviewer3", "", "Splendid work! Just a few questions..."),
-					mockgithubclient.NewReview(7, "commented", "reviewer3", "", "Splendid work! Just a few questions..."), // duplicate review by reviewer3 should be omitted
-					mockgithubclient.NewReview(8, "approved", "reviewer2", "", "LGTM 🚀"),
-					mockgithubclient.NewReview(9, "approved", "reviewer2", "", "LGTM again 🚀"), // duplicate approval by reviewer2 should be omitted
+					mockgithubclient.NewReview(6, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."),
+					mockgithubclient.NewReview(7, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."), // duplicate review by reviewer3 should be omitted
+					mockgithubclient.NewReview(8, "APPROVED", "reviewer2", "", "LGTM 🚀"),
+					mockgithubclient.NewReview(9, "APPROVED", "reviewer2", "", "LGTM again 🚀"), // duplicate approval by reviewer2 should be omitted
 				},
 			},
 			expectedSummary: "4 open PRs are waiting for attention 👀",
@@ -586,12 +589,12 @@ func TestScenarios(t *testing.T) {
 			prs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{Number: 1, Title: "PR with bot and human reviewers", AuthorLogin: "alice"}),
 			},
-			timelineEventsByPRNumber: map[int][]*github.Timeline{
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
-					mockgithubclient.NewReview(1, "commented", "human-reviewer", "Human Reviewer", "Human feedback", "User"),
-					mockgithubclient.NewReview(2, "commented", "alice", "Alice", "Self review", "User"),
-					mockgithubclient.NewReview(3, "commented", "dependabot", "Dependabot", "Bot feedback", "Bot"),
-					mockgithubclient.NewReview(4, "approved", "codecov", "Codecov", "Bot approval", "Bot"),
+					mockgithubclient.NewReview(1, "COMMENTED", "human-reviewer", "Human Reviewer", "Human feedback", "User"),
+					mockgithubclient.NewReview(2, "COMMENTED", "alice", "Alice", "Self review", "User"),
+					mockgithubclient.NewReview(3, "COMMENTED", "dependabot", "Dependabot", "Bot feedback", "Bot"),
+					mockgithubclient.NewReview(4, "APPROVED", "codecov", "Codecov", "Bot approval", "Bot"),
 				},
 			},
 			expectedPRNumbers: []int{1},
@@ -607,7 +610,7 @@ func TestScenarios(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(
-				tc.prs, tc.prsByRepo, cmp.Or(tc.fetchPRsStatus, 200), tc.fetchPRsError, tc.timelineEventsByPRNumber,
+				tc.prs, tc.prsByRepo, cmp.Or(tc.fetchPRsStatus, 200), tc.fetchPRsError, tc.reviewsByPRNumber, nil,
 			)
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(tc.foundSlackChannels, tc.findChannelError, tc.sendMessageError)
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
@@ -703,4 +706,64 @@ func TestScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPostModeStateSaving(t *testing.T) {
+	testStateFilePath := "/tmp/test-state.json"
+
+	postModeConfig := testhelpers.GetDefaultConfigFull()
+	configOverrides := map[string]any{
+		config.InputRunMode:       config.RunModePost,
+		config.InputStateFilePath: testStateFilePath,
+	}
+	testhelpers.SetTestEnvironment(t, postModeConfig, &configOverrides)
+
+	testPRs := getTestPRs(GetTestPRsOptions{})
+
+	mockGitHubClientGetter := mockgithubclient.MakeMockGitHubClientGetter(
+		testPRs.PRs, nil, 200, nil, nil, nil,
+	)
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(nil, nil, nil)
+
+	err := main.Run(
+		mockGitHubClientGetter,
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, but got error: %v", err)
+	}
+
+	if _, err := os.Stat(testStateFilePath); os.IsNotExist(err) {
+		t.Errorf("Expected state file to be created at %s, but it doesn't exist", testStateFilePath)
+		return
+	}
+
+	loadedState, err := state.Load(testStateFilePath)
+	if err != nil {
+		t.Fatalf("Failed to load state file: %v", err)
+	}
+
+	if err := loadedState.Validate(); err != nil {
+		t.Errorf("State validation failed: %v", err)
+	}
+
+	expectedChannelID := "C12345678" // From mock
+	if loadedState.SlackMessage.ChannelID != expectedChannelID {
+		t.Errorf("Expected channel ID %s, got %s", expectedChannelID, loadedState.SlackMessage.ChannelID)
+	}
+
+	if loadedState.SlackMessage.MessageTS == "" {
+		t.Error("Expected message timestamp to be set in state")
+	}
+
+	if len(loadedState.PullRequests) != len(testPRs.PRs) {
+		t.Errorf("Expected %d PRs in state, got %d", len(testPRs.PRs), len(loadedState.PullRequests))
+	}
+
+	defer func() {
+		if err := os.Remove(testStateFilePath); err != nil {
+			t.Logf("Failed to clean up test state file: %v", err)
+		}
+	}()
 }

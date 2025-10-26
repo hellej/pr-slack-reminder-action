@@ -15,6 +15,16 @@ inputs: {
     description: 'Slack bot token to send the message via (the bot must be a member of the channel)',
     required: true,
   },
+  mode: {
+    description: 'Run mode: post (default) posts a new reminder; update refreshes an existing reminder',
+    required: false,
+    default: 'post',
+  },
+  state-file-path: {
+    description: 'Path to state file used to persist message ID in order to later update it',
+    required: false,
+    default: '.pr-slack-reminder/state.json',
+  },
   slack-channel-name: {
     description: 'Slack channel name to send the message to',
     required: false,
@@ -24,7 +34,15 @@ inputs: {
     required: false,
   },
   github-repositories: {
-    description: 'Line break separated list of GitHub repositories to check for open PRs (maximum 50 repositories) - if not provided, the the repository of the current workflow run will be used',
+    description: 'Line break separated list of GitHub repositories (max 30) to check for open PRs. If not provided, the repository of the current workflow run will be used.',
+    required: false,
+  },
+  filters: {
+    description: 'Global filters (e.g. {"authors": ["alice", "bob"], "labels": ["bug", "enhancement"], "labels-ignore": ["wip"]})',
+    required: false,
+  },
+  repository-filters: {
+    description: 'Repository-specific filters (e.g., "repo1: {"authors-ignore": ["alice"]}; repo2: {"labels": ["bug"]})',
     required: false,
   },
   github-user-slack-user-id-mapping: {
@@ -32,33 +50,25 @@ inputs: {
     required: false,
   },
   main-list-heading: {
-    description: 'Main heading of the message to send',
+    description: 'Main heading of the message to send (`<pr_count>` gets replaced)',
     required: false,
     default: 'There are <pr_count> open PRs 🚀',
-  },
-  old-pr-threshold-hours: {
-    description: 'Threshold in hours to consider a PR as old (old PRs will be highlighted with alarm emojis and bold age text)',
-    required: false,
   },
   no-prs-message: {
     description: 'Message to send when there are no open PRs',
     required: false,
   },
-  repository-prefixes: {
-    description: 'Repository-specific prefixes to display before PR titles (e.g., "repo1: 🚀; repo2: 📦")',
-    required: false,
-  },
-  filters: {
-    description: 'e.g. {"authors": ["alice", "bob"], "labels": ["bug", "enhancement"], "labels-ignore": ["wip"]}',
-    required: false,
-  },
-  repository-filters: {
-    description: 'Repository-specific filters (e.g., "repo1: {\"authors-ignore\": [\"alice\"]}; repo2: {\"labels\": [\"bug\"]}")',
+  old-pr-threshold-hours: {
+    description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text)',
     required: false,
   },
   group-by-repository: {
     description: 'Group PRs by repository with repository headings. When enabled, main-list-heading is ignored.',
     required: false,
     default: 'false',
+  },
+  pr-link-repo-prefixes: {
+    description: 'Repository aliases to display as prefixes in PR link texts (e.g., "repo1: R1/; repo2: R2/"). Useful if group-by-repository is disabled.',
+    required: false,
   },
 }

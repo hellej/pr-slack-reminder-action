@@ -76,7 +76,6 @@ func (h *ConfigTestHelpers) createRepository(repoPath string) models.Repository 
 		h.t.Fatalf("Owner and repository name cannot be empty in: %s", repoPath)
 	}
 	return models.Repository{
-		Path:  repoPath,
 		Owner: parts[0],
 		Name:  parts[1],
 	}
@@ -134,9 +133,9 @@ func (h *ConfigTestHelpers) setupFullValidConfig() {
 	})
 	h.setInput(config.InputGlobalFilters, `{"authors": ["alice"], "labels": ["feature"]}`)
 	h.setInput(config.InputRepositoryFilters, `repo1: {"labels-ignore": ["wip"]}`)
-	h.setInputMapping(config.InputRepositoryPrefixes, map[string]string{
-		"repo1": "🚀",
-		"repo2": "📦",
+	h.setInputMapping(config.InputPRLinkRepoPrefixes, map[string]string{
+		"repo1": "R1",
+		"repo2": "R2",
 	})
 }
 
@@ -165,8 +164,8 @@ func TestGetConfig_MinimalValid(t *testing.T) {
 	if len(cfg.Repositories) != 1 {
 		t.Fatalf("Expected 1 repository, got %d", len(cfg.Repositories))
 	}
-	if cfg.Repositories[0].Path != "test-org/test-repo" {
-		t.Errorf("Expected repository path 'test-org/test-repo', got '%s'", cfg.Repositories[0].Path)
+	if cfg.Repositories[0].GetPath() != "test-org/test-repo" {
+		t.Errorf("Expected repository path 'test-org/test-repo', got '%s'", cfg.Repositories[0].GetPath())
 	}
 	if cfg.Repositories[0].Owner != "test-org" {
 		t.Errorf("Expected repository owner 'test-org', got '%s'", cfg.Repositories[0].Owner)
@@ -220,17 +219,18 @@ func TestGetConfig_FullValid(t *testing.T) {
 	}
 	expectedRepos := []string{"test-org/repo1", "test-org/repo2"}
 	for i, expectedRepo := range expectedRepos {
-		if cfg.Repositories[i].Path != expectedRepo {
-			t.Errorf("Expected repository %d path '%s', got '%s'", i, expectedRepo, cfg.Repositories[i].Path)
+		if cfg.Repositories[i].GetPath() != expectedRepo {
+			t.Errorf("Expected repository %d path '%s', got '%s'", i, expectedRepo, cfg.Repositories[i].GetPath())
 		}
 	}
 
 	expectedPrefixes := map[string]string{
-		"repo1": "🚀",
-		"repo2": "📦",
+		"test-org/repo1": "R1",
+		"test-org/repo2": "R2",
 	}
-	for repo, expectedPrefix := range expectedPrefixes {
-		if prefix, exists := cfg.ContentInputs.RepositoryPrefixes[repo]; !exists {
+	for repoPath, expectedPrefix := range expectedPrefixes {
+		repo := h.createRepository(repoPath)
+		if prefix := cfg.ContentInputs.GetPRLinkRepoPrefix(repo); prefix == "" {
 			t.Errorf("Expected repository prefix for '%s' to exist", repo)
 		} else if prefix != expectedPrefix {
 			t.Errorf("Expected prefix '%s' for repo '%s', got '%s'", expectedPrefix, repo, prefix)
@@ -335,8 +335,8 @@ func TestMultipleRepositories(t *testing.T) {
 
 	for i, expectedRepo := range expectedRepos {
 		repo := cfg.Repositories[i]
-		if repo.Path != expectedRepo.Path {
-			t.Errorf("Repository %d: expected path '%s', got '%s'", i, expectedRepo.Path, repo.Path)
+		if repo.GetPath() != expectedRepo.GetPath() {
+			t.Errorf("Repository %d: expected path '%s', got '%s'", i, expectedRepo.GetPath(), repo.GetPath())
 		}
 		if repo.Owner != expectedRepo.Owner {
 			t.Errorf("Repository %d: expected owner '%s', got '%s'", i, expectedRepo.Owner, repo.Owner)
@@ -382,8 +382,8 @@ func TestRepositoriesFallbackToDefault(t *testing.T) {
 	}
 
 	repo := cfg.Repositories[0]
-	if repo.Path != "fallback-org/fallback-repo" {
-		t.Errorf("Expected repository path 'fallback-org/fallback-repo', got '%s'", repo.Path)
+	if repo.GetPath() != "fallback-org/fallback-repo" {
+		t.Errorf("Expected repository path 'fallback-org/fallback-repo', got '%s'", repo.GetPath())
 	}
 	if repo.Owner != "fallback-org" {
 		t.Errorf("Expected repository owner 'fallback-org', got '%s'", repo.Owner)
@@ -588,7 +588,7 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 					config.InputRepositoryFilters,
 					`repo1: {"authors": ["alice"]}; org/repo2: {"labels": ["bug"]}`,
 				)
-				h.setInputMapping(config.InputRepositoryPrefixes, map[string]string{
+				h.setInputMapping(config.InputPRLinkRepoPrefixes, map[string]string{
 					"repo1": "🚀",
 					"repo2": "📦",
 				})
@@ -627,12 +627,12 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 			setupConfig: func(h *ConfigTestHelpers) {
 				h.setupMinimalValidConfig()
 				h.setInputList(config.InputGithubRepositories, []string{"org/repo1"})
-				h.setInputMapping(config.InputRepositoryPrefixes, map[string]string{
+				h.setInputMapping(config.InputPRLinkRepoPrefixes, map[string]string{
 					"repo2": "📦",
 				})
 			},
 			expectError:    true,
-			expectedErrMsg: "repository-prefixes contains entry for 'repo2' which does not match any repository",
+			expectedErrMsg: "pr-link-repo-prefixes contains entry for 'repo2' which does not match any repository",
 		},
 		{
 			name: "invalid - multiple non-existent repository names in filters & prefixes",
@@ -640,7 +640,7 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 				h.setupMinimalValidConfig()
 				h.setInputList(config.InputGithubRepositories, []string{"org/repo1"})
 				h.setInput(config.InputRepositoryFilters, `repo2: {"authors": ["alice"]}; repo3: {"labels": ["bug"]}`)
-				h.setInputMapping(config.InputRepositoryPrefixes, map[string]string{
+				h.setInputMapping(config.InputPRLinkRepoPrefixes, map[string]string{
 					"repo4": "🔧",
 				})
 			},
@@ -662,12 +662,12 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 			setupConfig: func(h *ConfigTestHelpers) {
 				h.setupMinimalValidConfig()
 				h.setInputList(config.InputGithubRepositories, []string{"org1/same-repo", "org2/same-repo"})
-				h.setInputMapping(config.InputRepositoryPrefixes, map[string]string{
+				h.setInputMapping(config.InputPRLinkRepoPrefixes, map[string]string{
 					"same-repo": "🚀",
 				})
 			},
 			expectError:    true,
-			expectedErrMsg: "repository-prefixes contains ambiguous entry for 'same-repo' which matches multiple repositories (needs owner/repo format)",
+			expectedErrMsg: "pr-link-repo-prefixes contains ambiguous entry for 'same-repo' which matches multiple repositories (needs owner/repo format)",
 		},
 		{
 			name: "invalid - exact duplicate repositories",
@@ -708,7 +708,7 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 			setupConfig: func(h *ConfigTestHelpers) {
 				h.setupMinimalValidConfig()
 				var repos []string
-				for i := 1; i <= 50; i++ {
+				for i := 1; i <= 30; i++ {
 					repos = append(repos, fmt.Sprintf("org%d/repo%d", i, i))
 				}
 				h.setInputList(config.InputGithubRepositories, repos)
@@ -720,13 +720,13 @@ func TestGetConfig_RepositoryValidation(t *testing.T) {
 			setupConfig: func(h *ConfigTestHelpers) {
 				h.setupMinimalValidConfig()
 				var repos []string
-				for i := 1; i <= 51; i++ { // 51 exceeds the limit of 50
+				for i := 1; i <= 31; i++ { // 31 exceeds the limit of 30
 					repos = append(repos, fmt.Sprintf("org%d/repo%d", i, i))
 				}
 				h.setInputList(config.InputGithubRepositories, repos)
 			},
 			expectError:    true,
-			expectedErrMsg: "too many repositories: maximum of 50 repositories allowed, got 51",
+			expectedErrMsg: "too many repositories: maximum of 30 repositories allowed, got 31",
 		},
 	}
 
@@ -767,4 +767,296 @@ func TestConfigPrint(t *testing.T) {
 	}
 
 	cfg.Print() // should not panic
+}
+
+func TestGetConfig_RunMode_DefaultsToPost(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		// Use Fatalf to ensure immediate test failure with context
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if cfg.RunMode != "post" {
+		// Validate default when input absent
+		t.Errorf("Expected RunMode 'post' by default, got '%s'", cfg.RunMode)
+	}
+}
+
+func TestGetConfig_RunMode_ParsedCorrectly(t *testing.T) {
+	testCases := []struct {
+		name     string
+		inputVal string
+	}{
+		{name: "post", inputVal: "post"},
+		{name: "update", inputVal: "update"},
+	}
+
+	for _, tc := range testCases {
+		// Table-driven scenarios for valid run modes
+		t.Run(tc.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			h.setInput(config.InputRunMode, tc.inputVal)
+
+			cfg, err := config.GetConfig()
+			if err != nil {
+				// Fail if parsing fails for valid modes
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+			if string(cfg.RunMode) != tc.inputVal {
+				t.Errorf("Expected RunMode '%s', got '%s'", tc.inputVal, cfg.RunMode)
+			}
+		})
+	}
+}
+
+func TestGetConfig_RunMode_Invalid(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputRunMode, "invalid-mode")
+
+	_, err := config.GetConfig()
+	if err == nil {
+		// Expect failure for unsupported mode values
+		t.Fatalf("Expected error for invalid run mode, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid run mode") {
+		// Confirm error message includes context
+		t.Errorf("Expected error to mention 'invalid run mode', got '%s'", err.Error())
+	}
+}
+
+func TestGetConfig_StateFilePath_Default(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if cfg.StateFilePath != ".pr-slack-reminder/state.json" {
+		t.Errorf("Expected default StateFilePath '.pr-slack-reminder/state.json', got '%s'", cfg.StateFilePath)
+	}
+}
+
+func TestGetConfig_StateFilePath_Custom(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	custom := "custom/path/state.json"
+	h.setInput(config.InputStateFilePath, custom)
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if cfg.StateFilePath != custom {
+		t.Errorf("Expected custom StateFilePath '%s', got '%s'", custom, cfg.StateFilePath)
+	}
+}
+
+func TestContentInputs_GetPRLinkRepoPrefix(t *testing.T) {
+	testCases := []struct {
+		name           string
+		repositories   []string
+		prefixes       map[string]string
+		testRepository string
+		expectedPrefix string
+	}{
+		{
+			name:           "empty prefixes map",
+			repositories:   []string{"test-org/test-repo"},
+			prefixes:       map[string]string{},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "",
+		},
+		{
+			name:           "no match found",
+			repositories:   []string{"test-org/test-repo", "test-org/other-repo"},
+			prefixes:       map[string]string{"other-repo": "OR"},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "",
+		},
+		{
+			name:           "match by full path",
+			repositories:   []string{"test-org/test-repo"},
+			prefixes:       map[string]string{"test-org/test-repo": "TR"},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "TR",
+		},
+		{
+			name:           "match by repository name only",
+			repositories:   []string{"test-org/test-repo"},
+			prefixes:       map[string]string{"test-repo": "TR"},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "TR",
+		},
+		{
+			name:         "full path takes precedence over name",
+			repositories: []string{"test-org/test-repo"},
+			prefixes: map[string]string{
+				"test-repo":          "NAME_MATCH",
+				"test-org/test-repo": "FULL_PATH_MATCH",
+			},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "FULL_PATH_MATCH",
+		},
+		{
+			name:         "different organization same repo name - no ambiguous match",
+			repositories: []string{"test-org/test-repo", "other-org/different-repo"},
+			prefixes: map[string]string{
+				"other-org/different-repo": "OTHER_ORG",
+				"test-repo":                "NAME_MATCH",
+			},
+			testRepository: "test-org/test-repo",
+			expectedPrefix: "NAME_MATCH",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			h.setInputList(config.InputGithubRepositories, tc.repositories)
+			h.setInputMapping(config.InputPRLinkRepoPrefixes, tc.prefixes)
+
+			cfg, err := config.GetConfig()
+			if err != nil {
+				t.Fatalf("Expected no error creating config, got: %v", err)
+			}
+
+			repo := h.createRepository(tc.testRepository)
+			actualPrefix := cfg.ContentInputs.GetPRLinkRepoPrefix(repo)
+			if actualPrefix != tc.expectedPrefix {
+				t.Errorf("Expected prefix '%s', got '%s'", tc.expectedPrefix, actualPrefix)
+			}
+		})
+	}
+}
+
+func TestConfig_GetFiltersForRepository(t *testing.T) {
+	testCases := []struct {
+		name              string
+		globalFilters     config.Filters
+		repositoryFilters map[string]config.Filters
+		repository        string
+		expectedAuthors   []string
+		expectedLabels    []string
+	}{
+		{
+			name: "no repository-specific filters - returns global",
+			globalFilters: config.Filters{
+				Authors: []string{"global-author"},
+				Labels:  []string{"global-label"},
+			},
+			repositoryFilters: map[string]config.Filters{},
+			repository:        "test-org/test-repo",
+			expectedAuthors:   []string{"global-author"},
+			expectedLabels:    []string{"global-label"},
+		},
+		{
+			name: "match by full path",
+			globalFilters: config.Filters{
+				Authors: []string{"global-author"},
+			},
+			repositoryFilters: map[string]config.Filters{
+				"test-org/test-repo": {
+					Authors: []string{"path-specific-author"},
+					Labels:  []string{"path-specific-label"},
+				},
+			},
+			repository:      "test-org/test-repo",
+			expectedAuthors: []string{"path-specific-author"},
+			expectedLabels:  []string{"path-specific-label"},
+		},
+		{
+			name: "match by repository name only",
+			globalFilters: config.Filters{
+				Authors: []string{"global-author"},
+			},
+			repositoryFilters: map[string]config.Filters{
+				"test-repo": {
+					Authors: []string{"name-specific-author"},
+					Labels:  []string{"name-specific-label"},
+				},
+			},
+			repository:      "test-org/test-repo",
+			expectedAuthors: []string{"name-specific-author"},
+			expectedLabels:  []string{"name-specific-label"},
+		},
+		{
+			name: "full path takes precedence over name",
+			globalFilters: config.Filters{
+				Authors: []string{"global-author"},
+			},
+			repositoryFilters: map[string]config.Filters{
+				"test-repo": {
+					Authors: []string{"name-match-author"},
+				},
+				"test-org/test-repo": {
+					Authors: []string{"full-path-author"},
+					Labels:  []string{"full-path-label"},
+				},
+			},
+			repository:      "test-org/test-repo",
+			expectedAuthors: []string{"full-path-author"},
+			expectedLabels:  []string{"full-path-label"},
+		},
+		{
+			name: "no match - fallback to global filters",
+			globalFilters: config.Filters{
+				Authors: []string{"fallback-author"},
+				Labels:  []string{"fallback-label"},
+			},
+			repositoryFilters: map[string]config.Filters{
+				"other-repo": {
+					Authors: []string{"other-author"},
+				},
+			},
+			repository:      "test-org/test-repo",
+			expectedAuthors: []string{"fallback-author"},
+			expectedLabels:  []string{"fallback-label"},
+		},
+		{
+			name:              "empty filters everywhere",
+			globalFilters:     config.Filters{},
+			repositoryFilters: map[string]config.Filters{},
+			repository:        "test-org/test-repo",
+			expectedAuthors:   []string(nil),
+			expectedLabels:    []string(nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			repo := h.createRepository(tc.repository)
+
+			cfg := config.Config{
+				GlobalFilters:     tc.globalFilters,
+				RepositoryFilters: tc.repositoryFilters,
+			}
+
+			actualFilters := cfg.GetFiltersForRepository(repo)
+
+			if len(actualFilters.Authors) != len(tc.expectedAuthors) {
+				t.Errorf("Expected authors length %d, got %d", len(tc.expectedAuthors), len(actualFilters.Authors))
+			}
+			for i, expectedAuthor := range tc.expectedAuthors {
+				if i >= len(actualFilters.Authors) || actualFilters.Authors[i] != expectedAuthor {
+					t.Errorf("Expected author[%d] '%s', got '%s'", i, expectedAuthor, actualFilters.Authors[i])
+				}
+			}
+
+			if len(actualFilters.Labels) != len(tc.expectedLabels) {
+				t.Errorf("Expected labels length %d, got %d", len(tc.expectedLabels), len(actualFilters.Labels))
+			}
+			for i, expectedLabel := range tc.expectedLabels {
+				if i >= len(actualFilters.Labels) || actualFilters.Labels[i] != expectedLabel {
+					t.Errorf("Expected label[%d] '%s', got '%s'", i, expectedLabel, actualFilters.Labels[i])
+				}
+			}
+		})
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/inputhelpers"
+
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -16,32 +17,40 @@ import (
 const (
 	EnvGithubRepository string = "GITHUB_REPOSITORY"
 
-	InputGithubRepositories          string = "github-repositories"
 	InputGithubToken                 string = "github-token"
 	InputSlackBotToken               string = "slack-bot-token"
+	InputRunMode                     string = "mode"
+	InputStateFilePath               string = "state-file-path"
 	InputSlackChannelName            string = "slack-channel-name"
 	InputSlackChannelID              string = "slack-channel-id"
-	InputSlackUserIdByGitHubUsername string = "github-user-slack-user-id-mapping"
-	InputNoPRsMessage                string = "no-prs-message"
-	InputPRListHeading               string = "main-list-heading"
-	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
+	InputGithubRepositories          string = "github-repositories"
 	InputGlobalFilters               string = "filters"
 	InputRepositoryFilters           string = "repository-filters"
-	InputRepositoryPrefixes          string = "repository-prefixes"
+	InputSlackUserIdByGitHubUsername string = "github-user-slack-user-id-mapping"
+	InputPRListHeading               string = "main-list-heading"
+	InputNoPRsMessage                string = "no-prs-message"
+	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
 	InputGroupByRepository           string = "group-by-repository"
+	InputPRLinkRepoPrefixes          string = "pr-link-repo-prefixes"
 
-	MaxRepositories int = 50
+	MaxRepositories int = 30
+
+	DefaultRunMode       = RunModePost
+	DefaultStateFilePath = ".pr-slack-reminder/state.json"
 )
 
 type Config struct {
 	GithubToken   string
 	SlackBotToken string
 
-	repository   string
-	Repositories []models.Repository
+	RunMode       RunMode
+	StateFilePath string
 
 	SlackChannelName string
 	SlackChannelID   string
+
+	repository   string
+	Repositories []models.Repository
 
 	GlobalFilters     Filters
 	RepositoryFilters map[string]Filters
@@ -49,12 +58,21 @@ type Config struct {
 }
 
 type ContentInputs struct {
-	NoPRsMessage                string
-	PRListHeading               string
-	OldPRThresholdHours         int
-	RepositoryPrefixes          map[string]string
 	SlackUserIdByGitHubUsername map[string]string
+	PRListHeading               string
+	NoPRsMessage                string
+	OldPRThresholdHours         int
 	GroupByRepository           bool
+	prLinkRepoPrefixes          map[string]string
+}
+
+func (contentInputs ContentInputs) GetPRLinkRepoPrefix(repo models.Repository) string {
+	for _, key := range []string{repo.GetPath(), repo.Name} {
+		if prefix, exists := contentInputs.prLinkRepoPrefixes[key]; exists {
+			return prefix
+		}
+	}
+	return ""
 }
 
 func (c Config) Print() {
@@ -71,22 +89,27 @@ func (c Config) Print() {
 }
 
 func GetConfig() (Config, error) {
-	repository, err1 := inputhelpers.GetEnvRequired(EnvGithubRepository)
-	githubToken, err2 := inputhelpers.GetInputRequired(InputGithubToken)
-	slackToken, err3 := inputhelpers.GetInputRequired(InputSlackBotToken)
+	githubToken, err1 := inputhelpers.GetInputRequired(InputGithubToken)
+	slackToken, err2 := inputhelpers.GetInputRequired(InputSlackBotToken)
+	runMode, err3 := getRunMode(InputRunMode)
+	stateFilePath := inputhelpers.GetInputOr(InputStateFilePath, DefaultStateFilePath)
+	slackChannelName := inputhelpers.GetInput(InputSlackChannelName)
+	slackChannelID := inputhelpers.GetInput(InputSlackChannelID)
+	repository, err4 := inputhelpers.GetEnvRequired(EnvGithubRepository)
+	repositoryPaths := inputhelpers.GetInputList(InputGithubRepositories)
+	globalFilters, err5 := GetGlobalFiltersFromInput(InputGlobalFilters)
+	repositoryFilters, err6 := GetRepositoryFiltersFromInput(InputRepositoryFilters)
+	slackUserIdByGitHubUsername, err7 := inputhelpers.GetInputMapping(InputSlackUserIdByGitHubUsername)
 	mainListHeading := inputhelpers.GetInput(InputPRListHeading)
-	oldPRsThresholdHours, err4 := inputhelpers.GetInputInt(InputOldPRThresholdHours)
-	slackUserIdByGitHubUsername, err5 := inputhelpers.GetInputMapping(InputSlackUserIdByGitHubUsername)
-	globalFilters, err6 := GetGlobalFiltersFromInput(InputGlobalFilters)
-	repositoryFilters, err7 := GetRepositoryFiltersFromInput(InputRepositoryFilters)
-	repositoryPrefixes, err8 := inputhelpers.GetInputMapping(InputRepositoryPrefixes)
+	noPRsMessage := inputhelpers.GetInput(InputNoPRsMessage)
+	oldPRsThresholdHours, err8 := inputhelpers.GetInputInt(InputOldPRThresholdHours)
 	groupByRepository, err9 := inputhelpers.GetInputBool(InputGroupByRepository)
+	prLinkRepoPrefixes, err10 := inputhelpers.GetInputMapping(InputPRLinkRepoPrefixes)
 
-	if err := selectNonNilError(err1, err2, err3, err4, err5, err6, err7, err8, err9); err != nil {
+	if err := selectNonNilError(err1, err2, err3, err4, err5, err6, err7, err8, err9, err10); err != nil {
 		return Config{}, err
 	}
 
-	repositoryPaths := inputhelpers.GetInputList(InputGithubRepositories)
 	if len(repositoryPaths) == 0 {
 		repositoryPaths = []string{repository}
 	}
@@ -99,22 +122,24 @@ func GetConfig() (Config, error) {
 	}
 
 	config := Config{
-		repository:       repository,
-		Repositories:     repositories,
-		GithubToken:      githubToken,
-		SlackBotToken:    slackToken,
-		SlackChannelName: inputhelpers.GetInput(InputSlackChannelName),
-		SlackChannelID:   inputhelpers.GetInput(InputSlackChannelID),
-		ContentInputs: ContentInputs{
-			SlackUserIdByGitHubUsername: slackUserIdByGitHubUsername,
-			NoPRsMessage:                inputhelpers.GetInput(InputNoPRsMessage),
-			PRListHeading:               mainListHeading,
-			OldPRThresholdHours:         oldPRsThresholdHours,
-			RepositoryPrefixes:          repositoryPrefixes,
-			GroupByRepository:           groupByRepository,
-		},
+		GithubToken:       githubToken,
+		SlackBotToken:     slackToken,
+		RunMode:           runMode,
+		StateFilePath:     stateFilePath,
+		SlackChannelName:  slackChannelName,
+		SlackChannelID:    slackChannelID,
+		repository:        repository,
+		Repositories:      repositories,
 		GlobalFilters:     globalFilters,
 		RepositoryFilters: repositoryFilters,
+		ContentInputs: ContentInputs{
+			SlackUserIdByGitHubUsername: slackUserIdByGitHubUsername,
+			PRListHeading:               mainListHeading,
+			NoPRsMessage:                noPRsMessage,
+			OldPRThresholdHours:         oldPRsThresholdHours,
+			GroupByRepository:           groupByRepository,
+			prLinkRepoPrefixes:          inputhelpers.UnquoteValues(prLinkRepoPrefixes),
+		},
 	}
 
 	if err := config.validate(); err != nil {
@@ -125,13 +150,10 @@ func GetConfig() (Config, error) {
 }
 
 func (c Config) GetFiltersForRepository(repo models.Repository) Filters {
-	filters, exists := c.RepositoryFilters[repo.Path]
-	if exists {
-		return filters
-	}
-	filters, exists = c.RepositoryFilters[repo.Name]
-	if exists {
-		return filters
+	for _, key := range []string{repo.GetPath(), repo.Name} {
+		if filters, exists := c.RepositoryFilters[key]; exists {
+			return filters
+		}
 	}
 	return c.GlobalFilters
 }
@@ -139,6 +161,9 @@ func (c Config) GetFiltersForRepository(repo models.Repository) Filters {
 // validate performs post-construction validation of business rules for Config.
 // It validates repository limits, Slack channel requirements and repository names.
 func (c Config) validate() error {
+	if c.RunMode != RunModePost && c.RunMode != RunModeUpdate {
+		return fmt.Errorf("invalid run mode: %s (expected '%s' or '%s')", c.RunMode, RunModePost, RunModeUpdate)
+	}
 	if len(c.Repositories) == 0 {
 		return fmt.Errorf("at least one repository must be specified in %s or %s", EnvGithubRepository, InputGithubRepositories)
 	}
@@ -168,7 +193,7 @@ func (c Config) validateRepositoryNames() error {
 		return err
 	}
 	if err := validateRepositoryReferences(
-		c.Repositories, c.ContentInputs.RepositoryPrefixes, "repository-prefixes",
+		c.Repositories, c.ContentInputs.prLinkRepoPrefixes, "pr-link-repo-prefixes",
 	); err != nil {
 		return err
 	}
@@ -178,10 +203,10 @@ func (c Config) validateRepositoryNames() error {
 func validateDuplicateRepositories(repositories []models.Repository) error {
 	repositoryPaths := make(map[string]bool, len(repositories))
 	for _, repo := range repositories {
-		if repositoryPaths[repo.Path] {
-			return fmt.Errorf("duplicate repository '%s' found in github-repositories", repo.Path)
+		if repositoryPaths[repo.GetPath()] {
+			return fmt.Errorf("duplicate repository '%s' found in github-repositories", repo.GetPath())
 		}
-		repositoryPaths[repo.Path] = true
+		repositoryPaths[repo.GetPath()] = true
 	}
 	return nil
 }
@@ -195,7 +220,7 @@ func validateRepositoryReferences[V any](
 ) error {
 	for repoNameOrPath := range repoMapping {
 		matches := utilities.Filter(repositories, func(r models.Repository) bool {
-			return r.Path == repoNameOrPath || r.Name == repoNameOrPath
+			return r.GetPath() == repoNameOrPath || r.Name == repoNameOrPath
 		})
 
 		switch len(matches) {

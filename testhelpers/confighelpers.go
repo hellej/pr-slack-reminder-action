@@ -22,9 +22,9 @@ type TestConfig struct {
 	// RepositoryFilters as a JSON string
 	// e.g. "test-repo: {\"labels\": [\"feature\", \"fix\"]}; test-repo2: {\"authors-ignore\": [\"alice\"]}"
 	RepositoryFiltersRaw string
-	// RepositoryPrefixes as a string mapping
-	// e.g. "test-repo: 🚀; test-repo2: 📦"
-	RepositoryPrefixesRaw string
+	// PRLinkRepoPrefixes as a string mapping
+	// e.g. "test-repo: TR1/; test-repo2: TR2/"
+	PRLinkRepoPrefixesRaw string
 	GroupByRepository     bool
 }
 
@@ -40,6 +40,8 @@ func GetDefaultConfigFull() TestConfig {
 		Config: config.Config{
 			GithubToken:      "SOME_TOKEN",
 			SlackBotToken:    "SOME_TOKEN",
+			RunMode:          config.RunModePost,
+			StateFilePath:    "/tmp/pr-slack-reminder-test-state.json",
 			SlackChannelName: "some-channel-name",
 			ContentInputs: config.ContentInputs{
 				NoPRsMessage:                "No open PRs found.",
@@ -52,7 +54,7 @@ func GetDefaultConfigFull() TestConfig {
 		Repositories:          []string{"test-org/test-repo"},
 		GlobalFiltersRaw:      "{\"labels\": [\"feature\", \"fix\"], \"authors\": [\"alice\", \"stitch\"]}",
 		RepositoryFiltersRaw:  "test-repo: {\"labels-ignore\": [\"label-to-ignore\"], \"authors-ignore\": [\"author-to-ignore\"]}",
-		RepositoryPrefixesRaw: "test-repo: 🔧",
+		PRLinkRepoPrefixesRaw: "test-repo: some-repo-prefix/",
 	}
 }
 
@@ -62,6 +64,8 @@ func GetDefaultConfigMinimal() TestConfig {
 		Config: config.Config{
 			GithubToken:      "SOME_TOKEN",
 			SlackBotToken:    "SOME_TOKEN",
+			RunMode:          config.RunModePost,
+			StateFilePath:    "/tmp/pr-slack-reminder-test-state.json",
 			SlackChannelName: "some-channel-name",
 			ContentInputs: config.ContentInputs{
 				PRListHeading: "There are <pr_count> open PRs 🚀",
@@ -75,6 +79,8 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputGithubRepositories, c.Repositories)
 	setInputEnv(t, overrides, config.InputGithubToken, c.GithubToken)
 	setInputEnv(t, overrides, config.InputSlackBotToken, c.SlackBotToken)
+	setInputEnv(t, overrides, config.InputRunMode, string(c.RunMode))
+	setInputEnv(t, overrides, config.InputStateFilePath, c.StateFilePath)
 	setInputEnv(t, overrides, config.InputSlackChannelName, c.SlackChannelName)
 	setInputEnv(t, overrides, config.InputSlackChannelID, c.SlackChannelID)
 	setInputEnv(t, overrides, config.InputSlackUserIdByGitHubUsername, c.ContentInputs.SlackUserIdByGitHubUsername)
@@ -83,7 +89,7 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
 	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
 	setInputEnv(t, overrides, config.InputRepositoryFilters, c.RepositoryFiltersRaw)
-	setInputEnv(t, overrides, config.InputRepositoryPrefixes, c.RepositoryPrefixesRaw)
+	setInputEnv(t, overrides, config.InputPRLinkRepoPrefixes, c.PRLinkRepoPrefixesRaw)
 	setInputEnv(t, overrides, config.InputGroupByRepository, c.GroupByRepository)
 }
 
@@ -122,6 +128,8 @@ func setInputEnv(t *testing.T, overrides *map[string]interface{}, inputName stri
 		strValue = strconv.Itoa(*v)
 	case bool:
 		strValue = strconv.FormatBool(v)
+	case config.RunMode:
+		strValue = string(v)
 	default:
 		t.Fatalf("unsupported value type for setInputEnv: %T", value)
 	}

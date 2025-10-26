@@ -20,6 +20,15 @@ func GetMockSlackAPI(
 	findChannelError error,
 	postMessageError error,
 ) *MockSlackAPI {
+	return GetMockSlackAPIWithUpdateError(slackChannels, findChannelError, postMessageError, nil)
+}
+
+func GetMockSlackAPIWithUpdateError(
+	slackChannels []*SlackChannel,
+	findChannelError error,
+	postMessageError error,
+	updateMessageError error,
+) *MockSlackAPI {
 	if slackChannels == nil {
 		slackChannels = []*SlackChannel{
 			{ID: "C12345678", Name: "some-channel-name"},
@@ -47,13 +56,21 @@ func GetMockSlackAPI(
 			Channel:   "C12345678",
 			Err:       postMessageError,
 		},
+		updateMessageResponse: UpdateMessageResponse{
+			Channel:   "C12345678",
+			Timestamp: "1234567890.123456",
+			Text:      "updated text",
+			Err:       updateMessageError,
+		},
 	}
 }
 
 type MockSlackAPI struct {
 	getConversationsResponse GetConversationsResponse
 	postMessageResponse      PostMessageResponse
+	updateMessageResponse    UpdateMessageResponse
 	SentMessage              SentMessage
+	UpdatedMessage           UpdatedMessage
 }
 
 func (m *MockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -87,7 +104,34 @@ func (m *MockSlackAPI) PostMessage(
 		m.SentMessage.Text = values["text"][0]
 		m.SentMessage.Blocks = sentBlocks
 	}
-	return "", "", m.postMessageResponse.Err
+	return m.postMessageResponse.Channel, m.postMessageResponse.Timestamp, m.postMessageResponse.Err
+}
+
+func (m *MockSlackAPI) UpdateMessage(
+	channelID string, timestamp string, options ...slack.MsgOption,
+) (string, string, string, error) {
+	_, values, err := slack.UnsafeApplyMsgOptions("", "", "", options...)
+
+	if err != nil {
+		panic("Failed to apply message options in mock Slack API: " + err.Error())
+	}
+
+	var updatedBlocks BlocksWrapper
+	if blocks, ok := values["blocks"]; ok && len(blocks) > 0 {
+		updatedBlocks, err = ParseBlocks([]byte(blocks[0]))
+	}
+
+	if err != nil {
+		panic("Failed to parse updated blocks in mock Slack API: " + err.Error())
+	}
+
+	if m.updateMessageResponse.Err == nil {
+		m.UpdatedMessage.ChannelID = channelID
+		m.UpdatedMessage.Timestamp = timestamp
+		m.UpdatedMessage.Text = values["text"][0]
+		m.UpdatedMessage.Blocks = updatedBlocks
+	}
+	return channelID, timestamp, "updated_timestamp", m.updateMessageResponse.Err
 }
 
 type SlackChannel struct {
@@ -107,10 +151,29 @@ type PostMessageResponse struct {
 	Err       error
 }
 
+type UpdateMessageResponse struct {
+	Channel   string
+	Timestamp string
+	Text      string
+	Err       error
+}
+
 // To allow storing and asserting the request in tests
 type SentMessage struct {
 	Request   string
 	ChannelID string
 	Blocks    BlocksWrapper
 	Text      string
+}
+
+type UpdatedMessage struct {
+	ChannelID string
+	Timestamp string
+	Blocks    BlocksWrapper
+	Text      string
+}
+
+// GetLastUpdateMessage returns the details of the last message update call
+func (m *MockSlackAPI) GetLastUpdateMessage() UpdatedMessage {
+	return m.UpdatedMessage
 }
