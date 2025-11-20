@@ -58,6 +58,48 @@ func TestReadInputIntInvalid(t *testing.T) {
 	}
 }
 
+func TestGetInputBool(t *testing.T) {
+	testCases := []struct {
+		name        string
+		value       string
+		expected    bool
+		expectError bool
+	}{
+		{"lowercase true", "true", true, false},
+		{"uppercase TRUE", "TRUE", true, false},
+		{"mixed case True", "True", true, false},
+		{"number 1", "1", true, false},
+		{"lowercase false", "false", false, false},
+		{"uppercase FALSE", "FALSE", false, false},
+		{"mixed case False", "False", false, false},
+		{"number 0", "0", false, false},
+		{"not set returns false", "", false, false},
+		{"invalid value", "invalid", false, true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.value != "" {
+				t.Setenv("INPUT_TEST", tc.value)
+			}
+			result, err := inputhelpers.GetInputBool("test")
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+				if result != tc.expected {
+					t.Errorf("Expected %v, got %v", tc.expected, result)
+				}
+			}
+		})
+	}
+}
+
 func TestReadStringMapping(t *testing.T) {
 	t.Setenv("INPUT_TEST", "a:b;c:d")
 	mapping, _ := inputhelpers.GetInputMapping("test")

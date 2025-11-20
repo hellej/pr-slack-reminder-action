@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -28,6 +29,14 @@ type SlackRef struct {
 	MessageTS string `json:"messageTs"`
 }
 
+type StateArtifactFetcher interface {
+	FetchLatestArtifactByName(
+		ctx context.Context,
+		owner, repo, artifactName, jsonFilePath string,
+		target any,
+	) error
+}
+
 func PRToPullRequestRef(pr prparser.PR) models.PullRequestRef {
 	return models.PullRequestRef{
 		Repository: pr.Repository,
@@ -35,17 +44,22 @@ func PRToPullRequestRef(pr prparser.PR) models.PullRequestRef {
 	}
 }
 
-func Load(path string) (*State, error) {
-	jsonData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
+func Load(
+	ctx context.Context,
+	reader StateArtifactFetcher,
+	repository models.Repository,
+	artifactName string,
+	stateFilePath string,
+) (*State, error) {
 	var state State
-	if err := json.Unmarshal(jsonData, &state); err != nil {
+	if err := reader.FetchLatestArtifactByName(
+		ctx,
+		repository.Owner, repository.Name,
+		artifactName, stateFilePath,
+		&state,
+	); err != nil {
 		return nil, err
 	}
-
 	return &state, nil
 }
 

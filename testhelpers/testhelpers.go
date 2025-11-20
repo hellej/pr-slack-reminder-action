@@ -1,7 +1,9 @@
 package testhelpers
 
 import (
+	"encoding/json"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -30,3 +32,16 @@ const charset = "abcdefghijklmnopqrstuvwxyz" +
 
 var seededRand *rand.Rand = rand.New(
 	rand.NewSource(time.Now().UnixNano()))
+
+func LoadJSONFromFile[T any](filePath string, target *T) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, target); err != nil {
+		return err
+	}
+
+	return nil
+}

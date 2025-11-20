@@ -87,7 +87,13 @@ func runUpdateMode(
 	cfg config.Config,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) error {
-	loadedState, err := state.Load(cfg.StateFilePath)
+	loadedState, err := state.Load(
+		context.Background(),
+		githubClient,
+		cfg.CurrentRepository,
+		cfg.StateArtifactName,
+		cfg.StateFilePath,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load state: %w", err)
 	}

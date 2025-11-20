@@ -1,0 +1,54 @@
+name: PR Reminder
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-mode:
+        description: 'Run mode'
+        type: choice
+        options:
+          - post
+          - update
+        required: true
+      build-first:
+        description: 'Build the project first'
+        type: boolean
+        default: false
+        required: false
+  schedule:
+    - cron: '0 9 * * 0-6'  # at 09:00 every day
+  issue_comment:
+  pull_request_review:
+    types: [submitted]
+  push:
+    branches: [main]
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build application
+        if: inputs.build-first
+        uses: ./.github/actions/build
+
+      - name: Send PR reminder
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
+          run-mode: ${{ github.event_name == 'schedule' || inputs.run-mode == 'post' && 'post' || 'update' }}
+          slack-channel-name: github
+          github-user-slack-user-id-mapping: |
+            hellej: U08SZJTJF0U
+            bob: U08EVPGNWER
+      
+      - uses: actions/upload-artifact@v5
+        with:
+          name: pr-slack-reminder-state
+          path: pr-slack-reminder-state.json
+          retention-days: 1

@@ -15,15 +15,15 @@ inputs: {
     description: 'Slack bot token to send the message via (the bot must be a member of the channel)',
     required: true,
   },
-  mode: {
+  run-mode: {
     description: 'Run mode: post (default) posts a new reminder; update refreshes an existing reminder',
     required: false,
     default: 'post',
   },
-  state-file-path: {
-    description: 'Path to state file used to persist message ID in order to later update it',
+  state-artifact-name: {
+    description: 'Name of the artifact containing state from previous runs (required when run-mode is update)',
     required: false,
-    default: '.pr-slack-reminder/state.json',
+    default: 'pr-slack-reminder-state',
   },
   slack-channel-name: {
     description: 'Slack channel name to send the message to',

@@ -54,7 +54,11 @@ func (b BlocksWrapper) GetPRLists() []PRList {
 				prText := ""
 				for _, element := range section.Elements {
 					if element.Text != "" {
-						prText += element.Text
+						text := element.Text
+						if element.Style != nil && element.Style.Strike {
+							text = "~" + text + "~"
+						}
+						prText += text
 					}
 					if element.UserID != "" {
 						prText += element.UserID
@@ -154,7 +158,8 @@ type Element struct {
 }
 
 type ElementStyle struct {
-	Bold bool `json:"bold,omitempty"`
+	Bold   bool `json:"bold,omitempty"`
+	Strike bool `json:"strike,omitempty"`
 }
 
 func ParseBlocks(data []byte) (BlocksWrapper, error) {

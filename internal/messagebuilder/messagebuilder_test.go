@@ -222,3 +222,163 @@ func getTestPRs() TestPRs {
 		PRs: []prparser.PR{pr1},
 	}
 }
+
+func TestMergedAndClosedPRFormatting(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		pr                      prparser.PR
+		expectedStrikethrough   bool
+		expectedMergedIndicator bool
+		expectedReviewerSection bool
+	}{
+		{
+			name: "Open PR - no special formatting",
+			pr: prparser.PR{
+				PR: &githubclient.PR{
+					PullRequest: &github.PullRequest{
+						CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+						Title:     github.Ptr("Open PR"),
+						State:     github.Ptr("open"),
+						Merged:    github.Ptr(false),
+						User: &github.User{
+							Login: github.Ptr("alice"),
+							Name:  github.Ptr("Alice"),
+						},
+					},
+				},
+				Author: prparser.Collaborator{
+					Collaborator: &githubclient.Collaborator{Login: "alice", Name: "Alice"},
+				},
+			},
+			expectedStrikethrough:   false,
+			expectedMergedIndicator: false,
+			expectedReviewerSection: false,
+		},
+		{
+			name: "Merged PR with reviewers",
+			pr: prparser.PR{
+				PR: &githubclient.PR{
+					PullRequest: &github.PullRequest{
+						CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+						Title:     github.Ptr("Merged PR"),
+						State:     github.Ptr("closed"),
+						Merged:    github.Ptr(true),
+						User: &github.User{
+							Login: github.Ptr("bob"),
+							Name:  github.Ptr("Bob"),
+						},
+					},
+				},
+				Author: prparser.Collaborator{
+					Collaborator: &githubclient.Collaborator{Login: "bob", Name: "Bob"},
+				},
+				Approvers: []prparser.Collaborator{
+					{Collaborator: &githubclient.Collaborator{Login: "reviewer1", Name: "Reviewer One"}},
+				},
+			},
+			expectedStrikethrough:   false, // Merged PRs should NOT have strikethrough
+			expectedMergedIndicator: true,
+			expectedReviewerSection: true,
+		},
+		{
+			name: "Closed PR without merge",
+			pr: prparser.PR{
+				PR: &githubclient.PR{
+					PullRequest: &github.PullRequest{
+						CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+						Title:     github.Ptr("Closed PR"),
+						State:     github.Ptr("closed"),
+						Merged:    github.Ptr(false),
+						User: &github.User{
+							Login: github.Ptr("charlie"),
+							Name:  github.Ptr("Charlie"),
+						},
+					},
+				},
+				Author: prparser.Collaborator{
+					Collaborator: &githubclient.Collaborator{Login: "charlie", Name: "Charlie"},
+				},
+			},
+			expectedStrikethrough:   true,
+			expectedMergedIndicator: false,
+			expectedReviewerSection: false,
+		},
+		{
+			name: "Merged PR without reviewers",
+			pr: prparser.PR{
+				PR: &githubclient.PR{
+					PullRequest: &github.PullRequest{
+						CreatedAt: &github.Timestamp{Time: time.Now().Add(-3 * time.Hour)},
+						Title:     github.Ptr("Merged PR no reviewers"),
+						State:     github.Ptr("closed"),
+						Merged:    github.Ptr(true),
+						User: &github.User{
+							Login: github.Ptr("dave"),
+							Name:  github.Ptr("Dave"),
+						},
+					},
+				},
+				Author: prparser.Collaborator{
+					Collaborator: &githubclient.Collaborator{Login: "dave", Name: "Dave"},
+				},
+			},
+			expectedStrikethrough:   false, // Merged PRs should NOT have strikethrough
+			expectedMergedIndicator: true,
+			expectedReviewerSection: false, // No reviewers, so no reviewer section
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			content := messagecontent.Content{
+				SummaryText:   "Test",
+				PRListHeading: "Test PRs",
+				PRs:           []prparser.PR{tc.pr},
+			}
+
+			message, _ := messagebuilder.BuildMessage(content)
+
+			prBlock := message.Blocks.BlockSet[1].(*slack.RichTextBlock)
+			prSection := prBlock.Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection)
+
+			linkElement := prSection.Elements[0].(*slack.RichTextSectionLinkElement)
+
+			if tc.expectedStrikethrough {
+				if linkElement.Style == nil || !linkElement.Style.Strike {
+					t.Error("Expected strikethrough formatting on PR title but it was not applied")
+				}
+			} else {
+				if linkElement.Style != nil && linkElement.Style.Strike {
+					t.Error("Did not expect strikethrough formatting on PR title but it was applied")
+				}
+			}
+
+			hasReviewerSection := false
+			hasMergedIndicator := false
+
+			for _, element := range prSection.Elements {
+				if textElement, ok := element.(*slack.RichTextSectionTextElement); ok {
+					if textElement.Text == " 🔀" {
+						hasMergedIndicator = true
+					}
+					if textElement.Text == " (✅ " || textElement.Text == " (💬 " || textElement.Text == " (" {
+						hasReviewerSection = true
+					}
+				}
+			}
+
+			if tc.expectedReviewerSection && !hasReviewerSection {
+				t.Error("Expected reviewer section but it was not found")
+			}
+			if !tc.expectedReviewerSection && hasReviewerSection {
+				t.Error("Did not expect reviewer section but it was found")
+			}
+			if tc.expectedMergedIndicator && !hasMergedIndicator {
+				t.Error("Expected merged indicator (🔀) but it was not found")
+			}
+			if !tc.expectedMergedIndicator && hasMergedIndicator {
+				t.Error("Did not expect merged indicator (🔀) but it was found")
+			}
+		})
+	}
+}

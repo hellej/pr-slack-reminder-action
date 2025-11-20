@@ -123,25 +123,32 @@ func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 		)
 	}
 
-	titleAgeAndAuthorElements := []slack.RichTextSectionElement{}
+	prItemElements := []slack.RichTextSectionElement{}
 
 	linkText := pr.GetTitle()
 	if pr.Prefix != "" {
 		linkText = pr.Prefix + pr.GetTitle()
 	}
 
-	titleAgeAndAuthorElements = append(titleAgeAndAuthorElements,
-		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), linkText, &slack.RichTextSectionTextStyle{Bold: true}),
+	linkStyle := &slack.RichTextSectionTextStyle{Bold: true, Strike: pr.IsClosedButNotMerged()}
+	prItemElements = append(prItemElements,
+		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), linkText, linkStyle),
 	)
-	titleAgeAndAuthorElements = append(titleAgeAndAuthorElements, ageElements...)
-	titleAgeAndAuthorElements = append(titleAgeAndAuthorElements,
+	prItemElements = append(prItemElements, ageElements...)
+	prItemElements = append(prItemElements,
 		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
 	)
 
-	return slack.NewRichTextSection(
-		append(titleAgeAndAuthorElements, getReviewersElements(pr)...)...,
-	)
+	prItemElements = append(prItemElements, getReviewersElements(pr)...)
+
+	if pr.IsMerged() {
+		prItemElements = append(prItemElements,
+			slack.NewRichTextSectionTextElement(" 🔀", &slack.RichTextSectionTextStyle{}),
+		)
+	}
+
+	return slack.NewRichTextSection(prItemElements...)
 }
 
 func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {

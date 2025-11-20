@@ -5,8 +5,11 @@ package githubclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"slices"
 
 	"time"
@@ -29,6 +32,11 @@ type Client interface {
 		references []models.PullRequestRef,
 		getFiltersForRepository func(repo models.Repository) config.Filters,
 	) ([]PR, error)
+	FetchLatestArtifactByName(
+		ctx context.Context,
+		owner, repo, artifactName, jsonFilePath string,
+		target any,
+	) error
 }
 
 type GithubPullRequestsService interface {
@@ -62,18 +70,58 @@ type GithubIssuesService interface {
 	)
 }
 
-func NewClient(prService GithubPullRequestsService, issueService GithubIssuesService) Client {
-	return &client{prService: prService, issueService: issueService}
+type GithubActionsService interface {
+	ListArtifacts(
+		context.Context, string, string, *github.ListArtifactsOptions,
+	) (
+		*github.ArtifactList, *github.Response, error,
+	)
+	DownloadArtifact(
+		ctx context.Context, owner, repo string, artifactID int64, maxRedirects int,
+	) (
+		*url.URL, *github.Response, error,
+	)
+}
+
+type HTTPClient interface {
+	Get(url string) (resp *http.Response, err error)
+}
+
+type httpClient struct{}
+
+func (h httpClient) Get(url string) (*http.Response, error) {
+	return http.Get(url)
+}
+
+func NewClient(
+	httpClient HTTPClient,
+	prService GithubPullRequestsService,
+	issueService GithubIssuesService,
+	actionsService GithubActionsService,
+) Client {
+	return &client{
+		http:           httpClient,
+		prService:      prService,
+		issueService:   issueService,
+		actionsService: actionsService,
+	}
 }
 
 func GetAuthenticatedClient(token string) Client {
 	ghClient := github.NewClient(nil).WithAuthToken(token)
-	return NewClient(ghClient.PullRequests, ghClient.Issues)
+	return NewClient(
+		httpClient{},
+		ghClient.PullRequests,
+		ghClient.Issues,
+		ghClient.Actions,
+	)
 }
 
 type client struct {
-	prService    GithubPullRequestsService
-	issueService GithubIssuesService
+	http           HTTPClient
+	prService      GithubPullRequestsService
+	issueService   GithubIssuesService
+	actionsService GithubActionsService
 }
 
 // DefaultGitHubAPIConcurrencyLimit caps concurrent repository fetches to avoid
@@ -309,14 +357,7 @@ func (c *client) addReviewerInfoToPRs(ctx context.Context, prResults []PRResult)
 				comments:         comments,
 				timelineComments: timelineComments,
 				repository:       repo,
-			}
-
-			if reviewsErr != nil {
-				fetchReviewsResult.err = reviewsErr
-			} else if commentsErr != nil {
-				fetchReviewsResult.err = commentsErr
-			} else if timelineCommentsErr != nil {
-				fetchReviewsResult.err = timelineCommentsErr
+				err:              errors.Join(reviewsErr, commentsErr, timelineCommentsErr),
 			}
 
 			resultChannel <- fetchReviewsResult

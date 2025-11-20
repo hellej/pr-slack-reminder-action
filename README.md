@@ -150,8 +150,8 @@ jobs:
 | ----------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                    |
 | `slack-bot-token`                   | ✅       | Slack bot token for sending messages<br>Example: `${{ secrets.SLACK_BOT_TOKEN }}`                               |
-| `mode`                              | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                        |
-| `state-file-path`                   | ❌       | Path to state file used to persist message ID in order to later update it                                       |
+| `run-mode`                          | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                        |
+| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous runs (required when run-mode is `update`)<br>Example: `pr-reminder-state` |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)<br>Example: `dev-team`                                      |
 | `slack-channel-id`                  | ❌       | Slack channel ID (use this OR `slack-channel-name`)<br>Example: `C1234567890`                                   |
 | `github-repositories`               | ❌       | Repositories to monitor (max 30) - defaults to current repo<br>Example:<br>`owner/repo1`<br>`owner/repo2`       |

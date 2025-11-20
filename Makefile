@@ -25,7 +25,8 @@ run:
 	'GITHUB_REPOSITORY=$(GITHUB_REPOSITORY)' \
 	'INPUT_GITHUB-TOKEN=$(INPUT_GITHUB_TOKEN)' \
 	'INPUT_SLACK-BOT-TOKEN=$(INPUT_SLACK_BOT_TOKEN)' \
-	'INPUT_MODE=$(INPUT_MODE)' \
+	'INPUT_RUN-MODE=$(INPUT_RUN_MODE)' \
+	'INPUT_STATE-ARTIFACT-NAME=$(INPUT_STATE_ARTIFACT_NAME)' \
 	'INPUT_GITHUB-REPOSITORIES=$(INPUT_GITHUB_REPOSITORIES)' \
 	'INPUT_SLACK-CHANNEL-NAME=$(INPUT_SLACK_CHANNEL_NAME)' \
 	'INPUT_GITHUB-USER-SLACK-USER-ID-MAPPING=$(INPUT_GITHUB_USER_SLACK_USER_ID_MAPPING)' \
@@ -61,12 +62,10 @@ update-invoke-binary-targets:
 		*) sed -i "s|^const VERSION = '.*'|const VERSION = '$(COMMIT_HASH)'|" ./invoke-binary.js ;; \
 	esac
 
-build-all:
+build:
 	rm -rf dist/*
 	make build-linux-amd64
 	make build-linux-arm64
-	# make build-windows-amd64 # TODO enable before v1
-	# make build-windows-arm64 # TODO enable before v1
 	make update-invoke-binary-targets
 
 release:

@@ -29,6 +29,7 @@ const (
 	TestRepoPrefix1         = "R1"
 	TestRepoPrefix2         = "R2"
 	TestMaskedToken         = "XXXXX"
+	TestStateArtifactName   = "test-state-artifact"
 )
 
 // ConfigTestHelpers provides helper functions for setting up test environments
@@ -869,6 +870,11 @@ func TestGetConfig_RunMode_ParsedCorrectly(t *testing.T) {
 			h.setupMinimalValidConfig()
 			h.setInput(config.InputRunMode, tc.inputVal)
 
+			// state-artifact-name is required when run-mode is update
+			if tc.inputVal == "update" {
+				h.setInput(config.InputStateArtifactName, TestStateArtifactName)
+			}
+
 			cfg, err := config.GetConfig()
 			if err != nil {
 				// Fail if parsing fails for valid modes
@@ -897,6 +903,63 @@ func TestGetConfig_RunMode_Invalid(t *testing.T) {
 	}
 }
 
+func TestGetConfig_StateArtifactName_ValidWhenProvided(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputStateArtifactName, "test-artifact")
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		t.Fatalf("Expected no error, got '%v'", err)
+	}
+	if cfg.StateArtifactName != "test-artifact" {
+		t.Errorf("Expected StateArtifactName to be 'test-artifact', got '%s'", cfg.StateArtifactName)
+	}
+}
+
+func TestGetConfig_StateArtifactName_EmptyWhenNotProvided(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		t.Fatalf("Expected no error, got '%v'", err)
+	}
+	if cfg.StateArtifactName != "" {
+		t.Errorf("Expected StateArtifactName to be empty, got '%s'", cfg.StateArtifactName)
+	}
+}
+
+func TestGetConfig_StateArtifactName_RequiredForUpdateMode(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputRunMode, "update")
+
+	_, err := config.GetConfig()
+	if err == nil {
+		t.Fatalf("Expected error when state-artifact-name is missing for update mode, got nil")
+	}
+	expectedErrMsg := "state-artifact-name is required when run mode is 'update'"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		t.Errorf("Expected error to contain '%s', got '%s'", expectedErrMsg, err.Error())
+	}
+}
+
+func TestGetConfig_StateArtifactName_ValidForUpdateMode(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputRunMode, "update")
+	h.setInput(config.InputStateArtifactName, "my-state-artifact")
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		t.Fatalf("Expected no error when state-artifact-name is provided for update mode, got '%v'", err)
+	}
+	if cfg.StateArtifactName != "my-state-artifact" {
+		t.Errorf("Expected StateArtifactName to be 'my-state-artifact', got '%s'", cfg.StateArtifactName)
+	}
+}
+
 func TestGetConfig_StateFilePath_Default(t *testing.T) {
 	h := newConfigTestHelpers(t)
 	h.setupMinimalValidConfig()
@@ -905,8 +968,9 @@ func TestGetConfig_StateFilePath_Default(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
-	if cfg.StateFilePath != ".pr-slack-reminder/state.json" {
-		t.Errorf("Expected default StateFilePath '.pr-slack-reminder/state.json', got '%s'", cfg.StateFilePath)
+	expectedPath := "pr-slack-reminder-state.json"
+	if cfg.StateFilePath != expectedPath {
+		t.Errorf("Expected default StateFilePath '%s', got '%s'", expectedPath, cfg.StateFilePath)
 	}
 }
 
@@ -914,7 +978,7 @@ func TestGetConfig_StateFilePath_Custom(t *testing.T) {
 	h := newConfigTestHelpers(t)
 	h.setupMinimalValidConfig()
 	custom := "custom/path/state.json"
-	h.setInput(config.InputStateFilePath, custom)
+	h.setEnv(config.EnvStateFilePath, custom)
 
 	cfg, err := config.GetConfig()
 	if err != nil {

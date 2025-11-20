@@ -49,6 +49,14 @@ func (pr PR) GetPRAgeText() string {
 	}
 }
 
+func (pr PR) IsMerged() bool {
+	return pr.GetMerged()
+}
+
+func (pr PR) IsClosedButNotMerged() bool {
+	return pr.GetState() == "closed" && !pr.IsMerged()
+}
+
 func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
 	return sortPRsByCreatedAt(utilities.Map(prs, getPRParser(config)))
 }

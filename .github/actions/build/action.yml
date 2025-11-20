@@ -27,7 +27,7 @@ runs:
       shell: bash
       run: |
         if [ "${{ inputs.target }}" = "all" ]; then
-          make build-all
+          make build
         else
           make build-${{ inputs.target }}
         fi
