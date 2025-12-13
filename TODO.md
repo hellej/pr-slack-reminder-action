@@ -7,6 +7,5 @@
 - [x] limit maximum PR count to 50
 - [x] add option/"mode" to update previously sent PR reminder to show latest review/merge status
 - [x] should delete the message in update mode if all PRs are filtered out (e.g. moved back to draft)
-- [ ] add "ignored-terms" input for excluding PRs if their titles contain those
+- [x] add "ignored-terms" input for excluding PRs if their titles contain those
 - [ ] add input for minimum PR age (to exclude new PRs)
-- [ ] (?) add optional/customizable footer element

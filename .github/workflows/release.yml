@@ -112,4 +112,4 @@ jobs:
               - type: "section"
                 text:
                   type: "mrkdwn"
-                  text: "New <${{ steps.create-release.outputs.release-url }}|draft release> created for *${{ steps.create-release.outputs.version }}*! :rocket:"
+                  text: "New <${{ steps.create-release.outputs.release-url }}|draft release> created for *${{ steps.create-release.outputs.version }}* :rocket:"
