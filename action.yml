@@ -1,7 +1,7 @@
 name: 'PR Slack Reminder'
 description: 'Sends a Slack reminder about open PRs'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'invoke-binary.js'
 branding:
   icon: 'git-pull-request'
