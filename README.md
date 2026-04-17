@@ -4,8 +4,6 @@
 
 This GitHub Action sends a friendly Slack reminder about open Pull Requests. The Slack message contains a list of PRs with (optional) highlighting for the old ones.
 
-> ⚠️ **Beta version notice**: This action is currently in beta (`v1-beta`). While functional and tested, the API may change before the stable `v1` release planned for January 2026.
-
 ### Example Output
 
 <img src="docs/examples/example_1.png" alt="Example Slack message" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
@@ -59,7 +57,7 @@ jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - uses: hellej/pr-slack-reminder-action@v1-beta
+      - uses: hellej/pr-slack-reminder-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -81,7 +79,7 @@ jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - uses: hellej/pr-slack-reminder-action@v1-beta
+      - uses: hellej/pr-slack-reminder-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -140,14 +138,14 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: hellej/pr-slack-reminder-action@v1-beta
+      - uses: hellej/pr-slack-reminder-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           slack-channel-name: "dev-team"
           run-mode: ${{ github.event_name == 'schedule' && 'post' || 'update' }}
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: pr-slack-reminder-state
           path: pr-slack-reminder-state.json
@@ -221,13 +219,13 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: generate-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Send PR Reminder
-        uses: hellej/pr-slack-reminder-action@v1-beta
+        uses: hellej/pr-slack-reminder-action@v1
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
