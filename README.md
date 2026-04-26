@@ -2,7 +2,7 @@
 
 # PR Slack Reminder Action
 
-This GitHub Action sends a friendly Slack reminder about open Pull Requests. The Slack message contains a list of PRs with (optional) highlighting for the old ones.
+This GitHub Action sends a friendly Slack reminder about open Pull Requests. The Slack message contains a list of PRs with (optional) highlighting for the old ones and can be set to auto-update as PRs get reviewed or merged.
 
 ### Example Output
 
@@ -246,14 +246,13 @@ To monitor multiple repositories, you may also use a Personal Access Token (PAT)
 
 ## 💡 Tips
 
-- **Test with `workflow_dispatch`**: Allow manual testing for your workflow
+- **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
 - **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
 - **Customize messages**: Make the reminders fit your team's culture
-- **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
 
 ## 👋 Contributing
 
-Found a bug or have a feature request? We'd love your help! Feel free to open an issue.
+Found a bug? Feel free to open an issue!
 
 ## 📄 License
 
