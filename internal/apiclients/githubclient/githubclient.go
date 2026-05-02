@@ -179,7 +179,11 @@ func (c *client) FindOpenPRs(
 	prResults = includeLatestPRsOnlyIfExceedsLimit(prResults)
 	logFoundPRs(prResults)
 
-	return c.addReviewerInfoToPRs(ctx, prResults)
+	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
+	if err != nil {
+		return nil, err
+	}
+	return excludeSnoozedPRs(prs), nil
 }
 
 func (c *client) GetPRs(
@@ -222,7 +226,11 @@ func (c *client) GetPRs(
 	prResults = includeLatestPRsOnlyIfExceedsLimit(prResults)
 	logFoundPRs(prResults)
 
-	return c.addReviewerInfoToPRs(ctx, prResults)
+	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
+	if err != nil {
+		return nil, err
+	}
+	return excludeSnoozedPRs(prs), nil
 }
 
 func getPRFilterFunc(

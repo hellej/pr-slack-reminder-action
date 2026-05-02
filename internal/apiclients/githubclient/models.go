@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"log"
 	"slices"
+	"time"
 
 	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -16,6 +17,7 @@ type PR struct {
 	Author           Collaborator
 	ApprovedByUsers  []Collaborator
 	CommentedByUsers []Collaborator // reviewers who commented the PR but did not approve it
+	SnoozedUntil     *time.Time
 }
 
 type PRResult struct {
@@ -92,6 +94,7 @@ func (r FetchReviewsResult) asPR() PR {
 		Author:           newCollaboratorFromUser(r.pr.GetUser()),
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
+		SnoozedUntil:     findActiveSnooze(r.timelineComments),
 	}
 }
 

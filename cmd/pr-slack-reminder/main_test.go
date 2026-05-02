@@ -195,23 +195,24 @@ func getTestState(options GetTestStateOptions) state.State {
 
 func TestScenarios(t *testing.T) {
 	testCases := []struct {
-		name                string
-		config              testhelpers.TestConfig
-		configOverrides     *map[string]any
-		fetchPRsStatus      int
-		prServiceError      error
-		issueServiceError   error
-		prs                 []*github.PullRequest
-		prsByRepo           map[string][]*github.PullRequest
-		reviewsByPRNumber   map[int][]*github.PullRequestReview
-		foundSlackChannels  []*mockslackclient.SlackChannel
-		findChannelError    error
-		sendMessageError    error
-		expectedErrorMsg    string
-		expectedPRNumbers   []int
-		expectedPRItemTexts []string
-		expectedSummary     string
-		expectedHeadings    []string // For group-by-repository mode to check repository headings
+		name                       string
+		config                     testhelpers.TestConfig
+		configOverrides            *map[string]any
+		fetchPRsStatus             int
+		prServiceError             error
+		issueServiceError          error
+		prs                        []*github.PullRequest
+		prsByRepo                  map[string][]*github.PullRequest
+		reviewsByPRNumber          map[int][]*github.PullRequestReview
+		timelineCommentsByPRNumber map[int][]*github.IssueComment
+		foundSlackChannels         []*mockslackclient.SlackChannel
+		findChannelError           error
+		sendMessageError           error
+		expectedErrorMsg           string
+		expectedPRNumbers          []int
+		expectedPRItemTexts        []string
+		expectedSummary            string
+		expectedHeadings           []string // For group-by-repository mode to check repository headings
 	}{
 		{
 			name:   "unset required inputs",
@@ -646,6 +647,26 @@ func TestScenarios(t *testing.T) {
 				"PR with bot and human reviewers 5 hours ago by Alice (💬 Human Reviewer)",
 			},
 		},
+		{
+			name:   "snoozed PR is excluded from message",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Active PR", AuthorLogin: "alice"}),
+				getTestPR(GetTestPROptions{Number: 2, Title: "Snoozed PR", AuthorLogin: "bob"}),
+				getTestPR(GetTestPROptions{Number: 3, Title: "Another active PR", AuthorLogin: "charlie"}),
+			},
+			timelineCommentsByPRNumber: map[int][]*github.IssueComment{
+				2: {
+					{
+						Body:      github.Ptr("/snooze PR reminder for 7 days"),
+						CreatedAt: &github.Timestamp{Time: now.Add(-1 * time.Hour)},
+						User:      &github.User{Login: github.Ptr("bob")},
+					},
+				},
+			},
+			expectedPRNumbers: []int{1, 3},
+			expectedSummary:   "2 open PRs are waiting for attention 👀",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -653,12 +674,13 @@ func TestScenarios(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRs:                   tc.prs,
-				PRsByRepo:             tc.prsByRepo,
-				ListPRsResponseStatus: cmp.Or(tc.fetchPRsStatus, 200),
-				ReviewsByPRNumber:     tc.reviewsByPRNumber,
-				PRServiceError:        tc.prServiceError,
-				IssueServiceError:     tc.issueServiceError,
+				PRs:                        tc.prs,
+				PRsByRepo:                  tc.prsByRepo,
+				ListPRsResponseStatus:      cmp.Or(tc.fetchPRsStatus, 200),
+				ReviewsByPRNumber:          tc.reviewsByPRNumber,
+				TimelineCommentsByPRNumber: tc.timelineCommentsByPRNumber,
+				PRServiceError:             tc.prServiceError,
+				IssueServiceError:          tc.issueServiceError,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
 				SlackChannels:    tc.foundSlackChannels,
