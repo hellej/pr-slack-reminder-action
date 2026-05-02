@@ -176,7 +176,7 @@ func (c *client) FindOpenPRs(
 		utilities.FlatMap(prResultSlices),
 		getPRFilterFunc(getFiltersForRepository),
 	)
-	prResults = includeLatestPRsOnlyIfExceedsLimit(prResults)
+	prResults = capPRsToLimit(prResults)
 	logFoundPRs(prResults)
 
 	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
@@ -223,7 +223,7 @@ func (c *client) GetPRs(
 		prResultSlices,
 		getPRFilterFunc(getFiltersForRepository),
 	)
-	prResults = includeLatestPRsOnlyIfExceedsLimit(prResults)
+	prResults = capPRsToLimit(prResults)
 	logFoundPRs(prResults)
 
 	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
@@ -305,7 +305,7 @@ func logFoundPRs(prResults []PRResult) {
 	}
 }
 
-func includeLatestPRsOnlyIfExceedsLimit(prs []PRResult) []PRResult {
+func capPRsToLimit(prs []PRResult) []PRResult {
 	if len(prs) <= MaxPRsToFetch {
 		return prs
 	}
