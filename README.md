@@ -25,6 +25,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 
 - Monitor up to 30 repositories
 - Option to ["refresh" the latest PR reminder](#3-advanced-setup-with-update-mode-enabled) when PRs get reviewed or merged (with run-mode: `update`)
+- Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
 - More customizable message content
@@ -184,6 +185,13 @@ Both `filters` and `repository-filters` support:
 
 ⚠️ **Note**: You cannot use both `authors` and `ignored-authors` in the same filter.
 
+## 💡 Tips
+
+- **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
+- **Snooze a PR**: Comment `/snooze for 3 days` (or `/snooze PR reminder for 3 days`) on a PR to temporarily hide it from reminders. To unsnooze, delete the comment or post `/snooze for 0 days`.
+- **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
+- **Customize messages**: Make the reminders fit your team's culture
+
 ## 🔑 GitHub Token Setup
 
 ### Option 1: Default Token (Single Repository)
@@ -243,12 +251,6 @@ To monitor multiple repositories, you may also use a Personal Access Token (PAT)
 2. **Click "Generate new token"** → Select the repositories of interest and at least read access to PRs
 3. **Add the token as a repository secret** named `PR_REMINDER_GITHUB_TOKEN`
 4. **Use it in your workflow:** `github-token: ${{ secrets.PR_REMINDER_GITHUB_TOKEN }}`
-
-## 💡 Tips
-
-- **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
-- **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
-- **Customize messages**: Make the reminders fit your team's culture
 
 ## 👋 Contributing
 
