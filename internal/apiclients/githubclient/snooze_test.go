@@ -16,27 +16,17 @@ func TestParseSnoozeComment(t *testing.T) {
 		expected *time.Time
 	}{
 		{
-			name:     "simple snooze with number only",
-			body:     "/snooze 4",
-			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
-		},
-		{
-			name:     "snooze without slash",
-			body:     "snooze 4",
-			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
-		},
-		{
-			name:     "snooze with d suffix",
-			body:     "Snooze 4d",
-			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
-		},
-		{
-			name:     "snooze with days suffix",
+			name:     "snooze for N days",
 			body:     "/snooze for 4 days",
 			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
 		},
 		{
-			name:     "snooze with day suffix",
+			name:     "snooze for N d",
+			body:     "/snooze for 4d",
+			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
+		},
+		{
+			name:     "snooze for 1 day (singular)",
 			body:     "/snooze for 1 day",
 			expected: timePtr(baseTime.Add(1 * 24 * time.Hour)),
 		},
@@ -46,34 +36,19 @@ func TestParseSnoozeComment(t *testing.T) {
 			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
 		},
 		{
-			name:     "snooze pr-reminder",
-			body:     "snooze pr-reminder 4d",
+			name:     "snooze pr-reminder for N d",
+			body:     "/snooze pr-reminder for 4d",
 			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
 		},
 		{
 			name:     "case insensitive",
-			body:     "SNOOZE PR REMINDER FOR 7 DAYS",
+			body:     "/SNOOZE PR REMINDER FOR 7 DAYS",
 			expected: timePtr(baseTime.Add(7 * 24 * time.Hour)),
 		},
 		{
 			name:     "zero days returns createdAt (effectively unsnooze)",
-			body:     "/snooze 0",
+			body:     "/snooze for 0 days",
 			expected: timePtr(baseTime),
-		},
-		{
-			name:     "non-matching comment",
-			body:     "This is a regular comment",
-			expected: nil,
-		},
-		{
-			name:     "snooze in middle of text does not match",
-			body:     "I think we should snooze 4 days",
-			expected: nil,
-		},
-		{
-			name:     "empty body",
-			body:     "",
-			expected: nil,
 		},
 		{
 			name:     "snooze with extra whitespace",
@@ -82,8 +57,43 @@ func TestParseSnoozeComment(t *testing.T) {
 		},
 		{
 			name:     "excessive days capped to 365",
-			body:     "/snooze 9999999",
+			body:     "/snooze for 9999999 days",
 			expected: timePtr(baseTime.Add(365 * 24 * time.Hour)),
+		},
+		{
+			name:     "missing slash does not match",
+			body:     "snooze for 4 days",
+			expected: nil,
+		},
+		{
+			name:     "missing for does not match",
+			body:     "/snooze 4 days",
+			expected: nil,
+		},
+		{
+			name:     "missing unit does not match",
+			body:     "/snooze for 4",
+			expected: nil,
+		},
+		{
+			name:     "bare number does not match",
+			body:     "/snooze 4",
+			expected: nil,
+		},
+		{
+			name:     "non-matching comment",
+			body:     "This is a regular comment",
+			expected: nil,
+		},
+		{
+			name:     "snooze in middle of text does not match",
+			body:     "I think we should snooze for 4 days",
+			expected: nil,
+		},
+		{
+			name:     "empty body",
+			body:     "",
+			expected: nil,
 		},
 	}
 
@@ -131,30 +141,30 @@ func TestFindActiveSnooze(t *testing.T) {
 		{
 			name: "active snooze comment",
 			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze 5"), CreatedAt: &github.Timestamp{Time: recentTime}},
+				{Body: github.Ptr("/snooze for 5 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
 			},
 			expectSnoozed: true,
 		},
 		{
 			name: "expired snooze comment",
 			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze 2"), CreatedAt: &github.Timestamp{Time: olderTime}},
+				{Body: github.Ptr("/snooze for 2 days"), CreatedAt: &github.Timestamp{Time: olderTime}},
 			},
 			expectSnoozed: false,
 		},
 		{
 			name: "most recent snooze wins - active snooze after expired",
 			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze 1"), CreatedAt: &github.Timestamp{Time: olderTime}},
-				{Body: github.Ptr("/snooze 7"), CreatedAt: &github.Timestamp{Time: recentTime}},
+				{Body: github.Ptr("/snooze for 1 day"), CreatedAt: &github.Timestamp{Time: olderTime}},
+				{Body: github.Ptr("/snooze for 7 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
 			},
 			expectSnoozed: true,
 		},
 		{
 			name: "most recent snooze wins - expired snooze after active",
 			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze 30"), CreatedAt: &github.Timestamp{Time: olderTime}},
-				{Body: github.Ptr("/snooze 0"), CreatedAt: &github.Timestamp{Time: recentTime}},
+				{Body: github.Ptr("/snooze for 30 days"), CreatedAt: &github.Timestamp{Time: olderTime}},
+				{Body: github.Ptr("/snooze for 0 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
 			},
 			expectSnoozed: false,
 		},

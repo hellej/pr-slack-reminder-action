@@ -16,19 +16,19 @@ import (
 )
 
 type MockGitHubClientOptions struct {
-	PRsByNumber                    map[int]*github.PullRequest
-	ErrByPRNumber                  map[int]error
-	PRs                            []*github.PullRequest
-	PRsByRepo                      map[string][]*github.PullRequest
-	ListPRsResponseStatus          int
-	ReviewsByPRNumber              map[int][]*github.PullRequestReview
-	CommentsByPRNumber             map[int][]*github.PullRequestComment
-	TimelineCommentsByPRNumber     map[int][]*github.IssueComment
-	PRServiceError                 error
-	IssueServiceError              error
-	MockStateForUpdateMode         *state.State
-	ListArtifactsError             error
-	DownloadArtifactError          error
+	PRsByNumber                map[int]*github.PullRequest
+	ErrByPRNumber              map[int]error
+	PRs                        []*github.PullRequest
+	PRsByRepo                  map[string][]*github.PullRequest
+	ListPRsResponseStatus      int
+	ReviewsByPRNumber          map[int][]*github.PullRequestReview
+	CommentsByPRNumber         map[int][]*github.PullRequestComment
+	TimelineCommentsByPRNumber map[int][]*github.IssueComment
+	PRServiceError             error
+	IssueServiceError          error
+	MockStateForUpdateMode     *state.State
+	ListArtifactsError         error
+	DownloadArtifactError      error
 }
 
 func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenForState string) githubclient.Client {

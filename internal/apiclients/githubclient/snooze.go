@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-github/v78/github"
 )
 
-var snoozeRegex = regexp.MustCompile(`(?i)^/?snooze(?:\s+pr[\s-]*reminder)?(?:\s+for)?\s+(\d+)\s*(d|days?)?$`)
+var snoozeRegex = regexp.MustCompile(`(?i)^/snooze(?:\s+pr[\s-]*reminder)?\s+for\s+(\d+)\s*(d|days?)$`)
 
 const maxSnoozeDays = 365
 
