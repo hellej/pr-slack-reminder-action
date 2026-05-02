@@ -11,6 +11,8 @@ import (
 
 var snoozeRegex = regexp.MustCompile(`(?i)^/?snooze(?:\s+pr[\s-]*reminder)?(?:\s+for)?\s+(\d+)\s*(d|days?)?$`)
 
+const maxSnoozeDays = 365
+
 func parseSnoozeComment(body string, createdAt time.Time) *time.Time {
 	matches := snoozeRegex.FindStringSubmatch(body)
 	if matches == nil {
@@ -20,6 +22,9 @@ func parseSnoozeComment(body string, createdAt time.Time) *time.Time {
 	days, err := strconv.Atoi(matches[1])
 	if err != nil {
 		return nil
+	}
+	if days > maxSnoozeDays {
+		days = maxSnoozeDays
 	}
 
 	expiration := createdAt.Add(time.Duration(days) * 24 * time.Hour)

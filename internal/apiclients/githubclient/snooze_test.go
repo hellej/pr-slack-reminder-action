@@ -80,6 +80,11 @@ func TestParseSnoozeComment(t *testing.T) {
 			body:     "/snooze   for   10   days",
 			expected: timePtr(baseTime.Add(10 * 24 * time.Hour)),
 		},
+		{
+			name:     "excessive days capped to 365",
+			body:     "/snooze 9999999",
+			expected: timePtr(baseTime.Add(365 * 24 * time.Hour)),
+		},
 	}
 
 	for _, tt := range tests {
