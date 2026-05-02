@@ -78,4 +78,8 @@ draft-release:
 	./create-draft-release.sh
 
 release-workflow:
-	./trigger-release-workflow.sh
+	./trigger-release-workflow.sh \
+		$(if $(SEMVER),--semver $(SEMVER)) \
+		$(if $(filter true,$(COMMIT_BINARY)),--commit-binary) \
+		$(if $(filter false,$(COMMIT_BINARY)),--no-commit-binary) \
+		$(if $(filter true,$(YES)),--yes)

@@ -1,6 +1,63 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Parse CLI flags for non-interactive mode
+SEMVER=""
+COMMIT_BINARY=""
+AUTO_YES=false
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --semver <patch|minor|major>  Version bump level"
+    echo "  --commit-binary               Commit built binary to repository"
+    echo "  --no-commit-binary            Do not commit built binary"
+    echo "  --yes                         Auto-confirm proceed prompts"
+    echo "  --help                        Show this help message"
+    echo ""
+    echo "With no options, runs interactively (prompts for all values)."
+    echo "Partial options are supported: only provided flags skip their prompts."
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --semver)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: --semver requires a value (patch, minor, or major)"
+                exit 1
+            fi
+            SEMVER="$2"
+            if [[ "$SEMVER" != "patch" && "$SEMVER" != "minor" && "$SEMVER" != "major" ]]; then
+                echo "Error: Invalid semver option '$SEMVER'. Must be 'patch', 'minor', or 'major'"
+                exit 1
+            fi
+            shift 2
+            ;;
+        --commit-binary)
+            COMMIT_BINARY="true"
+            shift
+            ;;
+        --no-commit-binary)
+            COMMIT_BINARY="false"
+            shift
+            ;;
+        --yes)
+            AUTO_YES=true
+            shift
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option '$1'"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
 if ! command -v gh &> /dev/null; then
     echo "Error: GitHub CLI (gh) is not installed"
     echo "Install it from: https://cli.github.com/"
@@ -80,33 +137,46 @@ else
     echo ""
     git --no-pager log "$LATEST_TAG..origin/main" --format="%ai %h %s (%an)"
     echo ""
-    read -p "Proceed with release? (y/n): " PROCEED
-    if [[ "$PROCEED" != "y" ]]; then
-        echo "Cancelled."
-        exit 0
+    if [[ "$AUTO_YES" == true ]]; then
+        echo "Proceeding (--yes)"
+    else
+        read -p "Proceed with release? (y/n): " PROCEED
+        if [[ "$PROCEED" != "y" ]]; then
+            echo "Cancelled."
+            exit 0
+        fi
     fi
 fi
 
-echo ""
-read -p "Select version bump (patch/minor/major) or 'exit' to cancel: " SEMVER
+if [[ -z "$SEMVER" ]]; then
+    echo ""
+    read -p "Select version bump (patch/minor/major) or 'exit' to cancel: " SEMVER
 
-if [[ -z "$SEMVER" || "$SEMVER" == "exit" ]]; then
-    echo "Cancelled."
-    exit 0
-fi
+    if [[ -z "$SEMVER" || "$SEMVER" == "exit" ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
 
-if [[ "$SEMVER" != "patch" && "$SEMVER" != "minor" && "$SEMVER" != "major" ]]; then
-    echo "Error: Invalid semver option. Must be 'patch', 'minor', or 'major'"
-    exit 1
-fi
-
-echo ""
-read -p "Commit the built binary to repository (for release)? (y/n): " COMMIT_BINARY_CHOICE
-
-if [[ "$COMMIT_BINARY_CHOICE" == "y" ]]; then
-    COMMIT_BINARY="true"
+    if [[ "$SEMVER" != "patch" && "$SEMVER" != "minor" && "$SEMVER" != "major" ]]; then
+        echo "Error: Invalid semver option. Must be 'patch', 'minor', or 'major'"
+        exit 1
+    fi
 else
-    COMMIT_BINARY="false"
+    echo ""
+    echo "Version bump: $SEMVER (from --semver flag)"
+fi
+
+if [[ -z "$COMMIT_BINARY" ]]; then
+    echo ""
+    read -p "Commit the built binary to repository (for release)? (y/n): " COMMIT_BINARY_CHOICE
+
+    if [[ "$COMMIT_BINARY_CHOICE" == "y" ]]; then
+        COMMIT_BINARY="true"
+    else
+        COMMIT_BINARY="false"
+    fi
+else
+    echo "Commit binary: $COMMIT_BINARY (from flag)"
 fi
 
 echo ""
