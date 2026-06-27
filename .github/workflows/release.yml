@@ -61,7 +61,8 @@ jobs:
       - name: Run E2E tests
         uses: ./.github/actions/e2e-tests
         with:
-          github-token: ${{ secrets.TEST_GITHUB_TOKEN }}
+          github-app-client-id: ${{ secrets.APP_CLIENT_ID }}
+          github-app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
           slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
 
   release:

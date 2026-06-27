@@ -2,8 +2,11 @@ name: 'Run E2E Tests'
 description: 'Run end-to-end tests using the built action'
 
 inputs:
-  github-token:
-    description: 'GitHub token for accessing repositories'
+  github-app-client-id:
+    description: 'GitHub App client ID'
+    required: true
+  github-app-private-key:
+    description: 'GitHub App private key'
     required: true
   slack-bot-token:
     description: 'Slack bot token for sending messages'
@@ -16,10 +19,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Generate GitHub App Token
+      id: app-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 #v3.2.0
+      with:
+        client-id: ${{ inputs.github-app-client-id }}
+        private-key: ${{ inputs.github-app-private-key }}
+
     - name: Basic run
       uses: ./
       with:
-        github-token: ${{ inputs.github-token }}
+        github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name }}
         github-user-slack-user-id-mapping: |
@@ -29,7 +39,7 @@ runs:
     - name: Multi-repository run
       uses: ./
       with:
-        github-token: ${{ inputs.github-token }}
+        github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name }}
         github-repositories: |
@@ -44,7 +54,7 @@ runs:
     - name: Run with filters
       uses: ./
       with:
-        github-token: ${{ inputs.github-token }}
+        github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name }}
         github-repositories: |
