@@ -25,6 +25,7 @@ runs:
       with:
         client-id: ${{ inputs.github-app-client-id }}
         private-key: ${{ inputs.github-app-private-key }}
+        owner: ${{ github.repository_owner }}
 
     - name: Basic run
       uses: ./
