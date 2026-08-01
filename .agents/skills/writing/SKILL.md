@@ -1,0 +1,16 @@
+---
+name: writing
+description: "Force the mandatory AGENTS.md output language style rules into context before writing text output. Use when: about to write a docstring, plan, or text written to a project file (docs, plans, skills, AGENTS.md), or the user runs /writing."
+argument-hint: "Optional: what you're about to write"
+---
+
+# Mandatory Output Style
+
+Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
+
+- Use plain, simple words. Keep answers short and direct
+- Prefer bullet points over prose
+- Avoid filler words
+- Avoid duplication and overlap with what's already said or written
+
+If a task was given as an argument to this skill, apply these rules to it now.
