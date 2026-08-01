@@ -2,7 +2,7 @@
 
 GitHub Action written in Go that fetches open PRs from GitHub repositories and sends or updates a Slack reminder listing them.
 
-## Skills
+## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
 
