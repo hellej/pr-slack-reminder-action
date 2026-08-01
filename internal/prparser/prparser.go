@@ -57,7 +57,7 @@ func (pr PR) IsClosedButNotMerged() bool {
 }
 
 func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return sortPRsByCreatedAt(utilities.Map(prs, getPRParser(config)))
+	return sortPRsOldestToNewest(utilities.Map(prs, getPRParser(config)))
 }
 
 func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {
@@ -85,12 +85,12 @@ func withSlackUserIds(
 	})
 }
 
-func sortPRsByCreatedAt(prs []PR) []PR {
+func sortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
 		if !a.GetCreatedAt().Time.Equal(b.GetCreatedAt().Time) {
-			return b.GetCreatedAt().Time.Compare(a.GetCreatedAt().Time)
+			return a.GetCreatedAt().Time.Compare(b.GetCreatedAt().Time)
 		}
-		return b.GetUpdatedAt().Time.Compare(a.GetUpdatedAt().Time)
+		return a.GetUpdatedAt().Time.Compare(b.GetUpdatedAt().Time)
 	})
 	return prs
 }
