@@ -38,7 +38,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 
 ### Prerequisites
 
-- Slack bot token with permissions to post messages
+- [Slack bot token](#-slack-bot-token-scopes) with permissions to post messages
 - [GitHub token](#-github-token-setup) with read access to your repositories
 
 ### Basic Usage Examples
@@ -136,7 +136,8 @@ jobs:
   send-or-update-pr-reminder:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      pull-requests: read
+      issues: read
       actions: read
     steps:
       - uses: hellej/pr-slack-reminder-action@v1
@@ -192,7 +193,30 @@ Both `filters` and `repository-filters` support:
 - **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
 - **Customize messages**: Make the reminders fit your team's culture
 
+## 💬 Slack Bot Token Scopes
+
+The bot token needs the scopes below. The bot must also be a member of the target channel to post to it.
+
+| Scope            | Required                                                  | Used for                                             |
+| ----------------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| `chat:write`       | ✅ Always                                                     | Sending, updating and deleting the reminder message     |
+| `channels:read`   | Only with `slack-channel-name` for a **public** channel     | Looking up the channel ID by name                       |
+| `groups:read`     | Only with `slack-channel-name` for a **private** channel    | Looking up the channel ID by name                        |
+
+💡 You can skip `channels:read`/`groups:read` entirely by using `slack-channel-id` instead of `slack-channel-name` - then only `chat:write` is needed.
+
 ## 🔑 GitHub Token Setup
+
+### Required Permissions
+
+If you're using the default `GITHUB_TOKEN`, grant these via the job's `permissions:` block (same permission names apply to GitHub App installations):
+
+```yaml
+permissions:
+  pull-requests: read # listing/fetching PRs, reviews and review comments
+  issues: read # reading PR comments (incl. /snooze comments)
+  actions: read # only needed for run-mode: update - downloading the previous run's state artifact
+```
 
 ### Option 1: Default Token (Single Repository)
 
