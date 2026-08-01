@@ -3,10 +3,11 @@
 date: 2026-08-01
 status: draft
 
-The "PR tracker canvas": a Slack canvas this action keeps updated with a live view of open + WIP PRs. Use this name in user-facing text (input description, README). Go code stays medium-named (`canvas*`, like `messagecontent`/`messagebuilder`) — no need to spell out "PR" internally.
+The "PR tracker canvas": a Slack canvas this action keeps updated with a live view of open + WIP PRs. Use this name in user-facing text (input description, README).
 
 ## Goals
 
+- Motivation: the reminder message is transient and drafts-free by design, and even GitHub itself has no single view of a team's open + WIP PRs (incl. their statuses/staleness/reviews) across multiple repos — the canvas fills both gaps with a persistent, on-demand, cross-repo view in Slack.
 - Optional feature: keep a Slack canvas continuously showing open PRs (oldest first) and draft/WIP PRs (most recent activity first).
 - Canvas always includes draft PRs (the main reminder message never does — unchanged).
 - Each PR row gets an activity-state indicator (circle): grey = stale (no commits in 48h), yellow = semi-active (no commits in 24h), green = active (commits in last 24h).
@@ -27,7 +28,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - `action.yml`: new optional input `pr-tracker-canvas-id` (string, no default). Empty/unset → feature off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
 - `githubclient`: fetching gains an explicit `PRFetchOptions{IncludeDrafts, FetchActivityTimestamps}` struct (zero value = today's behavior exactly). When set, drafts survive the fetch and each PR gets a `LastActivityAt *time.Time` from its head commit (one extra GitHub API call per PR — see Step 2).
 - `prparser`: `PR` gains an `ActivityState()` method (grey/yellow/green, based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
-- New `canvascontent` package (mirrors `messagecontent`): builds a canvas-ready `Content` — open PRs (oldest first, grouped/flat per `group-by-repository`) + draft PRs (always flat regardless of that input, most-recent-activity first, >2 months inactive excluded).
+- New `canvascontent` package (mirrors `messagecontent`; Go code stays medium-named, `canvas*`, no need to spell out "PR" internally): builds a canvas-ready `Content` — open PRs (oldest first, grouped/flat per `group-by-repository`) + draft PRs (always flat regardless of that input, most-recent-activity first, >2 months inactive excluded).
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
 - `slackclient`: gains a method that fully replaces a canvas's content by ID — one `canvases.edit` call, `replace` operation, `section_id` omitted.
 - `run.go`: after the existing post/update logic, if `pr-tracker-canvas-id` is set, runs one independent full PR fetch (open + draft, both run modes) and overwrites the canvas. Failures are logged as warnings, not fatal — same pattern already used for `DeleteMessage` failures in `run.go` — so a canvas hiccup can't take down the core reminder message.
@@ -107,7 +108,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 ### 5. `canvasbuilder` package
 
 - Renders `canvascontent.Content` to a Slack canvas markdown string (`slack.DocumentContent{Type: "markdown", ...}`), reusing the R3 display-text helpers.
-- Prefixes each PR row with an activity-state circle derived from `PR.ActivityState()`.
+- Each PR row (open or draft) shows the same fields as its message counterpart — linked title, age text with the old-PR warning marker, author, reviewers, merged/closed marker — with only one addition: an activity-state circle prefix derived from `PR.ActivityState()`.
 - Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
 
 ### 6. `slackclient`: full canvas content replace

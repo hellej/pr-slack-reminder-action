@@ -27,7 +27,7 @@ Before drafting an implementation plan, read:
 
 ## Structure
 
-1. Requirements/goals/non-goals — a short bullet list, or a reference to another document that already states them
+1. Requirements/goals/non-goals — a short bullet list, or a reference to another document that already states them, incl. motivation for the change (what problem this solves and for whom), if not obvious from the requirements
 2. The target shape: the resulting architecture/feature, if not already fully covered by the requirements. Always call out changes to action inputs (`action.yml`) here, and any new/changed required permissions (GitHub token permissions, third-party OAuth scopes) here too
 3. Whether the change is breaking or non-breaking, per the [release skill](../release/SKILL.md)'s semver table (patch/minor/major)
 4. A short summary listing the steps
