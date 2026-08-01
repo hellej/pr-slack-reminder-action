@@ -2,9 +2,22 @@
 
 GitHub Action written in Go that fetches open PRs from GitHub repositories and sends or updates a Slack reminder listing them.
 
+## Output Style
+
+Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
+
+- Use plain, simple words. Keep answers short and direct
+- Prefer bullet points over prose
+- Avoid filler words
+- Avoid duplication and overlap with what's already said or written
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
+
+## Git
+
+- Never amend commits or force push
 
 ## Code Style
 
@@ -31,14 +44,15 @@ GitHub Action written in Go that fetches open PRs from GitHub repositories and s
 
 ## Architecture
 
-Data pipeline with 6 stages:
+Two run modes (`run-mode` input) drive the pipeline: **post** sends a new reminder and saves state; **update** loads state, re-fetches those PRs, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
 3. **PR Parser** (`internal/prparser/`) — enriches PRs with Slack user mappings and metadata
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
-6. **Slack Client** (`internal/apiclients/slackclient/`) — sends messages
+6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages
+7. **State** (`internal/state/`) — persists PR refs and the Slack message ref after `post`; loaded from a GitHub Actions artifact in `update` mode
 
 ## Key Patterns
 
@@ -52,7 +66,7 @@ Data pipeline with 6 stages:
 
 - Multiple repositories supported via `config.Repositories` slice of `Repository` structs (`config.InputGithubRepositories`)
 - If `config.InputGithubRepositories` is set, `config.EnvGithubRepository` is ignored
-- Repository filters are mapped by repository name (not full path)
+- Repository filters are matched by full path (`owner/repo`) first, falling back to bare repository name
 - Each PR maintains its `Repository` field for context throughout the pipeline
 
 ### Error Handling
