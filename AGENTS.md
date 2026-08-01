@@ -15,6 +15,13 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
 
+## Package Specs
+
+- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities — read it before reading the package's source
+- Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
+- Update a package's spec file whenever its behaviour changes, in the same change
+- A `git commit` with staged `internal/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
+
 ## Git
 
 - Never amend commits or force push
