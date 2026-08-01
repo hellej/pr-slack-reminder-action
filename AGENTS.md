@@ -22,7 +22,6 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 ## Code Style
 
 - Use descriptive naming instead of explanatory comments (exception: complex algorithms or non-obvious business logic)
-- Return errors instead of panicking
 - Use `errors.Join()` for combining multiple errors
 
 ## Testing
@@ -72,7 +71,6 @@ Two run modes (`run-mode` input) drive the pipeline: **post** sends a new remind
 ### Error Handling
 
 - Filters validate mutual exclusivity (e.g., can't use both `authors` and `ignored-authors`)
-- Missing required inputs fail fast with descriptive error messages
 
 ### Slack Message Construction
 
