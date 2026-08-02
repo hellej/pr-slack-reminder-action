@@ -1,18 +1,37 @@
 # PR tracker canvas
 
-date: 2026-08-01
+date: 2026-08-02
 status: draft
 
 The "PR tracker canvas": a Slack canvas this action keeps updated with a live view of open + WIP PRs. Use this name in user-facing text (input description, README).
 
 ## Goals
 
-- Motivation: the reminder message is transient and drafts-free by design, and even GitHub itself has no single view of a team's open + WIP PRs (incl. their statuses/staleness/reviews) across multiple repos — the canvas fills both gaps with a persistent, on-demand, cross-repo view in Slack.
+- Motivation: the reminder message is transient and drafts-free by design, and even GitHub itself has no single "live" view of a team's open + WIP PRs (incl. their statuses/staleness/reviews) across multiple repos — the canvas fills both gaps with a persistent, on-demand, cross-repo view in Slack.
 - Optional feature: keep a Slack canvas continuously showing open PRs (oldest first) and draft/WIP PRs (most recent activity first).
 - Canvas always includes draft PRs (the main reminder message never does — unchanged).
-- Each PR row gets an activity-state indicator (circle): grey = stale (no commits in 48h), yellow = semi-active (no commits in 24h), green = active (commits in last 24h).
+- Open PR rows render exactly like the reminder message's rows.
+- WIP rows show last-push activity instead of age: drafts are ordered by activity, as the last push predicts which draft gets opened for review next better than its age does.
 - Draft PRs inactive for more than 2 months are excluded by default.
 - One new input, off by default, no other new configurability.
+
+### Canvas content format
+
+**Open PRs**
+
+- **Update CI workflow for faster Go builds** 🚨 `4 days old` by @José (✅ yzma, chaca)
+- **Revise onboarding guide in README** _2 days ago_ by @PR bot (✅ kronk)
+- **Implement feature flag system for UI** _19 hours ago_ by @José (✅ hellej / 💬 alice, bob)
+
+**Work in Progress**
+
+- **Spike: replace mux with chi** by @José `updated 2 hours ago`
+- **Refactor state store** by @kronk (💬 alice) `idle 3 days` 💤
+- **Prototype canvas rendering** by @alice `idle 12 days` 💤
+
+A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle for +48h. Chip wording: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above. Never the 🚨 old-PR marker — it nags about review latency, which doesn't apply to work nobody has been asked to review yet.
+
+"updated" is reader-facing wording only: the chip is always backed by the head commit's committer date (Step 2), never GitHub's `updated_at`, which also moves on comments and labels. Don't "fix" the mismatch by switching the data source.
 
 ## Non-goals
 
@@ -27,7 +46,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 
 - `action.yml`: new optional input `pr-tracker-canvas-id` (string, no default). Empty/unset → feature off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
 - `githubclient`: fetching gains an explicit `PRFetchOptions{IncludeDrafts, FetchActivityTimestamps}` struct (zero value = today's behavior exactly). When set, drafts survive the fetch and each PR gets a `LastActivityAt *time.Time` from its head commit (one extra GitHub API call per PR — see Step 2).
-- `prparser`: `PR` gains an `ActivityState()` method (grey/yellow/green, based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
+- `prparser`: `PR` gains activity display helpers (based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
 - New `canvascontent` package (mirrors `messagecontent`; Go code stays medium-named, `canvas*`, no need to spell out "PR" internally): builds a canvas-ready `Content` — open PRs (oldest first, grouped/flat per `group-by-repository`) + draft PRs (always flat regardless of that input, most-recent-activity first, >2 months inactive excluded).
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
 - `slackclient`: gains a method that fully replaces a canvas's content by ID — one `canvases.edit` call, `replace` operation, `section_id` omitted.
@@ -45,7 +64,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - R3. Refactor: extract medium-agnostic PR display text out of `messagebuilder` (closes two test-coverage gaps)
 1. `action.yml` + `config`: add the new input
 2. `githubclient`: add last-activity (head commit) lookup
-3. `prparser`: add activity state + most-recent-activity sort
+3. `prparser`: add activity text + most-recent-activity sort
 4. `canvascontent`: build canvas content
 5. `canvasbuilder`: render canvas content to markdown
 6. `slackclient`: fully replace canvas content by ID
@@ -72,7 +91,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Extract from `messagebuilder` into methods on `prparser.PR` (or a small shared helper file), as plain strings/booleans instead of `slack.RichTextSectionElement`s:
   - author display: Slack mention (`<@ID>`) if mapped, else GitHub name
   - reviewers summary text (✅/💬 grouping of approvers/commenters)
-  - age text, including the old-PR warning marker vs. plain "N ago"
+  - age text, including the old-PR warning marker vs. plain "N ago" — used by open PR rows only; the WIP section must not call it (see Goals)
   - closed-but-not-merged / merged markers
 - Test coverage gaps found in `messagebuilder_test.go`, both worth closing before extracting so a regression in either path is actually caught:
   - the old-PR warning-marker path (`IsOldPR: true` → 🚨 + bold/code age text) has no test at all today
@@ -94,9 +113,10 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Update `testhelpers/mockgithubclient` with a mock Git service.
 - The new `contents: read` GitHub permission is confirmed: the endpoint's docs page states "Get a commit object" requires the "Contents" repository permission (read).
 
-### 3. `prparser`: activity state + activity sort
+### 3. `prparser`: activity text + activity sort
 
-- Add an `ActivityState` type (`Stale`, `SemiActive`, `Active`) and `PR.ActivityState() ActivityState`, derived from `LastActivityAt` using hardcoded 48h/24h thresholds. Undefined/zero state if `LastActivityAt` is nil.
+- Add `PR.GetActivityText() string`, derived from `LastActivityAt`, reusing `GetPRAgeText`'s minutes/hours/days magnitude: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above. Empty string if `LastActivityAt` is nil.
+- Add `PR.IsIdle() bool`: true when `LastActivityAt` is older than a hardcoded 48h. False if `LastActivityAt` is nil.
 - Add an exported sort (most-recent-activity first) for use by the draft section, distinct from `ParsePRs`'s existing oldest-first sort.
 
 ### 4. `canvascontent` package
@@ -108,7 +128,9 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 ### 5. `canvasbuilder` package
 
 - Renders `canvascontent.Content` to a Slack canvas markdown string (`slack.DocumentContent{Type: "markdown", ...}`), reusing the R3 display-text helpers.
-- Each PR row (open or draft) shows the same fields as its message counterpart — linked title, age text with the old-PR warning marker, author, reviewers, merged/closed marker — with only one addition: an activity-state circle prefix derived from `PR.ActivityState()`.
+- Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `[label](url)`, `~~strike~~`, backtick code spans, `#`-`###` headings, `-` bullets, and `<@ID>` for user mentions. Bold, italic, strikethrough, code span, headings h1-h3, bulleted lists and inline links are all confirmed supported ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)).
+- Open PR rows: identical fields to the message — linked title (struck through if closed-but-not-merged), age text with the old-PR warning marker, author, reviewers, merged marker.
+- WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals).
 - Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
 
 ### 6. `slackclient`: full canvas content replace
