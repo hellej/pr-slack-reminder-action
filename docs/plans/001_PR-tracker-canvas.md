@@ -14,6 +14,8 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - WIP rows show last-push activity instead of age: drafts are ordered by activity, as the last push predicts which draft gets opened for review next better than its age does.
 - Draft PRs inactive for more than 2 months are excluded by default.
 - One new input, off by default, no other new configurability.
+- The input takes the canvas link the user copies from Slack; the action parses the ID out of it.
+- The reminder message links to the canvas, so the transient message is a way in to the persistent view.
 
 ### Canvas content format
 
@@ -36,23 +38,24 @@ A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle 
 ## Non-goals
 
 - Configurable thresholds (activity windows, draft staleness) — hardcoded for now.
-- Auto-creating or discovering a canvas — the user creates it themselves in Slack and provides its ID; the action never creates, deletes, or looks one up by channel.
-- Linking to the canvas from the reminder message — there's no scope-free, officially documented way to get a stable canvas URL (see Step 6); skipped for v1.
+- Auto-creating or discovering a canvas — the user creates it themselves in Slack and pastes its link; the action never creates, deletes, or looks one up by channel.
 - Splitting canvas content if it exceeds Slack's canvas size limits.
 - Persisting canvas identity in `state` — the ID is supplied fresh via input every run, nothing to persist.
 - A "no PRs" message input for the canvas (a fixed fallback string is used instead).
 
 ## Target shape
 
-- `action.yml`: new optional input `pr-tracker-canvas-id` (string, no default). Empty/unset → feature off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
+- `action.yml`: new optional input `pr-tracker-canvas-link` (string, no default). Empty/unset → feature off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
+- `config`: parses the link once into a canvas ID + canvas URL, so no other package parses it again. Both are always known when the feature is on.
 - `githubclient`: fetching gains an explicit `PRFetchOptions{IncludeDrafts, FetchActivityTimestamps}` struct (zero value = today's behavior exactly). When set, drafts survive the fetch and each PR gets a `LastActivityAt *time.Time` from its head commit (one extra GitHub API call per PR — see Step 2).
 - `prparser`: `PR` gains activity display helpers (based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
 - New `canvascontent` package (mirrors `messagecontent`; Go code stays medium-named, `canvas*`, no need to spell out "PR" internally): builds a canvas-ready `Content` — open PRs (oldest first, grouped/flat per `group-by-repository`) + draft PRs (always flat regardless of that input, most-recent-activity first, >2 months inactive excluded).
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
+- `messagecontent`/`messagebuilder`: the reminder message gains a trailing canvas link row whenever the feature is on.
 - `slackclient`: gains a method that fully replaces a canvas's content by ID — one `canvases.edit` call, `replace` operation, `section_id` omitted.
-- `run.go`: after the existing post/update logic, if `pr-tracker-canvas-id` is set, runs one independent full PR fetch (open + draft, both run modes) and overwrites the canvas. Failures are logged as warnings, not fatal — same pattern already used for `DeleteMessage` failures in `run.go` — so a canvas hiccup can't take down the core reminder message.
+- `run.go`: after the existing post/update logic, if `pr-tracker-canvas-link` is set, runs one independent full PR fetch (open + draft, both run modes) and overwrites the canvas. Failures are logged as warnings, not fatal — same pattern already used for `DeleteMessage` failures in `run.go` — so a canvas hiccup can't take down the core reminder message.
 - Permissions:
-  - Slack: one new scope, `canvases:write` (canvas-only). On top of it, a one-time manual step — the user shares the canvas with the bot (see Step 6), since the scope alone doesn't grant write access to a specific canvas.
+  - Slack: one new scope, `canvases:write` (canvas-only). On top of it, a one-time manual step — the user creates the canvas as a tab in the reminder channel (see Step 6), since the scope alone doesn't grant write access to a specific canvas.
   - GitHub: no change. The activity lookup runs on `pull-requests: read`, already required.
 
 ## Breaking change classification
@@ -64,15 +67,16 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - R1. Refactor: make draft-exclusion in `githubclient` explicit and optional instead of hardcoded
 - R2. Refactor: extract repository-grouping into a shared, reusable helper (closes a test-coverage gap)
 - R3. Refactor: extract medium-agnostic PR display text out of `messagebuilder` (closes two test-coverage gaps)
-1. `action.yml` + `config`: add the new input
+1. `action.yml` + `config`: add the new input, parse link → ID + URL
 2. `githubclient`: add last-activity (head commit) lookup
 3. `prparser`: add activity text + most-recent-activity sort
 4. `canvascontent`: build canvas content
 5. `canvasbuilder`: render canvas content to markdown
 6. `slackclient`: fully replace canvas content by ID
 7. `run.go`: wire up the canvas refresh
-8. Docs & permissions: README, `pr-reminder.yml`, `e2e-tests/action.yml`
-9. Spec sync
+8. Reminder message: link to the canvas
+9. Docs & permissions: README, `pr-reminder.yml`, `e2e-tests/action.yml`
+10. Spec sync
 
 ## Steps
 
@@ -100,10 +104,15 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
   - the author-fallback path (no mapped `SlackUserID` → GitHub display name instead of a mention) has no test at all today
 - `messagebuilder` wraps the extracted plain strings in its Block Kit elements; behavior and existing tests unchanged. This lets `canvasbuilder` (Step 5) reuse the exact same text instead of re-deriving it.
 
-### 1. New input: `pr-tracker-canvas-id`
+### 1. New input: `pr-tracker-canvas-link`
 
-- `action.yml`: add optional string input, no default. Description states the intent plainly, e.g. "ID of a Slack canvas to keep updated with a live tracker of open and work-in-progress pull requests. Leave empty to disable (default)."
-- `internal/config/config.go`: add constant `InputPRTrackerCanvasID`, parse via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID string`.
+- `action.yml`: add optional string input, no default. Description states the intent plainly, e.g. "Link to a Slack canvas to keep updated with a live tracker of open and work-in-progress pull requests. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default)."
+- `internal/config/config.go`: add constant `InputPRTrackerCanvasLink`, read via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID` and `Config.PRTrackerCanvasURL`, both empty when the input is unset.
+- Link shape, confirmed against a real channel canvas: `https://<workspace>.slack.com/docs/<TEAM_ID>/<CANVAS_ID>`, e.g. `https://hellej.slack.com/docs/T08SLKDVNB2B/F0BMEBEXVR1DL`.
+- Parse: `url.Parse`, then the last non-empty path segment, which must match `^F[A-Z0-9]+$`. No length bound — real IDs already run to 13 characters. Reading `URL.Path` drops query params for free.
+  - `PRTrackerCanvasURL` is the input string as given, never rebuilt.
+  - A non-empty input that doesn't parse is a hard config error, joined like the other input validation. A typo would otherwise mean a silently missing canvas. The message names the expected shape and the Copy link path.
+- Test cases: the real link above, trailing slash, query params, `http`, an unrelated URL, a bare `F…` ID, empty (feature off).
 - `testhelpers/confighelpers.go`: mirror the new input.
 - `go run .github/scripts/check_inputs.go` must still pass.
 
@@ -147,29 +156,44 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Add `Client.ReplaceCanvasContent(canvasID, markdown string) error`: one `EditCanvas` call (`EditCanvasParams{CanvasID, Changes: []CanvasChange{{Operation: "replace", DocumentContent: ...}}}` — confirmed struct shape in `slack-go/slack` v0.27.0's `canvas.go`), `SectionID` left at its zero value (`""`, omitted on the wire via `omitempty`), `DocumentContent{Type: "markdown", Markdown: markdown}`. Confirmed via [Slack's `canvases.edit` docs](https://docs.slack.dev/reference/methods/canvases.edit/#content-operations): omitting `section_id` on a `replace` operation replaces the entire canvas in one call, and the method needs only the `canvases:write` scope.
 - Add mock support in `testhelpers/mockslackclient`.
 - Log the canvas ID and markdown length before the call, confirm on success — matching `SendMessage`/`UpdateMessage`. The length is the only clue if content hits Slack's canvas size limit.
-- **Scope alone isn't sufficient**: canvases have their own access control (read/write/owner), separate from OAuth scopes ([`canvases.access.set` docs](https://docs.slack.dev/reference/methods/canvases.access.set)). Since the user creates the canvas as themselves, the bot has no access to it by default and `canvases.edit` will fail until the user explicitly shares the canvas with the bot (e.g. sharing it into a channel the bot's already a member of). Document this as a required manual setup step (Step 8) — it can't be automated by the action itself.
+- **Scope alone isn't sufficient**: canvases have their own access control (read/write/owner), separate from OAuth scopes ([`canvases.access.set` docs](https://docs.slack.dev/reference/methods/canvases.access.set)). The user creates the canvas as themselves, so the bot has no access by default and `canvases.edit` fails until the canvas is shared with it.
+- **Intended setup**: create the canvas as a tab in the reminder channel itself. A channel canvas needs no sharing step — per [`conversations.canvases.create` docs](https://docs.slack.dev/reference/methods/conversations.canvases.create/), "there are no access implications nor is it necessary to share a channel canvas to grant access. Access is tied to channel access", and [Slack's help article](https://slack.com/help/articles/21290478840979-Feature-change-notice--Channel-canvases) sets edit access by "a member's permission to post in the channel". The bot already posts the reminder there, so it clears that bar by construction. Neither source names apps explicitly — if `canvases.edit` returns `access_denied`/`canvas_not_found` on the first run, fall back to sharing the canvas with the bot.
+- Also in favour of a channel canvas: `canvases.edit` lists `free_teams_cannot_edit_standalone_canvases`, so standalone canvases are a dead end on free workspaces.
+- Document the channel-tab path as *the* setup (Step 9), not one option among several. It can't be automated by the action either way.
 
 ### 7. `run.go`: wire up the canvas refresh
 
 - `Run()` currently returns directly from inside the `RunMode` switch (`return runPostMode(...)` / `return runUpdateMode(...)`), so there's no code path "after" it today. Restructure to capture the switch's result in an `err` variable; if `err != nil`, return it unchanged (unaffected by this feature); otherwise, if `cfg.PRTrackerCanvasID != ""`, run the canvas refresh step before returning `nil`. This means the canvas only refreshes after a successful post/update — a failed primary run keeps failing the same way it does today, and doesn't attempt a canvas write.
 - Canvas refresh step: `FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository, PRFetchOptions{IncludeDrafts: true, FetchActivityTimestamps: true})`, then `canvascontent`/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
 - This always does a fresh full fetch, independent of `update` mode's targeted `GetPRs` (state-tracked refs) — the canvas reflects current reality, not a previously-sent PR set.
-- Log and continue (don't fail the run) if this step errors. The warning names the canvas-sharing requirement (Step 6) as the likely cause — the run still exits 0, so it's the user's only signal.
+- Log and continue (don't fail the run) if this step errors. The warning names the bot's canvas access (Step 6) as the likely cause — the run still exits 0, so it's the user's only signal.
 
-### 8. Docs & permissions
+### 8. Reminder message: link to the canvas
 
-- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up — create a canvas in Slack, share it with the bot (required, see Step 6), copy its ID into `pr-tracker-canvas-id`. Add `canvases:write` to the Slack scope table (canvas-only). The GitHub permissions block stays as is.
+- `messagecontent.Content` gains `CanvasURL string`, filled from `cfg.PRTrackerCanvasURL`. Empty → nothing changes anywhere, so existing tests stay untouched.
+- `messagebuilder.BuildMessage` appends a trailing context block, `<URL|📋 PR tracker canvas>` — a context block, not rich text, so it reads as a subdued footer rather than another list row. The label matches the feature name in the README.
+- Append it **after** `limitMaximumMessageSize`, not before: that function truncates at 50 blocks, and a link appended earlier would be the first thing dropped on a large message. Bump the constant's budget by one in its comment.
+- Add it on the no-PRs path too. That path is exactly when the link earns its place — no open PRs to report, but the canvas may still hold WIP work.
+- The link is rendered optimistically, before the canvas refresh runs (Step 7). It stays correct either way: the canvas is the user's and exists whether or not our write succeeded.
+- No preview card: add `slack.MsgOptionDisableLinkUnfurl()` and `slack.MsgOptionDisableMediaUnfurl()` to `PostMessage` and `UpdateMessage` in `slackclient`, neither of which sets an unfurl option today. A `slack.com` link is exactly what Slack expands into a card, and the card would dwarf the one-line footer. Set both: bot tokens default `unfurl_links` to false but `unfurl_media` to true.
+- Existing messages are unaffected — PR titles are links inside rich text blocks, which Slack never unfurls.
+- Tests: link present in the grouped, flat and no-PRs cases; absent when `CanvasURL` is empty; surviving a message that hits the block limit; both unfurl options passed on post and update.
+
+### 9. Docs & permissions
+
+- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up — add a canvas tab to the reminder channel, then ⋮ → Copy link and paste it into `pr-tracker-canvas-link`. State the access requirement behind it (Step 6), so a canvas kept elsewhere can still be made to work. Add `canvases:write` to the Slack scope table (canvas-only). The GitHub permissions block stays as is.
+- Mention that the reminder message then carries a footer link to the canvas (Step 8).
 - Document the new input in the inputs table.
 - Exercise both the on and off paths end to end. No workflow-permission change needed.
-  - `.github/workflows/pr-reminder.yml`: set `pr-tracker-canvas-id`, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
+  - `.github/workflows/pr-reminder.yml`: set `pr-tracker-canvas-link`, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
   - `.github/actions/e2e-tests/action.yml`: set it on the "Run with filters" step only — the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
   - Leave it unset on the "Basic run" and "Multi-repository run" steps, so every release also verifies the action still behaves exactly as before when the input is absent.
-  - The ID goes in as a plain literal, like `slack-channel-name` — it isn't a secret.
-- Manual prerequisites, not automatable here: grant `canvases:write` to the Slack app/bot token these workflows use, then create the canvas and share it with the bot to get an ID.
+  - The link goes in as a plain literal, like `slack-channel-name` — it isn't a secret, though it does carry the workspace name and team ID.
+- Manual prerequisites, not automatable here: grant `canvases:write` to the Slack app/bot token these workflows use, then add the canvas tab to the channel.
 
-### 9. Spec sync
+### 10. Spec sync
 
-- Update `githubclient.spec.md`, `slackclient.spec.md`, `prparser.spec.md`, `config.spec.md` for the changes above.
+- Update `githubclient.spec.md`, `slackclient.spec.md`, `prparser.spec.md`, `config.spec.md`, `messagecontent.spec.md`, `messagebuilder.spec.md` for the changes above.
 - Add `canvascontent.spec.md` and `canvasbuilder.spec.md`.
 
 ## Consequences
@@ -178,16 +202,17 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - An always-current PR/WIP view lives directly in Slack, with no need to open GitHub.
 - Draft/WIP visibility, absent from the main reminder message by design, becomes available to whoever wants it.
+- Every scheduled reminder carries a footer link into the canvas, so the transient message becomes the entry point to the persistent view — at no extra scope, since the user supplies the URL.
 - Fully additive and off by default: existing users see zero behavior change (zero-value fetch options, early-exit in `run.go`).
 - The R1-R3 refactors close pre-existing test-coverage gaps (draft filter, repository grouping, old-PR/author-fallback display paths) independent of whether the canvas feature itself is used.
 
 ### Negative
 
 - Opted-in runs make one extra GitHub API call per PR (commit lookup for activity), adding to rate-limit consumption.
-- Canvas access can't be granted by the action itself — the user must manually share the canvas with the bot in Slack, a step that's easy to miss and only surfaces as a silent warning log on failure.
+- Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing — easy to miss, and it only surfaces as a warning log on failure.
 - Two new packages (`canvascontent`, `canvasbuilder`) largely mirror existing ones (`messagecontent`, `messagebuilder`), adding maintenance surface for a feature many users won't enable.
 
 ### Neutral
 
-- No canvas URL is linked from the reminder message; users find the canvas in Slack themselves (see Non-goals).
 - Activity and draft-staleness thresholds are hardcoded, not configurable, in v1.
+- Link unfurling is now explicitly disabled for the reminder message. No visible change today, but any future link in the message won't preview either.
