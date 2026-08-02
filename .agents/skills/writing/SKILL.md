@@ -6,8 +6,6 @@ argument-hint: "Optional: what you're about to write"
 
 # Mandatory Output Style
 
-Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
-
 Read `AGENTS.md` § Output Style now and apply it. The rules and before/after examples live there so the two copies can't drift apart.
 
 Then re-read what you just wrote and cut every line those examples would reject.
