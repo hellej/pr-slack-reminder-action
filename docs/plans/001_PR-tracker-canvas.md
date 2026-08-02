@@ -89,10 +89,10 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 ### R3. Refactor: shared PR display text
 
 - Extract from `messagebuilder` into methods on `prparser.PR` (or a small shared helper file), as plain strings/booleans instead of `slack.RichTextSectionElement`s:
-  - author display: Slack mention (`<@ID>`) if mapped, else GitHub name
   - reviewers summary text (✅/💬 grouping of approvers/commenters)
   - age text, including the old-PR warning marker vs. plain "N ago" — used by open PR rows only; the WIP section must not call it (see Goals)
   - closed-but-not-merged / merged markers
+- Author display is not extracted: `pr.Author.SlackUserID` and `pr.Author.GetGitHubName()` are already exported, and the mention format itself differs per medium (`<@ID>` for Block Kit, `![](@ID)` for canvas markdown — see Step 5), so each builder wraps them directly.
 - Test coverage gaps found in `messagebuilder_test.go`, both worth closing before extracting so a regression in either path is actually caught:
   - the old-PR warning-marker path (`IsOldPR: true` → 🚨 + bold/code age text) has no test at all today
   - the author-fallback path (no mapped `SlackUserID` → GitHub display name instead of a mention) has no test at all today
@@ -128,7 +128,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 ### 5. `canvasbuilder` package
 
 - Renders `canvascontent.Content` to a Slack canvas markdown string (`slack.DocumentContent{Type: "markdown", ...}`), reusing the R3 display-text helpers.
-- Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `[label](url)`, `~~strike~~`, backtick code spans, `#`-`###` headings, `-` bullets, and `<@ID>` for user mentions. Bold, italic, strikethrough, code span, headings h1-h3, bulleted lists and inline links are all confirmed supported ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)).
+- Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `[label](url)`, `~~strike~~`, backtick code spans, `#`-`###` headings, `-` bullets — all confirmed supported ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)). User mentions use canvas-specific syntax, `![](@USERID)`, not Block Kit's `<@ID>`; `canvasbuilder` wraps `pr.Author.SlackUserID`/`GetGitHubName()` in this format itself (see R3).
 - Open PR rows: identical fields to the message — linked title (struck through if closed-but-not-merged), age text with the old-PR warning marker, author, reviewers, merged marker.
 - WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals).
 - Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
