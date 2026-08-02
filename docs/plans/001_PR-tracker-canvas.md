@@ -31,7 +31,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 
 A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle for +48h. Chip wording: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above. Never the 🚨 old-PR marker — it nags about review latency, which doesn't apply to work nobody has been asked to review yet.
 
-"updated" is reader-facing wording only: the chip is always backed by the head commit's committer date (Step 2), never GitHub's `updated_at`, which also moves on comments and labels. Don't "fix" the mismatch by switching the data source.
+"updated" is reader-facing wording only: the chip is backed by the head commit's committer date (Step 2), not GitHub's `updated_at`, which also moves on comments and labels. Don't "fix" the mismatch by switching the data source. `updated_at` serves only as a fallback when the head commit can't be fetched (Step 2).
 
 ## Non-goals
 
@@ -51,7 +51,9 @@ A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle 
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
 - `slackclient`: gains a method that fully replaces a canvas's content by ID — one `canvases.edit` call, `replace` operation, `section_id` omitted.
 - `run.go`: after the existing post/update logic, if `pr-tracker-canvas-id` is set, runs one independent full PR fetch (open + draft, both run modes) and overwrites the canvas. Failures are logged as warnings, not fatal — same pattern already used for `DeleteMessage` failures in `run.go` — so a canvas hiccup can't take down the core reminder message.
-- Permissions: needs `canvases:write` (Slack, new) and `contents: read` (GitHub, new), both canvas-only. Also needs a one-time manual step in Slack: sharing the canvas with the bot (see Step 6) — the scope alone doesn't grant write access to a specific canvas.
+- Permissions:
+  - Slack: one new scope, `canvases:write` (canvas-only). On top of it, a one-time manual step — the user shares the canvas with the bot (see Step 6), since the scope alone doesn't grant write access to a specific canvas.
+  - GitHub: no change. The activity lookup runs on `pull-requests: read`, already required.
 
 ## Breaking change classification
 
@@ -107,11 +109,16 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 ### 2. `githubclient`: last-activity lookup
 
-- Add `GithubGitDataService` interface wrapping `GetCommit(ctx, owner, repo, sha) (*github.Commit, *github.Response, error)` — matches `(*github.GitService).GetCommit` in `go-github/v78` exactly ([Git Data API, "Get a commit"](https://docs.github.com/en/rest/git/commits?apiVersion=2022-11-28#get-a-commit)); wire into `client`, `NewClient`, `GetAuthenticatedClient` (pass `ghClient.Git`). Use the commit's `committer.date`.
-- Add `PRFetchOptions.FetchActivityTimestamps bool`. When set, `addReviewerInfoToPRs`'s per-PR fan-out gets a 4th concurrent call alongside the existing three (reviews, comments, timeline comments): fetch the commit at `pr.Head.SHA` and record its committer date — the true last-push time, unlike `updated_at` (which also changes on comments, labels, etc.).
-- Add `PR.LastActivityAt *time.Time` (nil when not fetched, or on lookup failure — treat like the existing "partial failure" pattern for reviews/comments: don't fail the whole PR).
-- Update `testhelpers/mockgithubclient` with a mock Git service.
-- The new `contents: read` GitHub permission is confirmed: the endpoint's docs page states "Get a commit object" requires the "Contents" repository permission (read).
+- Add `ListCommits(ctx, owner, repo string, number int, opts *github.ListOptions) ([]*github.RepositoryCommit, *github.Response, error)` to the existing `GithubPullRequestsService` interface — matches `(*github.PullRequestsService).ListCommits` in `go-github/v78` exactly. No new service to wire in: `client`, `NewClient` and `GetAuthenticatedClient` are unchanged.
+- No new GitHub permission: [the endpoint's docs](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-commits-on-a-pull-request) state it needs `"Pull requests" repository permissions (read)`, which the action already requires.
+- Add `PRFetchOptions.FetchActivityTimestamps bool`. When set, `addReviewerInfoToPRs`'s per-PR fan-out gets a 4th concurrent call alongside the existing three (reviews, comments, timeline comments): resolve the PR's newest commit and record its `commit.committer.date` — the true last-push time, unlike `updated_at` (which also changes on comments, labels, etc.). Add the resolved timestamp to `models.go`'s existing per-PR "Found %d reviews, %d PR comments…" line rather than logging a new one per PR.
+- Resolution, one call per PR:
+  - `ListCommits` with `ListOptions{PerPage: 100}`. If `response.NextPage != 0` (over 100 commits), refetch at `response.LastPage`.
+  - Take that page's last element: the endpoint returns commits oldest first, head commit last (verified on PRs of 2-79 commits across four repositories).
+  - Confirm its SHA equals `pr.Head.SHA`, since the order isn't documented and the endpoint caps at 250 commits (above which the head commit is never returned).
+  - Fall back to `pr.GetUpdatedAt()`, already on the fetched PR, whenever the head commit can't be pinned down: SHA mismatch, a failed or empty `ListCommits` call. It overstates freshness, but it's an upper bound on the last push, so a busy long-lived draft never drops off the canvas via the staleness rule. Log a warning naming the repository, PR number and reason, then carry on — the existing "partial failure" pattern for reviews/comments (`models.go`'s "Unable to fetch reviews/comments for PR #%d"), never failing the whole PR.
+- Add `PR.LastActivityAt *time.Time`, nil only when `FetchActivityTimestamps` is off.
+- Extend `testhelpers/mockgithubclient`'s `mockPullRequestService` with `ListCommits`.
 
 ### 3. `prparser`: activity text + activity sort
 
@@ -124,6 +131,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Mirrors `messagecontent.GetContent`'s shape but for canvas: takes all fetched PRs (open + draft) and content inputs, and produces open-PR content (oldest first, grouped/flat per `group-by-repository`, via the R2 helper) plus draft-PR content (always flat, most-recent-activity first, regardless of `group-by-repository`).
 - Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (2 months / 60 days).
 - Fixed fallback text for the "nothing to show" case.
+- Log the counts put on the canvas: open PRs, drafts, and drafts dropped as inactive — otherwise a missing draft has no explanation.
 
 ### 5. `canvasbuilder` package
 
@@ -138,6 +146,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Add `EditCanvas` to `SlackAPI` (exists in `github.com/slack-go/slack` v0.27.0 — confirmed in source).
 - Add `Client.ReplaceCanvasContent(canvasID, markdown string) error`: one `EditCanvas` call (`EditCanvasParams{CanvasID, Changes: []CanvasChange{{Operation: "replace", DocumentContent: ...}}}` — confirmed struct shape in `slack-go/slack` v0.27.0's `canvas.go`), `SectionID` left at its zero value (`""`, omitted on the wire via `omitempty`), `DocumentContent{Type: "markdown", Markdown: markdown}`. Confirmed via [Slack's `canvases.edit` docs](https://docs.slack.dev/reference/methods/canvases.edit/#content-operations): omitting `section_id` on a `replace` operation replaces the entire canvas in one call, and the method needs only the `canvases:write` scope.
 - Add mock support in `testhelpers/mockslackclient`.
+- Log the canvas ID and markdown length before the call, confirm on success — matching `SendMessage`/`UpdateMessage`. The length is the only clue if content hits Slack's canvas size limit.
 - **Scope alone isn't sufficient**: canvases have their own access control (read/write/owner), separate from OAuth scopes ([`canvases.access.set` docs](https://docs.slack.dev/reference/methods/canvases.access.set)). Since the user creates the canvas as themselves, the bot has no access to it by default and `canvases.edit` will fail until the user explicitly shares the canvas with the bot (e.g. sharing it into a channel the bot's already a member of). Document this as a required manual setup step (Step 8) — it can't be automated by the action itself.
 
 ### 7. `run.go`: wire up the canvas refresh
@@ -145,13 +154,18 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - `Run()` currently returns directly from inside the `RunMode` switch (`return runPostMode(...)` / `return runUpdateMode(...)`), so there's no code path "after" it today. Restructure to capture the switch's result in an `err` variable; if `err != nil`, return it unchanged (unaffected by this feature); otherwise, if `cfg.PRTrackerCanvasID != ""`, run the canvas refresh step before returning `nil`. This means the canvas only refreshes after a successful post/update — a failed primary run keeps failing the same way it does today, and doesn't attempt a canvas write.
 - Canvas refresh step: `FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository, PRFetchOptions{IncludeDrafts: true, FetchActivityTimestamps: true})`, then `canvascontent`/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
 - This always does a fresh full fetch, independent of `update` mode's targeted `GetPRs` (state-tracked refs) — the canvas reflects current reality, not a previously-sent PR set.
-- Log and continue (don't fail the run) if this step errors.
+- Log and continue (don't fail the run) if this step errors. The warning names the canvas-sharing requirement (Step 6) as the likely cause — the run still exits 0, so it's the user's only signal.
 
 ### 8. Docs & permissions
 
-- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up — create a canvas in Slack, share it with the bot (required, see Step 6), copy its ID into `pr-tracker-canvas-id`. Add `canvases:write` to the Slack scope table (canvas-only). Add `contents: read` to the GitHub permissions block (canvas-only).
+- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up — create a canvas in Slack, share it with the bot (required, see Step 6), copy its ID into `pr-tracker-canvas-id`. Add `canvases:write` to the Slack scope table (canvas-only). The GitHub permissions block stays as is.
 - Document the new input in the inputs table.
-- Update `.github/workflows/pr-reminder.yml` and `.github/actions/e2e-tests/action.yml` to exercise `pr-tracker-canvas-id`, so the feature gets real end-to-end coverage. No workflow-permission change needed: `pr-reminder.yml` already declares `contents: read` at job level, and the workflows that invoke `e2e-tests` (`build.yml`, `release.yml`) already declare `contents: write` (a superset). Note: the Slack app/bot token used by these workflows needs the new `canvases:write` scope granted manually in Slack, and a canvas needs to be created and shared with the bot by hand to get an ID to test against — call this out, it can't be automated here.
+- Exercise both the on and off paths end to end. No workflow-permission change needed.
+  - `.github/workflows/pr-reminder.yml`: set `pr-tracker-canvas-id`, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
+  - `.github/actions/e2e-tests/action.yml`: set it on the "Run with filters" step only — the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
+  - Leave it unset on the "Basic run" and "Multi-repository run" steps, so every release also verifies the action still behaves exactly as before when the input is absent.
+  - The ID goes in as a plain literal, like `slack-channel-name` — it isn't a secret.
+- Manual prerequisites, not automatable here: grant `canvases:write` to the Slack app/bot token these workflows use, then create the canvas and share it with the bot to get an ID.
 
 ### 9. Spec sync
 
@@ -169,7 +183,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 ### Negative
 
-- Opted-in runs make one extra GitHub API call per PR (head-commit lookup for activity), adding to rate-limit consumption.
+- Opted-in runs make one extra GitHub API call per PR (commit lookup for activity), adding to rate-limit consumption.
 - Canvas access can't be granted by the action itself — the user must manually share the canvas with the bot in Slack, a step that's easy to miss and only surfaces as a silent warning log on failure.
 - Two new packages (`canvascontent`, `canvasbuilder`) largely mirror existing ones (`messagecontent`, `messagebuilder`), adding maintenance surface for a feature many users won't enable.
 
