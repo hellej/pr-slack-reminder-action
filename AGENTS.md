@@ -11,6 +11,38 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 - Avoid filler words
 - Avoid duplication and overlap with what's already said or written
 
+### Examples
+
+Trailing justification for an obvious rule:
+
+- ✗ `Return an error instead of calling os.Exit in library code, so callers can decide what to do — they own the process lifecycle, not the helper, and burying that decision makes the helper untestable.`
+- ✓ `Return an error instead of calling os.Exit.`
+
+Circular justification, restating the rule as its own reason:
+
+- ✗ `The mock goes in testhelpers/ rather than the package under test, because testhelpers/ is where shared mocks live.`
+- ✓ `The mock goes in testhelpers/.`
+
+Meta framing:
+
+- ✗ `One thing worth calling out before the details: the 2-month cutoff is hardcoded.`
+- ✓ `The 2-month cutoff is hardcoded.`
+
+Narrating how you found the answer, when the route doesn't change how much to trust it:
+
+- ✗ `I went through the config package and checked each call site, and can confirm the input is unused.`
+- ✓ `The input is unused.`
+
+Do name the source when it does change how much to trust it — third-party APIs above all, where "read it in the source" and "assumed from the name" are worlds apart:
+
+- ✗ `EditCanvas takes a CanvasID and a list of changes.`
+- ✓ `EditCanvas takes a CanvasID and a list of changes (slack-go v0.27.0 source).`
+
+Stacked hedges:
+
+- ✗ `This should probably work in most cases, though it may be worth verifying.`
+- ✓ `Unverified: <what to check>.`
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)

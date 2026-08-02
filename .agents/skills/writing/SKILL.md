@@ -8,9 +8,8 @@ argument-hint: "Optional: what you're about to write"
 
 Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
 
-- Use plain, simple words. Keep answers short and direct
-- Prefer bullet points over prose
-- Avoid filler words
-- Avoid duplication and overlap with what's already said or written
+Read `AGENTS.md` § Output Style now and apply it. The rules and before/after examples live there so the two copies can't drift apart.
+
+Then re-read what you just wrote and cut every line those examples would reject.
 
 If a task was given as an argument to this skill, apply these rules to it now.
