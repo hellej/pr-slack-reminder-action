@@ -8,7 +8,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 ## Goals
 
 - Motivation: the reminder message is transient and drafts-free by design, and even GitHub itself has no single "live" view of a team's open + WIP PRs (incl. their statuses/staleness/reviews) across multiple repos — the canvas fills both gaps with a persistent, on-demand, cross-repo view in Slack.
-- Optional feature: keep a Slack canvas continuously showing open PRs (oldest first) and draft/WIP PRs (most recent activity first).
+- New optional feature: keep a Slack canvas continuously showing open PRs (oldest first) and draft/WIP PRs (most recent activity first).
 - Canvas always includes draft PRs (the main reminder message never does — unchanged).
 - Open PR rows render exactly like the reminder message's rows.
 - WIP rows show last-push activity instead of age: drafts are ordered by activity, as the last push predicts which draft gets opened for review next better than its age does.
@@ -42,6 +42,7 @@ A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle 
 - Splitting canvas content if it exceeds Slack's canvas size limits.
 - Persisting canvas identity in `state` — the ID is supplied fresh via input every run, nothing to persist.
 - A "no PRs" message input for the canvas (a fixed fallback string is used instead).
+- Closed PRs on the canvas, struck through or otherwise — the canvas refresh fetches open PRs only.
 
 ## Target shape
 
@@ -97,7 +98,8 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Extract from `messagebuilder` into methods on `prparser.PR` (or a small shared helper file), as plain strings/booleans instead of `slack.RichTextSectionElement`s:
   - reviewers summary text (✅/💬 grouping of approvers/commenters)
   - age text, including the old-PR warning marker vs. plain "N ago" — used by open PR rows only; the WIP section must not call it (see Goals)
-  - closed-but-not-merged / merged markers
+
+  The closed-but-not-merged and merged markers stay in `messagebuilder`: only the message ever renders a closed or merged PR (see Step 5).
 - Author display is not extracted: `pr.Author.SlackUserID` and `pr.Author.GetGitHubName()` are already exported, and the mention format itself differs per medium (`<@ID>` for Block Kit, `![](@ID)` for canvas markdown — see Step 5), so each builder wraps them directly.
 - Test coverage gaps found in `messagebuilder_test.go`, both worth closing before extracting so a regression in either path is actually caught:
   - the old-PR warning-marker path (`IsOldPR: true` → 🚨 + bold/code age text) has no test at all today
@@ -146,7 +148,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Renders `canvascontent.Content` to a Slack canvas markdown string (`slack.DocumentContent{Type: "markdown", ...}`), reusing the R3 display-text helpers.
 - Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `[label](url)`, `~~strike~~`, backtick code spans, `#`-`###` headings, `-` bullets — all confirmed supported ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)). User mentions use canvas-specific syntax, `![](@USERID)`, not Block Kit's `<@ID>`; `canvasbuilder` wraps `pr.Author.SlackUserID`/`GetGitHubName()` in this format itself (see R3).
-- Open PR rows: identical fields to the message — linked title (struck through if closed-but-not-merged), age text with the old-PR warning marker, author, reviewers, merged marker.
+- Open PR rows: linked title, age text with the old-PR warning marker, author, reviewers. No strike-through, no 🚀 — the canvas fetch lists open PRs only, so a closed or merged PR can never reach a row here (see Non-goals). Those two markers stay message-only.
 - WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals).
 - Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
 
