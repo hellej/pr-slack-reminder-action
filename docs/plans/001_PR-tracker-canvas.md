@@ -42,7 +42,17 @@ A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle 
 - Splitting canvas content if it exceeds Slack's canvas size limits.
 - Persisting canvas identity in `state` — the ID is supplied fresh via input every run, nothing to persist.
 - A "no PRs" message input for the canvas (a fixed fallback string is used instead).
-- Closed PRs on the canvas, struck through or otherwise — the canvas refresh fetches open PRs only.
+- Closed PRs on the canvas, struck through or otherwise — the canvas refresh fetches open PRs only. Deferred, not rejected: Steps 3-5 keep the seams for a third section (see "Room for a recently-closed section").
+
+### Room for a recently-closed section
+
+A future third canvas section listing recently closed/merged PRs stays additive. What it would need, and what this plan already covers:
+
+- `githubclient`: a new list path — `PullRequestListOptions{State: "closed", Sort: "updated", Direction: "desc"}`, stopping at a time window. This is genuinely new code, not a `PRFetchOptions` flag: open PRs are bounded by "still open", closed PRs need a cutoff. Inherent to the feature; nothing here makes it worse. `FetchActivityTimestamps` stays off for it — `ClosedAt`/`MergedAt` are already on the fetched PR.
+- `prparser`: reuses Step 3's keyed newest-first sort with `ClosedAt`.
+- `canvascontent`/`canvasbuilder`: one more section field and one more `renderSection` call (Steps 4-5).
+- Row markers: `canvasbuilder` reads the existing `PR.IsMerged()`/`PR.IsClosedButNotMerged()` booleans. R3 leaving the message's strike-through and 🚀 rendering in `messagebuilder` costs nothing here — only the marker *elements* are Block Kit-specific, not the conditions.
+- `run.go`: the canvas refresh already does its own fetch, so a second one is contained there.
 
 ## Target shape
 
@@ -135,11 +145,12 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Add `PR.GetActivityText() string`, derived from `LastActivityAt`, reusing `GetPRAgeText`'s minutes/hours/days magnitude: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above. Empty string if `LastActivityAt` is nil.
 - Add `PR.IsIdle() bool`: true when `LastActivityAt` is older than a hardcoded 48h. False if `LastActivityAt` is nil.
-- Add an exported sort (most-recent-activity first) for use by the draft section, distinct from `ParsePRs`'s existing oldest-first sort.
+- Add an exported newest-first sort for use by the draft section, distinct from `ParsePRs`'s existing oldest-first sort. Take the timestamp as a key function (`func(PR) *time.Time`) rather than reading `LastActivityAt` directly, so sorting by any other timestamp needs no second sort.
 
 ### 4. `canvascontent` package
 
 - Mirrors `messagecontent.GetContent`'s shape but for canvas: takes all fetched PRs (open + draft) and content inputs, and produces open-PR content (oldest first, grouped/flat per `group-by-repository`, via the R2 helper) plus draft-PR content (always flat, most-recent-activity first, regardless of `group-by-repository`).
+- Keep the two sections as separate named fields on `Content`, not one merged list with a per-PR kind flag, so a third section is a field rather than a rework.
 - Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (2 months / 60 days).
 - Fixed fallback text for the "nothing to show" case.
 - Log the counts put on the canvas: open PRs, drafts, and drafts dropped as inactive — otherwise a missing draft has no explanation.
@@ -151,6 +162,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Open PR rows: linked title, age text with the old-PR warning marker, author, reviewers. No strike-through, no 🚀 — the canvas fetch lists open PRs only, so a closed or merged PR can never reach a row here (see Non-goals). Those two markers stay message-only.
 - WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals).
 - Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
+- Render both through one internal `renderSection(heading string, prs []prparser.PR, renderRow func(prparser.PR) string)`, not two bespoke paths. The two sections differ only in their row renderer, and a third section then costs one call.
 
 ### 6. `slackclient`: full canvas content replace
 
