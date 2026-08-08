@@ -31,9 +31,31 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - **Refactor state store** by @kronk (💬 alice) `idle 3 days` 💤
 - **Prototype canvas rendering** by @alice `idle 12 days` 💤
 
+The two section headings are fixed strings, rendered as `## Open PRs` and `## Work in Progress` (shown bold above only so this example renders). Both are always present, `group-by-repository` or not. When grouping is on, each repository is an `###` sub-heading under `## Open PRs` — no repeated top-level heading per repository.
+
+An empty section keeps its heading and shows one italic line instead of rows: `_No open PRs_` / `_No work in progress_` (Step 5).
+
 A WIP row is: linked title, author, reviewers, activity chip, then 💤 if idle for +48h. Chip wording: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above. Never the 🚨 old-PR marker — it nags about review latency, which doesn't apply to work nobody has been asked to review yet.
 
 "updated" is reader-facing wording only: the chip is backed by the head commit's committer date (Step 2), not GitHub's `updated_at`, which also moves on comments and labels. Don't "fix" the mismatch by switching the data source. `updated_at` serves only as a fallback when the head commit can't be fetched (Step 2).
+
+### Existing inputs and the canvas
+
+Which of today's inputs shape canvas content:
+
+| Input | Canvas | Note |
+| --- | --- | --- |
+| `filters`, `repository-filters` | applies | same fetch path as the message (Step 7) |
+| `github-repositories`, `GITHUB_REPOSITORY` | applies | same repository set |
+| `github-user-slack-user-id-mapping` | applies | author mentions and reviewer names, both sections |
+| `old-pr-threshold-hours` | applies | drives 🚨 on open rows; never on WIP rows |
+| `group-by-repository` | applies to the open section only | WIP list is always flat |
+| `pr-list-heading` | ignored | canvas headings are fixed (see "Canvas content format") |
+| `no-prs-message` | ignored | fixed fallback text (see Non-goals) |
+| `run-mode`, `state-artifact-name` | ignored | canvas always shows all currently open + WIP PRs, never the state-tracked set `update` mode's message re-fetches (Step 7) |
+| `slack-channel-name`, `slack-channel-id` | ignored | the canvas is addressed by ID (parsed from `pr-tracker-canvas-link`), not by channel |
+
+Not an input, but same question: `/snooze ... for N days` comments apply to the canvas too, drafts included — snoozed PRs are dropped inside `githubclient`, before any content package sees them.
 
 ## Non-goals
 
@@ -52,7 +74,7 @@ A future third canvas section listing recently closed/merged PRs stays additive.
 - `prparser`: reuses Step 3's keyed newest-first sort with `ClosedAt`.
 - `canvascontent`/`canvasbuilder`: one more section field and one more `renderSection` call (Steps 4-5).
 - Row markers: `canvasbuilder` reads the existing `PR.IsMerged()`/`PR.IsClosedButNotMerged()` booleans. R3 leaving the message's strike-through and 🚀 rendering in `messagebuilder` costs nothing here — only the marker *elements* are Block Kit-specific, not the conditions.
-- `run.go`: the canvas refresh already does its own fetch, so a second one is contained there.
+- `run.go`: a closed-PR list is its own fetch either way, so it lands next to the canvas refresh without touching the message path's fetch sharing (Step 7).
 
 ## Target shape
 
@@ -64,7 +86,7 @@ A future third canvas section listing recently closed/merged PRs stays additive.
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
 - `messagecontent`/`messagebuilder`: the reminder message gains a trailing canvas link row whenever the feature is on.
 - `slackclient`: gains a method that fully replaces a canvas's content by ID — one `canvases.edit` call, `replace` operation, `section_id` omitted.
-- `run.go`: after the existing post/update logic, if `pr-tracker-canvas-link` is set, runs one independent full PR fetch (open + draft, both run modes) and overwrites the canvas. Failures are logged as warnings, not fatal — same pattern already used for `DeleteMessage` failures in `run.go` — so a canvas hiccup can't take down the core reminder message.
+- `run.go`: if `pr-tracker-canvas-link` is set, gets open + draft PRs and overwrites the canvas. `post` mode shares the message's fetch (with drafts and activity timestamps switched on); `update` mode fetches separately, since its message path is state-tracked (Step 7). The canvas refresh and the message path are independent attempts — either can fail without stopping the other — and their errors are joined at the end, so the action fails if either did.
 - Permissions:
   - Slack: one new scope, `canvases:write` (canvas-only). On top of it, a one-time manual step — the user creates the canvas as a tab in the reminder channel (see Step 6), since the scope alone doesn't grant write access to a specific canvas.
   - GitHub: no change. The activity lookup runs on `pull-requests: read`, already required.
@@ -95,7 +117,9 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Add `PRFetchOptions{IncludeDrafts bool}` and thread it through `Client.FindOpenPRs`, `Client.GetPRs`, and `getPRFilterFunc` (replacing the hardcoded `!result.pr.GetDraft()`).
 - Update the two call sites in `run.go` to pass `PRFetchOptions{}` (zero value) — behavior must stay byte-for-byte identical to today.
-- Test coverage check: already good — `githubclient_test.go` has an explicit "draft PR should be filtered out" case. No gap here; existing tests must pass unchanged, and add one table-driven case that `IncludeDrafts: true` lets a draft PR through.
+- `capPRsToLimit` must cap drafts and non-drafts separately when `IncludeDrafts` is on (each up to `MaxPRsToFetch`), not the combined slice. The cap keeps the newest by creation date, so a shared capped slice would let drafts displace open PRs the message would otherwise show. Untouched when `IncludeDrafts` is off.
+- `logFoundPRs`'s "Found %d open pull requests" gains a draft count when `IncludeDrafts` is on. Log text only.
+- Test coverage check: already good — `githubclient_test.go` has an explicit "draft PR should be filtered out" case. No gap here; existing tests must pass unchanged. Add table-driven cases: `IncludeDrafts: true` lets a draft PR through, and `IncludeDrafts: true` with over `MaxPRsToFetch` PRs of both kinds keeps the same non-draft set as `IncludeDrafts: false` would.
 
 ### R2. Refactor: shared repository-grouping helper
 
@@ -151,8 +175,9 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Mirrors `messagecontent.GetContent`'s shape but for canvas: takes all fetched PRs (open + draft) and content inputs, and produces open-PR content (oldest first, grouped/flat per `group-by-repository`, via the R2 helper) plus draft-PR content (always flat, most-recent-activity first, regardless of `group-by-repository`).
 - Keep the two sections as separate named fields on `Content`, not one merged list with a per-PR kind flag, so a third section is a field rather than a rework.
+- Section headings are fixed strings owned by `canvasbuilder` (Step 5), so `contentInputs.PRListHeading` is unread here — no `<pr_count>` substitution, no "required when `group-by-repository` is false" coupling.
 - Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (2 months / 60 days).
-- Fixed fallback text for the "nothing to show" case.
+- No whole-canvas "nothing to show" case: each section falls back on its own, so the both-empty canvas is just both fallbacks (see Step 5).
 - Log the counts put on the canvas: open PRs, drafts, and drafts dropped as inactive — otherwise a missing draft has no explanation.
 
 ### 5. `canvasbuilder` package
@@ -161,8 +186,10 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `[label](url)`, `~~strike~~`, backtick code spans, `#`-`###` headings, `-` bullets — all confirmed supported ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)). User mentions use canvas-specific syntax, `![](@USERID)`, not Block Kit's `<@ID>`; `canvasbuilder` wraps `pr.Author.SlackUserID`/`GetGitHubName()` in this format itself (see R3).
 - Open PR rows: linked title, age text with the old-PR warning marker, author, reviewers. No strike-through, no 🚀 — the canvas fetch lists open PRs only, so a closed or merged PR can never reach a row here (see Non-goals). Those two markers stay message-only.
 - WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals).
-- Structure: open-PR heading/list (grouped or flat, matching the message's style) followed by a "Work in Progress" heading and the draft list.
-- Render both through one internal `renderSection(heading string, prs []prparser.PR, renderRow func(prparser.PR) string)`, not two bespoke paths. The two sections differ only in their row renderer, and a third section then costs one call.
+- Structure: a fixed `## Open PRs` heading and its list, then a fixed `## Work in Progress` heading and the draft list. Both headings always render, `group-by-repository` or not.
+  - Grouped: each repository is an `###` sub-heading under `## Open PRs`, linking to the repository's pulls page. The R2 helper's `HeadingPrefix` ("Open PRs in ") is Block Kit-side wording and is not used here — it would repeat the parent heading.
+- Render both through one internal `renderSection(heading string, prs []prparser.PR, renderRow func(prparser.PR) string, emptyText string)`, not two bespoke paths. The two sections differ only in their row renderer and empty text, and a third section then costs one call.
+- Empty section: heading still renders, followed by one italic line — `_No open PRs_` / `_No work in progress_`. An empty section means "nothing here right now", which a missing heading can't say; it would read as a broken render instead. Grouped mode with no open PRs renders the same single line, no repository sub-headings.
 
 ### 6. `slackclient`: full canvas content replace
 
@@ -170,7 +197,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Add `Client.ReplaceCanvasContent(canvasID, markdown string) error`: one `EditCanvas` call (`EditCanvasParams{CanvasID, Changes: []CanvasChange{{Operation: "replace", DocumentContent: ...}}}` — confirmed struct shape in `slack-go/slack` v0.27.0's `canvas.go`), `SectionID` left at its zero value (`""`, omitted on the wire via `omitempty`), `DocumentContent{Type: "markdown", Markdown: markdown}`. Confirmed via [Slack's `canvases.edit` docs](https://docs.slack.dev/reference/methods/canvases.edit/#content-operations): omitting `section_id` on a `replace` operation replaces the entire canvas in one call, and the method needs only the `canvases:write` scope.
 - Add mock support in `testhelpers/mockslackclient`.
 - Log the canvas ID and markdown length before the call, confirm on success — matching `SendMessage`/`UpdateMessage`. The length is the only clue if content hits Slack's canvas size limit.
-- On error, wrap it with a concise hint: `"canvas update failed: check that the bot has canvases:write permission and is invited to the channel where the canvas is"` — the only actionable feedback the user gets, since `run.go` only logs this as a warning (Step 7).
+- On error, wrap it with a concise hint: `"canvas update failed: check that the bot has canvases:write permission and is invited to the channel where the canvas is"` — this is what surfaces in the failed run's log (Step 7), so it carries the whole diagnosis.
 - **Scope alone isn't sufficient**: canvases have their own access control (read/write/owner), separate from OAuth scopes ([`canvases.access.set` docs](https://docs.slack.dev/reference/methods/canvases.access.set)). The user creates the canvas as themselves, so the bot has no access by default and `canvases.edit` fails until the canvas is shared with it.
 - **Intended setup**: create the canvas as a tab in the reminder channel itself. A channel canvas needs no sharing step — per [`conversations.canvases.create` docs](https://docs.slack.dev/reference/methods/conversations.canvases.create/), "there are no access implications nor is it necessary to share a channel canvas to grant access. Access is tied to channel access", and [Slack's help article](https://slack.com/help/articles/21290478840979-Feature-change-notice--Channel-canvases) sets edit access by "a member's permission to post in the channel". The bot already posts the reminder there, so it clears that bar by construction. Neither source names apps explicitly — if `canvases.edit` returns `access_denied`/`canvas_not_found` on the first run, fall back to sharing the canvas with the bot.
 - Also in favour of a channel canvas: `canvases.edit` lists `free_teams_cannot_edit_standalone_canvases`, so standalone canvases are a dead end on free workspaces.
@@ -178,10 +205,37 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 ### 7. `run.go`: wire up the canvas refresh
 
-- `Run()` currently returns directly from inside the `RunMode` switch (`return runPostMode(...)` / `return runUpdateMode(...)`), so there's no code path "after" it today. Restructure to capture the switch's result in an `err` variable; if `err != nil`, return it unchanged (unaffected by this feature); otherwise, if `cfg.PRTrackerCanvasID != ""`, run the canvas refresh step before returning `nil`. This means the canvas only refreshes after a successful post/update — a failed primary run keeps failing the same way it does today, and doesn't attempt a canvas write.
-- Canvas refresh step: `FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository, PRFetchOptions{IncludeDrafts: true, FetchActivityTimestamps: true})`, then `canvascontent`/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
-- This always does a fresh full fetch, independent of `update` mode's targeted `GetPRs` (state-tracked refs) — the canvas reflects current reality, not a previously-sent PR set.
-- Log and continue (don't fail the run) if this step errors, carrying the hint from Step 6 — the run still exits 0, so this warning is the user's only signal.
+- `Run()` currently returns directly from inside the `RunMode` switch (`return runPostMode(...)` / `return runUpdateMode(...)`), so there's no code path "after" it today. Restructure so the message path and the canvas refresh are two independent attempts whose errors are collected, not short-circuited:
+  1. capture the switch's result in `messageErr` instead of returning it
+  2. if `cfg.PRTrackerCanvasID != ""`, run the canvas refresh regardless of `messageErr`, capturing `canvasErr`
+  3. `return errors.Join(messageErr, canvasErr)`
+- The canvas refresh runs even when post/update failed. A failed message send says nothing about whether the canvas can be written, and a stale canvas is the thing this feature exists to prevent. The one exception is `post` mode's shared fetch (below): if that fails, neither path has PRs to work with, so both are skipped and only the fetch error is returned.
+- Both errors reach the action's exit code. A canvas that can't be written is a real failure of an opted-in feature — usually the one-time access setup (Step 6) — and a warning in a green run is easy to miss for a surface nobody watches. Wrap `canvasErr` so the log names the canvas as the failing part, not the reminder.
+- Message-path semantics are unchanged: the same conditions fail the run as today, with the same errors.
+- Canvas refresh step: PRs (see fetch sharing below), then `prparser.ParsePRs` (same call as the message path — this is what applies `github-user-slack-user-id-mapping` and `old-pr-threshold-hours`), then `canvascontent`/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
+- The canvas always lists all currently open + WIP PRs, never `update` mode's state-tracked set — it reflects current reality, not a previously-sent PR set.
+- Failure isolation by mode:
+  - `update`: fully separate, both ways. The canvas refresh has its own fetch and its own Slack call, and shares no state with the message path — a failure in either leaves the other's behavior untouched, whichever runs first.
+  - `post`: same after the shared fetch; the fetch itself is common to both (see above), and is deliberately built to add no new failure path.
+- Tests: canvas failure + message success → run fails, message still sent and state still saved; message failure + canvas success → run fails, canvas still written; both fail → both errors reported.
+
+#### Fetch sharing
+
+`post` mode's message path already calls `FindOpenPRs` over the same repositories with the same filters; only the options differ. Share that one fetch instead of running it twice:
+
+- `post`: one `FindOpenPRs(..., PRFetchOptions{IncludeDrafts: canvasOn, FetchActivityTimestamps: canvasOn})`, where `canvasOn` is `cfg.PRTrackerCanvasID != ""`. The message path takes the non-draft subset (filter on `pr.GetDraft()`, the same predicate `getPRFilterFunc` applies today); the canvas step takes the full set.
+- `update`: two fetches, inherently. The message re-fetches state-tracked refs via `GetPRs`, which includes PRs now closed or merged (rendered struck-through / 🚀) — those can never come from a list of open PRs. The canvas step runs its own `FindOpenPRs` with both options on.
+- Saves roughly one repository list call plus 3 calls per open PR (reviews, PR comments, timeline comments) per `post` run.
+- The fetch moves out of `runPostMode` up into `Run()`, so both consumers can read its result and a failure in one doesn't strand the other. `runPostMode` takes the PRs as an argument instead of fetching them.
+
+What keeps `post` mode's message byte-identical when the canvas is on:
+
+- Drafts are removed by exactly the predicate that excludes them today, before `prparser.ParsePRs` — so PR count, ordering, summary text and state saving all see the same set.
+- The `MaxPRsToFetch` cap is applied per kind (R1), so drafts can't displace open PRs on a >50-PR fetch.
+- Filters, snooze exclusion and every other fetch-path step are untouched — `IncludeDrafts` only removes the draft check.
+- `FetchActivityTimestamps` adds no fatal path: a failed `ListCommits` falls back to `updated_at` with a warning (Step 2), and the message never reads `LastActivityAt`.
+- Canvas off → zero-value options → today's call exactly.
+- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both.
 
 ### 8. Reminder message: link to the canvas
 
@@ -223,8 +277,10 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 ### Negative
 
-- Opted-in runs make one extra GitHub API call per PR (commit lookup for activity), adding to rate-limit consumption.
-- Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing — easy to miss, and it only surfaces as a warning log on failure.
+- Opted-in runs make one extra GitHub API call per PR (commit lookup for activity), adding to rate-limit consumption. `update` mode also fetches twice; `post` mode shares one fetch (Step 7).
+- `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
+- Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing.
+- Opting in adds a way for the run to fail: a canvas write that can't be done fails the action even though the reminder was posted (Step 7). Deliberate — the alternative is a feature that silently stops working — but it means a Slack-side access change turns scheduled runs red.
 - Two new packages (`canvascontent`, `canvasbuilder`) largely mirror existing ones (`messagecontent`, `messagebuilder`), adding maintenance surface for a feature many users won't enable.
 
 ### Neutral
