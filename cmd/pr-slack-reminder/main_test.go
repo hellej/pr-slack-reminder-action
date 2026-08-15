@@ -27,6 +27,7 @@ import (
 type GetTestPROptions struct {
 	Number      int
 	Title       string
+	HTMLURL     string // left unset by default
 	AuthorLogin string
 	AuthorName  string
 	Labels      []string
@@ -64,8 +65,9 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 	state := cmp.Or(options.State, "open")
 
 	return &github.PullRequest{
-		Number: &number,
-		Title:  &title,
+		Number:  &number,
+		Title:   &title,
+		HTMLURL: &options.HTMLURL,
 		User: &github.User{
 			Login: &authorLogin,
 			Name:  &authorName,

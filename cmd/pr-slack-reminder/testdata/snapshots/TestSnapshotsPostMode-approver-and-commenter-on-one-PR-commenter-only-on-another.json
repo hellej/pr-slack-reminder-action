@@ -1,0 +1,137 @@
+[
+  [
+    {
+      "type": "rich_text",
+      "block_id": "pr_list_heading",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "There are 2 open PRs 🚀",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rich_text",
+      "block_id": "open_prs",
+      "elements": [
+        {
+          "type": "rich_text_list",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/32",
+                  "text": "PR whose only reviewer input is a timeline comment",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 6 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Bob Brown",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " (💬 ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Frank Foster",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": ")",
+                  "style": {}
+                }
+              ]
+            },
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/31",
+                  "text": "Refactor the review fetching",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 4 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Alice Anderson",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " (✅ ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Dana Davis",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " / 💬 ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Erin Evans",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": ")",
+                  "style": {}
+                }
+              ]
+            }
+          ],
+          "style": "bullet",
+          "indent": 0,
+          "border": 0,
+          "offset": 0
+        }
+      ]
+    }
+  ]
+]

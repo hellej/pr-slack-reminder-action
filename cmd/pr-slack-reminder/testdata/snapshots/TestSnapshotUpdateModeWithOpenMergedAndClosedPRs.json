@@ -1,0 +1,133 @@
+[
+  [
+    {
+      "type": "rich_text",
+      "block_id": "pr_list_heading",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "There are 3 open PRs 🚀",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "rich_text",
+      "block_id": "open_prs",
+      "elements": [
+        {
+          "type": "rich_text_list",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/63",
+                  "text": "Closed PR without merge",
+                  "style": {
+                    "bold": true,
+                    "strike": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 10 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Carol Clark",
+                  "style": {}
+                }
+              ]
+            },
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/62",
+                  "text": "Merged PR",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 7 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Bob Brown",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " 🚀",
+                  "style": {}
+                }
+              ]
+            },
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/61",
+                  "text": "Still open PR",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 4 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Alice Anderson",
+                  "style": {}
+                }
+              ]
+            }
+          ],
+          "style": "bullet",
+          "indent": 0,
+          "border": 0,
+          "offset": 0
+        }
+      ]
+    }
+  ]
+]

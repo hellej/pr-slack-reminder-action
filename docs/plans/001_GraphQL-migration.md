@@ -194,10 +194,10 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Nothing in production changes. New `snapshot_test.go` in `package main_test`, reusing `main_test.go`'s fixtures and mocks and driving the full pipeline through `main.Run`.
 - The payload is already plumbed end to end: `SendMessage`/`UpdateMessage` return `SentMessageInfo.JSONBlocks` (`slackclient.go:18`) and `run.go:151` passes them to `state.SaveSentSlackBlocks`, which writes them as indented JSON. Under the mocks the bytes come from `mockslackclient.getJSONBlocks` (`mockslackclient.go:202`), which marshals `message.Blocks.BlockSet` directly. The snapshot therefore pins blocks, not the summary text — that stays on `main_test.go`'s `expectedSummary` assertions (`:702-711`), which Steps 5-6 keep.
 - The test points `config.EnvSentSlackBlocksFilePath` and `config.EnvStateFilePath` at `t.TempDir()` files — `confighelpers.go:42-43,67-68` defaults both under `/tmp`. The state file keeps the basename `pr-slack-reminder-state.json`: `FetchLatestArtifactByName` matches inside the artifact zip by basename (`fetchartifact.go:95`), and `mockgithubclient.createMockArtifactZip` (`mockgithubclient.go:251`) always writes that name, so any other basename fails update mode with *"json file … not found inside artifact zip"*.
-- Compare the blocks file against `cmd/pr-slack-reminder/testdata/snapshots/<slug>.json`, committed. Case names carry spaces and commas, so the slug is `t.Name()` with every non-alphanumeric run collapsed to `-`. A missing snapshot file fails the case, naming `make update-snapshots`.
+- Compare the blocks file against `cmd/pr-slack-reminder/testdata/snapshots/<slug>.json`, committed. Case names carry spaces and commas, so the slug is `t.Name()` with every non-alphanumeric run collapsed to `-`. A missing snapshot file fails the case, naming `make update-test-snapshots`.
 - One table with named scenario rows, each row a config + fixture set:
   - grouped by repository, two repositories
-  - reviewers present: one approver and one commenter on the same PR
+  - reviewers present: one approver and one commenter on the same PR, plus a second PR whose only reviewer input is a timeline comment — that one renders `messagebuilder.go:169`'s `" (💬 "`-only prefix, which R2's `deriveReviewers` and Steps 5-6's re-sourced connections would otherwise be free to drop
   - a PR past `old-pr-threshold-hours`, rendering the age indicator
   - an author mapped through `github-user-slack-user-id-mapping`, rendering a Slack mention — the other rows leave authors unmapped and pin the `GetGitHubName()` fallback, so without this row no snapshot covers `getUserNameElement`'s mention branch (`messagebuilder.go:149-158`)
   - the no-PRs message
@@ -205,7 +205,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Recording: `var updateSnapshots = flag.Bool("update-snapshots", false, …)` in `snapshot_test.go`; when set, a case writes its file instead of comparing. `go test ./... -update-snapshots` fails in every package that doesn't register the flag (*"flag provided but not defined: -update-snapshots"*), so the target scopes to the one package:
 
   ```make
-  update-snapshots:
+  update-test-snapshots:
   	go test ./cmd/pr-slack-reminder -count=1 -update-snapshots
   	@git add -N cmd/pr-slack-reminder/testdata && git diff --stat -- cmd/pr-slack-reminder/testdata
   ```
@@ -218,8 +218,8 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
   - the branch's `math.Round` half-boundary — 30 s of headroom in minutes, 30 min in hours, up to 12 h in days at a bucket midpoint. Prefer hours and days.
   - the branch edges at 1 h and 24 h, from below: an age in [23.5 h, 24 h) renders "24 hours" now and "1 days" later.
   - `old-pr-threshold-hours`.
-- `getTestPR` sets no `HTMLURL`, so PR links record an empty `url`. Left as is.
-- List `make update-snapshots` in AGENTS.md § Development Commands, with the one-package scoping.
+- `GetTestPROptions` gains an `HTMLURL` field, set on every snapshot fixture. It stays unset by default, so `main_test.go`'s cases are unaffected. Without it every PR link records an empty `url`, and nothing else in the repo asserts one — `githubclient_test.go` sets `HTMLURL` but never reads it back — so a wrong `pullRequest.url` mapping in Steps 5-6, or a zero-valued `GetHTMLURL` from R1's new type, would leave every snapshot byte-identical.
+- List `make update-test-snapshots` in AGENTS.md § Development Commands, with the one-package scoping.
 
 ### R1. Refactor: own PR type (`githubclient.go`, `models.go`, `prfilter.go`, `internal/prparser`, `internal/state`)
 

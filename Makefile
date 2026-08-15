@@ -13,6 +13,10 @@ clean-test-cache:
 	go clean -cache
 	@echo "Cleared Go test and build caches"
 
+update-test-snapshots:
+	go test ./cmd/pr-slack-reminder -count=1 -update-snapshots
+	@git add -N cmd/pr-slack-reminder/testdata && git diff --stat -- cmd/pr-slack-reminder/testdata
+
 test-with-coverage: clean-test-cache
 	$(TEST) -coverprofile=coverage.out -covermode=atomic -coverpkg=./cmd/...,./internal/...
 	go tool cover -func=coverage.out

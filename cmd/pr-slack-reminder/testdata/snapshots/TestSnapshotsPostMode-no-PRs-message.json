@@ -1,0 +1,20 @@
+[
+  [
+    {
+      "type": "rich_text",
+      "block_id": "no_prs_block",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "No open PRs, happy coding! 🎉",
+              "style": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+]
