@@ -18,6 +18,6 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 1. Write a failing test for the change; run it and confirm it fails for the expected reason
 2. Implement the minimal code to make it pass
 3. Run `make test`; refactor if needed
-4. Update the package's `.spec.md` in the same change if behaviour changed
+4. Update the package's `.spec.md` in the same change if behaviour changed (use [spec-writer skill](../spec-writer/SKILL.md))
 
 If a task was given as an argument to this skill, work through the read sequence then the implementation steps for it now.
