@@ -12,7 +12,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - Canvas always includes draft PRs (the main reminder message never does — unchanged).
 - Open PR rows carry the same fields in the same order as the reminder message's rows, except how authors and reviewers are rendered (see "Canvas content format").
 - WIP rows show last-push activity instead of age: drafts are ordered by activity, as the last push predicts which draft gets opened for review next better than its age does.
-- Draft PRs inactive for more than 2 months are always excluded.
+- Draft PRs with no activity for 60 days are always excluded.
 - One new input, off by default, no other new configurability.
 - The input takes the canvas link the user copies from Slack; the action parses the ID out of it.
 - The reminder message links to the canvas, so the transient message is a way in to the persistent view.
@@ -37,7 +37,7 @@ _Updated 2026-08-08 06:15 UTC_
 
 The two section headings are fixed strings, rendered as `## Open PRs` and `## Work in Progress` (shown bold above only so this example renders). When grouping is on, each repository is an `###` sub-heading under `## Open PRs` — no repeated top-level heading per repository.
 
-The canvas closes with a blank line, a `---` divider and a `_Updated <YYYY-MM-DD HH:MM UTC>_` line, preceded by a `_Showing the newest 50 …_` line when the fetch cap trimmed a section (Step 5). A canvas nobody has refreshed — action disabled, failing, or not yet run — otherwise looks identical to a current one, which defeats the point of a live view. UTC because there is no timezone input.
+The canvas closes with a blank line, a `---` divider and a `_Updated <YYYY-MM-DD HH:MM UTC>_` line, preceded by a `_Showing the newest …_` line when a fetch cap trimmed a section (Step 5). A canvas nobody has refreshed — action disabled, failing, or not yet run — otherwise looks identical to a current one, which defeats the point of a live view. UTC because there is no timezone input.
 
 No top-level heading. The canvas title lives on the tab, not in the document, and survives a full content replace (verified on `#pr-reminders-test`, 2026-08-08).
 
@@ -45,7 +45,7 @@ An empty section keeps its heading and shows one italic line instead of rows (St
 
 Authors and reviewers are plain names — GitHub name, falling back to username — never Slack mentions. Every run replaces the whole canvas, and each replace would re-notify everyone mentioned.
 
-A WIP row is: linked title, author, reviewers, activity chip (Step 3), then 💤 if idle for +48h. Never the 🚨 old-PR marker — it nags about review latency, which doesn't apply to work nobody has been asked to review yet.
+A WIP row is: linked title, author, commenters, activity chip (Step 3), then 💤 if idle for +48h. Commenters, never approvers: drafts skip the review and PR-comment calls (Step 2), so 💬 comes from timeline comments alone. Never the 🚨 old-PR marker — it nags about review latency, which doesn't apply to work nobody has been asked to review yet.
 
 "updated" is reader-facing wording only: the chip is backed by the head commit's committer date, not GitHub's `updated_at` (Step 2). Don't "fix" the mismatch by switching the data source — `updated_at` serves only as a fallback when the head commit can't be fetched.
 
@@ -71,7 +71,7 @@ Not an input, but same question: `/snooze ... for N days` comments apply to the 
 
 - Configurable thresholds (activity windows, draft staleness) — hardcoded for now.
 - Auto-creating or discovering a canvas — the user creates it themselves in Slack and pastes its link; the action never creates, deletes, or looks one up by channel.
-- Splitting canvas content if it exceeds Slack's canvas size limits. Deferred: an oversized canvas fails the write, and so the run, until the PR count drops. The logged markdown length (Step 6) is the clue. Revisit if it ever happens — the fetch caps at 50 per kind (R1).
+- Splitting canvas content if it exceeds Slack's canvas size limits. Deferred: an oversized canvas fails the write, and so the run, until the PR count drops. The logged markdown length (Step 6) is the clue. Revisit if it ever happens — the fetch caps at 50 open and 15 WIP PRs (R1).
 - Persisting canvas identity in `state` — the ID is supplied fresh via input every run, nothing to persist.
 - A "no PRs" message input for the canvas (a fixed fallback string is used instead).
 - A canvas-only mode. The message path always runs, and `pr-list-heading` stays required when `group-by-repository` is false.
@@ -129,11 +129,12 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Add `PRFetchOptions{IncludeDrafts bool}` and thread it through `Client.FindOpenPRs`, `Client.GetPRs`, and `getPRFilterFunc` (replacing the hardcoded `!result.pr.GetDraft()`).
 - Update the two call sites in `run.go` to pass `PRFetchOptions{}` (zero value) — behavior must stay byte-for-byte identical to today.
-- `capPRsToLimit` must cap drafts and non-drafts separately when `IncludeDrafts` is on (each up to `MaxPRsToFetch`), not the combined slice. The cap keeps the newest by creation date, so a shared capped slice would let drafts displace open PRs the message would otherwise show. Untouched when `IncludeDrafts` is off.
-- `FindOpenPRs` returns `(OpenPRsResult, error)` instead of `([]PR, error)`: `OpenPRsResult{PRs []PR; OpenPRsCapped, DraftPRsCapped bool}`, each flag set by `capPRsToLimit` when it actually trimmed that bucket. The canvas footer note (Steps 4-5) needs to know the cap fired, and no downstream length can tell: `excludeSnoozedPRs` runs after the cap (`githubclient.go`), and `canvascontent` prunes stale drafts on top, so a capped fetch routinely arrives as fewer than 50. `GetPRs` keeps `([]PR, error)` — nothing reads its cap.
-- The draft bucket sorts by `updated_at` desc, not creation date, so an over-50 draft fetch keeps the most recently active ones — the set the canvas orders and prunes by (Steps 3-4). Not the head-commit date: capping runs before `addReviewerInfoToPRs`, so `LastActivityAt` doesn't exist yet, and `updated_at` is the best proxy available at that point. The non-draft bucket keeps today's creation-date sort.
+- `capPRsToLimit` must cap drafts and non-drafts separately when `IncludeDrafts` is on, not the combined slice: non-drafts up to `MaxPRsToFetch` (50, unchanged), drafts up to a new `MaxDraftPRsToFetch` (15). The cap keeps the newest by creation date, so a shared capped slice would let drafts displace open PRs the message would otherwise show. Untouched when `IncludeDrafts` is off.
+- 15, not 50, because a WIP list that long is unreadable — the section is ordered newest-activity-first precisely because only its top is interesting. Fewer API calls is a side effect, not the reason.
+- `FindOpenPRs` returns `(OpenPRsResult, error)` instead of `([]PR, error)`: `OpenPRsResult{PRs []PR; OpenPRsCapped, DraftPRsCapped bool}`, each flag set by `capPRsToLimit` when it actually trimmed that bucket. The canvas footer note (Steps 4-5) needs to know the cap fired, and no downstream length can tell: `excludeSnoozedPRs` runs after the cap (`githubclient.go`), and `canvascontent` prunes stale drafts on top, so a capped fetch routinely arrives as fewer PRs than its cap. `GetPRs` keeps `([]PR, error)` — nothing reads its cap.
+- The draft bucket sorts by `updated_at` desc, not creation date, so an over-cap draft fetch keeps the most recently active ones — the set the canvas orders and prunes by (Steps 3-4). Not the head-commit date: capping runs before `addReviewerInfoToPRs`, so `LastActivityAt` doesn't exist yet, and `updated_at` is the best proxy available at that point. The non-draft bucket keeps today's creation-date sort.
 - `logFoundPRs`'s "Found %d open pull requests" gains a draft count when `IncludeDrafts` is on. Log text only.
-- Test coverage check: already good — `githubclient_test.go` has an explicit "draft PR should be filtered out" case. No gap here. Its five `FindOpenPRs`/`GetPRs` call sites take the new argument, and the `FindOpenPRs` ones read `.PRs` off the result, but no assertion changes. Add table-driven cases: `IncludeDrafts: true` lets a draft PR through, `IncludeDrafts: true` with over `MaxPRsToFetch` PRs of both kinds keeps the same non-draft set as `IncludeDrafts: false` would, and both cap flags set only for the bucket that overflowed.
+- Test coverage check: already good — `githubclient_test.go` has an explicit "draft PR should be filtered out" case. No gap here. Its five `FindOpenPRs`/`GetPRs` call sites take the new argument, and the `FindOpenPRs` ones read `.PRs` off the result, but no assertion changes. Add table-driven cases: `IncludeDrafts: true` lets a draft PR through, `IncludeDrafts: true` with both buckets over their caps keeps the same non-draft set as `IncludeDrafts: false` would, drafts are cut at the lower `MaxDraftPRsToFetch`, and both cap flags set only for the bucket that overflowed.
 - `testhelpers/mockgithubclient` needs no change: it mocks the GitHub *services*, not `githubclient.Client`, so the interface change flows through `NewClient` on its own.
 
 ### R2. Refactor: shared repository-grouping helper
@@ -180,7 +181,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
   `ctx` is the caller's fetch context (`prFetchTimeout`), not the errgroup's derived `prProcessingCtx` — the errgroup cancels its own child on `Wait`, never `ctx` — so this fires only when the budget actually ran out.
 - Deliberately not fatal: a reminder with missing reviewers beats no reminder at all. The log line is the whole diagnosis.
-- Independent of the canvas, but the canvas makes the path more likely by doubling the fetch (Step 2).
+- Independent of the canvas, but the canvas makes the path more likely by growing the fetch (Step 2).
 - Per-PR failures unrelated to the deadline (a single 403, one flaky call) are untouched, still one "Unable to fetch reviews/comments" line each.
 - Test: a mock PR service that blocks past a short fetch timeout → `FindOpenPRs` still returns its PRs, and the warning is logged. Capture via `log.SetOutput` to a buffer.
 
@@ -203,8 +204,18 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 
 - Add `ListCommits(ctx, owner, repo string, number int, opts *github.ListOptions) ([]*github.RepositoryCommit, *github.Response, error)` to the existing `GithubPullRequestsService` interface — matches `(*github.PullRequestsService).ListCommits` in `go-github/v78` exactly. No new service to wire in: `client`, `NewClient` and `GetAuthenticatedClient` are unchanged.
 - No new GitHub permission: [the endpoint's docs](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-commits-on-a-pull-request) state it needs `"Pull requests" repository permissions (read)`, which the action already requires.
-- Add `PRFetchOptions.FetchActivityTimestamps bool`, and thread `PRFetchOptions` into `addReviewerInfoToPRs` too — R1 stops at `FindOpenPRs`/`GetPRs`/`getPRFilterFunc`, and the fan-out below is where this flag is read. When set, **drafts only** get a 4th concurrent call in `addReviewerInfoToPRs`'s per-PR fan-out, alongside the existing three (reviews, comments, timeline comments): resolve the PR's newest commit and record its `commit.committer.date` — the true last-push time, unlike `updated_at` (which also changes on comments, labels, etc.). In Go: `RepositoryCommit.Commit.Committer.Date`. Not `RepositoryCommit.Committer` — that's a `*User`, whose `CreatedAt` is the account's, so the wrong reach compiles and yields a nonsense timestamp. Add the resolved timestamp to `models.go`'s existing per-PR "Found %d reviews, %d PR comments…" line rather than logging a new one per PR.
-- Gate on `pr.GetDraft()` in the fan-out. Only WIP rows read `LastActivityAt` (Steps 4-5), so fetching it for open PRs would be up to 50 wasted calls per run. Filtering and capping already ran by then, so filtered-out PRs cost nothing. Snoozed drafts still cost one call — the snooze isn't known until their timeline comments come back in the same fan-out.
+- Add `PRFetchOptions.FetchActivityTimestamps bool`, and thread `PRFetchOptions` into `addReviewerInfoToPRs` too — R1 stops at `FindOpenPRs`/`GetPRs`/`getPRFilterFunc`, and the fan-out below is where this flag is read.
+- With the flag set, `addReviewerInfoToPRs`'s per-PR fan-out branches on `pr.GetDraft()`:
+  - Open PRs: today's three concurrent calls (reviews, PR comments, timeline comments), unchanged.
+  - Drafts: two — timeline comments and the new commit lookup. `ListReviews` and `ListComments` are skipped: nobody is asked to review a draft, so approvers are close to meaningless there, and timeline comments already carry the 💬 commenters a WIP row shows (see "Canvas content format"). Timeline comments are needed regardless, for `/snooze`.
+  - Drafts therefore cost 2 calls, less than an open PR's 3.
+- Nothing downstream needs to know: `asPR()` builds `ApprovedByUsers` from a nil review slice as empty, and `CommentedByUsers` from timeline comments alone. `printResult()`'s "Found %d reviews, %d PR comments…" line would read `0, 0` for every draft, so give drafts their own wording — the counts weren't fetched, they aren't zero.
+- The commit lookup resolves the PR's newest commit and records its `commit.committer.date` — the true last-push time, unlike `updated_at` (which also changes on comments, labels, etc.). In Go: `RepositoryCommit.Commit.Committer.Date`. Not `RepositoryCommit.Committer` — that's a `*User`, whose `CreatedAt` is the account's, so the wrong reach compiles and yields a nonsense timestamp. Log the resolved timestamp on the draft's own result line rather than adding a line per PR.
+- Only WIP rows read `LastActivityAt` (Steps 4-5), so the lookup is draft-only — running it for open PRs would be up to 50 wasted calls per run. Filtering and capping already ran by then, so filtered-out PRs cost nothing. Snoozed drafts still cost both calls — the snooze isn't known until their timeline comments come back in the same fan-out.
+- Drop long-stale drafts before the fan-out, not just before the commit lookup: with `IncludeDrafts` on, a draft whose `updated_at` is older than `PRFetchOptions.MaxDraftInactivity` is dropped right after filtering, before capping. `updated_at` is an upper bound on the last push, so such a draft can only lose the staleness rule (Step 4) anyway — dropping it here is outcome-equivalent and saves both of its calls, not just the commit lookup. Log the dropped count.
+  - `MaxDraftInactivity` is a `time.Duration` on `PRFetchOptions`, passed by `run.go` from `canvascontent.MaxDraftPRInactivity` (Step 4). `githubclient` doesn't own the threshold, and the zero value means no pruning.
+  - Step 4's prune stays. `LastActivityAt` is the head commit's date, which can be older than `updated_at`: a draft commented on last week with a 90-day-old last push passes here and is dropped there.
+  - Pruning before capping also makes the cap flag say something true — it then trims only drafts the canvas could have shown.
 - Resolution, one call per PR:
   - `ListCommits` with `ListOptions{PerPage: 100}`. If `response.NextPage != 0` (over 100 commits), refetch at `response.LastPage`. `LastPage` is 0 when the `Link` header carries no `last` rel — refetching page 0 then returns page 1 again, its last element isn't the head commit, and the SHA check below catches it. Don't add a separate guard.
   - Take that page's last element: the endpoint returns commits oldest first, head commit last (verified on PRs of 2-79 commits across four repositories).
@@ -214,8 +225,8 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Add `PR.LastActivityAt *time.Time`: head-commit date, else `updated_at`, else nil. Also nil for every non-draft PR, and for every PR when `FetchActivityTimestamps` is off. Carry it on `FetchReviewsResult` too — `asPR()` builds the `PR`.
 - Fixtures and mocks: `mockPullRequestService` gains per-PR commits, and PRs used in canvas tests get `Head.SHA` plus a matching commit. Existing fixtures stay as they are — they exercise the nil path.
 - Extend `testhelpers/mockgithubclient`'s `mockPullRequestService` with `ListCommits`.
-- `ReviewsFetchTimeout` (10s) is unchanged — the 4th call runs concurrently with the other three.
-- `run.go`'s `prFetchTimeout` must be raised when the canvas is on: 60s → 120s. R1's per-kind cap doubles the fetch to up to 100 PRs, each with the same 3-call fan-out plus a 4th for drafts, all at `DefaultGitHubAPIConcurrencyLimit` (3) — ~34 sequential rounds instead of ~17. Doubling keeps the headroom 60s already leaves at 50 PRs, rather than adding new slack. Wiring in Step 7.
+- `ReviewsFetchTimeout` (10s) is unchanged — a draft's two calls run concurrently, as the three do today.
+- `run.go`'s `prFetchTimeout` must be raised when the canvas is on: 60s → 90s. R1's caps add up to 15 drafts on top of 50 open PRs, so the fan-out runs ~22 sequential rounds at `DefaultGitHubAPIConcurrencyLimit` (3) instead of ~17. 90s scales the headroom 60s already leaves at 50 PRs by that same factor, rather than adding new slack. Wiring in Step 7.
 - Overrunning it still degrades rather than fails, but no longer silently: R4 logs a warning naming the deadline. The degradation itself — PRs with no reviewers and no timeline comments, snoozed PRs back in the message — is what Step 7's equivalence test cannot catch, since that test runs on mocks.
 
 ### 3. `prparser`: activity text + activity sort
@@ -234,11 +245,11 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - `Content` carries `GeneratedAt time.Time` for the footer line, set by the caller (Step 7) rather than read from the clock here, so `canvasbuilder`'s output is deterministic under test (Step 5).
 - Keep the two sections as separate named fields on `Content`, not one merged list with a per-PR kind flag, so a third section is a field rather than a rework.
 - Section headings are fixed strings owned by `canvasbuilder` (Step 5), so `contentInputs.PRListHeading` is unread here — no `<pr_count>` substitution, no "required when `group-by-repository` is false" coupling.
-- Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (2 months / 60 days). A nil `LastActivityAt` is kept — unknown is not stale (Step 3).
+- Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (60 days). A nil `LastActivityAt` is kept — unknown is not stale (Step 3). Exported, so `run.go` can hand the same threshold to the fetch (Step 2).
 - No whole-canvas "nothing to show" case: each section falls back on its own, so the both-empty canvas is just both fallbacks (see Step 5).
 - `Content` carries `OpenPRsCapped` / `WIPPRsCapped bool` for the footer note (Step 5), passed in by the caller (Step 7) from `githubclient.OpenPRsResult` (R1). Never derived from `len(section)` (R1) — the staleness prune above shrinks the WIP list further still.
 - Log the counts put on the canvas: open PRs, drafts, and drafts dropped as inactive — otherwise a missing draft has no explanation.
-- Tests: the staleness cutoff on both sides, a nil-activity draft kept, drafts ordered newest-activity first, open PRs grouped and flat, and each cap flag reaching `Content` while its section holds fewer than 50 PRs.
+- Tests: the staleness cutoff on both sides, a nil-activity draft kept, drafts ordered newest-activity first, open PRs grouped and flat, and each cap flag reaching `Content` while its section holds fewer PRs than its cap.
 
 ### 5. `canvasbuilder` package
 
@@ -246,32 +257,37 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 - Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `_italic_`, `[label](url)`, backtick code spans, `~~strike~~`, `##`/`###` headings, `-` bullets, `---` dividers ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)). All of it rendered correctly in live `canvases.edit` replaces against the `#pr-reminders-test` canvas tab, 2026-08-08 — including this plan's own fixed strings (`_No open PRs_`, `_Showing the newest 50 open PRs_`, the `---` divider and the italic `_Updated …_` footer).
 - No Slack mentions: `canvasbuilder` never reads `pr.Author.SlackUserID`, and renders authors and reviewers through `GetGitHubName()`. Canvas markdown does support `![](@USERID)` — don't switch to it (see "Canvas content format").
 - Escape every GitHub-sourced string before it goes into markdown — PR titles, author and reviewer names, repository paths. Block Kit keeps text and styling in separate fields, so nothing in a title can be read as formatting there; a canvas row is one string, where it can. `Add _debug_ flag` italicizes, `**WIP** rewrite` bolds, `` Use `make test` `` code-spans, and `Fix [ABC-123] crash` breaks the link label.
-  - Add `escapeMarkdown(string) string` in `canvasbuilder`, backslash-escaping `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`. Backslash first, or it double-escapes what the later replacements add.
+  - Add `escapeMarkdown(string) string` in `canvasbuilder`, backslash-escaping `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `>`, `&`. Backslash first, or it double-escapes what the later replacements add.
   - Link targets need no escaping: they come from GitHub (`GetHTMLURL()`, `GetPullsURL()`) and can't contain a space or a `)`.
   - **Verified in the same probe**, raw rows next to escaped ones. Slack's canvas parser accepts [CommonMark](https://spec.commonmark.org/0.31.2/#backslash-escapes) backslash escapes even though it documents none: every one of `\`, `` ` ``, `*`, `_`, `[`, `]`, `~` was consumed and its character survived, bold and code spans were suppressed, and escapes held inside link labels too. No code-span fallback needed.
+  - **`<`, `>` and `&`, verified 2026-08-09** on the same canvas, and the reason each is in the set:
+    - Raw `<script>alert(1)</script>`, `<b>bold</b>` and `<!-- old -->` all render literally — the parser does not interpret HTML tags. `<` and `>` are escaped for the autolink case, not for injection.
+    - Raw `<https://example.com>` autolinks; escaped, it stays literal text. A PR title carrying a bare URL in angle brackets is the case.
+    - Raw `&amp;` decodes to `&`, so HTML entities are live. Without escaping, a title reading `Fix &amp; in output` renders as `Fix & in output` — the wrong text. `\&` renders `&` and blocks the decoding.
+    - `\<`, `\>` and `\&` are all consumed, leaving no visible backslash.
   - Delimiter behaviour, same probe, for anyone tempted to trim the escape set:
     - `_` is emphasis only at word boundaries: `Add _debug_ flag` italicizes, a raw `fix_the_thing_now` renders as-is. Keep `_` — the first case is a real PR title.
     - Strikethrough is `~~`, not `~`: `Remove ~~legacy~~ shim` strikes, a lone `~strike~` renders literally. Keep `~`.
     - Spaced delimiters are inert (`a * b * c`, `1 _ 2 _ 3`, `50% * 2` all render as typed). Escaping them anyway costs nothing and keeps the helper free of context rules.
   - Escaping belongs to `canvasbuilder`, not `canvascontent`: it's a property of the output format, and a third renderer would want its own rules.
 - Open PR rows: linked title, age text with the old-PR warning marker, author, reviewers. No strike-through, no 🚀 — the canvas fetch lists open PRs only, so a closed or merged PR can never reach a row here (see Non-goals). Those two markers stay message-only.
-- WIP rows: linked title, author, reviewers, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals). Empty activity text (Step 3) renders no chip and no 💤, leaving the row title-author-reviewers.
+- WIP rows: linked title, author, commenters, `PR.GetActivityText()` as a code span, then 💤 if `PR.IsIdle()`. No age text, no 🚨, no 🚀 (see Goals). The R3 reviewers helper renders the 💬 group; drafts never populate `Approvers` (Step 2), so the ✅ group can't appear and needs no special case here. Empty activity text (Step 3) renders no chip and no 💤, leaving the row title-author-reviewers.
 - Structure: a fixed `## Open PRs` heading and its list, then a fixed `## Work in Progress` heading and the draft list. Both headings always render, `group-by-repository` or not.
   - Grouped: each repository is an `###` sub-heading under `## Open PRs`, linking to the repository's pulls page. `canvasbuilder` builds that heading from `RepositoryPRs.Repository`, taking the URL from `Repository.GetPullsURL()` (R2) — no "Open PRs in " prefix, which would repeat the parent heading.
 - Render both through one internal `renderSection(heading string, prs []prparser.PR, renderRow func(prparser.PR) string, emptyText string)`, not two bespoke paths. The two sections differ only in their row renderer and empty text, and a third section then costs one call.
 - Empty section: heading still renders, followed by one italic line — `_No open PRs_` / `_No work in progress_`. An empty section means "nothing here right now", which a missing heading can't say; it would read as a broken render instead. Grouped mode with no open PRs renders the same single line, no repository sub-headings.
 - Footer, after both sections: blank line, `---`, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt` (see "Canvas content format").
-- Above the `Updated` line, when either cap flag is set (Step 4), one italic line naming what was cut: `_Showing the newest 50 open PRs_` / `_Showing the newest 50 WIP PRs_` / both in one line. Otherwise a capped canvas silently misses PRs, and only the run log says why.
+- Above the `Updated` line, when either cap flag is set (Step 4), one italic line naming what was cut: `_Showing the newest 50 open PRs_` / `_Showing the newest 15 WIP PRs_` / both in one line, the counts coming from `MaxPRsToFetch` and `MaxDraftPRsToFetch` (R1). Otherwise a capped canvas silently misses PRs, and only the run log says why.
 
 #### Snapshot tests
 
 The canvas is one markdown string, so golden files cover its formatting more cheaply and more completely than element-level assertions.
 
-- `internal/canvasbuilder/testdata/*.md` hold the expected output, one file per case: grouped, flat, empty open section, empty WIP section, both empty, an old PR, an idle draft, a draft with unknown activity, a capped section, and a PR whose title and author name carry `_`, `*`, `[`, `]`, `~`, `` ` `` and `\`.
+- `internal/canvasbuilder/testdata/*.md` hold the expected output, one file per case: grouped, flat, empty open section, empty WIP section, both empty, an old PR, an idle draft, a draft with unknown activity, a capped section, and a PR whose title and author name carry `_`, `*`, `[`, `]`, `~`, `` ` ``, `\`, `<`, `>` and `&amp;`.
 - The test compares byte-for-byte, and rewrites the golden file instead when `-update` is passed (`flag.Bool("update", false, …)`). A deliberate format change is then `make update-canvas-snapshots` plus a reviewable diff, not a hand-edited expectation.
 - Add that Makefile target: `go test ./internal/canvasbuilder -update`.
 - Determinism: `Content.GeneratedAt` is fixed by the test (Step 4), and PR fixtures set `CreatedAt`/`LastActivityAt` as offsets from `time.Now()` — `prparser` reads the clock directly, and offsets keep the rendered age and activity text stable.
-  - Keep those offsets clear of every boundary the rendering rounds or thresholds on: 1h and 24h (`GetPRAgeText`), 48h (`IsIdle`), 60 days (`MaxDraftPRInactivity`), and any half-unit `math.Round` flips on. `30m`, `5h`, `3d`, `10d` are safe; `24h` and `1h30m` flake, since the clock advances between fixture construction and render.
+  - Keep those offsets clear of every boundary the rendering rounds or thresholds on: 1h and 24h (`GetPRAgeText`), 48h (`IsIdle`), `MaxDraftPRInactivity`, and any half-unit `math.Round` flips on. `30m`, `5h`, `3d`, `10d` are safe; `24h` and `1h30m` flake, since the clock advances between fixture construction and render.
   - Give canvas fixtures a real `HTMLURL`. `getTestPR` sets none, so a fixture copied from it renders `[title]()` into the golden file.
 
 ### 6. `slackclient`: full canvas content replace
@@ -310,21 +326,21 @@ The canvas is one markdown string, so golden files cover its formatting more che
 
 `post` mode's message path already calls `FindOpenPRs` over the same repositories with the same filters; only the options differ. Share that one fetch instead of running it twice:
 
-- `post`: one `FindOpenPRs(..., PRFetchOptions{IncludeDrafts: canvasOn, FetchActivityTimestamps: canvasOn})`, where `canvasOn` is `cfg.PRTrackerCanvasID != ""`. The message path takes the non-draft subset (filter on `pr.GetDraft()`, the same predicate `getPRFilterFunc` applies today); the canvas step takes the full set.
+- `post`: one `FindOpenPRs(..., PRFetchOptions{IncludeDrafts: canvasOn, FetchActivityTimestamps: canvasOn, MaxDraftInactivity: canvascontent.MaxDraftPRInactivity})`, where `canvasOn` is `cfg.PRTrackerCanvasID != ""`. The message path takes the non-draft subset (filter on `pr.GetDraft()`, the same predicate `getPRFilterFunc` applies today); the canvas step takes the full set.
 - `update`: two fetches, inherently. The message re-fetches state-tracked refs via `GetPRs`, which includes PRs now closed or merged (rendered struck-through / 🚀) — those can never come from a list of open PRs. The canvas gets a second, separate `FindOpenPRs` with both options on.
 - Saves roughly one repository list call plus 3 calls per open PR (reviews, PR comments, timeline comments) per `post` run.
 - Placement: the canvas refresh takes a `githubclient.OpenPRsResult` as an argument and never fetches for itself, so it has one code path in both modes.
   - `post`: `runPostMode` keeps its own fetch and hands the result back, so `Run()` can pass it to the canvas refresh. Not lifted into `Run()` ahead of the mode switch: the fetch belongs to `post` mode only, so hoisting it would mean an `if cfg.RunMode == RunModePost` immediately followed by `switch cfg.RunMode`, branching on the mode twice.
   - Return a small result type, not a bare slice: `runPostMode(...) (postModeResult, error)` with `postModeResult{fetched githubclient.OpenPRsResult; prsFetched bool}`. `prsFetched` is the canvas's go/no-go. A bare slice can't carry it — "fetch failed" and "fetch succeeded, found nothing" would both be an empty slice, and only the second may reach the canvas. Refreshing on the first would wipe the canvas to `_No open PRs_` every time GitHub is unreachable. `OpenPRsResult` (R1) carries the cap flags the footer note needs (Step 4).
   - `runPostMode` returns `prsFetched: true` from every path after the fetch, its no-PRs early return included, so the canvas still refreshes when the message path stops early.
-  - Timeout: `prFetchTimeout` (60s) is a function-local const in `runPostMode` and `runUpdateMode` today. Both `Run()`-level calls need their own `context.WithTimeout`, so lift it to package scope rather than adding a third copy, as two consts — 60s, and 120s when the canvas is on (Step 2). The canvas-on value applies to `post` mode's shared fetch and to `update` mode's canvas fetch; `update` mode's `GetPRs` keeps 60s, since its PR count is unchanged.
+  - Timeout: `prFetchTimeout` (60s) is a function-local const in `runPostMode` and `runUpdateMode` today. Both `Run()`-level calls need their own `context.WithTimeout`, so lift it to package scope rather than adding a third copy, as two consts — 60s, and 90s when the canvas is on (Step 2). The canvas-on value applies to `post` mode's shared fetch and to `update` mode's canvas fetch; `update` mode's `GetPRs` keeps 60s, since its PR count is unchanged.
   - `update`: `Run()` calls `FindOpenPRs` for the canvas only, and only when the canvas is on. Not before the switch like `post` — it belongs to the canvas attempt (step 2 above), after `runUpdateMode` has already updated the message. A failed fetch becomes `canvasErr`, never an early return, so it cannot stop the message update. `runUpdateMode` is untouched.
 
 What keeps `post` mode's message byte-identical when the canvas is on:
 
 - The GitHub call itself is unchanged. `prService.List` returns drafts either way — today's exclusion is client-side in `getPRFilterFunc` — so `IncludeDrafts` cannot change which PRs the single fetched page holds.
 - Drafts are removed by exactly the predicate that excludes them today, before `prparser.ParsePRs` — so PR count, ordering, summary text and state saving all see the same set.
-- The `MaxPRsToFetch` cap is applied per kind (R1), so drafts can't displace open PRs on a >50-PR fetch.
+- Capping is per kind, and drafts have their own lower cap (R1), so they can't displace open PRs on an over-cap fetch.
 - Filters, snooze exclusion and every other fetch-path step are untouched — `IncludeDrafts` only removes the draft check.
 - `FetchActivityTimestamps` adds no fatal path: a failed `ListCommits` falls back to `updated_at` with a warning (Step 2), and the message never reads `LastActivityAt`.
 - Canvas off → zero-value options → today's call exactly.
@@ -390,8 +406,11 @@ What keeps `post` mode's message byte-identical when the canvas is on:
 
 ### Negative
 
-- Opted-in runs fetch drafts on top of open PRs, and make one extra GitHub API call per draft (commit lookup for activity), adding to rate-limit consumption. `update` mode also fetches twice; `post` mode shares one fetch (Step 7).
-- The PR fetch timeout doubles when the canvas is on (Step 2), so a slow or unreachable GitHub takes twice as long to surface.
+- Opted-in runs fetch up to 15 drafts on top of the open PRs, at two GitHub API calls each (timeline comments, commit lookup), adding to rate-limit consumption. `update` mode also fetches twice; `post` mode shares one fetch (Step 7).
+- At the caps that is ~180 calls per `post` run against ~150 today, against the Actions token's 1000 requests/hour per repository. The low draft cap (R1), the leaner draft fan-out and the stale-draft prune (Step 2) are together what keep it near flat.
+- With the canvas on, a grouped message that fills the block limit shows one repository fewer — the footer link reserves two blocks (Step 8).
+- The PR fetch timeout rises from 60s to 90s when the canvas is on (Step 2), so a slow or unreachable GitHub takes half as long again to surface.
+- WIP rows can't show approvers, since drafts skip the review calls (Step 2). Adding them back is two calls per draft, not a rendering change.
 - `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
 - Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing.
 - The canvas is a golden-file surface: any formatting change shows up as a snapshot diff to regenerate (Step 5). Intended, but it does make cosmetic tweaks a two-step change.
