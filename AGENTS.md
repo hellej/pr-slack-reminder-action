@@ -86,7 +86,7 @@ Don't stack hedges:
 
 ## Architecture
 
-Two run modes (`run-mode` input) drive the pipeline: **post** sends a new reminder and saves state; **update** loads state, re-fetches those PRs, and edits or deletes the existing message.
+Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** loads state, re-fetches those PRs, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
@@ -104,21 +104,9 @@ Two run modes (`run-mode` input) drive the pipeline: **post** sends a new remind
 - Repository-specific mappings use semicolon/newline-separated format: `"repo1: value1; repo2: value2"`
 - JSON inputs are parsed with `DisallowUnknownFields()` for strict validation
 
-### Repository Processing
-
-- Multiple repositories supported via `config.Repositories` slice of `Repository` structs (`config.InputGithubRepositories`)
-- If `config.InputGithubRepositories` is set, `config.EnvGithubRepository` is ignored
-- Repository filters are matched by full path (`owner/repo`) first, falling back to bare repository name
-- Each PR maintains its `Repository` field for context throughout the pipeline
-
 ### Error Handling
 
 - Filters validate mutual exclusivity (e.g., can't use both `authors` and `ignored-authors`)
-
-### Slack Message Construction
-
-- Uses Slack Block Kit with `RichTextBlock` and `RichTextSection`
-- `IsOldPR` field controls age indicator styling (emoji + bold)
 
 ## File Relationships
 

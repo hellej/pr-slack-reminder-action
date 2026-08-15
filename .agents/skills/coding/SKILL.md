@@ -20,4 +20,8 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 3. Run `make test`; refactor if needed
 4. Update the package's `.spec.md` in the same change if behaviour changed (use [spec-writer skill](../spec-writer/SKILL.md))
 
-If a task was given as an argument to this skill, work through the read sequence then the implementation steps for it now.
+## Implementing a Plan
+
+If a task or plan was given as an argument to this skill, work through the read sequence then the implementation steps for it now.
+
+You are allowed to make small adjustments to the plan if you find a better way to implement it (also update the plan file), but do not change the plan's intent or scope without explicit approval.
