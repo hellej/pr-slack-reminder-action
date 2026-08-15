@@ -22,6 +22,4 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 
 ## Implementing a Plan
 
-If a task or plan was given as an argument to this skill, work through the read sequence then the implementation steps for it now.
-
 You are allowed to make small adjustments to the plan if you find a better way to implement it (also update the plan file), but do not change the plan's intent or scope without explicit approval.
