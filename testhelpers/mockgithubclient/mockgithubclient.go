@@ -84,24 +84,30 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 	}
 }
 
-func NewReview(id int64, state, login, name, body string, userType ...string) *github.PullRequestReview {
+func NewReview(login, name, state string, userType ...string) *github.PullRequestReview {
+	return &github.PullRequestReview{
+		User:  newUser(login, name, userType...),
+		State: github.Ptr(state),
+	}
+}
+
+func NewTimelineComment(login, name, body string, createdAt time.Time, userType ...string) *github.IssueComment {
+	return &github.IssueComment{
+		User:      newUser(login, name, userType...),
+		Body:      github.Ptr(body),
+		CreatedAt: &github.Timestamp{Time: createdAt},
+	}
+}
+
+func newUser(login, name string, userType ...string) *github.User {
 	var t *string
 	if len(userType) > 0 && userType[0] != "" {
 		t = github.Ptr(userType[0])
 	}
-	var b *string
-	if body != "" {
-		b = github.Ptr(body)
-	}
-	return &github.PullRequestReview{
-		ID:   github.Ptr(id),
-		Body: b,
-		User: &github.User{
-			Login: github.Ptr(login),
-			Name:  github.Ptr(name),
-			Type:  t,
-		},
-		State: github.Ptr(state),
+	return &github.User{
+		Login: github.Ptr(login),
+		Name:  github.Ptr(name),
+		Type:  t,
 	}
 }
 

@@ -150,20 +150,13 @@ func TestSnapshotsPostMode(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				31: {
-					mockgithubclient.NewReview(1, "APPROVED", "dana", "Dana Davis", "LGTM 🚀"),
-					mockgithubclient.NewReview(2, "COMMENTED", "erin", "Erin Evans", "One question..."),
+					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
+					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
 				},
 			},
 			timelineCommentsByPRNumber: map[int][]*github.IssueComment{
 				32: {
-					{
-						Body:      github.Ptr("Could you split this into two commits?"),
-						CreatedAt: &github.Timestamp{Time: now.Add(-1 * time.Hour)},
-						User: &github.User{
-							Login: github.Ptr("frank"),
-							Name:  github.Ptr("Frank Foster"),
-						},
-					},
+					mockgithubclient.NewTimelineComment("frank", "Frank Foster", "Could you split this into two commits?", now.Add(-1*time.Hour)),
 				},
 			},
 		},

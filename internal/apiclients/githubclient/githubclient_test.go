@@ -13,6 +13,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 )
 
 type mockPullRequestService struct {
@@ -93,21 +94,6 @@ func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
 	return m.mockResponse, m.mockError
 }
 
-func NewReview(login, name, state string, userType ...string) *github.PullRequestReview {
-	var t *string
-	if len(userType) > 0 && userType[0] != "" {
-		t = github.Ptr(userType[0])
-	}
-	return &github.PullRequestReview{
-		User: &github.User{
-			Login: github.Ptr(login),
-			Name:  github.Ptr(name),
-			Type:  t,
-		},
-		State: github.Ptr(state),
-	}
-}
-
 func NewComment(login, name string, userType ...string) *github.PullRequestComment {
 	var t *string
 	if len(userType) > 0 && userType[0] != "" {
@@ -120,21 +106,6 @@ func NewComment(login, name string, userType ...string) *github.PullRequestComme
 			Type:  t,
 		},
 		Body: github.Ptr("Sample comment body"),
-	}
-}
-
-func NewTimelineComment(login, name string, userType ...string) *github.IssueComment {
-	var t *string
-	if len(userType) > 0 && userType[0] != "" {
-		t = github.Ptr(userType[0])
-	}
-	return &github.IssueComment{
-		User: &github.User{
-			Login: github.Ptr(login),
-			Name:  github.Ptr(name),
-			Type:  t,
-		},
-		Body: github.Ptr("Sample issue comment body"),
 	}
 }
 
@@ -203,6 +174,8 @@ func TestGetAuthenticatedClient(t *testing.T) {
 	}
 }
 
+const sampleCommentBody = "Sample issue comment body"
+
 func TestFindOneOrNoPRs(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -232,9 +205,9 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			},
 			mockReviews: map[int][]*github.PullRequestReview{
 				123: {
-					NewReview("approver1", "Approver One", "APPROVED"),
-					NewReview("commenter1", "Commenter One", "COMMENTED"),
-					NewReview("dependabot", "", "APPROVED", "Bot"),
+					mockgithubclient.NewReview("approver1", "Approver One", "APPROVED"),
+					mockgithubclient.NewReview("commenter1", "Commenter One", "COMMENTED"),
+					mockgithubclient.NewReview("dependabot", "", "APPROVED", "Bot"),
 				},
 			},
 			mockComments:            map[int][]*github.PullRequestComment{},
@@ -301,8 +274,8 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			},
 			mockReviews: map[int][]*github.PullRequestReview{
 				126: {
-					NewReview("reviewer1", "Reviewer One", "COMMENTED"),
-					NewReview("reviewer1", "Reviewer One", "APPROVED"),
+					mockgithubclient.NewReview("reviewer1", "Reviewer One", "COMMENTED"),
+					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
 				},
 			},
 			mockComments:            map[int][]*github.PullRequestComment{},
@@ -327,8 +300,8 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			},
 			mockReviews: map[int][]*github.PullRequestReview{
 				127: {
-					NewReview("pr-author", "PR Author", "COMMENTED"),
-					NewReview("external-reviewer", "External Reviewer", "APPROVED"),
+					mockgithubclient.NewReview("pr-author", "PR Author", "COMMENTED"),
+					mockgithubclient.NewReview("external-reviewer", "External Reviewer", "APPROVED"),
 				},
 			},
 			mockComments:            map[int][]*github.PullRequestComment{},
@@ -353,9 +326,9 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			},
 			mockReviews: map[int][]*github.PullRequestReview{
 				128: {
-					NewReview("dependabot[bot]", "", "APPROVED", "Bot"),
-					NewReview("codecov[bot]", "", "COMMENTED", "Bot"),
-					NewReview("human-reviewer", "Human Reviewer", "COMMENTED"),
+					mockgithubclient.NewReview("dependabot[bot]", "", "APPROVED", "Bot"),
+					mockgithubclient.NewReview("codecov[bot]", "", "COMMENTED", "Bot"),
+					mockgithubclient.NewReview("human-reviewer", "Human Reviewer", "COMMENTED"),
 				},
 			},
 			mockComments:            map[int][]*github.PullRequestComment{},
@@ -384,8 +357,8 @@ func TestFindOneOrNoPRs(t *testing.T) {
 						User:  nil,
 						State: github.Ptr("APPROVED"),
 					},
-					NewReview("", "Empty Login User", "COMMENTED"),
-					NewReview("valid-reviewer", "Valid Reviewer", "APPROVED"),
+					mockgithubclient.NewReview("", "Empty Login User", "COMMENTED"),
+					mockgithubclient.NewReview("valid-reviewer", "Valid Reviewer", "APPROVED"),
 				},
 			},
 			mockComments:            map[int][]*github.PullRequestComment{},
@@ -410,8 +383,8 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			},
 			mockReviews: map[int][]*github.PullRequestReview{
 				130: {
-					NewReview("review-commenter", "Review Commenter", "COMMENTED"),
-					NewReview("approver", "Approver", "APPROVED"),
+					mockgithubclient.NewReview("review-commenter", "Review Commenter", "COMMENTED"),
+					mockgithubclient.NewReview("approver", "Approver", "APPROVED"),
 				},
 			},
 			mockComments: map[int][]*github.PullRequestComment{
@@ -445,10 +418,10 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			mockComments: map[int][]*github.PullRequestComment{},
 			mockTimelineComments: map[int][]*github.IssueComment{
 				131: {
-					NewTimelineComment("issue-commenter", "Issue Commenter"),
-					NewTimelineComment("another-issue-commenter", "Another Issue Commenter"),
-					NewTimelineComment("author", "PR Author"),      // should be excluded (PR author)
-					NewTimelineComment("bot-commenter", "", "Bot"), // should be excluded (bot)
+					mockgithubclient.NewTimelineComment("issue-commenter", "Issue Commenter", sampleCommentBody, time.Time{}),
+					mockgithubclient.NewTimelineComment("another-issue-commenter", "Another Issue Commenter", sampleCommentBody, time.Time{}),
+					mockgithubclient.NewTimelineComment("author", "PR Author", sampleCommentBody, time.Time{}),      // should be excluded (PR author)
+					mockgithubclient.NewTimelineComment("bot-commenter", "", sampleCommentBody, time.Time{}, "Bot"), // should be excluded (bot)
 				},
 			},
 			expectedPRCount:         1,
@@ -935,8 +908,8 @@ func TestFindOpenPRs_ReviewsPartialErrors(t *testing.T) {
 		},
 		reviewsByPRNumber: map[int][]*github.PullRequestReview{
 			102: { // success case only
-				NewReview("approver2", "Approver Two", "APPROVED"),
-				NewReview("commenter2", "Commenter Two", "COMMENTED"),
+				mockgithubclient.NewReview("approver2", "Approver Two", "APPROVED"),
+				mockgithubclient.NewReview("commenter2", "Commenter Two", "COMMENTED"),
 			},
 		},
 		commentsByPRNumber: map[int][]*github.PullRequestComment{},

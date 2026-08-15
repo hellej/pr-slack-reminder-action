@@ -554,21 +554,21 @@ func TestScenarios(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				*getTestPRs(GetTestPRsOptions{}).PR1.Number: {
-					mockgithubclient.NewReview(1, "APPROVED", "reviewer1", "", "LGTM 🙏🏻"),
-					mockgithubclient.NewReview(2, "APPROVED", "reviewer2", "", "LGTM 🚀"),
+					mockgithubclient.NewReview("reviewer1", "", "APPROVED"),
+					mockgithubclient.NewReview("reviewer2", "", "APPROVED"),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR2.Number: {
-					mockgithubclient.NewReview(3, "COMMENTED", "reviewer1", "", "LGTM, just a few comments..."),
-					mockgithubclient.NewReview(4, "COMMENTED", "reviewer2", "", "Looks good but..."),
+					mockgithubclient.NewReview("reviewer1", "", "COMMENTED"),
+					mockgithubclient.NewReview("reviewer2", "", "COMMENTED"),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR3.Number: {
-					mockgithubclient.NewReview(5, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."),
+					mockgithubclient.NewReview("reviewer3", "", "COMMENTED"),
 				},
 				*getTestPRs(GetTestPRsOptions{}).PR4.Number: {
-					mockgithubclient.NewReview(6, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."),
-					mockgithubclient.NewReview(7, "COMMENTED", "reviewer3", "", "Splendid work! Just a few questions..."), // duplicate review by reviewer3 should be omitted
-					mockgithubclient.NewReview(8, "APPROVED", "reviewer2", "", "LGTM 🚀"),
-					mockgithubclient.NewReview(9, "APPROVED", "reviewer2", "", "LGTM again 🚀"), // duplicate approval by reviewer2 should be omitted
+					mockgithubclient.NewReview("reviewer3", "", "COMMENTED"),
+					mockgithubclient.NewReview("reviewer3", "", "COMMENTED"), // duplicate review by reviewer3 should be omitted
+					mockgithubclient.NewReview("reviewer2", "", "APPROVED"),
+					mockgithubclient.NewReview("reviewer2", "", "APPROVED"), // duplicate approval by reviewer2 should be omitted
 				},
 			},
 			expectedSummary: "4 open PRs are waiting for attention 👀",
@@ -637,10 +637,10 @@ func TestScenarios(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
-					mockgithubclient.NewReview(1, "COMMENTED", "human-reviewer", "Human Reviewer", "Human feedback", "User"),
-					mockgithubclient.NewReview(2, "COMMENTED", "alice", "Alice", "Self review", "User"),
-					mockgithubclient.NewReview(3, "COMMENTED", "dependabot", "Dependabot", "Bot feedback", "Bot"),
-					mockgithubclient.NewReview(4, "APPROVED", "codecov", "Codecov", "Bot approval", "Bot"),
+					mockgithubclient.NewReview("human-reviewer", "Human Reviewer", "COMMENTED", "User"),
+					mockgithubclient.NewReview("alice", "Alice", "COMMENTED", "User"),
+					mockgithubclient.NewReview("dependabot", "Dependabot", "COMMENTED", "Bot"),
+					mockgithubclient.NewReview("codecov", "Codecov", "APPROVED", "Bot"),
 				},
 			},
 			expectedPRNumbers: []int{1},
@@ -659,11 +659,7 @@ func TestScenarios(t *testing.T) {
 			},
 			timelineCommentsByPRNumber: map[int][]*github.IssueComment{
 				2: {
-					{
-						Body:      github.Ptr("/snooze PR reminder for 7 days"),
-						CreatedAt: &github.Timestamp{Time: now.Add(-1 * time.Hour)},
-						User:      &github.User{Login: github.Ptr("bob")},
-					},
+					mockgithubclient.NewTimelineComment("bob", "", "/snooze PR reminder for 7 days", now.Add(-1*time.Hour)),
 				},
 			},
 			expectedPRNumbers: []int{1, 3},
@@ -959,11 +955,11 @@ func TestScenariosUpdateMode(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
-					mockgithubclient.NewReview(1, "APPROVED", "reviewer1", "Reviewer One", "LGTM"),
-					mockgithubclient.NewReview(2, "APPROVED", "reviewer2", "Reviewer Two", "Looks good"),
+					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
+					mockgithubclient.NewReview("reviewer2", "Reviewer Two", "APPROVED"),
 				},
 				2: {
-					mockgithubclient.NewReview(3, "COMMENTED", "reviewer3", "Reviewer Three", "Just a few questions..."),
+					mockgithubclient.NewReview("reviewer3", "Reviewer Three", "COMMENTED"),
 				},
 			},
 			expectedPRItemTexts: []string{
@@ -1067,10 +1063,10 @@ func TestScenariosUpdateMode(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
-					mockgithubclient.NewReview(1, "APPROVED", "reviewer1", "Reviewer One", "LGTM"),
+					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
 				},
 				2: {
-					mockgithubclient.NewReview(2, "APPROVED", "reviewer2", "Reviewer Two", "Looks good"),
+					mockgithubclient.NewReview("reviewer2", "Reviewer Two", "APPROVED"),
 				},
 			},
 			expectedPRItemTexts: []string{
