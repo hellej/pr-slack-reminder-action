@@ -61,7 +61,7 @@ Don't stack hedges:
 
 ## Code Style
 
-- Use descriptive naming instead of explanatory comments (exception: complex algorithms or non-obvious business logic)
+- Use descriptive naming instead of explanatory comments
 - Use `errors.Join()` for combining multiple errors
 - Prefer pure functions; reuse or extend ./internal/utilities (Map, Filter, Find) over hand-written loops
 - Optimize for readability, not speed — data sets are tiny
