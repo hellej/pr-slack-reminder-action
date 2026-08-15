@@ -176,6 +176,61 @@ func TestNewPullRequestFromGitHubPR(t *testing.T) {
 	}
 }
 
+func TestDeriveReviewers(t *testing.T) {
+	tests := []struct {
+		name                 string
+		authorLogin          string
+		approvers            []Collaborator
+		reviewAuthors        []Collaborator
+		reviewCommentAuthors []Collaborator
+		timelineCommenters   []Collaborator
+		expectedApprovedBy   []Collaborator
+		expectedCommentedBy  []Collaborator
+	}{
+		{
+			name:                 "commenters ordered by reviews, review comments and timeline",
+			authorLogin:          "author",
+			approvers:            []Collaborator{{Login: "approver"}},
+			reviewAuthors:        []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
+			reviewCommentAuthors: []Collaborator{{Login: "review-commenter"}},
+			timelineCommenters:   []Collaborator{{Login: "timeline-commenter"}},
+			expectedApprovedBy:   []Collaborator{{Login: "approver"}},
+			expectedCommentedBy: []Collaborator{
+				{Login: "reviewer"},
+				{Login: "review-commenter"},
+				{Login: "timeline-commenter"},
+			},
+		},
+		{
+			name:                 "duplicate logins appear once",
+			authorLogin:          "author",
+			approvers:            []Collaborator{{Login: "approver"}, {Login: "approver"}},
+			reviewAuthors:        []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
+			reviewCommentAuthors: []Collaborator{{Login: "reviewer"}},
+			timelineCommenters:   []Collaborator{{Login: "reviewer"}, {Login: "timeline-commenter"}},
+			expectedApprovedBy:   []Collaborator{{Login: "approver"}},
+			expectedCommentedBy: []Collaborator{
+				{Login: "reviewer"},
+				{Login: "timeline-commenter"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			approvedBy, commentedBy := deriveReviewers(
+				tt.authorLogin, tt.approvers, tt.reviewAuthors, tt.reviewCommentAuthors, tt.timelineCommenters,
+			)
+			if !reflect.DeepEqual(approvedBy, tt.expectedApprovedBy) {
+				t.Errorf("approvedBy = %+v, expected %+v", approvedBy, tt.expectedApprovedBy)
+			}
+			if !reflect.DeepEqual(commentedBy, tt.expectedCommentedBy) {
+				t.Errorf("commentedBy = %+v, expected %+v", commentedBy, tt.expectedCommentedBy)
+			}
+		})
+	}
+}
+
 func TestCollaboratorGetGitHubName(t *testing.T) {
 	tests := []struct {
 		name         string

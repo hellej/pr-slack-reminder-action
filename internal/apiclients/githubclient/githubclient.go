@@ -373,7 +373,7 @@ func (c *client) addReviewerInfoToPRs(ctx context.Context, prResults []PRResult)
 				pr:               pr,
 				reviews:          reviews,
 				comments:         comments,
-				timelineComments: timelineComments,
+				timelineComments: utilities.Map(timelineComments, newTimelineCommentFromIssueComment),
 				repository:       repo,
 				err:              errors.Join(reviewsErr, commentsErr, timelineCommentsErr),
 			}

@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"time"
-
-	"github.com/google/go-github/v78/github"
 )
 
 var snoozeRegex = regexp.MustCompile(`(?i)^/snooze(?:\s+pr[\s-]*reminder)?\s+for\s+(\d+)\s*(d|days?)$`)
@@ -31,13 +29,13 @@ func parseSnoozeComment(body string, createdAt time.Time) *time.Time {
 	return &expiration
 }
 
-func findActiveSnooze(timelineComments []*github.IssueComment) *time.Time {
+func findActiveSnooze(timelineComments []TimelineComment) *time.Time {
 	var latestSnooze *time.Time
 	var latestSnoozeCommentTime time.Time
 
 	for _, comment := range timelineComments {
-		commentTime := comment.GetCreatedAt().Time
-		expiration := parseSnoozeComment(comment.GetBody(), commentTime)
+		commentTime := comment.CreatedAt
+		expiration := parseSnoozeComment(comment.Body, commentTime)
 		if expiration == nil {
 			continue
 		}

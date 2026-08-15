@@ -3,8 +3,6 @@ package githubclient
 import (
 	"testing"
 	"time"
-
-	"github.com/google/go-github/v78/github"
 )
 
 func TestParseSnoozeComment(t *testing.T) {
@@ -123,7 +121,7 @@ func TestFindActiveSnooze(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		timelineComments []*github.IssueComment
+		timelineComments []TimelineComment
 		expectSnoozed    bool
 	}{
 		{
@@ -133,47 +131,47 @@ func TestFindActiveSnooze(t *testing.T) {
 		},
 		{
 			name: "no snooze comments",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("looks good"), CreatedAt: &github.Timestamp{Time: recentTime}},
+			timelineComments: []TimelineComment{
+				{Body: "looks good", CreatedAt: recentTime},
 			},
 			expectSnoozed: false,
 		},
 		{
 			name: "active snooze comment",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze for 5 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
+			timelineComments: []TimelineComment{
+				{Body: "/snooze for 5 days", CreatedAt: recentTime},
 			},
 			expectSnoozed: true,
 		},
 		{
 			name: "expired snooze comment",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze for 2 days"), CreatedAt: &github.Timestamp{Time: olderTime}},
+			timelineComments: []TimelineComment{
+				{Body: "/snooze for 2 days", CreatedAt: olderTime},
 			},
 			expectSnoozed: false,
 		},
 		{
 			name: "most recent snooze wins - active snooze after expired",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze for 1 day"), CreatedAt: &github.Timestamp{Time: olderTime}},
-				{Body: github.Ptr("/snooze for 7 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
+			timelineComments: []TimelineComment{
+				{Body: "/snooze for 1 day", CreatedAt: olderTime},
+				{Body: "/snooze for 7 days", CreatedAt: recentTime},
 			},
 			expectSnoozed: true,
 		},
 		{
 			name: "most recent snooze wins - expired snooze after active",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("/snooze for 30 days"), CreatedAt: &github.Timestamp{Time: olderTime}},
-				{Body: github.Ptr("/snooze for 0 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
+			timelineComments: []TimelineComment{
+				{Body: "/snooze for 30 days", CreatedAt: olderTime},
+				{Body: "/snooze for 0 days", CreatedAt: recentTime},
 			},
 			expectSnoozed: false,
 		},
 		{
 			name: "snooze comment mixed with regular comments",
-			timelineComments: []*github.IssueComment{
-				{Body: github.Ptr("regular comment"), CreatedAt: &github.Timestamp{Time: olderTime}},
-				{Body: github.Ptr("/snooze PR reminder for 5 days"), CreatedAt: &github.Timestamp{Time: recentTime}},
-				{Body: github.Ptr("another comment"), CreatedAt: &github.Timestamp{Time: recentTime}},
+			timelineComments: []TimelineComment{
+				{Body: "regular comment", CreatedAt: olderTime},
+				{Body: "/snooze PR reminder for 5 days", CreatedAt: recentTime},
+				{Body: "another comment", CreatedAt: recentTime},
 			},
 			expectSnoozed: true,
 		},

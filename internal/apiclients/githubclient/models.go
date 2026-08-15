@@ -118,7 +118,7 @@ type FetchReviewsResult struct {
 	pr               *PullRequest
 	reviews          []*github.PullRequestReview
 	comments         []*github.PullRequestComment
-	timelineComments []*github.IssueComment
+	timelineComments []TimelineComment
 	repository       models.Repository
 	err              error
 }
@@ -134,6 +134,22 @@ func (r FetchReviewsResult) printResult() {
 type Collaborator struct {
 	Login string // GitHub username
 	Name  string // GitHub name if available
+}
+
+type TimelineComment struct {
+	Body        string
+	CreatedAt   time.Time
+	Author      Collaborator
+	AuthorIsBot bool
+}
+
+func newTimelineCommentFromIssueComment(comment *github.IssueComment) TimelineComment {
+	return TimelineComment{
+		Body:        comment.GetBody(),
+		CreatedAt:   comment.GetCreatedAt().Time,
+		Author:      newCollaboratorFromUser(comment.GetUser()),
+		AuthorIsBot: isBot(comment.GetUser()),
+	}
 }
 
 func newCollaboratorFromUser(user *github.User) Collaborator {
@@ -158,23 +174,16 @@ func (c Collaborator) GetGitHubName() string {
 }
 
 func (r FetchReviewsResult) asPR() PR {
-	authorLogin := r.pr.Author.Login
-
 	reviewsWithValidUser := utilities.Filter(r.reviews, hasValidUserData)
 	commentsWithValidUser := utilities.Filter(r.comments, hasValidUserData)
-	timelineCommentsWithValidUser := utilities.Filter(r.timelineComments, hasValidUserData)
-
 	approvingReviews := utilities.Filter(reviewsWithValidUser, isApprovingReview)
-	approvedByUsers := extractUniqueCollaborators(approvingReviews)
 
-	reviewCommenters := extractUniqueCollaborators(reviewsWithValidUser)
-	standaloneCommenters := extractUniqueCollaborators(commentsWithValidUser)
-	timelineCommenters := extractUniqueCollaborators(timelineCommentsWithValidUser)
-
-	allCommenters := slices.Concat(reviewCommenters, standaloneCommenters, timelineCommenters)
-	commentedByUsers := utilities.Filter(
-		utilities.UniqueFunc(allCommenters, isUniqueCollaborator),
-		getFilterForCommenters(authorLogin, approvedByUsers),
+	approvedByUsers, commentedByUsers := deriveReviewers(
+		r.pr.Author.Login,
+		extractUniqueCollaborators(approvingReviews),
+		extractUniqueCollaborators(reviewsWithValidUser),
+		extractUniqueCollaborators(commentsWithValidUser),
+		extractTimelineCommenters(r.timelineComments),
 	)
 
 	return PR{
@@ -185,6 +194,29 @@ func (r FetchReviewsResult) asPR() PR {
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(r.timelineComments),
 	}
+}
+
+func deriveReviewers(
+	authorLogin string,
+	approvers, reviewAuthors, reviewCommentAuthors, timelineCommenters []Collaborator,
+) (approvedBy, commentedBy []Collaborator) {
+	approvedBy = utilities.UniqueFunc(approvers, isUniqueCollaborator)
+
+	allCommenters := slices.Concat(reviewAuthors, reviewCommentAuthors, timelineCommenters)
+	commentedBy = utilities.Filter(
+		utilities.UniqueFunc(allCommenters, isUniqueCollaborator),
+		getFilterForCommenters(authorLogin, approvedBy),
+	)
+	return approvedBy, commentedBy
+}
+
+func extractTimelineCommenters(comments []TimelineComment) []Collaborator {
+	commentsWithValidAuthor := utilities.Filter(comments, hasValidTimelineCommentAuthor)
+	return utilities.Map(commentsWithValidAuthor, func(c TimelineComment) Collaborator { return c.Author })
+}
+
+func hasValidTimelineCommentAuthor(comment TimelineComment) bool {
+	return !comment.AuthorIsBot && comment.Author.Login != ""
 }
 
 func hasValidUserData[T GitHubUserProvider](item T) bool {
