@@ -35,7 +35,7 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 }
 
 func (pr PR) GetPRAgeText() string {
-	duration := time.Since(pr.CreatedAt.Time)
+	duration := time.Since(pr.GetCreatedAt())
 	if duration.Hours() >= 24 {
 		days := int(math.Round(duration.Hours())) / 24
 		return fmt.Sprintf("%d days", days)
@@ -87,10 +87,10 @@ func withSlackUserIds(
 
 func sortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
-		if !a.GetCreatedAt().Time.Equal(b.GetCreatedAt().Time) {
-			return a.GetCreatedAt().Time.Compare(b.GetCreatedAt().Time)
+		if !a.GetCreatedAt().Equal(b.GetCreatedAt()) {
+			return a.GetCreatedAt().Compare(b.GetCreatedAt())
 		}
-		return a.GetUpdatedAt().Time.Compare(b.GetUpdatedAt().Time)
+		return a.GetUpdatedAt().Compare(b.GetUpdatedAt())
 	})
 	return prs
 }

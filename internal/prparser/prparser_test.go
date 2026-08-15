@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
@@ -12,11 +11,11 @@ import (
 
 func testPR(number int, createdAt, updatedAt time.Time) githubclient.PR {
 	return githubclient.PR{
-		PullRequest: &github.PullRequest{
-			Number:    &number,
-			CreatedAt: &github.Timestamp{Time: createdAt},
-			UpdatedAt: &github.Timestamp{Time: updatedAt},
-			User:      &github.User{Login: github.Ptr("author")},
+		PullRequest: &githubclient.PullRequest{
+			Number:    number,
+			CreatedAt: createdAt,
+			UpdatedAt: updatedAt,
+			Author:    githubclient.Collaborator{Login: "author"},
 		},
 		Author: githubclient.Collaborator{Login: "author"},
 	}

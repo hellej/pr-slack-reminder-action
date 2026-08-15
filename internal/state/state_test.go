@@ -10,12 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
-	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 func LoadFromFile(filePath string) (*State, error) {
@@ -63,7 +61,7 @@ func createTestState() State {
 func createTestPR(number int, owner, repo string) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
-			PullRequest: &github.PullRequest{Number: testhelpers.AsPointer(number)},
+			PullRequest: &githubclient.PullRequest{Number: number},
 			Repository:  models.NewRepository(owner, repo),
 		},
 	}

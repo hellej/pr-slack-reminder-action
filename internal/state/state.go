@@ -40,7 +40,7 @@ type StateArtifactFetcher interface {
 func PRToPullRequestRef(pr prparser.PR) models.PullRequestRef {
 	return models.PullRequestRef{
 		Repository: pr.Repository,
-		Number:     *pr.Number,
+		Number:     pr.GetNumber(),
 	}
 }
 

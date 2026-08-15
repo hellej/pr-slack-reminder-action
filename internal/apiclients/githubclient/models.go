@@ -11,8 +11,97 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
+type PullRequest struct {
+	Number    int
+	Title     string
+	HTMLURL   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	State     string
+	Merged    bool
+	Draft     bool
+	Labels    []string
+	Author    Collaborator
+	HeadSHA   string
+}
+
+func (p *PullRequest) GetNumber() int {
+	if p == nil {
+		return 0
+	}
+	return p.Number
+}
+
+func (p *PullRequest) GetTitle() string {
+	if p == nil {
+		return ""
+	}
+	return p.Title
+}
+
+func (p *PullRequest) GetHTMLURL() string {
+	if p == nil {
+		return ""
+	}
+	return p.HTMLURL
+}
+
+func (p *PullRequest) GetCreatedAt() time.Time {
+	if p == nil {
+		return time.Time{}
+	}
+	return p.CreatedAt
+}
+
+func (p *PullRequest) GetUpdatedAt() time.Time {
+	if p == nil {
+		return time.Time{}
+	}
+	return p.UpdatedAt
+}
+
+func (p *PullRequest) GetState() string {
+	if p == nil {
+		return ""
+	}
+	return p.State
+}
+
+func (p *PullRequest) GetMerged() bool {
+	if p == nil {
+		return false
+	}
+	return p.Merged
+}
+
+func (p *PullRequest) GetDraft() bool {
+	if p == nil {
+		return false
+	}
+	return p.Draft
+}
+
+func newPullRequestFromGitHubPR(pr *github.PullRequest) *PullRequest {
+	if pr == nil {
+		return &PullRequest{}
+	}
+	return &PullRequest{
+		Number:    pr.GetNumber(),
+		Title:     pr.GetTitle(),
+		HTMLURL:   pr.GetHTMLURL(),
+		CreatedAt: pr.GetCreatedAt().Time,
+		UpdatedAt: pr.GetUpdatedAt().Time,
+		State:     pr.GetState(),
+		Merged:    pr.GetMerged(),
+		Draft:     pr.GetDraft(),
+		Labels:    utilities.Map(pr.Labels, func(l *github.Label) string { return l.GetName() }),
+		Author:    newCollaboratorFromUser(pr.GetUser()),
+		HeadSHA:   pr.GetHead().GetSHA(),
+	}
+}
+
 type PR struct {
-	*github.PullRequest
+	*PullRequest
 	Repository       models.Repository
 	Author           Collaborator
 	ApprovedByUsers  []Collaborator
@@ -21,12 +110,12 @@ type PR struct {
 }
 
 type PRResult struct {
-	pr         *github.PullRequest
+	pr         *PullRequest
 	repository models.Repository
 }
 
 type FetchReviewsResult struct {
-	pr               *github.PullRequest
+	pr               *PullRequest
 	reviews          []*github.PullRequestReview
 	comments         []*github.PullRequestComment
 	timelineComments []*github.IssueComment
@@ -69,7 +158,7 @@ func (c Collaborator) GetGitHubName() string {
 }
 
 func (r FetchReviewsResult) asPR() PR {
-	authorLogin := r.pr.GetUser().GetLogin()
+	authorLogin := r.pr.Author.Login
 
 	reviewsWithValidUser := utilities.Filter(r.reviews, hasValidUserData)
 	commentsWithValidUser := utilities.Filter(r.comments, hasValidUserData)
@@ -91,7 +180,7 @@ func (r FetchReviewsResult) asPR() PR {
 	return PR{
 		PullRequest:      r.pr,
 		Repository:       r.repository,
-		Author:           newCollaboratorFromUser(r.pr.GetUser()),
+		Author:           r.pr.Author,
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(r.timelineComments),

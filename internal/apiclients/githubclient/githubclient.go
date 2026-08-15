@@ -292,7 +292,7 @@ func (c *client) fetchPR(
 func getPRResultMapper(repo models.Repository) func(pr *github.PullRequest) PRResult {
 	return func(pr *github.PullRequest) PRResult {
 		return PRResult{
-			pr:         pr,
+			pr:         newPullRequestFromGitHubPR(pr),
 			repository: repo,
 		}
 	}
@@ -301,7 +301,7 @@ func getPRResultMapper(repo models.Repository) func(pr *github.PullRequest) PRRe
 func logFoundPRs(prResults []PRResult) {
 	log.Printf("Found %d open pull requests:", len(prResults))
 	for _, result := range prResults {
-		log.Printf("%s/%v", result.repository.GetPath(), *result.pr.Number)
+		log.Printf("%s/%v", result.repository.GetPath(), result.pr.GetNumber())
 	}
 }
 
@@ -314,10 +314,10 @@ func capPRsToLimit(prs []PRResult) []PRResult {
 		MaxPRsToFetch, len(prs), MaxPRsToFetch,
 	)
 	slices.SortStableFunc(prs, func(a, b PRResult) int {
-		if !a.pr.GetCreatedAt().Time.Equal(b.pr.GetCreatedAt().Time) {
-			return b.pr.GetCreatedAt().Time.Compare(a.pr.GetCreatedAt().Time)
+		if !a.pr.GetCreatedAt().Equal(b.pr.GetCreatedAt()) {
+			return b.pr.GetCreatedAt().Compare(a.pr.GetCreatedAt())
 		}
-		return b.pr.GetUpdatedAt().Time.Compare(a.pr.GetUpdatedAt().Time)
+		return b.pr.GetUpdatedAt().Compare(a.pr.GetUpdatedAt())
 	})
 	return prs[:MaxPRsToFetch]
 }
@@ -348,21 +348,21 @@ func (c *client) addReviewerInfoToPRs(ctx context.Context, prResults []PRResult)
 
 			dataFetchGroup.Go(func() error {
 				reviews, reviewsErr = fetchPRReviews(
-					dataFetchCtx, c.prService, repo.Owner, repo.Name, *pr.Number,
+					dataFetchCtx, c.prService, repo.Owner, repo.Name, pr.GetNumber(),
 				)
 				return nil // capture error in reviewsErr
 			})
 
 			dataFetchGroup.Go(func() error {
 				comments, commentsErr = fetchPRComments(
-					dataFetchCtx, c.prService, repo.Owner, repo.Name, *pr.Number,
+					dataFetchCtx, c.prService, repo.Owner, repo.Name, pr.GetNumber(),
 				)
 				return nil // capture error in commentsErr
 			})
 
 			dataFetchGroup.Go(func() error {
 				timelineComments, timelineCommentsErr = fetchPRTimelineComments(
-					dataFetchCtx, c.issueService, repo.Owner, repo.Name, *pr.Number,
+					dataFetchCtx, c.issueService, repo.Owner, repo.Name, pr.GetNumber(),
 				)
 				return nil // capture error in timelineCommentsErr
 			})
