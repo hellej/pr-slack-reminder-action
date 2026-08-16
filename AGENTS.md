@@ -11,6 +11,7 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 - Prefer short bullet points over long ones
 - Avoid filler words
 - Avoid duplication and overlap with what's already said or written
+- Avoid dashes as punctuation. Use a comma, a colon, or a new sentence
 
 ### Examples
 
