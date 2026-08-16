@@ -98,12 +98,14 @@ func NewClient(
 	prService GithubPullRequestsService,
 	issueService GithubIssuesService,
 	actionsService GithubActionsService,
+	transport graphqlTransport,
 ) Client {
 	return &client{
 		http:           httpClient,
 		prService:      prService,
 		issueService:   issueService,
 		actionsService: actionsService,
+		graphql:        graphqlClient{transport: transport},
 	}
 }
 
@@ -124,6 +126,7 @@ func GetAuthenticatedClient(token, tokenForState string) Client {
 		ghClient.PullRequests,
 		ghClient.Issues,
 		ghClientForState.Actions,
+		newHTTPGraphQLTransport(token),
 	)
 }
 
@@ -132,6 +135,7 @@ type client struct {
 	prService      GithubPullRequestsService
 	issueService   GithubIssuesService
 	actionsService GithubActionsService
+	graphql        graphqlClient
 }
 
 // DefaultGitHubAPIConcurrencyLimit caps concurrent repository fetches to avoid

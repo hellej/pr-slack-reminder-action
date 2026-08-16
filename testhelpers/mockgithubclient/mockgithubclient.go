@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -80,8 +81,20 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			err:                    opts.ListArtifactsError,
 			mockStateForUpdateMode: opts.MockStateForUpdateMode,
 		}
-		return githubclient.NewClient(mockHTTPClient, mockPRService, mockIssueService, mockActionsService)
+		return githubclient.NewClient(
+			mockHTTPClient,
+			mockPRService,
+			mockIssueService,
+			mockActionsService,
+			UnusedGraphQLTransport{},
+		)
 	}
+}
+
+type UnusedGraphQLTransport struct{}
+
+func (UnusedGraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawMessage, error) {
+	return 0, nil, errors.New("unexpected GraphQL request")
 }
 
 func NewReview(login, name, state string, userType ...string) *github.PullRequestReview {

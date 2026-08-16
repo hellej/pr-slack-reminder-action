@@ -493,7 +493,13 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				mockResponse: &http.Response{StatusCode: 200},
 				mockError:    nil,
 			}
-			client := githubclient.NewClient(mockHTTPClient, mockPRService, mockIssueService, mockActionsService)
+			client := githubclient.NewClient(
+				mockHTTPClient,
+				mockPRService,
+				mockIssueService,
+				mockActionsService,
+				mockgithubclient.UnusedGraphQLTransport{},
+			)
 
 			repos := []models.Repository{
 				{Owner: "testowner", Name: "testrepo"},
@@ -617,7 +623,13 @@ func TestFetchManyPRs(t *testing.T) {
 				mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
 				mockError:    nil,
 			}
-			client := githubclient.NewClient(mockHTTPClient, mockPRService, mockIssueService, mockActionsService)
+			client := githubclient.NewClient(
+				mockHTTPClient,
+				mockPRService,
+				mockIssueService,
+				mockActionsService,
+				mockgithubclient.UnusedGraphQLTransport{},
+			)
 			repos := []models.Repository{{Owner: "testowner", Name: "testrepo"}}
 
 			result, err := client.FindOpenPRs(
@@ -697,6 +709,7 @@ func TestFindOpenPRs_MultipleRepositories(t *testing.T) {
 			services: map[string]*mockIssueService{"repo1": mockIssueService1, "repo2": mockIssueService2},
 		},
 		mockActionsService,
+		mockgithubclient.UnusedGraphQLTransport{},
 	)
 	repos := []models.Repository{{Owner: "o", Name: "repo1"}, {Owner: "o", Name: "repo2"}}
 	result, err := client.FindOpenPRs(
@@ -769,6 +782,7 @@ func TestFindOpenPRs_ErrorShortCircuits(t *testing.T) {
 			},
 		},
 		mockActionsService,
+		mockgithubclient.UnusedGraphQLTransport{},
 	)
 	repos := []models.Repository{{Owner: "o", Name: "bad"}, {Owner: "o", Name: "good"}}
 	_, err := client.FindOpenPRs(
@@ -824,6 +838,7 @@ func TestFindOpenPRs_ConcurrencyLimit(t *testing.T) {
 		&multiRepoPRService{services: services},
 		&multiRepoIssuesService{services: issueServices},
 		mockActionsService,
+		mockgithubclient.UnusedGraphQLTransport{},
 	)
 	prs, err := client.FindOpenPRs(
 		context.Background(),
@@ -934,7 +949,13 @@ func TestFindOpenPRs_ReviewsPartialErrors(t *testing.T) {
 		mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
 		mockError:    nil,
 	}
-	client := githubclient.NewClient(mockHTTPClient, prService, issueService, mockActionsService)
+	client := githubclient.NewClient(
+		mockHTTPClient,
+		prService,
+		issueService,
+		mockActionsService,
+		mockgithubclient.UnusedGraphQLTransport{},
+	)
 	repos := []models.Repository{{Owner: "o", Name: "repo"}}
 	prs, err := client.FindOpenPRs(
 		context.Background(),
