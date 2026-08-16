@@ -146,7 +146,7 @@ const DefaultGitHubAPIConcurrencyLimit = 3
 const MaxPRsToFetch = 50
 
 // Per-call timeout defaults. Overridable in tests.
-const PullRequestListTimeout = 10 * time.Second
+const PullRequestListTimeout = 30 * time.Second
 const PullRequestFetchTimeout = 5 * time.Second
 const ReviewsFetchTimeout = 10 * time.Second
 
