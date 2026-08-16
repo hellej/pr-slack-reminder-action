@@ -312,7 +312,7 @@ func TestScenarios(t *testing.T) {
 			config:           testhelpers.GetDefaultConfigMinimal(),
 			fetchPRsStatus:   500,
 			prServiceError:   errors.New("unable to fetch PRs"),
-			expectedErrorMsg: "error fetching pull requests from test-org/test-repo: unable to fetch PRs",
+			expectedErrorMsg: "error fetching pull requests: GraphQL request failed with status 500",
 		},
 		{
 			name:   "no Slack channel found",

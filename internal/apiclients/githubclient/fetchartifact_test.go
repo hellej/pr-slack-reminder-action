@@ -289,17 +289,10 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 				mockHTTPClient: mockHTTPClient,
 			}
 
-			mockPRService := &mockPullRequestService{
-				mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-			}
-			mockIssueService := &mockIssueService{
-				mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-			}
-
 			client := githubclient.NewClient(
 				mockHTTPClient,
-				mockPRService,
-				mockIssueService,
+				&mockPullRequestService{},
+				&mockIssueService{},
 				mockActions,
 				mockgithubclient.UnusedGraphQLTransport{},
 			)

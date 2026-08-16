@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -16,155 +17,76 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 )
 
-type mockPullRequestService struct {
-	mockPRs                []*github.PullRequest
-	mockPRsByNumber        map[int]*github.PullRequest
-	mockReviewsByPRNumber  map[int][]*github.PullRequestReview
-	mockCommentsByPRNumber map[int][]*github.PullRequestComment
-	mockResponse           *github.Response
-	mockError              error
-}
+// The REST services are still wired for GetPRs; FindOpenPRs reads its fixtures off the GraphQL
+// transport instead.
+type mockPullRequestService struct{}
 
 func (m *mockPullRequestService) Get(
 	ctx context.Context, owner string, repo string, number int,
 ) (*github.PullRequest, *github.Response, error) {
-	if pr, ok := m.mockPRsByNumber[number]; ok {
-		return pr, m.mockResponse, m.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
+	return nil, nil, fmt.Errorf("unexpected REST call")
 }
 
 func (m *mockPullRequestService) List(
 	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
 ) ([]*github.PullRequest, *github.Response, error) {
-	return m.mockPRs, m.mockResponse, m.mockError
+	return nil, nil, fmt.Errorf("unexpected REST call")
 }
 
 func (m *mockPullRequestService) ListReviews(
 	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
 ) ([]*github.PullRequestReview, *github.Response, error) {
-	reviews := m.mockReviewsByPRNumber[number]
-	return reviews, m.mockResponse, m.mockError
+	return nil, nil, fmt.Errorf("unexpected REST call")
 }
 
 func (m *mockPullRequestService) ListComments(
 	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
 ) ([]*github.PullRequestComment, *github.Response, error) {
-	comments := m.mockCommentsByPRNumber[number]
-	return comments, m.mockResponse, m.mockError
+	return nil, nil, fmt.Errorf("unexpected REST call")
 }
 
-type mockIssueService struct {
-	mockTimelineCommentsByPRNumber map[int][]*github.IssueComment
-	mockResponse                   *github.Response
-	mockError                      error
-}
+type mockIssueService struct{}
 
 func (m *mockIssueService) ListComments(
 	ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
 ) ([]*github.IssueComment, *github.Response, error) {
-	comments := m.mockTimelineCommentsByPRNumber[number]
-	return comments, m.mockResponse, m.mockError
+	return nil, nil, fmt.Errorf("unexpected REST call")
 }
 
-type mockActionsService struct {
-	mockResponse *github.Response
-	mockError    error
-}
+type mockActionsService struct{}
 
 func (m *mockActionsService) ListArtifacts(
 	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
 ) (*github.ArtifactList, *github.Response, error) {
-	return &github.ArtifactList{}, m.mockResponse, m.mockError
+	return &github.ArtifactList{}, nil, nil
 }
+
 func (m *mockActionsService) DownloadArtifact(
 	ctx context.Context, owner string, repo string, artifactID int64, maxRedirects int,
 ) (
 	*url.URL, *github.Response, error,
 ) {
-	return &url.URL{}, m.mockResponse, m.mockError
+	return &url.URL{}, nil, nil
 }
 
-type mockHTTPClient struct {
-	mockResponse *http.Response
-	mockError    error
-}
+type mockHTTPClient struct{}
 
 func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
-	return m.mockResponse, m.mockError
+	return &http.Response{StatusCode: 200}, nil
 }
 
-func NewComment(login, name string, userType ...string) *github.PullRequestComment {
-	var t *string
-	if len(userType) > 0 && userType[0] != "" {
-		t = github.Ptr(userType[0])
-	}
-	return &github.PullRequestComment{
-		User: &github.User{
-			Login: github.Ptr(login),
-			Name:  github.Ptr(name),
-			Type:  t,
-		},
-		Body: github.Ptr("Sample comment body"),
-	}
+func newTestClient(opts mockgithubclient.MockGitHubClientOptions) githubclient.Client {
+	return githubclient.NewClient(
+		&mockHTTPClient{},
+		&mockPullRequestService{},
+		&mockIssueService{},
+		&mockActionsService{},
+		mockgithubclient.NewGraphQLTransport(opts),
+	)
 }
 
-// multiRepoPRService routes Get & List calls to different mock services based on repo name
-type multiRepoPRService struct {
-	services map[string]*mockPullRequestService
-}
-
-func (m *multiRepoPRService) Get(
-	ctx context.Context, owner string, repo string, number int,
-) (*github.PullRequest, *github.Response, error) {
-	if svc, ok := m.services[repo]; ok {
-		return svc.mockPRs[number], svc.mockResponse, svc.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
-}
-
-func (m *multiRepoPRService) List(
-	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
-) ([]*github.PullRequest, *github.Response, error) {
-	if svc, ok := m.services[repo]; ok {
-		return svc.mockPRs, svc.mockResponse, svc.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
-}
-
-func (m *multiRepoPRService) ListReviews(
-	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
-) ([]*github.PullRequestReview, *github.Response, error) {
-	if svc, ok := m.services[repo]; ok {
-		reviews := svc.mockReviewsByPRNumber[number]
-		return reviews, svc.mockResponse, svc.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
-}
-
-func (m *multiRepoPRService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
-) ([]*github.PullRequestComment, *github.Response, error) {
-	if svc, ok := m.services[repo]; ok {
-		comments := svc.mockCommentsByPRNumber[number]
-		return comments, svc.mockResponse, svc.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
-}
-
-// multiRepoIssuesService routes ListComments calls to different mock services based on repo name
-type multiRepoIssuesService struct {
-	services map[string]*mockIssueService
-}
-
-func (m *multiRepoIssuesService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
-) ([]*github.IssueComment, *github.Response, error) {
-	if svc, ok := m.services[repo]; ok {
-		comments := svc.mockTimelineCommentsByPRNumber[number]
-		return comments, svc.mockResponse, svc.mockError
-	}
-	return nil, &github.Response{Response: &http.Response{StatusCode: 404}}, fmt.Errorf("unknown repo")
+func noFilters(models.Repository) config.Filters {
+	return config.Filters{}
 }
 
 func TestGetAuthenticatedClient(t *testing.T) {
@@ -181,7 +103,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 		name                    string
 		mockPRs                 []*github.PullRequest
 		mockReviews             map[int][]*github.PullRequestReview
-		mockComments            map[int][]*github.PullRequestComment
 		mockTimelineComments    map[int][]*github.IssueComment
 		filters                 config.Filters
 		expectedPRCount         int
@@ -210,7 +131,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					mockgithubclient.NewReview("dependabot", "", "APPROVED", "Bot"),
 				},
 			},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{"approver1"},
@@ -231,7 +151,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				},
 			},
 			mockReviews:             map[int][]*github.PullRequestReview{},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         0,
 			expectedApproverLogins:  []string{},
@@ -252,7 +171,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				},
 			},
 			mockReviews:             map[int][]*github.PullRequestReview{},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{},
@@ -278,7 +196,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
 				},
 			},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{"reviewer1"},
@@ -304,7 +221,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					mockgithubclient.NewReview("external-reviewer", "External Reviewer", "APPROVED"),
 				},
 			},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{"external-reviewer"},
@@ -331,7 +247,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					mockgithubclient.NewReview("human-reviewer", "Human Reviewer", "COMMENTED"),
 				},
 			},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{},
@@ -361,18 +276,17 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					mockgithubclient.NewReview("valid-reviewer", "Valid Reviewer", "APPROVED"),
 				},
 			},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{"valid-reviewer"},
 			expectedCommenterLogins: []string{},
 		},
 		{
-			name: "PR with both review comments and standalone comments",
+			name: "commenter on the diff is included through the implicit review",
 			mockPRs: []*github.PullRequest{
 				{
 					Number:  github.Ptr(130),
-					Title:   github.Ptr("PR with Mixed Comments"),
+					Title:   github.Ptr("PR with a bare diff comment"),
 					Draft:   github.Ptr(false),
 					HTMLURL: github.Ptr("https://github.com/owner/repo/pull/130"),
 					User: &github.User{
@@ -381,24 +295,17 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					},
 				},
 			},
+			// GitHub wraps a bare diff comment in a COMMENTED review with an empty body.
 			mockReviews: map[int][]*github.PullRequestReview{
 				130: {
-					mockgithubclient.NewReview("review-commenter", "Review Commenter", "COMMENTED"),
+					mockgithubclient.NewReview("diff-commenter", "Diff Commenter", "COMMENTED"),
 					mockgithubclient.NewReview("approver", "Approver", "APPROVED"),
-				},
-			},
-			mockComments: map[int][]*github.PullRequestComment{
-				130: {
-					NewComment("standalone-commenter", "Standalone Commenter"),
-					NewComment("author", "PR Author"),  // author should be excluded
-					NewComment("bot-user", "", "Bot"),  // bot should be excluded
-					NewComment("approver", "Approver"), // should only appear in approvers, not commenters
 				},
 			},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         1,
 			expectedApproverLogins:  []string{"approver"},
-			expectedCommenterLogins: []string{"review-commenter", "standalone-commenter"},
+			expectedCommenterLogins: []string{"diff-commenter"},
 		},
 		{
 			name: "PR timeline commenters should be included in commenters",
@@ -414,8 +321,7 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					},
 				},
 			},
-			mockReviews:  map[int][]*github.PullRequestReview{},
-			mockComments: map[int][]*github.PullRequestComment{},
+			mockReviews: map[int][]*github.PullRequestReview{},
 			mockTimelineComments: map[int][]*github.IssueComment{
 				131: {
 					mockgithubclient.NewTimelineComment("issue-commenter", "Issue Commenter", sampleCommentBody, time.Time{}),
@@ -453,7 +359,6 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				},
 			},
 			mockReviews:             map[int][]*github.PullRequestReview{},
-			mockComments:            map[int][]*github.PullRequestComment{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			filters:                 config.Filters{IgnoredTerms: []string{"Release v", "Automated Update"}},
 			expectedPRCount:         1,
@@ -469,37 +374,11 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				t.Fatalf("Test setup error: TestFindOneOrNoPRs expects 0 or 1 PR, got expectedPRCount=%d", tt.expectedPRCount)
 			}
 
-			mockPRService := &mockPullRequestService{
-				mockPRs:                tt.mockPRs,
-				mockReviewsByPRNumber:  tt.mockReviews,
-				mockCommentsByPRNumber: tt.mockComments,
-				mockResponse: &github.Response{
-					Response: &http.Response{
-						StatusCode: 200,
-					},
-				},
-				mockError: nil,
-			}
-			mockIssueService := &mockIssueService{
-				mockTimelineCommentsByPRNumber: tt.mockTimelineComments,
-				mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-				mockError:                      nil,
-			}
-			mockActionsService := &mockActionsService{
-				mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-				mockError:    nil,
-			}
-			mockHTTPClient := &mockHTTPClient{
-				mockResponse: &http.Response{StatusCode: 200},
-				mockError:    nil,
-			}
-			client := githubclient.NewClient(
-				mockHTTPClient,
-				mockPRService,
-				mockIssueService,
-				mockActionsService,
-				mockgithubclient.UnusedGraphQLTransport{},
-			)
+			client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+				PRs:                        tt.mockPRs,
+				ReviewsByPRNumber:          tt.mockReviews,
+				TimelineCommentsByPRNumber: tt.mockTimelineComments,
+			})
 
 			repos := []models.Repository{
 				{Owner: "testowner", Name: "testrepo"},
@@ -603,41 +482,10 @@ func TestFetchManyPRs(t *testing.T) {
 				})
 			}
 
-			mockPRService := &mockPullRequestService{
-				mockPRs:                mockPRs,
-				mockReviewsByPRNumber:  map[int][]*github.PullRequestReview{},
-				mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-				mockResponse:           &github.Response{Response: &http.Response{StatusCode: 200}},
-				mockError:              nil,
-			}
-			mockIssueService := &mockIssueService{
-				mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-				mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-				mockError:                      nil,
-			}
-			mockHTTPClient := &mockHTTPClient{
-				mockResponse: &http.Response{StatusCode: 200},
-				mockError:    nil,
-			}
-			mockActionsService := &mockActionsService{
-				mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-				mockError:    nil,
-			}
-			client := githubclient.NewClient(
-				mockHTTPClient,
-				mockPRService,
-				mockIssueService,
-				mockActionsService,
-				mockgithubclient.UnusedGraphQLTransport{},
-			)
+			client := newTestClient(mockgithubclient.MockGitHubClientOptions{PRs: mockPRs})
 			repos := []models.Repository{{Owner: "testowner", Name: "testrepo"}}
 
-			result, err := client.FindOpenPRs(
-				context.Background(),
-				repos, func(models.Repository) config.Filters {
-					return config.Filters{}
-				},
-			)
+			result, err := client.FindOpenPRs(context.Background(), repos, noFilters)
 
 			if err != nil {
 				t.Fatalf("FindOpenPRs() returned error: %v", err)
@@ -651,73 +499,31 @@ func TestFetchManyPRs(t *testing.T) {
 }
 
 func TestFindOpenPRs_MultipleRepositories(t *testing.T) {
-	mockPRService1 := &mockPullRequestService{
-		mockPRs: []*github.PullRequest{
-			{
-				Number:  github.Ptr(1),
-				Title:   github.Ptr("Repo1 PR"),
-				Draft:   github.Ptr(false),
-				HTMLURL: github.Ptr("https://example.com/r1/1"),
-				User:    &github.User{Login: github.Ptr("author1")},
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRsByRepo: map[string][]*github.PullRequest{
+			"repo1": {
+				{
+					Number:  github.Ptr(1),
+					Title:   github.Ptr("Repo1 PR"),
+					Draft:   github.Ptr(false),
+					HTMLURL: github.Ptr("https://example.com/r1/1"),
+					User:    &github.User{Login: github.Ptr("author1")},
+				},
+			},
+			"repo2": {
+				{
+					Number:  github.Ptr(2),
+					Title:   github.Ptr("Repo2 PR"),
+					Draft:   github.Ptr(false),
+					HTMLURL: github.Ptr("https://example.com/r2/2"),
+					User:    &github.User{Login: github.Ptr("author2")},
+				},
 			},
 		},
-		mockReviewsByPRNumber:  map[int][]*github.PullRequestReview{},
-		mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-		mockResponse:           &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:              nil,
-	}
-	mockPRService2 := &mockPullRequestService{
-		mockPRs: []*github.PullRequest{
-			{
-				Number:  github.Ptr(2),
-				Title:   github.Ptr("Repo2 PR"),
-				Draft:   github.Ptr(false),
-				HTMLURL: github.Ptr("https://example.com/r2/2"),
-				User:    &github.User{Login: github.Ptr("author2")},
-			},
-		},
-		mockReviewsByPRNumber:  map[int][]*github.PullRequestReview{},
-		mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-		mockResponse:           &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:              nil,
-	}
+	})
 
-	mockIssueService1 := &mockIssueService{
-		mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-		mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:                      nil,
-	}
-	mockIssueService2 := &mockIssueService{
-		mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-		mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:                      nil,
-	}
-	mockHTTPClient := &mockHTTPClient{
-		mockResponse: &http.Response{StatusCode: 200},
-		mockError:    nil,
-	}
-	mockActionsService := &mockActionsService{
-		mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:    nil,
-	}
-	client := githubclient.NewClient(
-		mockHTTPClient,
-		&multiRepoPRService{
-			services: map[string]*mockPullRequestService{"repo1": mockPRService1, "repo2": mockPRService2},
-		},
-		&multiRepoIssuesService{
-			services: map[string]*mockIssueService{"repo1": mockIssueService1, "repo2": mockIssueService2},
-		},
-		mockActionsService,
-		mockgithubclient.UnusedGraphQLTransport{},
-	)
 	repos := []models.Repository{{Owner: "o", Name: "repo1"}, {Owner: "o", Name: "repo2"}}
-	result, err := client.FindOpenPRs(
-		context.Background(),
-		repos, func(models.Repository) config.Filters {
-			return config.Filters{}
-		},
-	)
+	result, err := client.FindOpenPRs(context.Background(), repos, noFilters)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -732,236 +538,75 @@ func TestFindOpenPRs_MultipleRepositories(t *testing.T) {
 }
 
 func TestFindOpenPRs_ErrorShortCircuits(t *testing.T) {
-	mockPRService404 := &mockPullRequestService{
-		mockPRs: nil, mockReviewsByPRNumber: map[int][]*github.PullRequestReview{},
-		mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-		mockResponse:           &github.Response{Response: &http.Response{StatusCode: 404}},
-		mockError:              fmt.Errorf("not found"),
-	}
-	mockPRServiceOK := &mockPullRequestService{
-		mockPRs: []*github.PullRequest{
-			{
-				Number:  github.Ptr(3),
-				Title:   github.Ptr("Ok PR"),
-				Draft:   github.Ptr(false),
-				HTMLURL: github.Ptr("https://example.com/r/3"),
-				User:    &github.User{Login: github.Ptr("author")},
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRsByRepo: map[string][]*github.PullRequest{
+			"good": {
+				{
+					Number:  github.Ptr(3),
+					Title:   github.Ptr("Ok PR"),
+					Draft:   github.Ptr(false),
+					HTMLURL: github.Ptr("https://example.com/r/3"),
+					User:    &github.User{Login: github.Ptr("author")},
+				},
 			},
 		},
-		mockReviewsByPRNumber:  map[int][]*github.PullRequestReview{},
-		mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-		mockResponse:           &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:              nil,
-	}
+		ListPRsResponseStatus: 404, // "bad" has no fixture, so its alias comes back NOT_FOUND
+		PRServiceError:        errors.New("not found"),
+	})
 
-	mockHTTPClient := &mockHTTPClient{
-		mockResponse: &http.Response{StatusCode: 200},
-		mockError:    nil,
-	}
-	mockActionsService := &mockActionsService{
-		mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:    nil,
-	}
-	client := githubclient.NewClient(
-		mockHTTPClient,
-		&multiRepoPRService{
-			services: map[string]*mockPullRequestService{"bad": mockPRService404, "good": mockPRServiceOK},
-		},
-		&multiRepoIssuesService{
-			services: map[string]*mockIssueService{
-				"bad": {
-					mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-					mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 404}},
-					mockError:                      fmt.Errorf("not found"),
-				},
-				"good": {
-					mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-					mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-					mockError:                      nil,
-				},
-			},
-		},
-		mockActionsService,
-		mockgithubclient.UnusedGraphQLTransport{},
-	)
 	repos := []models.Repository{{Owner: "o", Name: "bad"}, {Owner: "o", Name: "good"}}
-	_, err := client.FindOpenPRs(
-		context.Background(),
-		repos,
-		func(models.Repository) config.Filters { return config.Filters{} },
-	)
+	_, err := client.FindOpenPRs(context.Background(), repos, noFilters)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
 }
 
-func TestFindOpenPRs_ConcurrencyLimit(t *testing.T) {
-	repoCount := githubclient.DefaultGitHubAPIConcurrencyLimit + 3
-	services := make(map[string]*mockPullRequestService)
-	repos := make([]models.Repository, 0, repoCount)
-	for i := 0; i < repoCount; i++ {
-		name := fmt.Sprintf("repo-%d", i)
-		services[name] = &mockPullRequestService{
-			mockPRs: []*github.PullRequest{
-				{
-					Number:  github.Ptr(i + 100),
-					Title:   github.Ptr(name + " PR"),
-					Draft:   github.Ptr(false),
-					HTMLURL: github.Ptr("https://example.com/" + name),
-					User:    &github.User{Login: github.Ptr("author")}},
-			},
-			mockReviewsByPRNumber:  map[int][]*github.PullRequestReview{},
-			mockCommentsByPRNumber: map[int][]*github.PullRequestComment{},
-			mockResponse:           &github.Response{Response: &http.Response{StatusCode: 200}},
-			mockError:              nil,
-		}
-		repos = append(repos, models.Repository{Owner: "o", Name: name})
+func TestFindOpenPRs_EnrichmentIsBatched(t *testing.T) {
+	prCount := 30 // more than the 25 aliases one enrichment request carries
+	mockPRs := make([]*github.PullRequest, 0, prCount)
+	for i := range prCount {
+		mockPRs = append(mockPRs, &github.PullRequest{
+			Number:    github.Ptr(i + 100),
+			Title:     github.Ptr(fmt.Sprintf("PR %d", i)),
+			Draft:     github.Ptr(false),
+			CreatedAt: &github.Timestamp{Time: time.Now().Add(-time.Duration(i) * time.Hour)},
+			HTMLURL:   github.Ptr(fmt.Sprintf("https://example.com/r/%d", i)),
+			User:      &github.User{Login: github.Ptr("author")},
+		})
 	}
-	issueServices := make(map[string]*mockIssueService)
-	for name := range services {
-		issueServices[name] = &mockIssueService{
-			mockTimelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-			mockResponse:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-			mockError:                      nil,
-		}
-	}
-	mockHTTPClient := &mockHTTPClient{
-		mockResponse: &http.Response{StatusCode: 200},
-		mockError:    nil,
-	}
-	mockActionsService := &mockActionsService{
-		mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:    nil,
-	}
-	client := githubclient.NewClient(
-		mockHTTPClient,
-		&multiRepoPRService{services: services},
-		&multiRepoIssuesService{services: issueServices},
-		mockActionsService,
-		mockgithubclient.UnusedGraphQLTransport{},
-	)
-	prs, err := client.FindOpenPRs(
-		context.Background(),
-		repos,
-		func(models.Repository) config.Filters { return config.Filters{} },
-	)
+
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{PRs: mockPRs})
+	repos := []models.Repository{{Owner: "o", Name: "repo"}}
+
+	prs, err := client.FindOpenPRs(context.Background(), repos, noFilters)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(prs) != repoCount {
-		t.Fatalf("expected %d PRs, got %d", repoCount, len(prs))
+	if len(prs) != prCount {
+		t.Fatalf("expected %d PRs, got %d", prCount, len(prs))
 	}
-}
-
-// selectivePRService allows per-PR errors to test best-effort reviewer info enrichment.
-type selectivePRService struct {
-	mockPRs            []*github.PullRequest
-	reviewsByPRNumber  map[int][]*github.PullRequestReview
-	commentsByPRNumber map[int][]*github.PullRequestComment
-	errByPRNumber      map[int]error
-	response           *github.Response
-	reviewsResponse    *github.Response
-}
-
-func (s *selectivePRService) Get(
-	ctx context.Context, owner string, repo string, number int,
-) (*github.PullRequest, *github.Response, error) {
-	if err, ok := s.errByPRNumber[number]; ok {
-		return nil, s.response, err
-	}
-	for _, pr := range s.mockPRs {
-		if pr.GetNumber() == number {
-			return pr, s.response, nil
-		}
-	}
-	return nil, s.response, fmt.Errorf("PR not found")
-}
-
-func (s *selectivePRService) List(
-	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
-) ([]*github.PullRequest, *github.Response, error) {
-	return s.mockPRs, s.response, nil
-}
-
-func (s *selectivePRService) ListReviews(
-	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
-) ([]*github.PullRequestReview, *github.Response, error) {
-	reviews := s.reviewsByPRNumber[number]
-	err := s.errByPRNumber[number]
-	return reviews, s.reviewsResponse, err
-}
-
-func (s *selectivePRService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
-) ([]*github.PullRequestComment, *github.Response, error) {
-	comments := s.commentsByPRNumber[number]
-	err := s.errByPRNumber[number]
-	return comments, s.reviewsResponse, err
-}
-
-// selectiveIssuesService allows per-PR errors to test best-effort issue comment info enrichment.
-type selectiveIssuesService struct {
-	timelineCommentsByPRNumber map[int][]*github.IssueComment
-	errByPRNumber              map[int]error
-	response                   *github.Response
-}
-
-func (s *selectiveIssuesService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
-) ([]*github.IssueComment, *github.Response, error) {
-	comments := s.timelineCommentsByPRNumber[number]
-	err := s.errByPRNumber[number]
-	return comments, s.response, err
 }
 
 func TestFindOpenPRs_ReviewsPartialErrors(t *testing.T) {
-	// Two PRs: first reviews fetch fails, second succeeds.
-	prService := &selectivePRService{
-		mockPRs: []*github.PullRequest{
+	// Two PRs: enriching the first fails, the second succeeds.
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{
 			{Number: github.Ptr(101), Title: github.Ptr("PR One"), Draft: github.Ptr(false), HTMLURL: github.Ptr("https://example.com/repo/101"), User: &github.User{Login: github.Ptr("author1")}},
 			{Number: github.Ptr(102), Title: github.Ptr("PR Two"), Draft: github.Ptr(false), HTMLURL: github.Ptr("https://example.com/repo/102"), User: &github.User{Login: github.Ptr("author2")}},
 		},
-		reviewsByPRNumber: map[int][]*github.PullRequestReview{
+		ReviewsByPRNumber: map[int][]*github.PullRequestReview{
 			102: { // success case only
 				mockgithubclient.NewReview("approver2", "Approver Two", "APPROVED"),
 				mockgithubclient.NewReview("commenter2", "Commenter Two", "COMMENTED"),
 			},
 		},
-		commentsByPRNumber: map[int][]*github.PullRequestComment{},
-		errByPRNumber: map[int]error{
+		ErrByPRNumber: map[int]error{
 			101: fmt.Errorf("network timeout"), // failure for first PR
 		},
-		response:        &github.Response{Response: &http.Response{StatusCode: 200}},
-		reviewsResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-	}
+	})
 
-	issueService := &selectiveIssuesService{
-		timelineCommentsByPRNumber: map[int][]*github.IssueComment{},
-		errByPRNumber:              map[int]error{},
-		response:                   &github.Response{Response: &http.Response{StatusCode: 200}},
-	}
-
-	mockHTTPClient := &mockHTTPClient{
-		mockResponse: &http.Response{StatusCode: 200},
-		mockError:    nil,
-	}
-	mockActionsService := &mockActionsService{
-		mockResponse: &github.Response{Response: &http.Response{StatusCode: 200}},
-		mockError:    nil,
-	}
-	client := githubclient.NewClient(
-		mockHTTPClient,
-		prService,
-		issueService,
-		mockActionsService,
-		mockgithubclient.UnusedGraphQLTransport{},
-	)
 	repos := []models.Repository{{Owner: "o", Name: "repo"}}
-	prs, err := client.FindOpenPRs(
-		context.Background(),
-		repos,
-		func(models.Repository) config.Filters { return config.Filters{} },
-	)
+	prs, err := client.FindOpenPRs(context.Background(), repos, noFilters)
 	if err != nil {
 		t.Fatalf("did not expect error, got %v", err)
 	}

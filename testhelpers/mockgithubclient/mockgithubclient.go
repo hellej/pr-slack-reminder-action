@@ -3,17 +3,21 @@ package mockgithubclient
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 type MockGitHubClientOptions struct {
@@ -23,7 +27,6 @@ type MockGitHubClientOptions struct {
 	PRsByRepo                  map[string][]*github.PullRequest
 	ListPRsResponseStatus      int
 	ReviewsByPRNumber          map[int][]*github.PullRequestReview
-	CommentsByPRNumber         map[int][]*github.PullRequestComment
 	TimelineCommentsByPRNumber map[int][]*github.IssueComment
 	PRServiceError             error
 	IssueServiceError          error
@@ -39,12 +42,11 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 
 	return func(token, tokenForState string) githubclient.Client {
 		mockPRService := &mockPullRequestService{
-			prsByNumber:        opts.PRsByNumber,
-			errorByPRNumber:    opts.ErrByPRNumber,
-			prs:                opts.PRs,
-			prsByRepo:          opts.PRsByRepo,
-			reviewsByPRNumber:  opts.ReviewsByPRNumber,
-			commentsByPRNumber: opts.CommentsByPRNumber,
+			prsByNumber:       opts.PRsByNumber,
+			errorByPRNumber:   opts.ErrByPRNumber,
+			prs:               opts.PRs,
+			prsByRepo:         opts.PRsByRepo,
+			reviewsByPRNumber: opts.ReviewsByPRNumber,
 			response: &github.Response{
 				Response: &http.Response{
 					StatusCode: opts.ListPRsResponseStatus,
@@ -86,7 +88,7 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			mockPRService,
 			mockIssueService,
 			mockActionsService,
-			UnusedGraphQLTransport{},
+			NewGraphQLTransport(opts),
 		)
 	}
 }
@@ -124,35 +126,251 @@ func newUser(login, name string, userType ...string) *github.User {
 	}
 }
 
-func NewComment(id int64, login, name, body string, userType ...string) *github.PullRequestComment {
-	var t *string
-	if len(userType) > 0 && userType[0] != "" {
-		t = github.Ptr(userType[0])
+// Renders the fixture options into GraphQL responses. The phase is read off the query text, and
+// each alias is bound from the request variables: rN to ownerN/nameN, pN to ownerN/nameN/numN.
+type GraphQLTransport struct {
+	opts MockGitHubClientOptions
+}
+
+func NewGraphQLTransport(opts MockGitHubClientOptions) GraphQLTransport {
+	return GraphQLTransport{opts: opts}
+}
+
+func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawMessage, error) {
+	var request struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
 	}
-	var b *string
-	if body != "" {
-		b = github.Ptr(body)
+	if err := json.Unmarshal(body, &request); err != nil {
+		return 0, nil, err
 	}
-	return &github.PullRequestComment{
-		ID:   github.Ptr(id),
-		Body: b,
-		User: &github.User{
-			Login: github.Ptr(login),
-			Name:  github.Ptr(name),
-			Type:  t,
-		},
+	if strings.Contains(request.Query, "pullRequests(") {
+		return t.openPRsResponse(request.Variables)
+	}
+	if strings.Contains(request.Query, "pullRequest(number:") {
+		return t.enrichedPRsResponse(request.Variables)
+	}
+	return 0, nil, errors.New("unrecognized GraphQL query: " + request.Query)
+}
+
+type renderedResponse struct {
+	Data   map[string]any  `json:"data"`
+	Errors []renderedError `json:"errors,omitempty"`
+}
+
+type renderedError struct {
+	Type    string `json:"type,omitempty"`
+	Path    []any  `json:"path"`
+	Message string `json:"message"`
+}
+
+const notFoundStatus = 404
+
+// A 404 renders NOT_FOUND on the aliases of the repositories that have no PRs fixture; any other
+// non-200 status fails the whole request at the transport level.
+func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	status := cmp.Or(t.opts.ListPRsResponseStatus, http.StatusOK)
+	if status != http.StatusOK && status != notFoundStatus {
+		body, err := json.Marshal(map[string]string{"message": errorMessage(t.opts.PRServiceError)})
+		return status, body, err
+	}
+
+	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
+	for index, repoName := range postedRepositoryNames(variables) {
+		alias := fmt.Sprintf("r%d", index)
+		if status == notFoundStatus && !t.hasOpenPRsFixture(repoName) {
+			response.Data[alias] = nil
+			response.Errors = append(response.Errors, renderedError{
+				Type:    "NOT_FOUND",
+				Path:    []any{alias},
+				Message: errorMessage(t.opts.PRServiceError),
+			})
+			continue
+		}
+		response.Data[alias] = map[string]any{
+			"pullRequests": connectionJSON(utilities.Map(t.openPRs(repoName), openPullRequestNodeJSON)),
+		}
+	}
+	return marshalResponse(response)
+}
+
+// An ErrByPRNumber entry renders as a PR-level error, an IssueServiceError as a field error on
+// every PR's comments connection.
+func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
+	for index, ref := range postedPullRequestRefs(variables) {
+		alias := fmt.Sprintf("p%d", index)
+		if err, hasError := t.opts.ErrByPRNumber[ref.number]; hasError {
+			response.Data[alias] = map[string]any{"pullRequest": nil}
+			response.Errors = append(response.Errors, renderedError{
+				Path: []any{alias, "pullRequest"}, Message: err.Error(),
+			})
+			continue
+		}
+		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(ref)}
+		if t.opts.IssueServiceError != nil {
+			response.Errors = append(response.Errors, renderedError{
+				Type:    "RESOURCE_LIMITS_EXCEEDED",
+				Path:    []any{alias, "pullRequest", "comments"},
+				Message: t.opts.IssueServiceError.Error(),
+			})
+		}
+	}
+	return marshalResponse(response)
+}
+
+func (t GraphQLTransport) openPRs(repoName string) []*github.PullRequest {
+	if t.opts.PRsByRepo != nil {
+		return t.opts.PRsByRepo[repoName]
+	}
+	return t.opts.PRs
+}
+
+func (t GraphQLTransport) hasOpenPRsFixture(repoName string) bool {
+	if t.opts.PRsByRepo != nil {
+		_, isConfigured := t.opts.PRsByRepo[repoName]
+		return isConfigured
+	}
+	return len(t.opts.PRs) > 0
+}
+
+// PR scalars come from PRsByNumber when it is set, and from the listing fixtures otherwise.
+func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullRequest {
+	if pr, isSet := t.opts.PRsByNumber[ref.number]; isSet {
+		return pr
+	}
+	pr, _ := utilities.Find(t.openPRs(ref.repoName), func(pr *github.PullRequest) bool {
+		return pr.GetNumber() == ref.number
+	})
+	return pr
+}
+
+func (t GraphQLTransport) enrichedPullRequestNodeJSON(ref pullRequestRef) map[string]any {
+	node := pullRequestScalarsJSON(t.findPullRequest(ref))
+	node["number"] = ref.number
+	node["commits"] = connectionJSON([]map[string]any{})
+	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[ref.number], reviewNodeJSON))
+	node["comments"] = t.commentsJSON(ref.number)
+	return node
+}
+
+// The failed connection comes back null.
+func (t GraphQLTransport) commentsJSON(number int) any {
+	if t.opts.IssueServiceError != nil {
+		return nil
+	}
+	return connectionJSON(utilities.Map(t.opts.TimelineCommentsByPRNumber[number], commentNodeJSON))
+}
+
+func openPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
+	node := pullRequestScalarsJSON(pr)
+	node["labels"] = connectionJSON(utilities.Map(pr.Labels, labelNodeJSON))
+	return node
+}
+
+func pullRequestScalarsJSON(pr *github.PullRequest) map[string]any {
+	return map[string]any{
+		"number":     pr.GetNumber(),
+		"title":      pr.GetTitle(),
+		"url":        pr.GetHTMLURL(),
+		"isDraft":    pr.GetDraft(),
+		"createdAt":  pr.GetCreatedAt().Time,
+		"updatedAt":  pr.GetUpdatedAt().Time,
+		"headRefOid": pr.GetHead().GetSHA(),
+		"author":     authorNodeJSON(pr.GetUser()),
 	}
 }
 
+func labelNodeJSON(label *github.Label) map[string]any {
+	return map[string]any{"name": label.GetName()}
+}
+
+func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
+	return map[string]any{
+		"state":  review.GetState(),
+		"author": authorNodeJSON(review.GetUser()),
+	}
+}
+
+func commentNodeJSON(comment *github.IssueComment) map[string]any {
+	return map[string]any{
+		"createdAt": comment.GetCreatedAt().Time,
+		"body":      comment.GetBody(),
+		"author":    authorNodeJSON(comment.GetUser()),
+	}
+}
+
+// An unset user type renders as "User" - anything else drops the name in the collaborator mapper.
+func authorNodeJSON(user *github.User) map[string]any {
+	if user == nil {
+		return nil
+	}
+	return map[string]any{
+		"login":      user.GetLogin(),
+		"__typename": cmp.Or(user.GetType(), "User"),
+		"name":       user.GetName(),
+	}
+}
+
+func connectionJSON[T any](nodes []T) map[string]any {
+	return map[string]any{"nodes": nodes}
+}
+
+func rateLimitJSON() map[string]any {
+	return map[string]any{"cost": 1, "remaining": 4999, "limit": 5000}
+}
+
+func marshalResponse(response renderedResponse) (int, json.RawMessage, error) {
+	body, err := json.Marshal(response)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, body, nil
+}
+
+func errorMessage(err error) string {
+	if err == nil {
+		return "GraphQL request failed"
+	}
+	return err.Error()
+}
+
+type pullRequestRef struct {
+	repoName string
+	number   int
+}
+
+func postedRepositoryNames(variables map[string]any) []string {
+	names := []string{}
+	for index := 0; ; index++ {
+		name, isSet := variables[fmt.Sprintf("name%d", index)].(string)
+		if !isSet {
+			return names
+		}
+		names = append(names, name)
+	}
+}
+
+func postedPullRequestRefs(variables map[string]any) []pullRequestRef {
+	refs := []pullRequestRef{}
+	for index, repoName := range postedRepositoryNames(variables) {
+		number, isSet := variables[fmt.Sprintf("num%d", index)].(float64)
+		if !isSet {
+			return refs
+		}
+		refs = append(refs, pullRequestRef{repoName: repoName, number: int(number)})
+	}
+	return refs
+}
+
 type mockPullRequestService struct {
-	prsByNumber        map[int]*github.PullRequest
-	errorByPRNumber    map[int]error
-	prs                []*github.PullRequest
-	prsByRepo          map[string][]*github.PullRequest
-	reviewsByPRNumber  map[int][]*github.PullRequestReview
-	commentsByPRNumber map[int][]*github.PullRequestComment
-	response           *github.Response
-	err                error
+	prsByNumber       map[int]*github.PullRequest
+	errorByPRNumber   map[int]error
+	prs               []*github.PullRequest
+	prsByRepo         map[string][]*github.PullRequest
+	reviewsByPRNumber map[int][]*github.PullRequestReview
+	response          *github.Response
+	err               error
 }
 
 func (m *mockPullRequestService) Get(
@@ -186,8 +404,7 @@ func (m *mockPullRequestService) ListReviews(
 func (m *mockPullRequestService) ListComments(
 	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
 ) ([]*github.PullRequestComment, *github.Response, error) {
-	comments := m.commentsByPRNumber[number]
-	return comments, m.response, m.err
+	return nil, m.response, m.err
 }
 
 type mockIssueService struct {

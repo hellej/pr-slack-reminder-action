@@ -150,7 +150,7 @@ const PullRequestListTimeout = 30 * time.Second
 const PullRequestFetchTimeout = 5 * time.Second
 const ReviewsFetchTimeout = 10 * time.Second
 
-// Returns an error if fetching PRs from any repository fails (and cancels the other requests).
+// Returns an error if listing the PRs of any repository fails.
 func (c *client) FindOpenPRs(
 	ctx context.Context,
 	repositories []models.Repository,
@@ -158,32 +158,16 @@ func (c *client) FindOpenPRs(
 ) ([]PR, error) {
 	log.Printf("Fetching open pull requests for repositories: %v", repositories)
 
-	listGroup, listCtx := errgroup.WithContext(ctx)
-	listGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
-	prResultSlices := make([][]PRResult, len(repositories))
-
-	for i, repo := range repositories {
-		i, repo := i, repo // https://golang.org/doc/faq#closures_and_goroutines
-		listGroup.Go(func() error {
-			res, err := c.fetchOpenPRsForRepository(listCtx, repo)
-			if err == nil {
-				prResultSlices[i] = res
-			}
-			return err
-		})
-	}
-	if err := listGroup.Wait(); err != nil {
+	listedPRs, err := c.listOpenPRs(ctx, repositories)
+	if err != nil {
 		return nil, err
 	}
 
-	prResults := utilities.Filter(
-		utilities.FlatMap(prResultSlices),
-		getPRFilterFunc(getFiltersForRepository),
-	)
+	prResults := utilities.Filter(listedPRs, getPRFilterFunc(getFiltersForRepository))
 	prResults = capPRsToLimit(prResults)
 	logFoundPRs(prResults)
 
-	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
+	prs, err := c.enrichPRs(ctx, prResults)
 	if err != nil {
 		return nil, err
 	}
