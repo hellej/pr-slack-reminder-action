@@ -185,6 +185,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 7. Verify against the live API with the existing workflows
 8. Delete the REST PR path
 9. Docs and spec sync
+10. Cleanup and readability pass over the finished codebase
 
 ## Steps
 
@@ -331,7 +332,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Aliases are generated into the query text (aliases can't be variables); owner and name go in as **variables**, never concatenated. The builder returns a `graphqlQuery` — text, variables, aliases and the alias → `models.Repository` map — which Steps 4 and 6 reuse. `listOpenPRs` uses that map to turn Step 1's `repositoryError` into `fmt.Errorf("repository %s/%s not found - check the repository name and permissions", ...)`, keeping today's wording and `main_test.go:306`'s expectation.
 - Every other hard error becomes `fmt.Errorf("error fetching pull requests: %w", err)` — the Step 5 wording, produced here because `listOpenPRs` owns the call. The wrapped typed error prints its own text, so Step 5's `main_test.go:313` expectation is that prefix plus the `transportError` text, not the bare service error.
 - A `fieldError` under a repository alias **fails the list**, named as `error fetching pull requests from %s/%s: %w`. Phase 1 has no per-PR unit to degrade to, so degrading would drop every PR of that repository silently; REST fails the whole call when one repository's list fails, so failing preserves today's behaviour. Same wording and same reason for `data.<alias>` being null or absent with no matching error.
-- The response's repository aliases are generated, so `listOpenPRsData` decodes them by name through an `UnmarshalJSON` that splits `rateLimit` from the aliases. A decode failure stays a hard error, per Step 1's contract.
+- The response's repository aliases are generated, so they decode by name through an `UnmarshalJSON` that splits `rateLimit` from the aliases — `aliasedData[T]`, shared with phase 2 in Step 4. A decode failure stays a hard error, per Step 1's contract.
 - `state` and `merged` are not selected. `states: OPEN` guarantees both, so the mapper sets `State: "open"`, `Merged: false` on the own type. `prparser.IsMerged()` and `IsClosedButNotMerged()` then behave as they do today for open PRs.
 - `CREATED_AT DESC` is required, not cosmetic: REST's list defaults to `sort=created&direction=desc`, so a repository with more than 100 open PRs must yield the same newest-100 candidate set.
 - `first: 100` matches today's `PerPage: 100`, and `MaxRepositories` (30) bounds the alias count.
@@ -340,7 +341,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Log the `rateLimit` cost and remaining at debug level — it is the only visibility into budget consumption.
 - Tests: one query-shape test asserting the generated text carries `states: OPEN`, `first: 100`, `orderBy: {field: CREATED_AT, direction: DESC}` and one aliased `repository` per configured repository, with owner/name only in the variables map. Ordering itself is GitHub's to honour and cannot be tested against canned JSON — `first: 100` means the client never sees more than 100 nodes per alias. Plus one table over canned responses: PRs mapped from both aliases, a `repositoryError` on `r0` producing the preserved error string, a `FORBIDDEN` producing the same, a null alias with a matching error not being read as an empty repository, a whole-query `RATE_LIMITED` failing without naming a repository. Plus one test pinning the node → `PullRequest` mapping field by field, `State: "open"` and `Merged: false` included.
 
-### 4. Phase 2: enrich the capped set (`graphqlfetch.go`, `graphqlfetch_test.go`, `models.go`)
+### 4. Phase 2: enrich the capped set (`graphqlfetch.go`, `graphqlfetch_test.go`)
 
 - `enrichPRs(ctx, []PRResult) ([]PR, error)` runs after filtering and capping, so it only ever covers PRs that will be shown. It returns PRs in input order, which is deterministic and matches `capPRsToLimit`'s, replacing today's arbitrary completion order. A test row asserts it.
 - Batches of 25 aliases, one request each, batches issued concurrently at `DefaultGitHubAPIConcurrencyLimit` (3), each with `ReviewsFetchTimeout` (10s, unchanged — 25 aliases measured ~2 s):
@@ -354,17 +355,20 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
   } }
   ```
 
-- `reviews(first: 100)` replaces today's 200-review cap (two pages of 100); `comments(first: 100)` matches today's 100 timeline comments exactly. Review comments are not fetched at all — their authors are always review authors (see "Reviewer derivation").
+- `rateLimit` is selected here too, and the aliases are generated, so both phases decode through one generic `aliasedData[T]` and assemble their text through one `assembleQuery`. The selection above goes in as a `fragment enrichedPr on PullRequest`, matching phase 1's shape.
+- `reviews(first: 100)` replaces today's 200-review cap (two pages of 100); `comments(first: 100)` matches today's 100 timeline comments exactly. Review comments are not fetched at all — their authors are always review authors (see "Reviewer derivation"), so `deriveReviewers`' review-comment input is nil until Step 8 drops it.
 - Approvers are the review nodes with `state == "APPROVED"` (`PullRequestReviewState`, schema introspection 2026-08-09), feeding `deriveReviewers` in place of `isApprovingReview` (`models.go:120`). `PENDING` nodes are dropped entirely; every other state contributes a commenter, and `APPROVED` authors are then excluded from commenters by the approver filter, as today.
 - `commits(last: 1)` is selected now, unused until 002. It costs one connection resolution per PR and removes the need to revisit this query later.
 - Batch failure semantics:
-  - All batches share one errgroup limited to `DefaultGitHubAPIConcurrencyLimit`. A `transportError` or `repositoryError` from any batch fails the group and cancels its siblings.
+  - All batches share one errgroup limited to `DefaultGitHubAPIConcurrencyLimit`. A `transportError`, `repositoryError` or `queryError` from any batch fails the group and cancels its siblings, wrapped as `error fetching reviews and comments: %w` — or `error fetching reviews and comments from %s/%s: %w` for a `repositoryError`, whose alias names a repository.
   - A `pullRequestError` does **not** fail the group here, unlike in `GetPRs` (Step 6). Enrichment has never been able to fail the call — `githubclient.spec.md` states a failed reviews/comments fetch for one PR does not fail `FindOpenPRs` — and a PR closed between phase 1 and phase 2 would otherwise abort a whole run. It degrades to the field-level path below.
   - `fieldError`s never fail the group. Each is attached to its alias's PR.
   - `data.<alias>.pullRequest == null` with no matching `errors` entry is treated as a `fieldError` covering the whole PR: it keeps its phase-1 scalars and loses reviews, comments and commits. The null is on `pullRequest`, not on the alias — a missing PR returns `{"data":{"p0":{"pullRequest":null}}}` with the alias object intact (verified live). `data.<alias> == null` is the repository-level shape, and only phase 1 produces it.
-- A field-level error on one alias means that PR keeps its scalars and loses everything under the failed connection. Log it in the existing *"Unable to fetch reviews/comments for PR #%d"* form, naming the connection, and carry on.
+- A field-level error on one alias means that PR keeps its scalars and loses everything under the failed connection. Log it in the existing *"Unable to fetch reviews/comments for PR #%d"* form, naming the connection through the error's path, and carry on. The per-PR success line drops its review-comment count, which is no longer fetched: *"Found %d reviews and %d timeline comments for PR %v/%d"*.
 - A field-level error on `comments` specifically also loses `/snooze`: `findActiveSnooze` sees an empty slice and a snoozed PR reappears in the reminder. Same failure mode as today's timeline-comment call failing, so it degrades rather than fails — the log line is the whole diagnosis.
-- Tests: one table over canned phase-2 responses → `([]PR, error)`, with rows for a batch boundary at exactly 25 and at 26, a field-level error on one alias leaving the other 24 intact, a null `pullRequest` with no error behaving the same, a `pullRequestError` on one alias leaving the rest of the batch intact, a `transportError` on one batch failing the whole call, and snooze parsing off `comments.nodes.body`/`createdAt`. Separately, a field-level error on `comments` letting a snoozed PR through, with the log line asserted.
+- Tests: one table over canned phase-2 responses → `([]PR, error)`, with rows for a batch boundary at exactly 25 and at 26, a field-level error on one alias leaving the other 24 intact, a null `pullRequest` with no error behaving the same, a `pullRequestError` on one alias leaving the rest of the batch intact, a `transportError` on one batch failing the whole call, a `repositoryError` failing it while naming the repository, review states mapping onto approvers and commenters with `PENDING` dropped, and snooze parsing off `comments.nodes.body`/`createdAt`. Separately, a field-level error on `comments` letting a snoozed PR through, with the log line asserted.
+- The batch-boundary rows also carry the input-order assertion, since two batches complete in an order the test does not control. The fake transport renders a response per posted body, keyed by the `numN` variables, so one fixture set drives both batches.
+- Plus a query-shape test asserting whole calls — `commits(last: 1)`, `reviews(first: 100)`, `comments(first: 100)` — with their full selection sets and the author sub-selection, one aliased `pullRequest` per reference, and owner, name and number only in the variables map. A bare `first: 100` substring is satisfied by either connection and does not discriminate.
 
 ### 5. `FindOpenPRs` on GraphQL (`githubclient.go`, `githubclient_test.go`, `testhelpers/mockgithubclient/mockgithubclient.go`, `cmd/pr-slack-reminder/main_test.go`)
 

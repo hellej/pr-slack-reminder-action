@@ -1,10 +1,15 @@
 package githubclient
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"maps"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -221,5 +226,444 @@ func TestListOpenPRsMapsNodeToPullRequest(t *testing.T) {
 	}
 	if prResults[0].repository != testRepositories[0] {
 		t.Errorf("repository = %+v, expected %+v", prResults[0].repository, testRepositories[0])
+	}
+}
+
+const testEnrichFragmentName = "enrichedPr"
+
+func TestBuildEnrichPRsQuery(t *testing.T) {
+	references := []models.PullRequestRef{
+		{Repository: testRepositories[0], Number: 111},
+		{Repository: testRepositories[1], Number: 222},
+	}
+
+	query := buildEnrichPRsQuery(references)
+
+	requiredFragments := []string{
+		"query($owner0:String!,$name0:String!,$num0:Int!,$owner1:String!,$name1:String!,$num1:Int!)",
+		"rateLimit { cost remaining limit }",
+		"p0: repository(owner:$owner0,name:$name0){ pullRequest(number:$num0){ ..." + testEnrichFragmentName + " } }",
+		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." + testEnrichFragmentName + " } }",
+		"fragment " + testEnrichFragmentName + " on PullRequest {",
+		"number\n  commits(last: 1){ nodes { commit { oid committedDate } } }",
+		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
+		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
+	}
+	for _, fragment := range requiredFragments {
+		if !strings.Contains(query.text, fragment) {
+			t.Errorf("query text is missing %q, got:\n%s", fragment, query.text)
+		}
+	}
+
+	forbiddenFragments := []string{
+		"pullRequests(", "labels(", "owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
+	}
+	for _, fragment := range forbiddenFragments {
+		if strings.Contains(query.text, fragment) {
+			t.Errorf("query text contains %q, got:\n%s", fragment, query.text)
+		}
+	}
+
+	if aliasCount := strings.Count(query.text, ": repository(owner:"); aliasCount != len(references) {
+		t.Errorf("query text has %d aliased repositories, expected %d", aliasCount, len(references))
+	}
+	spreadCount := strings.Count(query.text, "..."+testEnrichFragmentName+" }")
+	if spreadCount != len(references) {
+		t.Errorf("query text spreads the fragment %d times, expected %d", spreadCount, len(references))
+	}
+
+	expectedVariables := map[string]any{
+		"owner0": "owner-one", "name0": "repo-one", "num0": 111,
+		"owner1": "owner-two", "name1": "repo-two", "num1": 222,
+	}
+	if !reflect.DeepEqual(query.variables, expectedVariables) {
+		t.Errorf("variables = %+v, expected %+v", query.variables, expectedVariables)
+	}
+	if !reflect.DeepEqual(query.aliases, []string{"p0", "p1"}) {
+		t.Errorf("aliases = %v, expected [p0 p1]", query.aliases)
+	}
+	if !reflect.DeepEqual(query.repositoryByAlias["p1"], testRepositories[1]) {
+		t.Errorf("repositoryByAlias[p1] = %+v, expected %+v", query.repositoryByAlias["p1"], testRepositories[1])
+	}
+}
+
+type enrichFixture struct {
+	reviews         []map[string]any
+	comments        []map[string]any
+	nullPullRequest bool
+	errorType       string
+	errorPath       []any // path suffix after the alias; the field it points at comes back null
+	errorMessage    string
+	requestStatus   int // non-zero: the whole request carrying this PR fails with this status
+}
+
+func (f enrichFixture) aliasResponse(number int) any {
+	if f.errorType != "" && len(f.errorPath) == 0 {
+		return nil
+	}
+	if f.nullPullRequest || len(f.errorPath) == 1 {
+		return map[string]any{"pullRequest": nil}
+	}
+	pullRequest := map[string]any{
+		"number":   number,
+		"commits":  map[string]any{"nodes": []any{}},
+		"reviews":  map[string]any{"nodes": f.reviews},
+		"comments": map[string]any{"nodes": f.comments},
+	}
+	if len(f.errorPath) > 1 {
+		pullRequest[f.errorPath[len(f.errorPath)-1].(string)] = nil
+	}
+	return map[string]any{"pullRequest": pullRequest}
+}
+
+type fakeEnrichTransport struct {
+	fixtureByNumber  map[int]enrichFixture
+	mutex            sync.Mutex
+	requestedNumbers [][]int
+}
+
+func (t *fakeEnrichTransport) Post(_ context.Context, body []byte) (int, json.RawMessage, error) {
+	var request graphqlRequest
+	if err := json.Unmarshal(body, &request); err != nil {
+		return 0, nil, err
+	}
+	numbers := postedPRNumbers(request.Variables)
+
+	t.mutex.Lock()
+	t.requestedNumbers = append(t.requestedNumbers, numbers)
+	t.mutex.Unlock()
+
+	data := map[string]any{"rateLimit": map[string]any{"cost": 1, "remaining": 4999, "limit": 5000}}
+	responseErrors := []map[string]any{}
+
+	for index, number := range numbers {
+		fixture := t.fixtureByNumber[number]
+		if fixture.requestStatus != 0 {
+			return fixture.requestStatus, json.RawMessage(`{"message":"server error"}`), nil
+		}
+		alias := fmt.Sprintf("p%d", index)
+		data[alias] = fixture.aliasResponse(number)
+		if fixture.errorType != "" {
+			responseErrors = append(responseErrors, map[string]any{
+				"type":    fixture.errorType,
+				"path":    append([]any{alias}, fixture.errorPath...),
+				"message": fixture.errorMessage,
+			})
+		}
+	}
+
+	response := map[string]any{"data": data}
+	if len(responseErrors) > 0 {
+		response["errors"] = responseErrors
+	}
+	responseBody, err := json.Marshal(response)
+	if err != nil {
+		return 0, nil, err
+	}
+	return 200, responseBody, nil
+}
+
+func postedPRNumbers(variables map[string]any) []int {
+	numbers := []int{}
+	for index := 0; ; index++ {
+		value, isSet := variables[fmt.Sprintf("num%d", index)]
+		if !isSet {
+			return numbers
+		}
+		numbers = append(numbers, int(value.(float64)))
+	}
+}
+
+func authorNodeJSON(login string) map[string]any {
+	return map[string]any{"login": login, "__typename": "User", "name": strings.ToUpper(login)}
+}
+
+func reviewNodeJSON(state, login string) map[string]any {
+	return map[string]any{"state": state, "author": authorNodeJSON(login)}
+}
+
+func commentNodeJSON(login, body string, createdAt time.Time) map[string]any {
+	return map[string]any{
+		"createdAt": createdAt.Format(time.RFC3339),
+		"body":      body,
+		"author":    authorNodeJSON(login),
+	}
+}
+
+func testPRResults(count int) []PRResult {
+	results := make([]PRResult, count)
+	for index := range results {
+		results[index] = PRResult{
+			pr: &PullRequest{
+				Number: index + 1,
+				Title:  fmt.Sprintf("PR %d", index+1),
+				Author: Collaborator{Login: "pr-author"},
+			},
+			repository: testRepositories[0],
+		}
+	}
+	return results
+}
+
+func reviewedAndCommentedFixtures(count int, overrides map[int]enrichFixture) map[int]enrichFixture {
+	fixtures := map[int]enrichFixture{}
+	for number := 1; number <= count; number++ {
+		fixtures[number] = enrichFixture{
+			reviews:  []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+			comments: []map[string]any{commentNodeJSON("commenter", "nice", time.Now())},
+		}
+	}
+	maps.Copy(fixtures, overrides)
+	return fixtures
+}
+
+func numbersUpTo(count int) []int {
+	numbers := make([]int, count)
+	for index := range numbers {
+		numbers[index] = index + 1
+	}
+	return numbers
+}
+
+func assertPRNumbers(t *testing.T, prs []PR, expected []int) {
+	t.Helper()
+	numbers := make([]int, len(prs))
+	for index, pr := range prs {
+		numbers[index] = pr.GetNumber()
+	}
+	if !reflect.DeepEqual(numbers, expected) {
+		t.Errorf("PR numbers = %v, expected %v", numbers, expected)
+	}
+}
+
+func assertLogins(t *testing.T, label string, collaborators []Collaborator, expected []string) {
+	t.Helper()
+	logins := make([]string, len(collaborators))
+	for index, collaborator := range collaborators {
+		logins[index] = collaborator.Login
+	}
+	if len(logins) == 0 && len(expected) == 0 {
+		return
+	}
+	if !reflect.DeepEqual(logins, expected) {
+		t.Errorf("%s = %v, expected %v", label, logins, expected)
+	}
+}
+
+func captureLogOutput(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var captured bytes.Buffer
+	original := log.Writer()
+	log.SetOutput(&captured)
+	t.Cleanup(func() { log.SetOutput(original) })
+	return &captured
+}
+
+func TestEnrichPRs(t *testing.T) {
+	withoutRetryDelay(t)
+
+	tests := []struct {
+		name             string
+		prCount          int
+		fixtureByNumber  map[int]enrichFixture
+		expectedRequests int
+		expectedErrorMsg string
+		assert           func(t *testing.T, prs []PR)
+	}{
+		{
+			name:    "reviews and comments become approvers and commenters",
+			prCount: 1,
+			fixtureByNumber: map[int]enrichFixture{
+				1: {
+					reviews: []map[string]any{
+						reviewNodeJSON("PENDING", "pending-reviewer"),
+						reviewNodeJSON("APPROVED", "approver"),
+						reviewNodeJSON("CHANGES_REQUESTED", "change-requester"),
+					},
+					comments: []map[string]any{commentNodeJSON("timeline-commenter", "looks good", time.Now())},
+				},
+			},
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				assertLogins(t, "approvers", prs[0].ApprovedByUsers, []string{"approver"})
+				assertLogins(
+					t, "commenters", prs[0].CommentedByUsers,
+					[]string{"change-requester", "timeline-commenter"},
+				)
+			},
+		},
+		{
+			name:             "25 PRs are enriched in one batch, in input order",
+			prCount:          25,
+			fixtureByNumber:  reviewedAndCommentedFixtures(25, nil),
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				assertPRNumbers(t, prs, numbersUpTo(25))
+			},
+		},
+		{
+			name:             "26 PRs are split into two batches, keeping input order",
+			prCount:          26,
+			fixtureByNumber:  reviewedAndCommentedFixtures(26, nil),
+			expectedRequests: 2,
+			assert: func(t *testing.T, prs []PR) {
+				assertPRNumbers(t, prs, numbersUpTo(26))
+			},
+		},
+		{
+			name:    "a field error on one alias leaves the other 24 intact",
+			prCount: 25,
+			fixtureByNumber: reviewedAndCommentedFixtures(25, map[int]enrichFixture{
+				3: {
+					reviews:      []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+					errorType:    "RESOURCE_LIMITS_EXCEEDED",
+					errorPath:    []any{"pullRequest", "comments"},
+					errorMessage: "resource limit exceeded",
+				},
+			}),
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				assertPRNumbers(t, prs, numbersUpTo(25))
+				assertLogins(t, "approvers of PR 3", prs[2].ApprovedByUsers, []string{"approver"})
+				assertLogins(t, "commenters of PR 3", prs[2].CommentedByUsers, nil)
+				assertLogins(t, "commenters of PR 4", prs[3].CommentedByUsers, []string{"commenter"})
+			},
+		},
+		{
+			name:    "a null pull request with no error leaves the other 24 intact",
+			prCount: 25,
+			fixtureByNumber: reviewedAndCommentedFixtures(25, map[int]enrichFixture{
+				3: {nullPullRequest: true},
+			}),
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				assertPRNumbers(t, prs, numbersUpTo(25))
+				assertLogins(t, "approvers of PR 3", prs[2].ApprovedByUsers, nil)
+				assertLogins(t, "commenters of PR 3", prs[2].CommentedByUsers, nil)
+				assertLogins(t, "approvers of PR 4", prs[3].ApprovedByUsers, []string{"approver"})
+			},
+		},
+		{
+			name:    "a pull request error on one alias leaves the rest of the batch intact",
+			prCount: 25,
+			fixtureByNumber: reviewedAndCommentedFixtures(25, map[int]enrichFixture{
+				3: {
+					errorType:    "NOT_FOUND",
+					errorPath:    []any{"pullRequest"},
+					errorMessage: "Could not resolve to a PullRequest with the number 3.",
+				},
+			}),
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				assertPRNumbers(t, prs, numbersUpTo(25))
+				assertLogins(t, "approvers of PR 3", prs[2].ApprovedByUsers, nil)
+				assertLogins(t, "approvers of PR 4", prs[3].ApprovedByUsers, []string{"approver"})
+			},
+		},
+		{
+			name:    "a transport error on one batch fails the whole call",
+			prCount: 26,
+			fixtureByNumber: reviewedAndCommentedFixtures(26, map[int]enrichFixture{
+				26: {requestStatus: 500},
+			}),
+			expectedErrorMsg: "error fetching reviews and comments: GraphQL request failed with status 500",
+		},
+		{
+			name:    "a repository error fails the whole call, naming the repository",
+			prCount: 3,
+			fixtureByNumber: reviewedAndCommentedFixtures(3, map[int]enrichFixture{
+				1: {errorType: "NOT_FOUND", errorMessage: "Could not resolve to a Repository."},
+			}),
+			expectedErrorMsg: "error fetching reviews and comments from owner-one/repo-one: " +
+				"repository error on alias p0: NOT_FOUND Could not resolve to a Repository.",
+		},
+		{
+			name:    "a snooze is parsed off the comments connection",
+			prCount: 1,
+			fixtureByNumber: map[int]enrichFixture{
+				1: {comments: []map[string]any{
+					commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),
+				}},
+			},
+			expectedRequests: 1,
+			assert: func(t *testing.T, prs []PR) {
+				if prs[0].SnoozedUntil == nil {
+					t.Fatal("SnoozedUntil = nil, expected a snooze three days out")
+				}
+				if !prs[0].SnoozedUntil.After(time.Now().Add(2 * 24 * time.Hour)) {
+					t.Errorf("SnoozedUntil = %v, expected a snooze three days out", prs[0].SnoozedUntil)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &fakeEnrichTransport{fixtureByNumber: tt.fixtureByNumber}
+			testClient := &client{graphql: graphqlClient{transport: transport}}
+
+			prs, err := testClient.enrichPRs(context.Background(), testPRResults(tt.prCount))
+
+			if tt.expectedErrorMsg != "" {
+				if err == nil {
+					t.Fatalf("expected error %q, got none with %d PRs", tt.expectedErrorMsg, len(prs))
+				}
+				if !strings.Contains(err.Error(), tt.expectedErrorMsg) {
+					t.Errorf("error = %q, expected it to contain %q", err.Error(), tt.expectedErrorMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(prs) != tt.prCount {
+				t.Fatalf("got %d PRs, expected %d", len(prs), tt.prCount)
+			}
+			if len(transport.requestedNumbers) != tt.expectedRequests {
+				t.Errorf(
+					"made %d requests, expected %d: %v",
+					len(transport.requestedNumbers), tt.expectedRequests, transport.requestedNumbers,
+				)
+			}
+			tt.assert(t, prs)
+		})
+	}
+}
+
+func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
+	withoutRetryDelay(t)
+	logOutput := captureLogOutput(t)
+
+	transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{
+		1: {
+			comments:     []map[string]any{commentNodeJSON("snoozer", "/snooze for 3 days", time.Now())},
+			errorType:    "RESOURCE_LIMITS_EXCEEDED",
+			errorPath:    []any{"pullRequest", "comments"},
+			errorMessage: "resource limit exceeded",
+		},
+	}}
+	testClient := &client{graphql: graphqlClient{transport: transport}}
+
+	prs, err := testClient.enrichPRs(context.Background(), testPRResults(1))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 1 {
+		t.Fatalf("got %d PRs, expected 1", len(prs))
+	}
+	if prs[0].SnoozedUntil != nil {
+		t.Errorf("SnoozedUntil = %v, expected nil - the comments connection failed", prs[0].SnoozedUntil)
+	}
+	if remaining := excludeSnoozedPRs(prs); len(remaining) != 1 {
+		t.Errorf("the snoozed PR was excluded, expected it to reappear in the reminder")
+	}
+
+	for _, expected := range []string{
+		"Unable to fetch reviews/comments for PR #1", "RESOURCE_LIMITS_EXCEEDED", "comments",
+	} {
+		if !strings.Contains(logOutput.String(), expected) {
+			t.Errorf("log output is missing %q, got:\n%s", expected, logOutput.String())
+		}
 	}
 }
