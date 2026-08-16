@@ -61,10 +61,12 @@ Don't stack hedges:
 
 ## Code Style
 
-- Use descriptive naming instead of explanatory comments (comments are almost never needed)
-- KISS
-- Prefer pure functions; reuse or extend ./internal/utilities (Map, Filter, Find) over hand-written loops
-- Optimize for readability, not speed — data sets are tiny
+- **Readability > Speed:** Data sets are tiny; never trade clarity for execution speed or micro-optimizations.
+- **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
+- **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead.
+- **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
+- **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
+- **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
 
 ## Testing
 
