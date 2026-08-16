@@ -9,7 +9,7 @@ argument-hint: "Optional: what you're about to implement, change or fix"
 Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGENTS.md) sections in full:
 
 - **Package Specs** — the touched package's `<package>.spec.md`, plus any related package's spec needed to understand how the change fits
-- **Git** — never amend or force push
+- **Git**: branching, staging, and what never to do
 - **Code Style**
 - **Testing** — TDD is mandatory, no exceptions for small changes
 

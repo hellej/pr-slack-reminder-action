@@ -59,6 +59,9 @@ Don't stack hedges:
 ## Git
 
 - Never amend commits or force push
+- Work on `main` by default. Branch only if the user asks for a branch or mentions a PR
+- Stage only the files for the task you were given. Another agent may have unrelated work
+  in the same working tree, so never use `git add -A` or `git commit -a`
 
 ## Code Style
 
