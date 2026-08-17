@@ -410,8 +410,6 @@ func prWithReviewers(
 		pullRequest.Author.Login,
 		utilities.Map(approvingReviews, reviewAuthor),
 		utilities.Map(submittedReviews, reviewAuthor),
-		nil, // review comment authors are always review authors, so review comments are not fetched
-
 		utilities.Map(commentsFromUsers, commentAuthor),
 	)
 

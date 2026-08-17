@@ -5,8 +5,6 @@ package githubclient
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,7 +16,6 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
-	"golang.org/x/sync/errgroup"
 )
 
 type Client interface {
@@ -37,37 +34,6 @@ type Client interface {
 		owner, repo, artifactName, jsonFilePath string,
 		target any,
 	) error
-}
-
-type GithubPullRequestsService interface {
-	Get(
-		ctx context.Context, owner string, repo string, number int,
-	) (
-		*github.PullRequest, *github.Response, error,
-	)
-	List(
-		ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
-	) (
-		[]*github.PullRequest, *github.Response, error,
-	)
-	ListReviews(
-		ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
-	) (
-		[]*github.PullRequestReview, *github.Response, error,
-	)
-	ListComments(
-		ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
-	) (
-		[]*github.PullRequestComment, *github.Response, error,
-	)
-}
-
-type GithubIssuesService interface {
-	ListComments(
-		ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
-	) (
-		[]*github.IssueComment, *github.Response, error,
-	)
 }
 
 type GithubActionsService interface {
@@ -95,15 +61,11 @@ func (h httpClient) Get(url string) (*http.Response, error) {
 
 func NewClient(
 	httpClient HTTPClient,
-	prService GithubPullRequestsService,
-	issueService GithubIssuesService,
 	actionsService GithubActionsService,
 	transport graphqlTransport,
 ) Client {
 	return &client{
 		http:           httpClient,
-		prService:      prService,
-		issueService:   issueService,
 		actionsService: actionsService,
 		graphql:        graphqlClient{transport: transport},
 	}
@@ -123,8 +85,6 @@ func GetAuthenticatedClient(token, tokenForState string) Client {
 
 	return NewClient(
 		httpClient{},
-		ghClient.PullRequests,
-		ghClient.Issues,
 		ghClientForState.Actions,
 		newHTTPGraphQLTransport(token),
 	)
@@ -132,8 +92,6 @@ func GetAuthenticatedClient(token, tokenForState string) Client {
 
 type client struct {
 	http           HTTPClient
-	prService      GithubPullRequestsService
-	issueService   GithubIssuesService
 	actionsService GithubActionsService
 	graphql        graphqlClient
 }
@@ -147,7 +105,6 @@ const MaxPRsToFetch = 50
 
 // Per-call timeout defaults. Overridable in tests.
 const PullRequestListTimeout = 30 * time.Second
-const PullRequestFetchTimeout = 5 * time.Second
 const ReviewsFetchTimeout = 10 * time.Second
 
 // Returns an error if listing the PRs of any repository fails.
@@ -211,63 +168,6 @@ func getPRFilterFunc[T repositoryPullRequest](
 	}
 }
 
-func (c *client) fetchOpenPRsForRepository(
-	ctx context.Context, repo models.Repository,
-) ([]PRResult, error) {
-	callCtx, cancel := context.WithTimeout(ctx, PullRequestListTimeout)
-	defer cancel()
-	prs, response, err := c.prService.List(
-		callCtx, repo.Owner, repo.Name, &github.PullRequestListOptions{ListOptions: github.ListOptions{PerPage: 100}},
-	)
-	if err == nil {
-		return utilities.Map(prs, getPRResultMapper(repo)), nil
-	}
-	if response != nil && response.StatusCode == 404 {
-		return nil, fmt.Errorf(
-			"repository %s/%s not found - check the repository name and permissions",
-			repo.Owner,
-			repo.Name,
-		)
-	}
-	return nil, fmt.Errorf(
-		"error fetching pull requests from %s/%s: %w", repo.Owner, repo.Name, err,
-	)
-}
-
-func (c *client) fetchPR(
-	ctx context.Context, prRef models.PullRequestRef,
-) (PRResult, error) {
-	callCtx, cancel := context.WithTimeout(ctx, PullRequestFetchTimeout)
-	defer cancel()
-	pr, response, err := c.prService.Get(
-		callCtx, prRef.Repository.Owner, prRef.Repository.Name, prRef.Number,
-	)
-	if err == nil {
-		return getPRResultMapper(prRef.Repository)(pr), nil
-	}
-	if response != nil && response.StatusCode == 404 {
-		return PRResult{}, fmt.Errorf(
-			"PR %s/%s/%d not found - check the path and permissions",
-			prRef.Repository.Owner,
-			prRef.Repository.Name,
-			prRef.Number,
-		)
-	}
-	return PRResult{}, fmt.Errorf(
-		"error fetching pull request %s/%s/%d: %w",
-		prRef.Repository.Owner, prRef.Repository.Name, prRef.Number, err,
-	)
-}
-
-func getPRResultMapper(repo models.Repository) func(pr *github.PullRequest) PRResult {
-	return func(pr *github.PullRequest) PRResult {
-		return PRResult{
-			pr:         newPullRequestFromGitHubPR(pr),
-			repository: repo,
-		}
-	}
-}
-
 func logFoundPRs[T repositoryPullRequest](prs []T) {
 	log.Printf("Found %d open pull requests:", len(prs))
 	for _, item := range prs {
@@ -291,184 +191,4 @@ func capPRsToLimit[T repositoryPullRequest](prs []T) []T {
 		return b.getPullRequest().GetUpdatedAt().Compare(a.getPullRequest().GetUpdatedAt())
 	})
 	return prs[:MaxPRsToFetch]
-}
-
-// Fetches review and comment data for the given PRs and returns enriched PR data.
-// Returns all PRs even if fetching review data for some PRs fails (those will just be missing reviewer info then).
-func (c *client) addReviewerInfoToPRs(ctx context.Context, prResults []PRResult) ([]PR, error) {
-	log.Printf("\nFetching pull request reviews and comments for PRs")
-
-	prProcessingGroup, prProcessingCtx := errgroup.WithContext(ctx)
-	prProcessingGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
-	resultChannel := make(chan FetchReviewsResult, len(prResults))
-
-	for _, result := range prResults {
-		repo := result.repository
-		pr := result.pr
-		prProcessingGroup.Go(func() error {
-			callCtx, cancel := context.WithTimeout(prProcessingCtx, ReviewsFetchTimeout)
-			defer cancel()
-
-			var reviews []*github.PullRequestReview
-			var comments []*github.PullRequestComment
-			var timelineComments []*github.IssueComment
-			var reviewsErr, commentsErr, timelineCommentsErr error
-
-			// Inner group for fetching reviews, comments, and timeline comments for this PR in parallel
-			dataFetchGroup, dataFetchCtx := errgroup.WithContext(callCtx)
-
-			dataFetchGroup.Go(func() error {
-				reviews, reviewsErr = fetchPRReviews(
-					dataFetchCtx, c.prService, repo.Owner, repo.Name, pr.GetNumber(),
-				)
-				return nil // capture error in reviewsErr
-			})
-
-			dataFetchGroup.Go(func() error {
-				comments, commentsErr = fetchPRComments(
-					dataFetchCtx, c.prService, repo.Owner, repo.Name, pr.GetNumber(),
-				)
-				return nil // capture error in commentsErr
-			})
-
-			dataFetchGroup.Go(func() error {
-				timelineComments, timelineCommentsErr = fetchPRTimelineComments(
-					dataFetchCtx, c.issueService, repo.Owner, repo.Name, pr.GetNumber(),
-				)
-				return nil // capture error in timelineCommentsErr
-			})
-
-			dataFetchGroup.Wait()
-
-			fetchReviewsResult := FetchReviewsResult{
-				pr:               pr,
-				reviews:          reviews,
-				comments:         comments,
-				timelineComments: utilities.Map(timelineComments, newTimelineCommentFromIssueComment),
-				repository:       repo,
-				err:              errors.Join(reviewsErr, commentsErr, timelineCommentsErr),
-			}
-
-			resultChannel <- fetchReviewsResult
-			return nil // Don't fail outer group - we handle partial failures gracefully
-		})
-	}
-
-	if err := prProcessingGroup.Wait(); err != nil {
-		return nil, err
-	}
-	close(resultChannel)
-
-	allPRs := []PR{}
-	for result := range resultChannel {
-		result.printResult()
-		allPRs = append(allPRs, result.asPR())
-	}
-	return allPRs, nil
-}
-
-const reviewsMaximumPages = 2
-
-func fetchPRReviews(
-	ctx context.Context,
-	prService GithubPullRequestsService,
-	owner, repo string,
-	number int,
-) ([]*github.PullRequestReview, error) {
-	reviews := []*github.PullRequestReview{}
-	opts := &github.ListOptions{PerPage: 100}
-	pagesFetched := 0
-
-	for {
-		reviewsPage, response, err := prService.ListReviews(ctx, owner, repo, number, opts)
-
-		if err != nil {
-			statusText := ""
-			if response != nil && response.Status != "" {
-				statusText = " status=" + response.Status
-			}
-			return nil, fmt.Errorf(
-				"error fetching reviews for pull request %s/%s/%d%s: %w",
-				owner,
-				repo,
-				number,
-				statusText,
-				err,
-			)
-		}
-
-		reviews = append(reviews, reviewsPage...)
-		pagesFetched++
-
-		if response == nil || response.NextPage == 0 || pagesFetched >= reviewsMaximumPages {
-			break
-		}
-		opts.Page = response.NextPage
-	}
-	return reviews, nil
-}
-
-const commentsPerPage = 100 // Fetch only the first 100 comments to keep things simple and performant
-
-func fetchPRComments(
-	ctx context.Context,
-	prService GithubPullRequestsService,
-	owner, repo string,
-	number int,
-) ([]*github.PullRequestComment, error) {
-	opts := &github.PullRequestListCommentsOptions{
-		ListOptions: github.ListOptions{PerPage: commentsPerPage},
-	}
-
-	comments, response, err := prService.ListComments(ctx, owner, repo, number, opts)
-
-	if err == nil {
-		return comments, nil
-	}
-
-	statusText := ""
-	if response != nil && response.Status != "" {
-		statusText = " status=" + response.Status
-	}
-	return nil, fmt.Errorf(
-		"error fetching comments for pull request %s/%s/%d%s: %w",
-		owner,
-		repo,
-		number,
-		statusText,
-		err,
-	)
-
-}
-
-const timelineCommentsPerPage = 100 // Fetch only the first 100 timeline comments to keep things simple and performant
-
-func fetchPRTimelineComments(
-	ctx context.Context,
-	issueService GithubIssuesService,
-	owner, repo string,
-	number int,
-) ([]*github.IssueComment, error) {
-	opts := &github.IssueListCommentsOptions{
-		ListOptions: github.ListOptions{PerPage: timelineCommentsPerPage},
-	}
-
-	comments, response, err := issueService.ListComments(ctx, owner, repo, number, opts)
-
-	if err == nil {
-		return comments, nil
-	}
-
-	statusText := ""
-	if response != nil && response.Status != "" {
-		statusText = " status=" + response.Status
-	}
-	return nil, fmt.Errorf(
-		"error fetching timeline comments for pull request %s/%s/%d%s: %w",
-		owner,
-		repo,
-		number,
-		statusText,
-		err,
-	)
 }

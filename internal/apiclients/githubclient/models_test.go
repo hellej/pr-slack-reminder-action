@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/google/go-github/v78/github"
 )
 
 func TestPullRequestGetters(t *testing.T) {
@@ -82,133 +80,35 @@ func TestPullRequestGetters(t *testing.T) {
 	}
 }
 
-func TestNewPullRequestFromGitHubPR(t *testing.T) {
-	createdAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
-	updatedAt := time.Date(2026, 5, 2, 9, 30, 0, 0, time.UTC)
-
-	tests := []struct {
-		name     string
-		gitHubPR *github.PullRequest
-		expected PullRequest
-	}{
-		{
-			name:     "nil pull request",
-			gitHubPR: nil,
-			expected: PullRequest{},
-		},
-		{
-			name:     "all fields unset",
-			gitHubPR: &github.PullRequest{},
-			expected: PullRequest{},
-		},
-		{
-			name: "all fields set",
-			gitHubPR: &github.PullRequest{
-				Number:    github.Ptr(7),
-				Title:     github.Ptr("Add feature"),
-				HTMLURL:   github.Ptr("https://github.com/owner/repo/pull/7"),
-				CreatedAt: &github.Timestamp{Time: createdAt},
-				UpdatedAt: &github.Timestamp{Time: updatedAt},
-				State:     github.Ptr("closed"),
-				Merged:    github.Ptr(true),
-				Draft:     github.Ptr(true),
-				Labels: []*github.Label{
-					{Name: github.Ptr("bug")},
-					{Name: github.Ptr("urgent")},
-				},
-				User: &github.User{
-					Login: github.Ptr("author1"),
-					Name:  github.Ptr("Author One"),
-				},
-				Head: &github.PullRequestBranch{SHA: github.Ptr("abc123")},
-			},
-			expected: PullRequest{
-				Number:    7,
-				Title:     "Add feature",
-				HTMLURL:   "https://github.com/owner/repo/pull/7",
-				CreatedAt: createdAt,
-				UpdatedAt: updatedAt,
-				State:     "closed",
-				Merged:    true,
-				Draft:     true,
-				Labels:    []string{"bug", "urgent"},
-				Author:    Collaborator{Login: "author1", Name: "Author One"},
-				HeadSHA:   "abc123",
-			},
-		},
-		{
-			name: "nil label",
-			gitHubPR: &github.PullRequest{
-				Labels: []*github.Label{nil, {Name: github.Ptr("bug")}},
-			},
-			expected: PullRequest{Labels: []string{"", "bug"}},
-		},
-		{
-			name: "label with nil name",
-			gitHubPR: &github.PullRequest{
-				Labels: []*github.Label{{}},
-			},
-			expected: PullRequest{Labels: []string{""}},
-		},
-		{
-			name: "empty labels",
-			gitHubPR: &github.PullRequest{
-				Labels: []*github.Label{},
-			},
-			expected: PullRequest{Labels: nil},
-		},
-		{
-			name: "head without sha",
-			gitHubPR: &github.PullRequest{
-				Head: &github.PullRequestBranch{},
-			},
-			expected: PullRequest{HeadSHA: ""},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := newPullRequestFromGitHubPR(tt.gitHubPR)
-			if !reflect.DeepEqual(*got, tt.expected) {
-				t.Errorf("newPullRequestFromGitHubPR() = %+v, expected %+v", *got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestDeriveReviewers(t *testing.T) {
 	tests := []struct {
-		name                 string
-		authorLogin          string
-		approvers            []Collaborator
-		reviewAuthors        []Collaborator
-		reviewCommentAuthors []Collaborator
-		timelineCommenters   []Collaborator
-		expectedApprovedBy   []Collaborator
-		expectedCommentedBy  []Collaborator
+		name                string
+		authorLogin         string
+		approvers           []Collaborator
+		reviewAuthors       []Collaborator
+		timelineCommenters  []Collaborator
+		expectedApprovedBy  []Collaborator
+		expectedCommentedBy []Collaborator
 	}{
 		{
-			name:                 "commenters ordered by reviews, review comments and timeline",
-			authorLogin:          "author",
-			approvers:            []Collaborator{{Login: "approver"}},
-			reviewAuthors:        []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
-			reviewCommentAuthors: []Collaborator{{Login: "review-commenter"}},
-			timelineCommenters:   []Collaborator{{Login: "timeline-commenter"}},
-			expectedApprovedBy:   []Collaborator{{Login: "approver"}},
+			name:               "commenters ordered by reviews and timeline",
+			authorLogin:        "author",
+			approvers:          []Collaborator{{Login: "approver"}},
+			reviewAuthors:      []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
+			timelineCommenters: []Collaborator{{Login: "timeline-commenter"}},
+			expectedApprovedBy: []Collaborator{{Login: "approver"}},
 			expectedCommentedBy: []Collaborator{
 				{Login: "reviewer"},
-				{Login: "review-commenter"},
 				{Login: "timeline-commenter"},
 			},
 		},
 		{
-			name:                 "duplicate logins appear once",
-			authorLogin:          "author",
-			approvers:            []Collaborator{{Login: "approver"}, {Login: "approver"}},
-			reviewAuthors:        []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
-			reviewCommentAuthors: []Collaborator{{Login: "reviewer"}},
-			timelineCommenters:   []Collaborator{{Login: "reviewer"}, {Login: "timeline-commenter"}},
-			expectedApprovedBy:   []Collaborator{{Login: "approver"}},
+			name:               "duplicate logins appear once",
+			authorLogin:        "author",
+			approvers:          []Collaborator{{Login: "approver"}, {Login: "approver"}},
+			reviewAuthors:      []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
+			timelineCommenters: []Collaborator{{Login: "reviewer"}, {Login: "timeline-commenter"}},
+			expectedApprovedBy: []Collaborator{{Login: "approver"}},
 			expectedCommentedBy: []Collaborator{
 				{Login: "reviewer"},
 				{Login: "timeline-commenter"},
@@ -219,7 +119,7 @@ func TestDeriveReviewers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			approvedBy, commentedBy := deriveReviewers(
-				tt.authorLogin, tt.approvers, tt.reviewAuthors, tt.reviewCommentAuthors, tt.timelineCommenters,
+				tt.authorLogin, tt.approvers, tt.reviewAuthors, tt.timelineCommenters,
 			)
 			if !reflect.DeepEqual(approvedBy, tt.expectedApprovedBy) {
 				t.Errorf("approvedBy = %+v, expected %+v", approvedBy, tt.expectedApprovedBy)

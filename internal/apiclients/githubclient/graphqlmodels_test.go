@@ -102,17 +102,14 @@ func TestTimelineCommentFromNode(t *testing.T) {
 			expected: TimelineComment{
 				Body:      "looks good",
 				CreatedAt: createdAt,
-				Author:    Collaborator{Login: "user1", Name: "User One"},
 			},
 		},
 		{
 			name:        "bot comment",
 			commentJSON: `{"createdAt":"2026-05-01T12:00:00Z","body":"/snooze [pr-reminder] for 2 days","author":{"login":"dependabot","__typename":"Bot"}}`,
 			expected: TimelineComment{
-				Body:        "/snooze [pr-reminder] for 2 days",
-				CreatedAt:   createdAt,
-				Author:      Collaborator{Login: "dependabot[bot]"},
-				AuthorIsBot: true,
+				Body:      "/snooze [pr-reminder] for 2 days",
+				CreatedAt: createdAt,
 			},
 		},
 		{

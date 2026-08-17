@@ -19,43 +19,6 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 )
 
-// No PR data is read over REST any more: both fetch paths read their fixtures off the GraphQL
-// transport, and these stubs error to prove it. NewClient keeps the parameters until the REST
-// path is deleted.
-type mockPullRequestService struct{}
-
-func (m *mockPullRequestService) Get(
-	ctx context.Context, owner string, repo string, number int,
-) (*github.PullRequest, *github.Response, error) {
-	return nil, nil, fmt.Errorf("unexpected REST call")
-}
-
-func (m *mockPullRequestService) List(
-	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
-) ([]*github.PullRequest, *github.Response, error) {
-	return nil, nil, fmt.Errorf("unexpected REST call")
-}
-
-func (m *mockPullRequestService) ListReviews(
-	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
-) ([]*github.PullRequestReview, *github.Response, error) {
-	return nil, nil, fmt.Errorf("unexpected REST call")
-}
-
-func (m *mockPullRequestService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
-) ([]*github.PullRequestComment, *github.Response, error) {
-	return nil, nil, fmt.Errorf("unexpected REST call")
-}
-
-type mockIssueService struct{}
-
-func (m *mockIssueService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
-) ([]*github.IssueComment, *github.Response, error) {
-	return nil, nil, fmt.Errorf("unexpected REST call")
-}
-
 type mockActionsService struct{}
 
 func (m *mockActionsService) ListArtifacts(
@@ -81,8 +44,6 @@ func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
 func newTestClient(opts mockgithubclient.MockGitHubClientOptions) githubclient.Client {
 	return githubclient.NewClient(
 		&mockHTTPClient{},
-		&mockPullRequestService{},
-		&mockIssueService{},
 		&mockActionsService{},
 		mockgithubclient.NewGraphQLTransport(opts),
 	)

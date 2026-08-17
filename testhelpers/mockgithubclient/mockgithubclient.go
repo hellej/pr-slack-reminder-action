@@ -57,11 +57,8 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			err:                    opts.ListArtifactsError,
 			mockStateForUpdateMode: opts.MockStateForUpdateMode,
 		}
-		// The PR data is served by the GraphQL transport; the REST PR services are never called.
 		return githubclient.NewClient(
 			mockHTTPClient,
-			nil,
-			nil,
 			mockActionsService,
 			NewGraphQLTransport(opts),
 		)
@@ -368,63 +365,6 @@ func postedPullRequestRefs(variables map[string]any) []pullRequestRef {
 		refs = append(refs, pullRequestRef{repoName: repoName, number: int(number)})
 	}
 	return refs
-}
-
-type mockPullRequestService struct {
-	prsByNumber       map[int]*github.PullRequest
-	errorByPRNumber   map[int]error
-	prs               []*github.PullRequest
-	prsByRepo         map[string][]*github.PullRequest
-	reviewsByPRNumber map[int][]*github.PullRequestReview
-	response          *github.Response
-	err               error
-}
-
-func (m *mockPullRequestService) Get(
-	ctx context.Context, owner string, repo string, number int,
-) (*github.PullRequest, *github.Response, error) {
-	if err, ok := m.errorByPRNumber[number]; ok {
-		return nil, m.response, err
-	}
-	if pr, ok := m.prsByNumber[number]; ok {
-		return pr, m.response, m.err
-	}
-	return nil, m.response, m.err
-}
-
-func (m *mockPullRequestService) List(
-	ctx context.Context, owner string, repo string, opts *github.PullRequestListOptions,
-) ([]*github.PullRequest, *github.Response, error) {
-	if m.prsByRepo != nil {
-		return m.prsByRepo[repo], m.response, m.err
-	}
-	return m.prs, m.response, m.err
-}
-
-func (m *mockPullRequestService) ListReviews(
-	ctx context.Context, owner string, repo string, number int, opts *github.ListOptions,
-) ([]*github.PullRequestReview, *github.Response, error) {
-	reviews := m.reviewsByPRNumber[number]
-	return reviews, m.response, m.err
-}
-
-func (m *mockPullRequestService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.PullRequestListCommentsOptions,
-) ([]*github.PullRequestComment, *github.Response, error) {
-	return nil, m.response, m.err
-}
-
-type mockIssueService struct {
-	mockTimelineCommentsByPRNumber map[int][]*github.IssueComment
-	response                       *github.Response
-	err                            error
-}
-
-func (m *mockIssueService) ListComments(
-	ctx context.Context, owner string, repo string, number int, opts *github.IssueListCommentsOptions,
-) ([]*github.IssueComment, *github.Response, error) {
-	comments := m.mockTimelineCommentsByPRNumber[number]
-	return comments, m.response, m.err
 }
 
 type mockActionsService struct {

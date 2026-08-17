@@ -77,13 +77,7 @@ func hasValidAuthorNode(author *authorNode) bool {
 
 func timelineCommentFromNode(comment commentNode) TimelineComment {
 	return TimelineComment{
-		Body:        comment.Body,
-		CreatedAt:   comment.CreatedAt,
-		Author:      collaboratorFromAuthorNode(comment.Author),
-		AuthorIsBot: isBotNode(comment.Author),
+		Body:      comment.Body,
+		CreatedAt: comment.CreatedAt,
 	}
-}
-
-func isBotNode(author *authorNode) bool {
-	return author != nil && author.Typename == botTypename
 }

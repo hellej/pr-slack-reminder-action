@@ -291,8 +291,6 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 
 			client := githubclient.NewClient(
 				mockHTTPClient,
-				&mockPullRequestService{},
-				&mockIssueService{},
 				mockActions,
 				mockgithubclient.UnusedGraphQLTransport{},
 			)
