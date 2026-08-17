@@ -13,6 +13,10 @@ Follow the `coding` skill's rules exactly. They are mandatory, not advice.
 
 Implement only what was asked.
 
+Record every deviation from a plan step in that step's own text in the plan file, not
+only in your report. A stale file list, call-site count or line number is a deviation.
+Keep the edit inside the step you are implementing.
+
 Do not commit. Leave the changes in the working tree for review.
 
 If you get review feedback on changes you already made, fix the issues the same way:
