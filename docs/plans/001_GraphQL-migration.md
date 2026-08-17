@@ -439,8 +439,12 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Those two dispatches collide with production state. `FetchLatestArtifactByName` takes the newest artifact named `pr-slack-reminder-state` repo-wide, with no branch or run scoping, so the `post` dispatch becomes the repo-wide latest state and orphans the live reminder in `#github`.
 - Any `schedule` (daily 09:00), `push: main`, `pull_request`, `pull_request_review` or `issue_comment` run landing between the two dispatches feeds `update` someone else's state, and the round-trip proves nothing. Run the two dispatches back-to-back, and re-run if a third run interleaves.
 - Both runs log Step 3's `rateLimit` cost and remaining, so real per-run cost is read off the job log.
-- Done, 2026-08-17: the `post` dispatch (run 31999212548) ran both phases at 1 point each over one repository and 3 PRs, sent the message and saved state. It logged a 5,000-point budget, which "Observed budget" covers. The `update` dispatch is still outstanding, as is `build.yml`.
-- That run found 0 reviews and 0 timeline comments across all 3 PRs, so it says nothing about reviewer derivation or display names. Those are the two things canned fixtures cannot check, so `build.yml` still has to run against repositories that hold a PR with an approval and one with a comment.
+- Done, 2026-08-17. `pr-reminder.yml`: `post` (31999212548), then `update` (31999519609, 31999667977). Both phases cost 1 point each over one repository and 3 PRs. `update` loaded the `post` run's own artifact and edited the message. Budget logged 5,000, see "Observed budget".
+- Run 31999641932 (`pull_request_review`) ran the pre-migration binary over the same 3 PRs 52 seconds before the second `update`. Same reviewers, same message: a REST vs GraphQL A/B on identical data.
+- `build.yml` (32058202149): all three e2e runs green under the App token. Phase 1 costs 1 point per repository alias (1, then 3 over 3 repositories), phase 2 costs 1 per batch, budget 5,150.
+- The rendered message closes "Display names" and "Bot logins": `✅ Joose` where REST rendered `hellej`, and `dependabot[bot]` keeps its suffix.
+- Still unverified: timeline comments were 0 in every run, so the implicit review from a diff comment and the timeline commenter never ran live. The filters run excluded no PR, and nor did the pre-migration run of 2026-06-27 (28296590244), so the e2e fixtures hold nothing matching `ignore-reminder` or author `alice`.
+- Run 32054716033 failed on GitHub's 2026-08-17 incident: GraphQL 503 on both attempts, one retry, error surfaced intact.
 
 ### 8. Delete the REST PR path (`githubclient.go`, `models.go`, `snooze.go`, `githubclient_test.go`, `fetchartifact_test.go`, `testhelpers/mockgithubclient/mockgithubclient.go`)
 
