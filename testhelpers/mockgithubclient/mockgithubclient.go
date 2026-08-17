@@ -41,32 +41,6 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 	}
 
 	return func(token, tokenForState string) githubclient.Client {
-		mockPRService := &mockPullRequestService{
-			prsByNumber:       opts.PRsByNumber,
-			errorByPRNumber:   opts.ErrByPRNumber,
-			prs:               opts.PRs,
-			prsByRepo:         opts.PRsByRepo,
-			reviewsByPRNumber: opts.ReviewsByPRNumber,
-			response: &github.Response{
-				Response: &http.Response{
-					StatusCode: opts.ListPRsResponseStatus,
-				},
-			},
-			err: opts.PRServiceError,
-		}
-		timelineComments := opts.TimelineCommentsByPRNumber
-		if timelineComments == nil {
-			timelineComments = map[int][]*github.IssueComment{}
-		}
-		mockIssueService := &mockIssueService{
-			mockTimelineCommentsByPRNumber: timelineComments,
-			response: &github.Response{
-				Response: &http.Response{
-					StatusCode: 200,
-				},
-			},
-			err: opts.IssueServiceError,
-		}
 		mockHTTPClient := &mockHTTPClient{
 			response: &http.Response{
 				StatusCode: 200,
@@ -83,10 +57,11 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			err:                    opts.ListArtifactsError,
 			mockStateForUpdateMode: opts.MockStateForUpdateMode,
 		}
+		// The PR data is served by the GraphQL transport; the REST PR services are never called.
 		return githubclient.NewClient(
 			mockHTTPClient,
-			mockPRService,
-			mockIssueService,
+			nil,
+			nil,
 			mockActionsService,
 			NewGraphQLTransport(opts),
 		)
@@ -194,8 +169,8 @@ func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.R
 	return marshalResponse(response)
 }
 
-// An ErrByPRNumber entry renders as a PR-level error, an IssueServiceError as a field error on
-// every PR's comments connection.
+// An ErrByPRNumber entry renders as a PR-level error, a reference with no PR fixture as a
+// PR-level NOT_FOUND, and an IssueServiceError as a field error on every PR's comments connection.
 func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
 	for index, ref := range postedPullRequestRefs(variables) {
@@ -207,7 +182,19 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 			})
 			continue
 		}
-		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(ref)}
+		pr := t.findPullRequest(ref)
+		if pr == nil {
+			response.Data[alias] = map[string]any{"pullRequest": nil}
+			response.Errors = append(response.Errors, renderedError{
+				Type: "NOT_FOUND",
+				Path: []any{alias, "pullRequest"},
+				Message: fmt.Sprintf(
+					"Could not resolve to a PullRequest with the number of %d.", ref.number,
+				),
+			})
+			continue
+		}
+		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(pr, ref.number)}
 		if t.opts.IssueServiceError != nil {
 			response.Errors = append(response.Errors, renderedError{
 				Type:    "RESOURCE_LIMITS_EXCEEDED",
@@ -245,13 +232,29 @@ func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullReques
 	return pr
 }
 
-func (t GraphQLTransport) enrichedPullRequestNodeJSON(ref pullRequestRef) map[string]any {
-	node := pullRequestScalarsJSON(t.findPullRequest(ref))
-	node["number"] = ref.number
+// GetPRs selects state, merged and labels alongside the scalars both phases share.
+func (t GraphQLTransport) enrichedPullRequestNodeJSON(
+	pr *github.PullRequest, number int,
+) map[string]any {
+	node := pullRequestScalarsJSON(pr)
+	node["number"] = number
+	node["state"] = pullRequestNodeState(pr)
+	node["merged"] = pr.GetMerged()
+	node["labels"] = labelsJSON(pr)
 	node["commits"] = connectionJSON([]map[string]any{})
-	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[ref.number], reviewNodeJSON))
-	node["comments"] = t.commentsJSON(ref.number)
+	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
+	node["comments"] = t.commentsJSON(number)
 	return node
+}
+
+func pullRequestNodeState(pr *github.PullRequest) string {
+	if pr.GetMerged() {
+		return "MERGED"
+	}
+	if pr.GetState() == "closed" {
+		return "CLOSED"
+	}
+	return "OPEN"
 }
 
 // The failed connection comes back null.
@@ -264,8 +267,12 @@ func (t GraphQLTransport) commentsJSON(number int) any {
 
 func openPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
 	node := pullRequestScalarsJSON(pr)
-	node["labels"] = connectionJSON(utilities.Map(pr.Labels, labelNodeJSON))
+	node["labels"] = labelsJSON(pr)
 	return node
+}
+
+func labelsJSON(pr *github.PullRequest) map[string]any {
+	return connectionJSON(utilities.Map(pr.Labels, labelNodeJSON))
 }
 
 func pullRequestScalarsJSON(pr *github.PullRequest) map[string]any {

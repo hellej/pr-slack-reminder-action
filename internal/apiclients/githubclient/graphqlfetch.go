@@ -15,7 +15,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const openPullRequestState = "open"
+const (
+	openPullRequestState   = "open"
+	closedPullRequestState = "closed"
+)
+
+// GraphQL states of a PR node. CLOSED and MERGED are both "closed" to the pipeline.
+const (
+	closedNodeState = "CLOSED"
+	mergedNodeState = "MERGED"
+)
+
+const notFoundErrorType = "NOT_FOUND"
 
 const rateLimitField = "rateLimit"
 
@@ -35,6 +46,7 @@ type graphqlQuery struct {
 	variables         map[string]any
 	aliases           []string
 	repositoryByAlias map[string]models.Repository
+	referenceByAlias  map[string]models.PullRequestRef // PR queries only
 }
 
 // Aliases cannot be variables, so they are generated into the query text; owner and name are
@@ -187,19 +199,35 @@ func openPRResultMapper(repository models.Repository) func(node pullRequestNode)
 
 // states: OPEN guarantees the state, which is therefore not selected.
 func openPullRequestFromNode(node pullRequestNode) *PullRequest {
+	pullRequest := pullRequestFromNode(node)
+	pullRequest.State = openPullRequestState
+	pullRequest.Merged = false
+	return pullRequest
+}
+
+func pullRequestFromNode(node pullRequestNode) *PullRequest {
 	return &PullRequest{
 		Number:    node.Number,
 		Title:     node.Title,
 		HTMLURL:   node.URL,
 		CreatedAt: node.CreatedAt,
 		UpdatedAt: node.UpdatedAt,
-		State:     openPullRequestState,
-		Merged:    false,
+		State:     pullRequestStateFromNodeState(node.State),
+		Merged:    node.Merged,
 		Draft:     node.IsDraft,
 		Labels:    utilities.Map(node.Labels.Nodes, func(label labelNode) string { return label.Name }),
 		Author:    collaboratorFromAuthorNode(node.Author),
 		HeadSHA:   node.HeadRefOID,
 	}
+}
+
+// Only the two closed states close a PR, so an unexpected or missing state renders as open
+// rather than striking through every PR in the reminder.
+func pullRequestStateFromNodeState(nodeState string) string {
+	if nodeState == closedNodeState || nodeState == mergedNodeState {
+		return closedPullRequestState
+	}
+	return openPullRequestState
 }
 
 const enrichBatchSize = 25
@@ -209,21 +237,35 @@ const approvedReviewState = "APPROVED"
 // A pending review is visible only to its own author, so it contributes no reviewer.
 const pendingReviewState = "PENDING"
 
-const enrichedPullRequestFragmentName = "enrichedPr"
+// The spread name and the definition are built together so that they cannot drift apart.
+type pullRequestFragment struct {
+	name string
+	text string
+}
+
+func newPullRequestFragment(name, selection string) pullRequestFragment {
+	return pullRequestFragment{
+		name: name,
+		text: fmt.Sprintf("fragment %s on PullRequest {\n%s\n}", name, selection),
+	}
+}
 
 // commits are selected for the PR tracker canvas and are not read yet.
-const enrichedPullRequestFragment = `fragment ` + enrichedPullRequestFragmentName + ` on PullRequest {
-  number
+const enrichedPullRequestSelection = `  number
   commits(last: 1){ nodes { commit { oid committedDate } } }
   reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
-  comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
-}`
+  comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }`
 
-func buildEnrichPRsQuery(references []models.PullRequestRef) graphqlQuery {
+var enrichedPullRequestFragment = newPullRequestFragment("enrichedPr", enrichedPullRequestSelection)
+
+func buildPullRequestsQuery(
+	references []models.PullRequestRef, fragment pullRequestFragment,
+) graphqlQuery {
 	query := graphqlQuery{
 		variables:         map[string]any{},
 		aliases:           make([]string, len(references)),
 		repositoryByAlias: map[string]models.Repository{},
+		referenceByAlias:  map[string]models.PullRequestRef{},
 	}
 	variableDeclarations := make([]string, 0, 3*len(references))
 	pullRequestSelections := make([]string, len(references))
@@ -236,6 +278,7 @@ func buildEnrichPRsQuery(references []models.PullRequestRef) graphqlQuery {
 
 		query.aliases[index] = alias
 		query.repositoryByAlias[alias] = reference.Repository
+		query.referenceByAlias[alias] = reference
 		query.variables[ownerVariable] = reference.Repository.Owner
 		query.variables[nameVariable] = reference.Repository.Name
 		query.variables[numberVariable] = reference.Number
@@ -245,11 +288,11 @@ func buildEnrichPRsQuery(references []models.PullRequestRef) graphqlQuery {
 		)
 		pullRequestSelections[index] = fmt.Sprintf(
 			"  %s: repository(owner:$%s,name:$%s){ pullRequest(number:$%s){ ...%s } }",
-			alias, ownerVariable, nameVariable, numberVariable, enrichedPullRequestFragmentName,
+			alias, ownerVariable, nameVariable, numberVariable, fragment.name,
 		)
 	}
 
-	query.text = assembleQuery(variableDeclarations, pullRequestSelections, enrichedPullRequestFragment)
+	query.text = assembleQuery(variableDeclarations, pullRequestSelections, fragment.text)
 	return query
 }
 
@@ -282,7 +325,9 @@ func (c *client) enrichPRs(ctx context.Context, prResults []PRResult) ([]PR, err
 }
 
 func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, error) {
-	query := buildEnrichPRsQuery(utilities.Map(batch, pullRequestRefOfResult))
+	query := buildPullRequestsQuery(
+		utilities.Map(batch, pullRequestRefOfResult), enrichedPullRequestFragment,
+	)
 
 	callCtx, cancel := context.WithTimeout(ctx, ReviewsFetchTimeout)
 	defer cancel()
@@ -348,15 +393,21 @@ func enrichedPR(result PRResult, aliasNode *pullRequestWrapperNode, aliasError e
 	if !isEnriched {
 		aliasError = cmp.Or(aliasError, errNoPullRequestReturned)
 	}
-	logEnrichment(result, node, aliasError)
+	logEnrichment(result.repository, result.pr.GetNumber(), node, aliasError)
+	return prWithReviewers(result.pr, result.repository, node)
+}
 
+// Reads the reviewer lists and the snooze off a PR's reviews and comments connections.
+func prWithReviewers(
+	pullRequest *PullRequest, repository models.Repository, node pullRequestNode,
+) PR {
 	submittedReviews := utilities.Filter(node.Reviews.Nodes, isSubmittedUserReview)
 	approvingReviews := utilities.Filter(submittedReviews, isApprovingReviewNode)
 	commentsFromUsers := utilities.Filter(node.Comments.Nodes, hasValidCommentAuthor)
 	timelineComments := utilities.Map(node.Comments.Nodes, timelineCommentFromNode)
 
 	approvedByUsers, commentedByUsers := deriveReviewers(
-		result.pr.Author.Login,
+		pullRequest.Author.Login,
 		utilities.Map(approvingReviews, reviewAuthor),
 		utilities.Map(submittedReviews, reviewAuthor),
 		nil, // review comment authors are always review authors, so review comments are not fetched
@@ -365,9 +416,9 @@ func enrichedPR(result PRResult, aliasNode *pullRequestWrapperNode, aliasError e
 	)
 
 	return PR{
-		PullRequest:      result.pr,
-		Repository:       result.repository,
-		Author:           result.pr.Author,
+		PullRequest:      pullRequest,
+		Repository:       repository,
+		Author:           pullRequest.Author,
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),
@@ -381,14 +432,14 @@ func enrichedNode(aliasNode *pullRequestWrapperNode) (pullRequestNode, bool) {
 	return *aliasNode.PullRequest, true
 }
 
-func logEnrichment(result PRResult, node pullRequestNode, err error) {
+func logEnrichment(repository models.Repository, number int, node pullRequestNode, err error) {
 	if err != nil {
-		log.Printf("Unable to fetch reviews/comments for PR #%d: %v", result.pr.GetNumber(), err)
+		log.Printf("Unable to fetch reviews/comments for PR #%d: %v", number, err)
 		return
 	}
 	log.Printf(
 		"Found %d reviews and %d timeline comments for PR %v/%d",
-		len(node.Reviews.Nodes), len(node.Comments.Nodes), result.repository, result.pr.GetNumber(),
+		len(node.Reviews.Nodes), len(node.Comments.Nodes), repository, number,
 	)
 }
 
@@ -410,4 +461,97 @@ func hasValidCommentAuthor(comment commentNode) bool {
 
 func commentAuthor(comment commentNode) Collaborator {
 	return collaboratorFromAuthorNode(comment.Author)
+}
+
+// The referenced PRs may be closed or merged, so state and merged are selected alongside the
+// scalars, author and labels the open-PR listing provides in the "post" run mode.
+const fullPullRequestSelection = `  number title url isDraft createdAt updatedAt headRefOid state merged
+  author { login __typename ... on User { name } }
+  labels(first: 100){ nodes { name } }
+  commits(last: 1){ nodes { commit { oid committedDate } } }
+  reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
+  comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }`
+
+var fullPullRequestFragment = newPullRequestFragment("fullPr", fullPullRequestSelection)
+
+// Fetches the referenced PRs with their reviews and comments, in input order. A PR that cannot
+// be fetched fails the call: unlike in FindOpenPRs there are no listed scalars to fall back to.
+func (c *client) getPRsByRef(ctx context.Context, references []models.PullRequestRef) ([]PR, error) {
+	batches := slices.Collect(slices.Chunk(references, enrichBatchSize))
+	fetchedBatches := make([][]PR, len(batches))
+
+	batchGroup, batchCtx := errgroup.WithContext(ctx)
+	batchGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
+
+	for index, batch := range batches {
+		batchGroup.Go(func() error {
+			prs, err := c.getPRBatchByRef(batchCtx, batch)
+			fetchedBatches[index] = prs
+			return err
+		})
+	}
+	if err := batchGroup.Wait(); err != nil {
+		return nil, err
+	}
+	return utilities.FlatMap(fetchedBatches), nil
+}
+
+func (c *client) getPRBatchByRef(
+	ctx context.Context, references []models.PullRequestRef,
+) ([]PR, error) {
+	query := buildPullRequestsQuery(references, fullPullRequestFragment)
+
+	callCtx, cancel := context.WithTimeout(ctx, ReviewsFetchTimeout)
+	defer cancel()
+
+	var data aliasedData[pullRequestWrapperNode]
+	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
+	if err != nil {
+		return nil, getPRsError(err, query.referenceByAlias)
+	}
+	logRateLimit(data.RateLimit)
+
+	prs := make([]PR, len(references))
+	for index, reference := range references {
+		alias := query.aliases[index]
+		node, isFetched := enrichedNode(data.ByAlias[alias])
+		if !isFetched {
+			return nil, pullRequestFetchError(reference, errNoPullRequestReturned)
+		}
+		logEnrichment(
+			reference.Repository, reference.Number, node, errorsForAlias(alias, nil, fieldErrors),
+		)
+		prs[index] = prWithReviewers(pullRequestFromNode(node), reference.Repository, node)
+	}
+	return prs, nil
+}
+
+// Mirrors the REST path's split between a missing PR and any other fetch failure.
+func getPRsError(err error, referenceByAlias map[string]models.PullRequestRef) error {
+	var prError pullRequestError
+	if !errors.As(err, &prError) {
+		return fmt.Errorf("error fetching pull requests: %w", err)
+	}
+	reference, isKnownAlias := referenceByAlias[prError.alias]
+	if !isKnownAlias {
+		return fmt.Errorf("error fetching pull requests: %w", err)
+	}
+	if prError.errorType == notFoundErrorType {
+		return pullRequestNotFoundError(reference)
+	}
+	return pullRequestFetchError(reference, err)
+}
+
+func pullRequestNotFoundError(reference models.PullRequestRef) error {
+	return fmt.Errorf(
+		"PR %s/%s/%d not found - check the path and permissions",
+		reference.Repository.Owner, reference.Repository.Name, reference.Number,
+	)
+}
+
+func pullRequestFetchError(reference models.PullRequestRef, err error) error {
+	return fmt.Errorf(
+		"error fetching pull request %s/%s/%d: %w",
+		reference.Repository.Owner, reference.Repository.Name, reference.Number, err,
+	)
 }

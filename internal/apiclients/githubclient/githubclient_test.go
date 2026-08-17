@@ -9,16 +9,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 )
 
-// The REST services are still wired for GetPRs; FindOpenPRs reads its fixtures off the GraphQL
-// transport instead.
+// No PR data is read over REST any more: both fetch paths read their fixtures off the GraphQL
+// transport, and these stubs error to prove it. NewClient keeps the parameters until the REST
+// path is deleted.
 type mockPullRequestService struct{}
 
 func (m *mockPullRequestService) Get(
@@ -425,15 +428,8 @@ func TestFindOneOrNoPRs(t *testing.T) {
 					expectedPR = tt.mockPRs[0]
 				}
 
-				actualApproverLogins := make([]string, len(pr.ApprovedByUsers))
-				for i, user := range pr.ApprovedByUsers {
-					actualApproverLogins[i] = user.Login
-				}
-
-				actualCommenterLogins := make([]string, len(pr.CommentedByUsers))
-				for i, user := range pr.CommentedByUsers {
-					actualCommenterLogins[i] = user.Login
-				}
+				actualApproverLogins := collaboratorLogins(pr.ApprovedByUsers)
+				actualCommenterLogins := collaboratorLogins(pr.CommentedByUsers)
 
 				if !slicesEqualIgnoreOrder(tt.expectedApproverLogins, actualApproverLogins) {
 					t.Errorf("Expected approver logins %v, got %v", tt.expectedApproverLogins, actualApproverLogins)
@@ -636,6 +632,90 @@ func TestFindOpenPRs_ReviewsPartialErrors(t *testing.T) {
 	if len(pr2.CommentedByUsers) != 1 || pr2.CommentedByUsers[0].Login != "commenter2" {
 		t.Errorf("expected PR2 commenter 'commenter2', got %+v", pr2.CommentedByUsers)
 	}
+}
+
+func TestGetPRsMapsStateAndMerged(t *testing.T) {
+	tests := []struct {
+		name           string
+		state          string
+		merged         bool
+		expectedState  string
+		expectedMerged bool
+	}{
+		{name: "open PR", state: "open", expectedState: "open"},
+		{name: "merged PR", state: "closed", merged: true, expectedState: "closed", expectedMerged: true},
+		{name: "closed PR without merge", state: "closed", expectedState: "closed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+				PRsByNumber: map[int]*github.PullRequest{
+					7: {
+						Number:  github.Ptr(7),
+						Title:   github.Ptr("Fetched PR"),
+						Draft:   github.Ptr(false),
+						HTMLURL: github.Ptr("https://example.com/repo/7"),
+						State:   github.Ptr(tt.state),
+						Merged:  github.Ptr(tt.merged),
+						User:    &github.User{Login: github.Ptr("author"), Name: github.Ptr("PR Author")},
+					},
+				},
+				ReviewsByPRNumber: map[int][]*github.PullRequestReview{
+					7: {mockgithubclient.NewReview("approver1", "Approver One", "APPROVED")},
+				},
+			})
+
+			references := []models.PullRequestRef{
+				{Repository: models.Repository{Owner: "testowner", Name: "testrepo"}, Number: 7},
+			}
+			prs, err := client.GetPRs(context.Background(), references, noFilters)
+
+			if err != nil {
+				t.Fatalf("GetPRs() returned error: %v", err)
+			}
+			if len(prs) != 1 {
+				t.Fatalf("expected 1 PR, got %d", len(prs))
+			}
+			pr := prs[0]
+			if pr.GetState() != tt.expectedState {
+				t.Errorf("expected state %q, got %q", tt.expectedState, pr.GetState())
+			}
+			if pr.GetMerged() != tt.expectedMerged {
+				t.Errorf("expected merged %t, got %t", tt.expectedMerged, pr.GetMerged())
+			}
+			if pr.GetTitle() != "Fetched PR" || pr.GetHTMLURL() != "https://example.com/repo/7" {
+				t.Errorf("unexpected scalars: title %q, url %q", pr.GetTitle(), pr.GetHTMLURL())
+			}
+			if pr.Author.Login != "author" || pr.Author.Name != "PR Author" {
+				t.Errorf("unexpected author: %+v", pr.Author)
+			}
+			if !slicesEqualIgnoreOrder([]string{"approver1"}, collaboratorLogins(pr.ApprovedByUsers)) {
+				t.Errorf("expected approver 'approver1', got %+v", pr.ApprovedByUsers)
+			}
+		})
+	}
+}
+
+func TestGetPRsFailsWhenPRIsNotFound(t *testing.T) {
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{})
+
+	references := []models.PullRequestRef{
+		{Repository: models.Repository{Owner: "test-org", Name: "test-repo"}, Number: 404},
+	}
+	_, err := client.GetPRs(context.Background(), references, noFilters)
+
+	expectedMessage := "PR test-org/test-repo/404 not found - check the path and permissions"
+	if err == nil {
+		t.Fatalf("expected error %q, got nil", expectedMessage)
+	}
+	if !strings.Contains(err.Error(), expectedMessage) {
+		t.Errorf("expected error message %q, got: %v", expectedMessage, err)
+	}
+}
+
+func collaboratorLogins(collaborators []githubclient.Collaborator) []string {
+	return utilities.Map(collaborators, func(c githubclient.Collaborator) string { return c.Login })
 }
 
 func slicesEqualIgnoreOrder(a, b []string) bool {

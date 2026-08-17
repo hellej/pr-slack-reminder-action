@@ -163,7 +163,7 @@ func (c *client) FindOpenPRs(
 		return nil, err
 	}
 
-	prResults := utilities.Filter(listedPRs, getPRFilterFunc(getFiltersForRepository))
+	prResults := utilities.Filter(listedPRs, getPRFilterFunc[PRResult](getFiltersForRepository))
 	prResults = capPRsToLimit(prResults)
 	logFoundPRs(prResults)
 
@@ -189,43 +189,25 @@ func (c *client) GetPRs(
 		log.Printf("Fetching %d pull requests", len(references))
 	}
 
-	listGroup, listCtx := errgroup.WithContext(ctx)
-	listGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
-	prResultSlices := make([]PRResult, len(references))
-
-	for i, prRef := range references {
-		i, prRef := i, prRef // https://golang.org/doc/faq#closures_and_goroutines
-		listGroup.Go(func() error {
-			res, err := c.fetchPR(listCtx, prRef)
-			if err == nil {
-				prResultSlices[i] = res
-			}
-			return err
-		})
-	}
-	if err := listGroup.Wait(); err != nil {
-		return nil, err
-	}
-
-	prResults := utilities.Filter(
-		prResultSlices,
-		getPRFilterFunc(getFiltersForRepository),
-	)
-	prResults = capPRsToLimit(prResults)
-	logFoundPRs(prResults)
-
-	prs, err := c.addReviewerInfoToPRs(ctx, prResults)
+	fetchedPRs, err := c.getPRsByRef(ctx, references)
 	if err != nil {
 		return nil, err
 	}
+
+	prs := utilities.Filter(fetchedPRs, getPRFilterFunc[PR](getFiltersForRepository))
+	prs = capPRsToLimit(prs)
+	logFoundPRs(prs)
+
 	return excludeSnoozedPRs(prs), nil
 }
 
-func getPRFilterFunc(
+func getPRFilterFunc[T repositoryPullRequest](
 	getFiltersForRepository func(repo models.Repository) config.Filters,
-) func(result PRResult) bool {
-	return func(result PRResult) bool {
-		return !result.pr.GetDraft() && includePR(result.pr, getFiltersForRepository(result.repository))
+) func(item T) bool {
+	return func(item T) bool {
+		pullRequest := item.getPullRequest()
+		return !pullRequest.GetDraft() &&
+			includePR(pullRequest, getFiltersForRepository(item.getRepository()))
 	}
 }
 
@@ -286,14 +268,14 @@ func getPRResultMapper(repo models.Repository) func(pr *github.PullRequest) PRRe
 	}
 }
 
-func logFoundPRs(prResults []PRResult) {
-	log.Printf("Found %d open pull requests:", len(prResults))
-	for _, result := range prResults {
-		log.Printf("%s/%v", result.repository.GetPath(), result.pr.GetNumber())
+func logFoundPRs[T repositoryPullRequest](prs []T) {
+	log.Printf("Found %d open pull requests:", len(prs))
+	for _, item := range prs {
+		log.Printf("%s/%v", item.getRepository().GetPath(), item.getPullRequest().GetNumber())
 	}
 }
 
-func capPRsToLimit(prs []PRResult) []PRResult {
+func capPRsToLimit[T repositoryPullRequest](prs []T) []T {
 	if len(prs) <= MaxPRsToFetch {
 		return prs
 	}
@@ -301,11 +283,12 @@ func capPRsToLimit(prs []PRResult) []PRResult {
 		"More than %d pull requests found (%d), including only the latest %d",
 		MaxPRsToFetch, len(prs), MaxPRsToFetch,
 	)
-	slices.SortStableFunc(prs, func(a, b PRResult) int {
-		if !a.pr.GetCreatedAt().Equal(b.pr.GetCreatedAt()) {
-			return b.pr.GetCreatedAt().Compare(a.pr.GetCreatedAt())
+	slices.SortStableFunc(prs, func(a, b T) int {
+		createdA, createdB := a.getPullRequest().GetCreatedAt(), b.getPullRequest().GetCreatedAt()
+		if !createdA.Equal(createdB) {
+			return createdB.Compare(createdA)
 		}
-		return b.pr.GetUpdatedAt().Compare(a.pr.GetUpdatedAt())
+		return b.getPullRequest().GetUpdatedAt().Compare(a.getPullRequest().GetUpdatedAt())
 	})
 	return prs[:MaxPRsToFetch]
 }

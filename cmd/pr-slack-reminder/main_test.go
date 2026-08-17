@@ -80,6 +80,16 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 	}
 }
 
+// GitHub returns a null name for accounts that have not set one.
+func withoutAuthorName(pr *github.PullRequest) *github.PullRequest {
+	authorWithoutName := *pr.User
+	authorWithoutName.Name = nil
+
+	prWithNamelessAuthor := *pr
+	prWithNamelessAuthor.User = &authorWithoutName
+	return &prWithNamelessAuthor
+}
+
 type GetTestPRsOptions struct {
 	Labels     []string
 	AuthorUser string
@@ -966,6 +976,20 @@ func TestScenariosUpdateMode(t *testing.T) {
 				"First PR 5 hours ago by Alice (✅ Reviewer One, Reviewer Two)",
 				"Second PR 5 hours ago by Bob (💬 Reviewer Three)",
 			},
+		},
+		{
+			name:   "update mode renders the login of an author without a display name",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1}})),
+			prByNumber: map[int]*github.PullRequest{
+				1: withoutAuthorName(
+					getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "nameless-author"}),
+				),
+			},
+			expectedPRItemTexts: []string{"First PR 5 hours ago by nameless-author"},
 		},
 		{
 			name:   "update mode fails when fetching individual PR fails",

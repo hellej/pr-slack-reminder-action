@@ -114,6 +114,21 @@ type PRResult struct {
 	repository models.Repository
 }
 
+// Filtering, capping and logging run over listed PRs in "post" run mode and over fetched ones in
+// "update" run mode.
+type repositoryPullRequest interface {
+	getPullRequest() *PullRequest
+	getRepository() models.Repository
+}
+
+func (r PRResult) getPullRequest() *PullRequest { return r.pr }
+
+func (r PRResult) getRepository() models.Repository { return r.repository }
+
+func (p PR) getPullRequest() *PullRequest { return p.PullRequest }
+
+func (p PR) getRepository() models.Repository { return p.Repository }
+
 type FetchReviewsResult struct {
 	pr               *PullRequest
 	reviews          []*github.PullRequestReview
