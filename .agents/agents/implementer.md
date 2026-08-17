@@ -19,6 +19,7 @@ If you get review feedback on changes you already made, fix the issues the same 
 failing test first, then the fix. Say so if a finding is wrong instead of changing
 working code to satisfy it.
 
-Report back: what you changed, which files, test result, and anything you had to
-decide that the task left open. Write it for a reviewer who has no context beyond
-the diff, so state facts that feel obvious to you.
+Report back: every file you changed or added, including untracked ones, the test result,
+each deviation from the plan and where you recorded it, and anything you had to decide
+that the task left open. Write it for a reviewer who has no context beyond the diff, so
+state facts that feel obvious to you.

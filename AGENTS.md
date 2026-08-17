@@ -25,6 +25,11 @@ Don't restate the rule as its own reason (circular justification):
 - ✗ `The mock goes in testhelpers/ rather than the package under test, because testhelpers/ is where shared mocks live.`
 - ✓ `The mock goes in testhelpers/.`
 
+Don't let a sentence's second half restate its first:
+
+- ✗ `Evidence from this run only, and nothing that would fit any run.`
+- ✓ `Evidence from this run only.`
+
 Don't frame before saying the thing (meta framing):
 
 - ✗ `One thing worth calling out before the details: the 2-month cutoff is hardcoded.`
