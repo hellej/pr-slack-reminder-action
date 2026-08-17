@@ -14,7 +14,7 @@ Move `githubclient`'s PR fetching from GitHub's REST API to its GraphQL API. The
 
 Measured against the live API, 2026-08-09.
 
-- **Rate limit.** `GITHUB_TOKEN` gets [1,000 points/hour per repository on GraphQL](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api) and [1,000 requests/hour per repository on REST](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). At the action's own caps that is 31 `post` runs/hour against today's 4-5 (see "Cost model").
+- **Rate limit.** `GITHUB_TOKEN` gets [1,000 points/hour per repository on GraphQL](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api) and [1,000 requests/hour per repository on REST](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). At the action's own caps that is 31 `post` runs/hour against today's 4-5 (see "Cost model"). In practice the budget is larger: see "Observed budget".
 - **Separate buckets.** After draining GraphQL to 4893/5000, `GET /rate_limit` still reported `core: 5000/5000`. REST spend and GraphQL spend do not compete, so the action stops eating the REST budget shared with every other workflow in the repository.
 - **Head-commit date.** `commits(last: 1) { nodes { commit { committedDate } } }` replaces a paginated commit scan with a SHA cross-check, a 250-commit ceiling and an `updated_at` fallback that overstates freshness. That timestamp is what 002's WIP section sorts, marks and prunes by.
 - **Display names.** REST's PR-list and review payloads carry no `name` field at all (verified on `/pulls` and `/pulls/{n}/reviews`), so `Collaborator.Name` is always empty today and `GetGitHubName()` always falls back to the login. GraphQL returns names.
@@ -53,6 +53,14 @@ Measured at the action's own caps — `MaxRepositories` 30 (`config.go`), `MaxPR
 | Phase 2, 50 aliases in one request | 2 | 10,050 | ~2.5 s |
 
 So a worst-case `post` run costs **32 points** (30 + two batches of 25) and a worst-case `update` run skips phase 1 and costs **2 points**.
+
+### Observed budget
+
+Step 7's `pr-reminder.yml` dispatch ran on `secrets.GITHUB_TOKEN` and logged `remaining 4999 of 5000`, not the documented 1,000. Both phases cost 1 point, so that one-repository `post` run spent 2 of 5,000.
+
+The documented 1,000 is the figure the headline above is derived from, and it stays the number to plan against: one observation on one public repository does not establish the ceiling every repository gets, and `rateLimit.limit` reports what the token is granted, not what is enforced. Read the headline as a floor. At the observed 5,000 a worst-case `post` run of 32 points fits 156 times an hour.
+
+Step 7 was meant to prove `GITHUB_TOKEN` reaches GraphQL at all. It did, and the budget came back larger than planned for.
 
 ### Query size limits
 
@@ -162,7 +170,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 | Review-comment authors ⊆ review authors is GitHub's observed behaviour, not a documented guarantee | See "Reviewer derivation" | An orphan review comment would drop its author from 💬; display-only, no PR dropped or mis-ordered |
 | Repository-level or PR-level error mapped wrongly → misconfigured repo becomes a silent empty list | Explicit `errors[].type`/`path` mapping, test per class | None once tested |
 | Test suite is rewritten wholesale — the fetch path's only regression net | R0 pins the rendered Slack payload byte-for-byte before anything moves, so Steps 5-6 must leave every snapshot unchanged; R2 moves derivation under direct unit tests that survive the mock swap, and filtering stays on `main_test.go`'s cases, which Step 5 keeps | A query-shape regression the mock renderer reproduces faithfully (a wrong `orderBy`, a wrong page size) is invisible to the snapshots and still rests on Step 7's five live runs — three e2e messages plus the two `pr-reminder.yml` dispatches |
-| `GITHUB_TOKEN`'s GraphQL budget behaviour is documentation, not observation | Step 7 dispatches `pr-reminder.yml`, which runs on `secrets.GITHUB_TOKEN`, before the REST path is deleted | None once run |
+| `GITHUB_TOKEN`'s GraphQL budget behaviour is documentation, not observation | Step 7 dispatches `pr-reminder.yml`, which runs on `secrets.GITHUB_TOKEN`, before the REST path is deleted | Closed: the `post` dispatch reached GraphQL and reported a 5,000-point budget (see "Observed budget") |
 | GraphQL needs a permission REST does not on **private** repositories | Documented permission model; Step 7 confirms `GITHUB_TOKEN` reaches GraphQL | Unverifiable here: this repository's `GITHUB_TOKEN` reaches only this repository, which is public, so its permission block is not binding for PR reads |
 | Ordering differs from REST when a repo has >100 open PRs | Phase 1 pins `CREATED_AT DESC`, matching REST's default (`sort=created`, `direction=desc`) | None |
 
@@ -431,6 +439,8 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Those two dispatches collide with production state. `FetchLatestArtifactByName` takes the newest artifact named `pr-slack-reminder-state` repo-wide, with no branch or run scoping, so the `post` dispatch becomes the repo-wide latest state and orphans the live reminder in `#github`.
 - Any `schedule` (daily 09:00), `push: main`, `pull_request`, `pull_request_review` or `issue_comment` run landing between the two dispatches feeds `update` someone else's state, and the round-trip proves nothing. Run the two dispatches back-to-back, and re-run if a third run interleaves.
 - Both runs log Step 3's `rateLimit` cost and remaining, so real per-run cost is read off the job log.
+- Done, 2026-08-17: the `post` dispatch (run 31999212548) ran both phases at 1 point each over one repository and 3 PRs, sent the message and saved state. It logged a 5,000-point budget, which "Observed budget" covers. The `update` dispatch is still outstanding, as is `build.yml`.
+- That run found 0 reviews and 0 timeline comments across all 3 PRs, so it says nothing about reviewer derivation or display names. Those are the two things canned fixtures cannot check, so `build.yml` still has to run against repositories that hold a PR with an approval and one with a comment.
 
 ### 8. Delete the REST PR path (`githubclient.go`, `models.go`, `snooze.go`, `githubclient_test.go`, `fetchartifact_test.go`, `testhelpers/mockgithubclient/mockgithubclient.go`)
 
