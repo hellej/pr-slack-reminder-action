@@ -7,16 +7,16 @@ Turns `messagecontent.Content` into a Slack message.
 - `BuildMessage(content)` returns the Slack message plus its summary text (used as Slack's plain-text fallback)
 - No-PRs case: renders `content.SummaryText` only
 - Ungrouped case: one heading followed by one bulleted list of all PRs
-- Grouped-by-repository case: per repository, a heading linking to that repo's GitHub pulls page, followed by its bulleted PR list, with visual spacing between repositories
-- Each PR entry shows: title (linked, struck through if closed-but-not-merged), age (flagged with a warning marker if older than the configured threshold, otherwise a plain "N ago"), author (Slack mention if a Slack user ID is mapped for them, else their GitHub name), approvers/commenters (marked distinctly, both shown together if both exist), and a rocket marker if merged
-- The message is capped at `maximumBlocksInSlackMessage` (50) content blocks; anything beyond that is silently dropped
+- Grouped-by-repository case: per repository, a heading carrying the repository link from [internal/messagecontent](../messagecontent/messagecontent.spec.md), then its bulleted PR list, with a spacing block between repositories
+- Each PR entry shows: title (linked, struck through if closed-but-not-merged), age (warning marker when [internal/prparser](../prparser/prparser.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist), and a rocket marker if merged
+- The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
+- The message is capped at 50 content blocks; blocks past the cap are dropped and logged
 
 ## Doesn't Do
 
-- Doesn't split content across multiple Slack messages when it exceeds the block cap — excess content is dropped, not deferred
-- Doesn't validate that mapped Slack user IDs are real Slack user IDs
+- Doesn't check any Slack limit other than block count, such as per-block text length or total payload size
 
 ## Oddities
 
-- The block cap effectively bounds repository count, not PR count: in grouped mode each repository costs multiple blocks, but in ungrouped mode all PRs share a single list block — a large PR count alone will not hit the cap, only a large repository count in grouped mode will
-- When content is dropped for exceeding the cap, only a log line is emitted — the message is still sent, truncated, with no indication in the message itself that anything was cut
+- The block cap bounds repository count, not PR count: grouped mode spends 3 blocks per repository, ungrouped mode puts every PR in one list block
+- Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it

@@ -209,11 +209,13 @@ The bot token needs the scopes below. The bot must also be a member of the targe
 
 ### Required Permissions
 
+PR data is read through GitHub's GraphQL API.
+
 If you're using the default `GITHUB_TOKEN`, grant these via the job's `permissions:` block (same permission names apply to GitHub App installations):
 
 ```yaml
 permissions:
-  pull-requests: read # listing/fetching PRs, reviews and review comments
+  pull-requests: read # listing/fetching PRs and reviews
   issues: read # reading PR comments (incl. /snooze comments)
   actions: read # only needed for run-mode: update - downloading the previous run's state artifact
 ```
