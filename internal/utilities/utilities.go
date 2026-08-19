@@ -97,26 +97,6 @@ func FlatMapToIter[T any](items [][]T) iter.Seq[T] {
 	}
 }
 
-// Unique returns a new slice with duplicate elements removed, preserving the order of first occurrence.
-// For comparable types, it uses a map for O(n) performance.
-func Unique[T comparable](items []T) []T {
-	if len(items) == 0 {
-		return nil
-	}
-
-	seen := make(map[T]struct{}, len(items))
-	result := make([]T, 0, len(items))
-
-	for _, item := range items {
-		if _, exists := seen[item]; !exists {
-			seen[item] = struct{}{}
-			result = append(result, item)
-		}
-	}
-
-	return result
-}
-
 // UniqueFunc returns a new slice with duplicate elements removed, using a custom equality function.
 // For non-comparable types or custom equality logic.
 func UniqueFunc[T any](items []T, equal func(T, T) bool) []T {

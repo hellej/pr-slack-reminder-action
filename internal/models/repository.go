@@ -19,13 +19,6 @@ func (r Repository) String() string {
 	return r.GetPath()
 }
 
-func NewRepository(owner, name string) Repository {
-	return Repository{
-		Owner: owner,
-		Name:  name,
-	}
-}
-
 func ParseRepository(repository string) (Repository, error) {
 	repoParts := strings.Split(repository, "/")
 	if len(repoParts) != 2 {

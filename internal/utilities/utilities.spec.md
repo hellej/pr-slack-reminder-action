@@ -6,8 +6,7 @@ Generic slice helpers (filter/map/find/unique/flatten) used throughout the pipel
 
 - `Filter`, `Map`, `Find`, `FlatMap`: standard slice transformations, plus lazy iterator variants of each
 - `MapWithError`: maps a slice, stopping at the first error and returning it along with the results collected so far
-- `Unique`: dedupes values, preserving first-occurrence order
-- `UniqueFunc`: dedupes using a caller-supplied equality function, for types that aren't directly comparable
+- `UniqueFunc`: dedupes using a caller-supplied equality function, preserving first-occurrence order
 
 ## Doesn't Do
 
@@ -16,6 +15,6 @@ Generic slice helpers (filter/map/find/unique/flatten) used throughout the pipel
 
 ## Oddities
 
-- `Unique`/`UniqueFunc` return `nil`, not an empty slice, for empty input
+- `UniqueFunc` returns `nil`, not an empty slice, for empty input
 - `MapWithError`'s partial results (everything mapped before the failing element) are still returned alongside the error, not discarded — a caller that ignores the error risks acting on an incomplete slice
 - `UniqueFunc`'s equality check is quadratic in the input size, since it lacks a hashable key to dedupe by directly

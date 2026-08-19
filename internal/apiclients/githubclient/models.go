@@ -82,7 +82,6 @@ func (p *PullRequest) GetDraft() bool {
 type PR struct {
 	*PullRequest
 	Repository       models.Repository
-	Author           Collaborator
 	ApprovedByUsers  []Collaborator
 	CommentedByUsers []Collaborator // reviewers who commented the PR but did not approve it
 	SnoozedUntil     *time.Time

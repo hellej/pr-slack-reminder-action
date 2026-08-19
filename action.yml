@@ -17,7 +17,7 @@ inputs: {
   },
   github-token-for-state: {
     description: 'GitHub token that has read access to artifacts of the current repository (i.e. actions: read). Only needed if the run-mode is `update` and if the default github-token misses permissions.',
-    required: true,
+    required: false,
   },
   run-mode: {
     description: 'Run mode: post (default) posts a new reminder; update refreshes an existing reminder',

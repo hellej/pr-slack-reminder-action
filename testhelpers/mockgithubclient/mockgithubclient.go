@@ -36,10 +36,6 @@ type MockGitHubClientOptions struct {
 }
 
 func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenForState string) githubclient.Client {
-	if opts.ListPRsResponseStatus == 0 {
-		opts.ListPRsResponseStatus = 200
-	}
-
 	return func(token, tokenForState string) githubclient.Client {
 		mockHTTPClient := &mockHTTPClient{
 			response: &http.Response{

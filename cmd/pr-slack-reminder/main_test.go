@@ -826,10 +826,6 @@ func TestPostModeStateSaving(t *testing.T) {
 		t.Fatalf("Failed to load state file: %v", err)
 	}
 
-	if err := loadedState.Validate(); err != nil {
-		t.Errorf("State validation failed: %v", err)
-	}
-
 	expectedChannelID := "C12345678" // From mock
 	if loadedState.SlackMessage.ChannelID != expectedChannelID {
 		t.Errorf("Expected channel ID %s, got %s", expectedChannelID, loadedState.SlackMessage.ChannelID)

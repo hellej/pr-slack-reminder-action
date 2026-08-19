@@ -116,7 +116,6 @@ func (b BlocksWrapper) GetPRCount() int {
 
 type Block struct {
 	Type     string          `json:"type"`
-	Text     *TextObject     `json:"text,omitempty"`
 	BlockID  string          `json:"block_id,omitempty"`
 	Elements json.RawMessage `json:"elements,omitempty"` // We'll unmarshal this based on Type
 }
@@ -129,36 +128,21 @@ func (b Block) IsPRItem() bool {
 	return strings.HasPrefix(b.BlockID, "open_prs")
 }
 
-type TextObject struct {
-	Type  string `json:"type"`
-	Text  string `json:"text"`
-	Emoji bool   `json:"emoji,omitempty"`
-}
-
 type RichTextList struct {
-	Type     string            `json:"type"`
 	Elements []RichTextSection `json:"elements"`
-	Style    string            `json:"style"`
-	Indent   int               `json:"indent"`
-	Border   int               `json:"border"`
-	Offset   int               `json:"offset"`
 }
 
 type RichTextSection struct {
-	Type     string    `json:"type"`
 	Elements []Element `json:"elements"`
 }
 
 type Element struct {
-	Type   string        `json:"type"`
 	Text   string        `json:"text,omitempty"`
-	URL    string        `json:"url,omitempty"`
 	UserID string        `json:"user_id,omitempty"`
 	Style  *ElementStyle `json:"style,omitempty"`
 }
 
 type ElementStyle struct {
-	Bold   bool `json:"bold,omitempty"`
 	Strike bool `json:"strike,omitempty"`
 }
 

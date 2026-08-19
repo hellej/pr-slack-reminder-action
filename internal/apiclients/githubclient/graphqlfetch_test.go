@@ -17,8 +17,8 @@ import (
 )
 
 var testRepositories = []models.Repository{
-	models.NewRepository("owner-one", "repo-one"),
-	models.NewRepository("owner-two", "repo-two"),
+	{Owner: "owner-one", Name: "repo-one"},
+	{Owner: "owner-two", Name: "repo-two"},
 }
 
 const testFragmentName = "prs"

@@ -18,11 +18,7 @@ type MockSlackClientOptions struct {
 	DeleteMessageError error
 }
 
-// creates the MockSlackAPI (for dependency injection) if nil is provided
 func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclient.Client {
-	if slackAPI == nil {
-		slackAPI = GetMockSlackAPI(MockSlackClientOptions{})
-	}
 	return func(token string) slackclient.Client {
 		return slackAPI
 	}

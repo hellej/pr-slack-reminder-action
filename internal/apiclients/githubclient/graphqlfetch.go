@@ -416,7 +416,6 @@ func prWithReviewers(
 	return PR{
 		PullRequest:      pullRequest,
 		Repository:       repository,
-		Author:           pullRequest.Author,
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),

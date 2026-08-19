@@ -17,7 +17,6 @@ func testPR(number int, createdAt, updatedAt time.Time) githubclient.PR {
 			UpdatedAt: updatedAt,
 			Author:    githubclient.Collaborator{Login: "author"},
 		},
-		Author: githubclient.Collaborator{Login: "author"},
 	}
 }
 

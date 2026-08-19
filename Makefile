@@ -79,12 +79,6 @@ build-linux-amd64:
 build-linux-arm64:
 	env GOOS=linux GOARCH=arm64 $(GO_BUILD) -o dist/main-linux-arm64-$(COMMIT_HASH) $(MAIN_GO)
 
-build-windows-amd64:
-	env GOOS=windows GOARCH=amd64 $(GO_BUILD) -o dist/main-windows-amd64-$(COMMIT_HASH) $(MAIN_GO)
-
-build-windows-arm64:
-	env GOOS=windows GOARCH=arm64 $(GO_BUILD) -o dist/main-windows-arm64-$(COMMIT_HASH) $(MAIN_GO)
-
 update-invoke-binary-targets:
 	@echo "Updating executable versions to $(COMMIT_HASH) in invoke-binary.js"
 	@case "$$(uname)" in \
@@ -107,10 +101,3 @@ release-tag:
 
 draft-release:
 	./create-draft-release.sh
-
-release-workflow:
-	./trigger-release-workflow.sh \
-		$(if $(SEMVER),--semver $(SEMVER)) \
-		$(if $(filter true,$(COMMIT_BINARY)),--commit-binary) \
-		$(if $(filter false,$(COMMIT_BINARY)),--no-commit-binary) \
-		$(if $(filter true,$(YES)),--yes)

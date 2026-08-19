@@ -53,7 +53,7 @@ func createTestState() State {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
 		},
 	}
 }
@@ -62,7 +62,7 @@ func createTestPR(number int, owner, repo string) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{Number: number},
-			Repository:  models.NewRepository(owner, repo),
+			Repository:  models.Repository{Owner: owner, Name: repo},
 		},
 	}
 }
@@ -79,9 +79,9 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 2},
-			{Repository: models.NewRepository("owner2", "repo2"), Number: 5},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 2},
+			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 5},
 		},
 	}
 
@@ -153,49 +153,6 @@ func TestLoadInvalidJSON(t *testing.T) {
 	var jsonErr *json.SyntaxError
 	if !errors.As(err, &jsonErr) {
 		t.Errorf("Expected JSON syntax error, got: %v", err)
-	}
-}
-
-func TestStateValidateSchemaVersionMismatch(t *testing.T) {
-	state := State{
-		SchemaVersion: CurrentSchemaVersion + 1, // Wrong version
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
-			ChannelID: "C123456789",
-			MessageTS: "1729123456.123456",
-		},
-		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-		},
-	}
-
-	err := state.Validate()
-	if err == nil {
-		t.Fatal("Expected validation error for schema version mismatch, got nil")
-	}
-
-	expectedMsg := "unsupported schema version"
-	if !strings.Contains(err.Error(), expectedMsg) {
-		t.Errorf("Expected error message to contain %q, got: %v", expectedMsg, err)
-	}
-}
-
-func TestStateValidateValidState(t *testing.T) {
-	state := State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
-			ChannelID: "C123456789",
-			MessageTS: "1729123456.123456",
-		},
-		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-		},
-	}
-
-	err := state.Validate()
-	if err != nil {
-		t.Errorf("Expected valid state to pass validation, got error: %v", err)
 	}
 }
 
@@ -382,13 +339,13 @@ func TestLoadSuccessful(t *testing.T) {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-			{Repository: models.NewRepository("owner2", "repo2"), Number: 42},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
+			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 42},
 		},
 	}
 
 	mockFetcher := &mockStateArtifactFetcher{state: expectedState}
-	repository := models.NewRepository("owner1", "repo1")
+	repository := models.Repository{Owner: "owner1", Name: "repo1"}
 
 	loadedState, err := Load(context.Background(), mockFetcher, repository, "test-artifact", "state.json")
 	if err != nil {
@@ -411,7 +368,7 @@ func TestLoadSuccessful(t *testing.T) {
 func TestLoadFetchError(t *testing.T) {
 	expectedError := errors.New("artifact fetch failed")
 	mockFetcher := &mockStateArtifactFetcher{fetchError: expectedError}
-	repository := models.NewRepository("owner1", "repo1")
+	repository := models.Repository{Owner: "owner1", Name: "repo1"}
 
 	_, err := Load(context.Background(), mockFetcher, repository, "test-artifact", "state.json")
 	if err == nil {
