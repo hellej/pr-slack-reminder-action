@@ -1,0 +1,33 @@
+name: 'Run Lint & Unit Tests'
+description: 'Run static checks and unit tests with coverage for the Go application'
+  
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 #v6.5.0
+      with:
+        go-version-file: go.mod
+
+    - name: Check action inputs
+      shell: bash
+      run: go run .github/scripts/check_inputs.go
+
+    - name: Check formatting
+      shell: bash
+      run: make check-fmt
+
+    - name: Check vet
+      shell: bash
+      run: make check-vet
+
+    - name: Run unit tests with coverage
+      shell: bash
+      run: make test-with-coverage
+
+    - name: Check dead code
+      shell: bash
+      run: make check-dead-code
+
+    - name: Check vulnerabilities
+      shell: bash
+      run: make check-vulnerabilities

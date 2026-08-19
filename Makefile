@@ -1,4 +1,4 @@
-TEST=go test ./...
+TEST=go test -race ./...
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
@@ -7,6 +7,33 @@ SEMVER =
 
 test:
 	$(TEST)
+
+check-fmt:
+	@set -e; \
+	unformatted=$$(gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "gofmt needs to run on:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+
+check-vet:
+	go vet ./...
+
+check-dead-code:
+	@set -e; \
+	findings=$$(go run golang.org/x/tools/cmd/deadcode@latest ./cmd/...); \
+	if [ -n "$$findings" ]; then \
+		echo "unreachable functions:"; \
+		echo "$$findings"; \
+		exit 1; \
+	fi
+
+check-vulnerabilities:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+install-hooks:
+	git config core.hooksPath githooks
 
 clean-test-cache:
 	go clean -testcache

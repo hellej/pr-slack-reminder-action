@@ -93,6 +93,11 @@ Don't stack hedges:
 - `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
+- `make check-fmt` — fail if any file needs `gofmt`
+- `make check-vet` — run `go vet ./...`
+- `make check-dead-code` — fail if `deadcode` finds an unreachable function under `./cmd/...`. Expected to fail until plan 001 Step 1 lands
+- `make check-vulnerabilities` — run `govulncheck ./...`
+- `make install-hooks` — point git at `githooks/`, a pre-commit hook running `check-fmt` and `check-vet`. One-time opt-in per clone
 - `go run .github/scripts/check_inputs.go` — validate action.yml and config.go constants are in sync
 
 ## Architecture

@@ -2,10 +2,6 @@ name: 'Build Application'
 description: 'Build the Go application for all platforms and commit built binary'
 
 inputs:
-  go-version:
-    description: 'Go version to use'
-    required: false
-    default: '1.26'
   target:
     description: 'Build target (all, linux-amd64, etc.)'
     required: false
@@ -21,7 +17,7 @@ runs:
     - name: Setup Go
       uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 #v6.5.0
       with:
-        go-version: ${{ inputs.go-version }}
+        go-version-file: go.mod
 
     - name: Build application
       shell: bash

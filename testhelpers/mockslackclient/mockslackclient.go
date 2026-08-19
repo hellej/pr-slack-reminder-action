@@ -59,15 +59,15 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 }
 
 type MockSlackAPI struct {
-	slackChannels         []slack.Channel
-	findChannelError      error
-	postMessageError      error
-	updateMessageError    error
-	deleteMessageError    error
-	postMessageResponse   PostMessageResponse
-	SentMessage           SentMessage
-	UpdatedMessage        UpdatedMessage
-	DeletedMessage        DeletedMessage
+	slackChannels       []slack.Channel
+	findChannelError    error
+	postMessageError    error
+	updateMessageError  error
+	deleteMessageError  error
+	postMessageResponse PostMessageResponse
+	SentMessage         SentMessage
+	UpdatedMessage      UpdatedMessage
+	DeletedMessage      DeletedMessage
 }
 
 func (m *MockSlackAPI) GetChannelIDByName(channelName string) (string, error) {
