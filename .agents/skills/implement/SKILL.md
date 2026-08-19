@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Run an implementer and reviewer sub-agent loop over one plan step, up to three rounds, until the reviewer returns PASS. Use when: implementing a step from docs/plans/, or the user runs /implement."
+description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from docs/plans/, or the user runs /implement."
 argument-hint: "The plan file and step, e.g. docs/plans/001_GraphQL-migration.md step 3"
 ---
 
@@ -13,7 +13,7 @@ findings.
 
 ## Scope
 
-- One plan step per run. If the user names several, run this loop once per step, in order
+- One plan step (or planned batch) per run. If the user names several, run this loop once per step, in order
 - Round 1 starts on a tree holding only this step's work. Between chained steps, commit or
   hand back, otherwise the next reviewer reads two steps as one diff
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
@@ -56,7 +56,7 @@ landed. Tell the implementer where the plan has gone stale.
    - `CHANGES NEEDED`: send the findings to the implementer, then ask the reviewer to
      re-review. Give it the implementer's answers, including any finding it rejected and
      why, otherwise nothing surfaces a deadlock. That is one more round
-4. Three rounds maximum. At the cap, hand back with the open findings named and the code
+4. Four rounds maximum. At the cap, hand back with the open findings named and the code
    as it stands
 
 Spawn both agents with `run_in_background: false`.
@@ -124,7 +124,7 @@ An interruption never spends a round.
 Stop and hand back to the user when:
 
 - The implementer rejects a finding and the reviewer repeats it. That is a deadlock, and
-  round 3 will not break it
+  a further round will not break it
 - The step turns out to be wrong, blocked, or bigger than the plan says
 - Tests fail for a reason outside the step
 
