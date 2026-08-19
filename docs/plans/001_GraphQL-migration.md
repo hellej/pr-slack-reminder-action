@@ -193,7 +193,6 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 7. Verify against the live API with the existing workflows
 8. Delete the REST PR path
 9. Docs and spec sync
-10. Cleanup and readability pass over the finished codebase
 
 ## Steps
 
