@@ -33,10 +33,8 @@ Run `make test` yourself.
 A green suite says the tests pass, not that they cover the change. Read the tests, then
 mutate where you doubt they would catch a behaviour's loss: break it and confirm a test
 fails. A mutation that survives is a missing test. Report it, naming the mutation and
-what it would cost in production.
-
-A check the change adds is not verified by passing. Mutate what it guards and confirm it
-fails. A tool that prints findings but exits 0 yields a check that can never fail.
+what it would cost in production. This covers a check the change adds too: a tool that
+prints findings but exits 0 yields a check that can never fail.
 
 Read assertions for what else would satisfy them. A substring another construct also
 matches is a test that cannot fail for the reason it is named: `"first: 100"` is satisfied
