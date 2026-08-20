@@ -19,7 +19,9 @@ jobs:
       - name: Build application
         uses: ./.github/actions/build
 
+      # Dependabot PRs can't read these secrets
       - name: Smoke/E2E test
+        if: github.actor != 'dependabot[bot]'
         uses: ./.github/actions/e2e-tests
         with:
           github-app-client-id: ${{ secrets.APP_CLIENT_ID }}
