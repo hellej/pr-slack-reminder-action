@@ -82,6 +82,7 @@ Don't stack hedges:
 
 - **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
 - Use table-driven tests for functions with multiple input scenarios
+- Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go` — integration tests using full pipeline with mocks
 - `testhelpers/confighelpers.go` — `TestConfig` struct and `SetTestEnvironment()` for consistent test setup
