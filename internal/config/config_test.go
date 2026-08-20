@@ -1069,3 +1069,105 @@ func TestConfig_GetFiltersForRepository(t *testing.T) {
 		})
 	}
 }
+
+func TestGetConfig_PRTrackerCanvasLink(t *testing.T) {
+	tests := []struct {
+		name        string
+		link        string
+		expectedID  string
+		expectError bool
+	}{
+		{
+			name:       "canvas link as copied from Slack",
+			link:       "https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL",
+			expectedID: "F0BMEPVR1DL",
+		},
+		{
+			name:       "trailing slash",
+			link:       "https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL/",
+			expectedID: "F0BMEPVR1DL",
+		},
+		{
+			name:       "query parameters",
+			link:       "https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL?focus_section_id=temp%3AC%3A123",
+			expectedID: "F0BMEPVR1DL",
+		},
+		{
+			name:       "trailing title slug",
+			link:       "https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL/pr-tracker-canvas",
+			expectedID: "F0BMEPVR1DL",
+		},
+		{
+			name:       "http scheme",
+			link:       "http://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL",
+			expectedID: "F0BMEPVR1DL",
+		},
+		{
+			name:        "unrelated URL",
+			link:        "https://example.com/some/page",
+			expectError: true,
+		},
+		{
+			name:        "Slack file link",
+			link:        "https://hellej.slack.com/files/T08SGDGNB2B/F0BMEPVR1DL/some_file",
+			expectError: true,
+		},
+		{
+			name:        "bare canvas ID",
+			link:        "F0BMEPVR1DL",
+			expectError: true,
+		},
+		{
+			name:        "link without scheme",
+			link:        "hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL",
+			expectError: true,
+		},
+		{
+			name:        "link truncated before the canvas ID",
+			link:        "https://hellej.slack.com/docs/T08SGDGNB2B",
+			expectError: true,
+		},
+		{
+			name:       "unset input disables the feature",
+			link:       "",
+			expectedID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			h.setInput(config.InputPRTrackerCanvasLink, tt.link)
+
+			cfg, err := config.GetConfig()
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("Expected error for link '%s', got none", tt.link)
+				}
+				for _, expectedInError := range []string{
+					"slack.com/docs/", "Copy link", config.InputPRTrackerCanvasLink,
+				} {
+					if !strings.Contains(err.Error(), expectedInError) {
+						t.Errorf("Expected error to contain '%s', got: %v", expectedInError, err)
+					}
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+			if cfg.PRTrackerCanvasID != tt.expectedID {
+				t.Errorf("Expected PRTrackerCanvasID '%s', got '%s'", tt.expectedID, cfg.PRTrackerCanvasID)
+			}
+			if cfg.PRTrackerCanvasURL != tt.link {
+				t.Errorf("Expected PRTrackerCanvasURL '%s', got '%s'", tt.link, cfg.PRTrackerCanvasURL)
+			}
+			if cfg.ContentInputs.CanvasURL != tt.link {
+				t.Errorf("Expected ContentInputs.CanvasURL '%s', got '%s'", tt.link, cfg.ContentInputs.CanvasURL)
+			}
+		})
+	}
+}

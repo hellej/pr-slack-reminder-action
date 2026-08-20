@@ -36,6 +36,7 @@ const (
 	InputNoPRsMessage                string = "no-prs-message"
 	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
 	InputGroupByRepository           string = "group-by-repository"
+	InputPRTrackerCanvasLink         string = "pr-tracker-canvas-link"
 
 	MaxRepositories int = 30
 
@@ -63,6 +64,9 @@ type Config struct {
 	GlobalFilters     Filters
 	RepositoryFilters map[string]Filters
 	ContentInputs     ContentInputs
+
+	PRTrackerCanvasID  string
+	PRTrackerCanvasURL string
 }
 
 type ContentInputs struct {
@@ -71,6 +75,7 @@ type ContentInputs struct {
 	NoPRsMessage                string
 	OldPRThresholdHours         int
 	GroupByRepository           bool
+	CanvasURL                   string
 }
 
 func (c Config) Print() {
@@ -113,9 +118,11 @@ func GetConfig() (Config, error) {
 	noPRsMessage := inputhelpers.GetInput(InputNoPRsMessage)
 	oldPRsThresholdHours, err9 := inputhelpers.GetInputInt(InputOldPRThresholdHours)
 	groupByRepository, err10 := inputhelpers.GetInputBool(InputGroupByRepository)
+	prTrackerCanvasURL := inputhelpers.GetInput(InputPRTrackerCanvasLink)
+	prTrackerCanvasID, err11 := getCanvasIDFromLink(prTrackerCanvasURL)
 
 	if err := errors.Join(
-		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10,
+		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10, err11,
 	); err != nil {
 		return Config{}, err
 	}
@@ -151,7 +158,10 @@ func GetConfig() (Config, error) {
 			NoPRsMessage:                noPRsMessage,
 			OldPRThresholdHours:         oldPRsThresholdHours,
 			GroupByRepository:           groupByRepository,
+			CanvasURL:                   prTrackerCanvasURL,
 		},
+		PRTrackerCanvasID:  prTrackerCanvasID,
+		PRTrackerCanvasURL: prTrackerCanvasURL,
 	}
 
 	if err := config.validate(); err != nil {

@@ -92,6 +92,7 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
 	setInputEnv(t, overrides, config.InputRepositoryFilters, c.RepositoryFiltersRaw)
 	setInputEnv(t, overrides, config.InputGroupByRepository, c.Config.ContentInputs.GroupByRepository)
+	setInputEnv(t, overrides, config.InputPRTrackerCanvasLink, c.Config.PRTrackerCanvasURL)
 }
 
 func setEnv(t *testing.T, overrides *map[string]any, envName string, value any) {

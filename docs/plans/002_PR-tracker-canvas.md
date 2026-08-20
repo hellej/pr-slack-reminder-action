@@ -201,6 +201,7 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
   - Must be an absolute URL with a host, a bare `F…` ID is rejected. `PRTrackerCanvasURL` is the input as given, never rebuilt, and Step 8 puts it straight into the message footer, a bare ID there is a dead link.
   - A non-empty input that doesn't parse is a hard config error, joined like the other input validation. A typo would otherwise mean a silently missing canvas. The message names the expected shape and the Copy link path.
 - Test cases: the real link above, trailing slash, query params, a trailing title slug, `http`, an unrelated URL, a Slack `/files/F…` link (rejected), a bare `F…` ID (rejected), empty (feature off).
+  - Deviation (implemented): the link parsing lives in a new file `internal/config/canvaslink.go` (`getCanvasIDFromLink`), not in `config.go`, which only gains the constant, the fields and the call. The test cases live in `internal/config/config_test.go` (`TestGetConfig_PRTrackerCanvasLink`), going through `GetConfig`, since the parser is unexported and the config tests are an external `config_test` package.
 - `testhelpers/confighelpers.go`: mirror the new input.
 - `go run .github/scripts/check_inputs.go` must still pass.
 

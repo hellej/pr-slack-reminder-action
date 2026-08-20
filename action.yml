@@ -72,4 +72,8 @@ inputs: {
     required: false,
     default: 'false',
   },
+  pr-tracker-canvas-link: {
+    description: 'Link to a Slack canvas to keep updated with a live tracker of open and work-in-progress PRs. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default).',
+    required: false,
+  },
 }
