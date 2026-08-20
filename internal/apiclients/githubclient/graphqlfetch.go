@@ -9,6 +9,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -250,7 +251,7 @@ func newPullRequestFragment(name, selection string) pullRequestFragment {
 	}
 }
 
-// commits are selected for the PR tracker canvas and are not read yet.
+// commits are selected for the PR tracker canvas, as the last-activity timestamp.
 const enrichedPullRequestSelection = `  number
   commits(last: 1){ nodes { commit { oid committedDate } } }
   reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
@@ -414,12 +415,32 @@ func prWithReviewers(
 	)
 
 	return PR{
-		PullRequest:      pullRequest,
+		PullRequest:      pullRequestWithLastActivity(pullRequest, node),
 		Repository:       repository,
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),
 	}
+}
+
+// Copies the PullRequest instead of writing the timestamp into the caller's one.
+func pullRequestWithLastActivity(pullRequest *PullRequest, node pullRequestNode) *PullRequest {
+	withLastActivity := *pullRequest
+	withLastActivity.LastActivityAt = lastActivityAt(pullRequest, node)
+	return &withLastActivity
+}
+
+// The update time overstates the last push, but bounds it from above, so a busy PR is never
+// mistaken for an inactive one.
+func lastActivityAt(pullRequest *PullRequest, node pullRequestNode) *time.Time {
+	if len(node.Commits.Nodes) > 0 {
+		committedDate := node.Commits.Nodes[0].Commit.CommittedDate
+		return &committedDate
+	}
+	if updatedAt := pullRequest.GetUpdatedAt(); !updatedAt.IsZero() {
+		return &updatedAt
+	}
+	return nil
 }
 
 func enrichedNode(aliasNode *pullRequestWrapperNode) (pullRequestNode, bool) {

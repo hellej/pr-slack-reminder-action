@@ -21,6 +21,8 @@ type PullRequest struct {
 	Labels    []string
 	Author    Collaborator
 	HeadSHA   string
+	// Head commit date when known, the update time as a fallback, nil when neither is known.
+	LastActivityAt *time.Time
 }
 
 func (p *PullRequest) GetNumber() int {

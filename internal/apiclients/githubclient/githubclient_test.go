@@ -857,3 +857,69 @@ func rangeOfNumbers(first, count int) []int {
 	}
 	return numbers
 }
+
+func TestFindOpenPRs_LastActivityAt(t *testing.T) {
+	commitDate := time.Now().Add(-3 * time.Hour).UTC().Truncate(time.Second)
+	updatedAt := time.Now().Add(-9 * time.Hour).UTC().Truncate(time.Second)
+
+	tests := []struct {
+		name                   string
+		updatedAt              time.Time
+		commitDate             *time.Time
+		expectedLastActivityAt *time.Time
+	}{
+		{
+			name:                   "head commit date wins over the update time",
+			updatedAt:              updatedAt,
+			commitDate:             &commitDate,
+			expectedLastActivityAt: &commitDate,
+		},
+		{
+			name:                   "no commits falls back to the update time",
+			updatedAt:              updatedAt,
+			expectedLastActivityAt: &updatedAt,
+		},
+		{
+			name: "no commits and no update time leaves it unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := mockgithubclient.MockGitHubClientOptions{
+				PRs: []*github.PullRequest{makePRFixture(7, false, time.Time{}, tt.updatedAt)},
+			}
+			if tt.commitDate != nil {
+				opts.CommitsByPRNumber = map[int]time.Time{7: *tt.commitDate}
+			}
+			client := newTestClient(opts)
+
+			result, err := client.FindOpenPRs(
+				context.Background(),
+				[]models.Repository{{Owner: "o", Name: "repo"}},
+				noFilters,
+				githubclient.PRFetchOptions{},
+			)
+			if err != nil {
+				t.Fatalf("FindOpenPRs() returned error: %v", err)
+			}
+			if len(result.PRs) != 1 {
+				t.Fatalf("expected 1 PR, got %d", len(result.PRs))
+			}
+
+			lastActivityAt := result.PRs[0].LastActivityAt
+			if tt.expectedLastActivityAt == nil {
+				if lastActivityAt != nil {
+					t.Fatalf("expected LastActivityAt nil, got %v", lastActivityAt)
+				}
+				return
+			}
+			if lastActivityAt == nil {
+				t.Fatalf("expected LastActivityAt %v, got nil", tt.expectedLastActivityAt)
+			}
+			if !lastActivityAt.Equal(*tt.expectedLastActivityAt) {
+				t.Errorf("expected LastActivityAt %v, got %v", tt.expectedLastActivityAt, lastActivityAt)
+			}
+		})
+	}
+}

@@ -28,6 +28,7 @@ type MockGitHubClientOptions struct {
 	ListPRsResponseStatus      int
 	ReviewsByPRNumber          map[int][]*github.PullRequestReview
 	TimelineCommentsByPRNumber map[int][]*github.IssueComment
+	CommitsByPRNumber          map[int]time.Time // head commit date per PR; unset renders an empty commits connection
 	PRServiceError             error
 	IssueServiceError          error
 	MockStateForUpdateMode     *state.State
@@ -234,10 +235,20 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["state"] = pullRequestNodeState(pr)
 	node["merged"] = pr.GetMerged()
 	node["labels"] = labelsJSON(pr)
-	node["commits"] = connectionJSON([]map[string]any{})
+	node["commits"] = t.commitsJSON(number)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)
 	return node
+}
+
+func (t GraphQLTransport) commitsJSON(number int) map[string]any {
+	committedDate, isSet := t.opts.CommitsByPRNumber[number]
+	if !isSet {
+		return connectionJSON([]map[string]any{})
+	}
+	return connectionJSON([]map[string]any{
+		{"commit": map[string]any{"committedDate": committedDate}},
+	})
 }
 
 func pullRequestNodeState(pr *github.PullRequest) string {
