@@ -32,31 +32,48 @@ Run `make test` yourself.
 
 A green suite says the tests pass, not that they cover the change. Read the tests, then
 mutate where you doubt they would catch a behaviour's loss: break it and confirm a test
-fails. A mutation that survives is a missing test. Report it, naming the mutation and
-what it would cost in production. This covers a check the change adds too: a tool that
-prints findings but exits 0 yields a check that can never fail.
+fails. A mutation that survives is a missing test. Report it, naming the mutation, where
+the test for it belongs, and what it would cost in production. This covers a check the
+change adds too: a tool that prints findings but exits 0 yields a check that can never
+fail.
 
 Read assertions for what else would satisfy them. A substring another construct also
 matches is a test that cannot fail for the reason it is named: `"first: 100"` is satisfied
-by `labels(first: 100)`, so `pullRequests(first: 20)` passes it.
+by `labels(first: 100)`, so `pullRequests(first: 20)` passes it. Doubt a test that only
+feeds the case that passes: force the code's condition to always-true and see whether
+anything fails.
 
-Pick the targets yourself. A handful is usually enough, and a pure refactor needs none,
-since the existing tests and snapshots already pin the contract.
+Pick the targets yourself. A handful is usually enough. A pure refactor needs none.
 
 ### Mutation protocol
 
-The change under review is uncommitted, so git cannot recover a file you lose. Never
-`git checkout`, `git stash` or `git restore`.
+The change under review is uncommitted, so never `git checkout`, `git stash` or
+`git restore`: git cannot recover what you destroy.
 
-1. Copy the file to your scratchpad directory
-2. Mutate it with Bash
-3. Confirm the file changed. A `sed` or `perl` pattern that matches nothing reads as a
-   caught mutation
-4. Run the narrowest test that should fail
-5. Restore from the copy, then `diff` against it to prove the tree is byte-identical
+For a `go test` mutation, mutate a copy of the Go source and build against it with
+`-overlay`, so the tree is never written to:
 
-End with a full `make test` and a `git status`. If you cannot restore a file, say so
-first, before any finding.
+1. Copy each file you want to mutate to your scratchpad directory, and mutate the copy
+2. Confirm the copy differs from the original. A `sed` or `perl` pattern that matches
+   nothing reads as a caught mutation
+3. Map each original to its copy in an overlay file, absolute paths, since a relative
+   original resolves against the current directory:
+   `{"Replace": {"/abs/repo/pkg/thing.go": "/abs/scratchpad/thing.go"}}`
+4. Run `go test -race -overlay=<overlay.json>` over the narrowest packages that should
+   fail. `make test` forwards no flags, so call `go test` directly
+5. Confirm a named `--- FAIL: TestX` failed. `[build failed]` means the mutation didn't
+   compile and proves nothing, yet gives the same exit 1 and screen of `FAIL` lines a
+   real catch does
+
+`-overlay` reaches that build only. Map a snapshot or `action.yml` and the go command
+accepts it in silence, the check still reads the tree's copy, and the pass reads as a
+surviving mutation. `deadcode` takes no `-overlay` flag at all. Both cases mutate in
+place: keep the scratchpad copy pristine and record the file's `shasum`, mutate the file
+in the tree, run the check, copy the scratchpad copy back, then confirm the `shasum`
+matches. A `diff` against the copy you restored from proves only that `cp` ran.
+
+When you mutated in place, end with a full `make test` and a `git status`. If you cannot
+restore a file, say so first, before any finding.
 
 Classify every finding before reporting it:
 
@@ -82,7 +99,8 @@ Report back:
   Otherwise `PASS`, even with nits open
 - Then each finding: `Fix (high|medium|nit)` or `Document`, `file:line`, what is wrong,
   why it matters. Most severe first
-- One line on what you mutated: how many survived, and that the tree is restored and green
+- One line on what you mutated, and how many survived. When you mutated in place, that
+  the tree is restored
 - Nothing else. No praise, no summary of what the code does
 
 If you suspect a problem but cannot confirm it from the code, label it `unverified` and

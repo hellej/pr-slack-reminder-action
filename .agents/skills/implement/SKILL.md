@@ -37,7 +37,8 @@ the diff, never re-record it.
 If the step states no criteria, say so and carry on. Do not invent them.
 
 Check the step's claims about the tree yourself: paths, call sites, what is already
-landed. Tell the implementer where the plan has gone stale.
+landed, and whether wording the step quotes verbatim still matches the tree. Tell the
+implementer where the plan has gone stale.
 
 ## Rounds
 
@@ -115,7 +116,7 @@ A reviewer that cannot resume is replaced the same way, handing the fresh one an
 findings and the implementer's answers to them.
 
 Check the tree before you do. A reviewer that stopped mid-mutation never reached the
-restore step, so a mutated file is still in place.
+restore step, so a file it mutated in place is still mutated.
 
 An interruption never spends a round.
 
