@@ -6,10 +6,10 @@ import (
 )
 
 func Filter[T any](items []T, filter func(e T) bool) []T {
-	return slices.Collect(FilterToIter(items, filter))
+	return slices.Collect(filterToIter(items, filter))
 }
 
-func FilterToIter[T any](items []T, filter func(e T) bool) iter.Seq[T] {
+func filterToIter[T any](items []T, filter func(e T) bool) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for _, item := range items {
 
@@ -35,10 +35,10 @@ func Find[T any](items []T, predicate func(e T) bool) (T, bool) {
 }
 
 func Map[T any, V any](items []T, mapper func(T) V) []V {
-	return slices.Collect(MapToIter(items, mapper))
+	return slices.Collect(mapToIter(items, mapper))
 }
 
-func MapToIter[T any, V any](items []T, mapper func(T) V) iter.Seq[V] {
+func mapToIter[T any, V any](items []T, mapper func(T) V) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		for _, item := range items {
 			if !yield(mapper(item)) {
@@ -53,7 +53,7 @@ func MapWithError[T any, V any](items []T, mapper func(T) (V, error)) ([]V, erro
 	var result []V
 	var firstError error
 
-	for mapped, err := range MapWithErrorToIter(items, mapper) {
+	for mapped, err := range mapWithErrorToIter(items, mapper) {
 		if err != nil {
 			firstError = err
 			break
@@ -65,7 +65,7 @@ func MapWithError[T any, V any](items []T, mapper func(T) (V, error)) ([]V, erro
 }
 
 // exits early on error (and returns it)
-func MapWithErrorToIter[T any, V any](items []T, mapper func(T) (V, error)) iter.Seq2[V, error] {
+func mapWithErrorToIter[T any, V any](items []T, mapper func(T) (V, error)) iter.Seq2[V, error] {
 	return func(yield func(V, error) bool) {
 		for _, item := range items {
 			mapped, err := mapper(item)
@@ -81,11 +81,11 @@ func MapWithErrorToIter[T any, V any](items []T, mapper func(T) (V, error)) iter
 
 // FlatMap flattens a slice of slices into a single slice, preserving order.
 func FlatMap[T any](items [][]T) []T {
-	return slices.Collect(FlatMapToIter(items))
+	return slices.Collect(flatMapToIter(items))
 }
 
-// FlatMapToIter flattens a slice of slices into an iterator that yields each element.
-func FlatMapToIter[T any](items [][]T) iter.Seq[T] {
+// flatMapToIter flattens a slice of slices into an iterator that yields each element.
+func flatMapToIter[T any](items [][]T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for _, slice := range items {
 			for _, item := range slice {

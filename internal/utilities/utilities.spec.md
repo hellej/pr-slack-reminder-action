@@ -4,7 +4,7 @@ Generic slice helpers (filter/map/find/unique/flatten) used throughout the pipel
 
 ## Behaviour
 
-- `Filter`, `Map`, `Find`, `FlatMap`: standard slice transformations, plus lazy iterator variants of each
+- `Filter`, `Map`, `Find`, `FlatMap`: standard slice transformations; `Filter`, `Map` and `FlatMap` collect from unexported lazy iterators
 - `MapWithError`: maps a slice, stopping at the first error and returning it along with the results collected so far
 - `UniqueFunc`: dedupes using a caller-supplied equality function, preserving first-occurrence order
 

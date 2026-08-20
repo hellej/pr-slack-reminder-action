@@ -174,7 +174,7 @@ func TestMapWithErrorToIter(t *testing.T) {
 	var results []int
 	var errors []error
 
-	for value, err := range MapWithErrorToIter(items, mapper) {
+	for value, err := range mapWithErrorToIter(items, mapper) {
 		results = append(results, value)
 		errors = append(errors, err)
 
@@ -340,7 +340,7 @@ func TestFlatMapToIter(t *testing.T) {
 	items := [][]int{{1, 2}, {3, 4}, {5}}
 	expected := []int{1, 2, 3, 4, 5}
 
-	result := slices.Collect(FlatMapToIter(items))
+	result := slices.Collect(flatMapToIter(items))
 	if !slices.Equal(result, expected) {
 		t.Errorf("FlatMapToIter() collected = %v, expected %v", result, expected)
 	}

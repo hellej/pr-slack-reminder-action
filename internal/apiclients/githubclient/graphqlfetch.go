@@ -135,7 +135,7 @@ func (c *client) listOpenPRs(
 ) ([]PRResult, error) {
 	query := buildListOpenPRsQuery(repositories)
 
-	callCtx, cancel := context.WithTimeout(ctx, PullRequestListTimeout)
+	callCtx, cancel := context.WithTimeout(ctx, pullRequestListTimeout)
 	defer cancel()
 
 	var data aliasedData[repositoryPullRequestsNode]
@@ -309,7 +309,7 @@ func (c *client) enrichPRs(ctx context.Context, prResults []PRResult) ([]PR, err
 	enrichedBatches := make([][]PR, len(batches))
 
 	batchGroup, batchCtx := errgroup.WithContext(ctx)
-	batchGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
+	batchGroup.SetLimit(defaultGitHubAPIConcurrencyLimit)
 
 	for index, batch := range batches {
 		batchGroup.Go(func() error {
@@ -329,7 +329,7 @@ func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, err
 		utilities.Map(batch, pullRequestRefOfResult), enrichedPullRequestFragment,
 	)
 
-	callCtx, cancel := context.WithTimeout(ctx, ReviewsFetchTimeout)
+	callCtx, cancel := context.WithTimeout(ctx, reviewsFetchTimeout)
 	defer cancel()
 
 	var data aliasedData[pullRequestWrapperNode]
@@ -478,7 +478,7 @@ func (c *client) getPRsByRef(ctx context.Context, references []models.PullReques
 	fetchedBatches := make([][]PR, len(batches))
 
 	batchGroup, batchCtx := errgroup.WithContext(ctx)
-	batchGroup.SetLimit(DefaultGitHubAPIConcurrencyLimit)
+	batchGroup.SetLimit(defaultGitHubAPIConcurrencyLimit)
 
 	for index, batch := range batches {
 		batchGroup.Go(func() error {
@@ -498,7 +498,7 @@ func (c *client) getPRBatchByRef(
 ) ([]PR, error) {
 	query := buildPullRequestsQuery(references, fullPullRequestFragment)
 
-	callCtx, cancel := context.WithTimeout(ctx, ReviewsFetchTimeout)
+	callCtx, cancel := context.WithTimeout(ctx, reviewsFetchTimeout)
 	defer cancel()
 
 	var data aliasedData[pullRequestWrapperNode]
@@ -523,7 +523,7 @@ func (c *client) getPRBatchByRef(
 	return prs, nil
 }
 
-// Mirrors the REST path's split between a missing PR and any other fetch failure.
+// Reports a missing PR separately from any other fetch failure.
 func getPRsError(err error, referenceByAlias map[string]models.PullRequestRef) error {
 	var prError pullRequestError
 	if !errors.As(err, &prError) {

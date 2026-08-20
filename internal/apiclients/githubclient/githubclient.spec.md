@@ -9,10 +9,10 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Result count is capped at `MaxPRsToFetch` (50); when over the cap, only the newest PRs (by creation time, then update time) are kept
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
 - Both PR-reading paths use the GraphQL API: `FindOpenPRs` lists every repository's open PRs in one request, then fetches reviews and comments for the capped set; `GetPRs` fetches the referenced PRs directly. Both fetch in batches of 25 PRs per request. `FetchLatestArtifactByName` is the only path that uses REST
-- Batches run at most `DefaultGitHubAPIConcurrencyLimit` (3) requests at a time
+- Batches run at most `defaultGitHubAPIConcurrencyLimit` (3) requests at a time
 - Per PR 100 reviews and 100 timeline comments are read, oldest first by GitHub's default connection order since the query sets none; review comments are not read at all (their authors always have a review of their own)
 - A collaborator carries a display name only when GitHub returns one for a user, and the login otherwise
-- Per-call timeouts: `PullRequestListTimeout` (30s) for the listing request, `ReviewsFetchTimeout` (10s) per batch; each covers that request's retry as well
+- Per-call timeouts: `pullRequestListTimeout` (30s) for the listing request, `reviewsFetchTimeout` (10s) per batch; each covers that request's retry as well
 - A PR with an active `/snooze [pr-reminder] for N (day|days|d)` comment (case-insensitive; most recent matching comment wins) is excluded from results until the snooze expires
 - `FetchLatestArtifactByName` downloads the newest GitHub Actions artifact matching a given name and decodes a named JSON file from it into a caller-supplied target, used by [internal/state](../../state/state.spec.md) to load prior-run state
 

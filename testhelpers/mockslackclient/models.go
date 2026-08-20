@@ -146,7 +146,7 @@ type ElementStyle struct {
 	Strike bool `json:"strike,omitempty"`
 }
 
-func ParseBlocks(data []byte) (BlocksWrapper, error) {
+func parseBlocks(data []byte) (BlocksWrapper, error) {
 	var blocks []Block
 	err := json.Unmarshal(data, &blocks)
 	return BlocksWrapper{Blocks: blocks}, err

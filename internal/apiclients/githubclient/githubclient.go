@@ -1,6 +1,6 @@
 // Package githubclient provides GitHub API integration for fetching PR data.
-// It handles concurrent repository queries, review data fetching, and applies
-// repository-specific and global filters to PRs.
+// It fetches PR and review data in concurrent batches, and applies
+// repository-specific and global filters.
 package githubclient
 
 import (
@@ -96,16 +96,15 @@ type client struct {
 	graphql        graphqlClient
 }
 
-// DefaultGitHubAPIConcurrencyLimit caps concurrent repository fetches to avoid
-// creating excessive simultaneous GitHub API calls when many repositories are configured.
-// Exported to allow tests (and potential future configuration) to reference it.
-const DefaultGitHubAPIConcurrencyLimit = 3
+// defaultGitHubAPIConcurrencyLimit caps how many PR batches run at a time,
+// to avoid creating excessive simultaneous GitHub API calls.
+const defaultGitHubAPIConcurrencyLimit = 3
 
 const MaxPRsToFetch = 50
 
-// Per-call timeout defaults. Overridable in tests.
-const PullRequestListTimeout = 30 * time.Second
-const ReviewsFetchTimeout = 10 * time.Second
+// Per-call timeout defaults.
+const pullRequestListTimeout = 30 * time.Second
+const reviewsFetchTimeout = 10 * time.Second
 
 // Returns an error if listing the PRs of any repository fails.
 func (c *client) FindOpenPRs(

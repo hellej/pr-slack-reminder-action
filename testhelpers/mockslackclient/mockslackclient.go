@@ -192,7 +192,7 @@ func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
 	if len(blockBytes) == 0 {
 		return BlocksWrapper{}, nil
 	}
-	return ParseBlocks(blockBytes)
+	return parseBlocks(blockBytes)
 }
 
 func getJSONBlocks(message slack.Message) []string {
