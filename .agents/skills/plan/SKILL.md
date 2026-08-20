@@ -32,6 +32,8 @@ Before drafting an implementation plan, read:
 3. Whether the change is breaking or non-breaking, per the [release skill](../release/SKILL.md)'s semver table (patch/minor/major)
 4. A short summary listing the steps
 5. The full steps, each naming the files/packages it touches, in that same order — the order they're written IS the implementation order, never a separate order/sequence table. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`
+   - Order by dependency. A step calling an external API the repo hasn't used goes early, before the code built on it
+   - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
    - Don't plan tests as their own step — writing tests is a natural, inherent part of implementing each step (see the [coding skill](../coding/SKILL.md)'s TDD steps) — unless the feature is complex enough to need its own test-suite shape/refactor planned up front
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
 6. Consequences, at the very end, only if there's something worth saying — subsections **Positive**, **Negative**, **Neutral**, each a short bullet list; include only the subsections that actually apply
