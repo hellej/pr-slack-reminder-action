@@ -53,8 +53,9 @@ implementer where the plan has gone stale.
    - The contracts it consumes from steps already landed, by file and symbol
    - Findings carried forward from the previous step's review
 2. When it reports, spawn the `reviewer` agent. Give it the same step, the implementer's
-   report, and the blind spots above. A mock renders whatever the code asks it for, so a
-   wrong query shape or page size passes it
+   report, and the blind spots above. Tell it to check the report's claims against the
+   tree. A mock renders whatever the code asks it for, so a wrong query shape or page
+   size passes it
 3. Read the verdict:
    - `PASS`: clear any open nits as below, then stop
    - `CHANGES NEEDED`: send the findings to the implementer, then ask the reviewer to
