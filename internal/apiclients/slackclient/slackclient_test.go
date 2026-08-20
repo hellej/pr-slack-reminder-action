@@ -136,6 +136,8 @@ type mockSlackAPI struct {
 	publicChannelsError  error
 	privateChannelsError error
 	deleteMessageError   error
+	editCanvasError      error
+	editCanvasParams     []slack.EditCanvasParams
 }
 
 func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -163,6 +165,11 @@ func (m *mockSlackAPI) PostMessage(channelID string, options ...slack.MsgOption)
 
 func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, options ...slack.MsgOption) (string, string, string, error) {
 	return channelID, timestamp, "updated_timestamp", nil
+}
+
+func (m *mockSlackAPI) EditCanvas(params slack.EditCanvasParams) error {
+	m.editCanvasParams = append(m.editCanvasParams, params)
+	return m.editCanvasError
 }
 
 func (m *mockSlackAPI) DeleteMessage(channelID string, timestamp string) (string, string, error) {
@@ -311,6 +318,74 @@ func TestDeleteMessage(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Expected no error, got %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestReplaceCanvasContent(t *testing.T) {
+	tests := []struct {
+		name            string
+		canvasID        string
+		markdown        string
+		editCanvasError error
+		expectedError   string
+	}{
+		{
+			name:     "successful canvas content replace",
+			canvasID: "F0BMEPVR1DL",
+			markdown: "## Open PRs\n\n- one",
+		},
+		{
+			name:            "canvas edit failure is wrapped with a permission hint",
+			canvasID:        "F0BMEPVR1DL",
+			markdown:        "## Open PRs",
+			editCanvasError: errors.New("canvas_not_found"),
+			expectedError: "canvas update failed: check that the bot has canvases:write permission " +
+				"and is invited to the channel where the canvas is: canvas_not_found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAPI := &mockSlackAPI{editCanvasError: tt.editCanvasError}
+			client := slackclient.NewClient(mockAPI)
+
+			err := client.ReplaceCanvasContent(tt.canvasID, tt.markdown)
+
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Fatalf("Expected error %q, got nil", tt.expectedError)
+				}
+				if err.Error() != tt.expectedError {
+					t.Fatalf("Expected error %q, got %q", tt.expectedError, err.Error())
+				}
+			} else if err != nil {
+				t.Fatalf("Expected no error, got %v", err)
+			}
+
+			if len(mockAPI.editCanvasParams) != 1 {
+				t.Fatalf("Expected exactly one EditCanvas call, got %d", len(mockAPI.editCanvasParams))
+			}
+			params := mockAPI.editCanvasParams[0]
+			if params.CanvasID != tt.canvasID {
+				t.Errorf("Expected canvas ID %q, got %q", tt.canvasID, params.CanvasID)
+			}
+			if len(params.Changes) != 1 {
+				t.Fatalf("Expected exactly one change, got %d", len(params.Changes))
+			}
+			change := params.Changes[0]
+			if change.Operation != "replace" {
+				t.Errorf("Expected operation \"replace\", got %q", change.Operation)
+			}
+			if change.SectionID != "" {
+				t.Errorf("Expected empty section ID, got %q", change.SectionID)
+			}
+			if change.DocumentContent.Type != "markdown" {
+				t.Errorf("Expected document content type \"markdown\", got %q", change.DocumentContent.Type)
+			}
+			if change.DocumentContent.Markdown != tt.markdown {
+				t.Errorf("Expected markdown %q, got %q", tt.markdown, change.DocumentContent.Markdown)
 			}
 		})
 	}

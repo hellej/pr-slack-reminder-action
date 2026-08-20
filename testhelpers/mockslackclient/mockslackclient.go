@@ -64,6 +64,7 @@ type MockSlackAPI struct {
 	SentMessage         SentMessage
 	UpdatedMessage      UpdatedMessage
 	DeletedMessage      DeletedMessage
+	ReplacedCanvas      ReplacedCanvas
 }
 
 func (m *MockSlackAPI) GetChannelIDByName(channelName string) (string, error) {
@@ -155,6 +156,12 @@ func (m *MockSlackAPI) DeleteMessage(channelID string, timestamp string) error {
 	return nil
 }
 
+func (m *MockSlackAPI) ReplaceCanvasContent(canvasID string, markdown string) error {
+	m.ReplacedCanvas.CanvasID = canvasID
+	m.ReplacedCanvas.Markdown = markdown
+	return nil
+}
+
 type SlackChannel struct {
 	ID   string
 	Name string
@@ -182,6 +189,11 @@ type UpdatedMessage struct {
 type DeletedMessage struct {
 	ChannelID string
 	Timestamp string
+}
+
+type ReplacedCanvas struct {
+	CanvasID string
+	Markdown string
 }
 
 func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
