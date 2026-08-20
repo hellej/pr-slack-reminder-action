@@ -13,9 +13,9 @@ findings.
 
 ## Scope
 
-- One plan step (or planned batch) per run. If the user names several, run this loop once per step, in order
-- Round 1 starts on a tree holding only this step's work. Between chained steps, commit or
-  hand back, otherwise the next reviewer reads two steps as one diff
+- Check what of the plan is already implemented, and continue from there
+- One plan step or phase (a group of related steps) per run
+- Confirm the planned scope of the run with the user before starting
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the step
 
@@ -35,6 +35,9 @@ the whole step:
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
 
+Work out where the regression net is blind before round 1 and give it to both agents:
+the implementer tests those spots, the reviewer mutates them.
+
 If the step states no criteria, say so and carry on. Do not invent them.
 
 Check the step's claims about the tree yourself: paths, call sites, what is already
@@ -50,9 +53,8 @@ implementer where the plan has gone stale.
    - The contracts it consumes from steps already landed, by file and symbol
    - Findings carried forward from the previous step's review
 2. When it reports, spawn the `reviewer` agent. Give it the same step, the implementer's
-   report, and where the regression net is blind: name the check that should catch a
-   regression here, and what it cannot see. A mock renders whatever the code asks it for,
-   so a wrong query shape or page size passes it
+   report, and the blind spots above. A mock renders whatever the code asks it for, so a
+   wrong query shape or page size passes it
 3. Read the verdict:
    - `PASS`: clear any open nits as below, then stop
    - `CHANGES NEEDED`: send the findings to the implementer, then ask the reviewer to
@@ -141,7 +143,7 @@ Report to the user:
 - Each acceptance criterion, and whether it holds. Check them yourself, do not relay
   either agent's word for it
 - What changed, by file
-- Each deviation from the plan, and where the implementer recorded it
+- Each deviation from the plan, and how the step now reads
 - Nits, cleared or left, and why any was left
 - Any finding the implementer rejected, and any the reviewer labelled `unverified`
 

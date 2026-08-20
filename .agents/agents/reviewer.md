@@ -22,9 +22,10 @@ implementer's report. Check it against:
   `internal/utilities` (`Map`, `Filter`, `Find`), and layers the change now makes
   collapsible
 - The task or plan step the change came from: does it do what was asked, and no more
-- The plan file's own diff, when the change came from `docs/plans/`. Does each recorded
-  deviation stay inside the step's intent and scope, and describe what the code does? A
-  deviation the code made but the plan does not record is a finding
+- The plan file's own diff, when the change came from `docs/plans/`. Does the rewritten
+  step stay inside its original intent and scope, and describe what the code does? Code
+  deviating from the step with no matching plan edit is a finding, and so is a note left
+  standing beside the text it contradicts
 
 ## Verify, Don't Trust
 
