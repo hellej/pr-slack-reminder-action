@@ -30,6 +30,7 @@ the whole step:
 - A regression net the step must leave untouched, snapshots and golden files above all
 - Wording the step says is preserved verbatim
 - What the step must **not** do, usually a later step's work
+- Test cases the step lists are a minimum. A guard they don't cover needs one too
 
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
