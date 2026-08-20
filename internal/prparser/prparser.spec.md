@@ -9,6 +9,7 @@ Enriches fetched PRs with display-ready metadata.
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude
 - `IsMerged` and `IsClosedButNotMerged` expose PR state for display styling
+- `GroupPRsByRepositories(prs)` buckets PRs into `[]RepositoryPRs`, ordered alphabetically by repository path; PRs keep their given order within a bucket. It carries no display text, so each renderer supplies its own headings and links
 
 ## Doesn't Do
 

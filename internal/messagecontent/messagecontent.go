@@ -5,12 +5,10 @@ package messagecontent
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -57,30 +55,17 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 }
 
 func groupPRsByRepositories(openPRs []prparser.PR) []PRsOfRepository {
-	prsByRepo := make(map[string][]prparser.PR)
-	repoMap := make(map[string]models.Repository)
-
-	for _, pr := range openPRs {
-		repoKey := pr.Repository.GetPath()
-		prsByRepo[repoKey] = append(prsByRepo[repoKey], pr)
-		repoMap[repoKey] = pr.Repository
-	}
-
-	var repoKeys []string
-	for repoKey := range prsByRepo {
-		repoKeys = append(repoKeys, repoKey)
-	}
-	sort.Strings(repoKeys)
-
-	return utilities.Map(repoKeys, func(repoKey string) PRsOfRepository {
-		repo := repoMap[repoKey]
-		return PRsOfRepository{
-			HeadingPrefix:       "Open PRs in ",
-			RepositoryLinkLabel: repo.GetPath(),
-			RepositoryLink:      fmt.Sprintf("https://github.com/%s/pulls", repo.GetPath()),
-			PRs:                 prsByRepo[repoKey],
-		}
-	})
+	return utilities.Map(
+		prparser.GroupPRsByRepositories(openPRs),
+		func(group prparser.RepositoryPRs) PRsOfRepository {
+			return PRsOfRepository{
+				HeadingPrefix:       "Open PRs in ",
+				RepositoryLinkLabel: group.Repository.GetPath(),
+				RepositoryLink:      group.Repository.GetPullsURL(),
+				PRs:                 group.PRs,
+			}
+		},
+	)
 }
 
 func getSummaryText(prCount int) string {

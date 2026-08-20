@@ -5,12 +5,14 @@ package prparser
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -82,6 +84,33 @@ func withSlackUserIds(
 ) []Collaborator {
 	return utilities.Map(collaborators, func(c githubclient.Collaborator) Collaborator {
 		return NewCollaborator(c, slackUserIdByGitHubUsername[c.Login])
+	})
+}
+
+type RepositoryPRs struct {
+	Repository models.Repository
+	PRs        []PR
+}
+
+// Buckets PRs by repository, ordered alphabetically by repository path. PRs keep their given
+// order within a bucket.
+func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
+	repositoryByPath := make(map[string]models.Repository)
+	prsByRepositoryPath := make(map[string][]PR)
+
+	for _, pr := range prs {
+		path := pr.Repository.GetPath()
+		repositoryByPath[path] = pr.Repository
+		prsByRepositoryPath[path] = append(prsByRepositoryPath[path], pr)
+	}
+
+	paths := slices.Sorted(maps.Keys(repositoryByPath))
+
+	return utilities.Map(paths, func(path string) RepositoryPRs {
+		return RepositoryPRs{
+			Repository: repositoryByPath[path],
+			PRs:        prsByRepositoryPath[path],
+		}
 	})
 }
 

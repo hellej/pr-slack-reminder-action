@@ -115,3 +115,12 @@ func TestParseRepository_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestRepositoryGetPullsURL(t *testing.T) {
+	repo := models.Repository{Owner: "test-org", Name: "test-repo"}
+
+	expected := "https://github.com/test-org/test-repo/pulls"
+	if repo.GetPullsURL() != expected {
+		t.Errorf("Expected pulls URL '%s', got '%s'", expected, repo.GetPullsURL())
+	}
+}

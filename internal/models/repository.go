@@ -15,6 +15,11 @@ func (r Repository) GetPath() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
+// GetPullsURL returns the repository's GitHub pull requests page.
+func (r Repository) GetPullsURL() string {
+	return fmt.Sprintf("https://github.com/%s/pulls", r.GetPath())
+}
+
 func (r Repository) String() string {
 	return r.GetPath()
 }
