@@ -366,3 +366,55 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 		})
 	}
 }
+
+func prSectionElements(t *testing.T, pr prparser.PR) []slack.RichTextSectionElement {
+	t.Helper()
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		SummaryText:   "Test",
+		PRListHeading: "Test PRs",
+		PRs:           []prparser.PR{pr},
+	})
+	prBlock := message.Blocks.BlockSet[1].(*slack.RichTextBlock)
+	return prBlock.Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection).Elements
+}
+
+func TestOldPRWarningMarker(t *testing.T) {
+	pr := getTestPRs().PR1
+	pr.PullRequest.CreatedAt = time.Now().Add(-72 * time.Hour)
+	pr.IsOldPR = true
+
+	elements := prSectionElements(t, pr)
+
+	warningElement := elements[1].(*slack.RichTextSectionTextElement)
+	if warningElement.Text != " 🚨 " {
+		t.Errorf("expected warning marker ' 🚨 ', got '%s'", warningElement.Text)
+	}
+	if warningElement.Style != nil && (warningElement.Style.Bold || warningElement.Style.Code) {
+		t.Error("expected the warning marker to sit outside the styled age element")
+	}
+
+	ageElement := elements[2].(*slack.RichTextSectionTextElement)
+	if ageElement.Text != "3 days old" {
+		t.Errorf("expected age text '3 days old', got '%s'", ageElement.Text)
+	}
+	if ageElement.Style == nil || !ageElement.Style.Bold || !ageElement.Style.Code {
+		t.Errorf("expected bold+code style on the age text, got %+v", ageElement.Style)
+	}
+}
+
+func TestAuthorFallsBackToGitHubName(t *testing.T) {
+	pr := getTestPRs().PR1
+	pr.Author = prparser.Collaborator{
+		Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},
+	}
+
+	elements := prSectionElements(t, pr)
+
+	authorElement, ok := elements[3].(*slack.RichTextSectionTextElement)
+	if !ok {
+		t.Fatalf("expected a text element for the author, got %T", elements[3])
+	}
+	if authorElement.Text != "Test User" {
+		t.Errorf("expected author name 'Test User', got '%s'", authorElement.Text)
+	}
+}

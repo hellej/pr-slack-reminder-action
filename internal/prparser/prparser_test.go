@@ -135,3 +135,72 @@ func TestGroupPRsByRepositories(t *testing.T) {
 		})
 	}
 }
+
+func testCollaborator(name string) prparser.Collaborator {
+	return prparser.Collaborator{Collaborator: &githubclient.Collaborator{Login: name, Name: name}}
+}
+
+func TestGetReviewersTextSegments(t *testing.T) {
+	alice := testCollaborator("Alice")
+	bob := testCollaborator("Bob")
+	carol := testCollaborator("Carol")
+
+	tests := []struct {
+		name       string
+		approvers  []prparser.Collaborator
+		commenters []prparser.Collaborator
+		expected   []string
+	}{
+		{
+			name:     "no reviewers",
+			expected: nil,
+		},
+		{
+			name:      "approvers only",
+			approvers: []prparser.Collaborator{alice, bob},
+			expected:  []string{" (✅ ", "Alice", ", ", "Bob", ")"},
+		},
+		{
+			name:       "commenters only",
+			commenters: []prparser.Collaborator{carol},
+			expected:   []string{" (💬 ", "Carol", ")"},
+		},
+		{
+			name:       "approvers and commenters",
+			approvers:  []prparser.Collaborator{alice},
+			commenters: []prparser.Collaborator{bob, carol},
+			expected:   []string{" (✅ ", "Alice", " / 💬 ", "Bob", ", ", "Carol", ")"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			segments := prparser.GetReviewersTextSegments(tt.approvers, tt.commenters)
+			if !slices.Equal(segments, tt.expected) {
+				t.Errorf("expected segments %q, got %q", tt.expected, segments)
+			}
+		})
+	}
+}
+
+func TestGetPRAgeDisplayText(t *testing.T) {
+	tests := []struct {
+		name     string
+		isOldPR  bool
+		expected string
+	}{
+		{name: "PR under the old-PR threshold", isOldPR: false, expected: "3 days ago"},
+		{name: "PR past the old-PR threshold", isOldPR: true, expected: "3 days old"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testPR(1, time.Now().Add(-72*time.Hour), time.Time{})
+			parsed := prparser.PR{PR: &pr, IsOldPR: tt.isOldPR}
+
+			if parsed.GetPRAgeDisplayText() != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, parsed.GetPRAgeDisplayText())
+			}
+		})
+	}
+}

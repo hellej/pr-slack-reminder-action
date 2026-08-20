@@ -7,7 +7,8 @@ Enriches fetched PRs with display-ready metadata.
 - `ParsePRs(prs, contentInputs)` returns PRs enriched for display, sorted oldest first (by creation time, ties broken by update time)
 - Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it
-- `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude
+- `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
+- `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
 - `IsMerged` and `IsClosedButNotMerged` expose PR state for display styling
 - `GroupPRsByRepositories(prs)` buckets PRs into `[]RepositoryPRs`, ordered alphabetically by repository path; PRs keep their given order within a bucket. It carries no display text, so each renderer supplies its own headings and links
 
