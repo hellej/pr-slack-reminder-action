@@ -11,7 +11,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - With `IncludeDrafts` on, drafts are capped in their own bucket at `MaxDraftPRsToFetch` (15) by update time (newest kept), so they can never displace open PRs; open PRs keep the cap and sort above
 - `OpenPRsResult` carries `OpenPRsCapped` and `DraftPRsCapped`, each true only when that bucket was trimmed to its cap
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
-- Each enriched PR carries `LastActivityAt`: the committer date of the single commit `commits(last: 1)` returns, the PR's update time when that connection is empty, nil when neither is known. No reader yet
+- Each enriched PR carries `LastActivityAt`: the committer date of the single commit `commits(last: 1)` returns, the PR's update time when that connection is empty, nil when neither is known, read through `GetLastActivityAt()`
 - Both PR-reading paths use the GraphQL API: `FindOpenPRs` lists every repository's open PRs in one request, then fetches reviews and comments for the capped set; `GetPRs` fetches the referenced PRs directly. Both fetch in batches of 25 PRs per request. `FetchLatestArtifactByName` is the only path that uses REST
 - Batches run at most `defaultGitHubAPIConcurrencyLimit` (3) requests at a time
 - Per PR 100 reviews and 100 timeline comments are read, oldest first by GitHub's default connection order since the query sets none; review comments are not read at all (their authors always have a review of their own)

@@ -1,5 +1,40 @@
 package prparser
 
+import (
+	"fmt"
+	"math"
+	"time"
+)
+
+// Renders a duration as days, hours or minutes depending on its magnitude, always plural and
+// rounded to whole units.
+func durationText(duration time.Duration) string {
+	if duration.Hours() >= 24 {
+		days := int(math.Round(duration.Hours())) / 24
+		return fmt.Sprintf("%d days", days)
+	} else if duration.Hours() >= 1 {
+		hours := int(math.Round(duration.Hours()))
+		return fmt.Sprintf("%d hours", hours)
+	} else {
+		minutes := int(math.Round(duration.Minutes()))
+		return fmt.Sprintf("%d minutes", minutes)
+	}
+}
+
+// GetActivityText renders how long ago the PR last saw activity: "updated N minutes/hours ago"
+// under a day, "idle N days" from a day onwards. Unknown activity yields no text.
+func (pr PR) GetActivityText() string {
+	lastActivityAt := pr.GetLastActivityAt()
+	if lastActivityAt == nil {
+		return ""
+	}
+	inactivity := time.Since(*lastActivityAt)
+	if inactivity.Hours() >= 24 {
+		return "idle " + durationText(inactivity)
+	}
+	return "updated " + durationText(inactivity) + " ago"
+}
+
 // GetPRAgeDisplayText renders the PR's age as "N days old" past the old-PR threshold and
 // "N days ago" otherwise. The warning marker that goes with an old PR belongs to the renderer.
 func (pr PR) GetPRAgeDisplayText() string {

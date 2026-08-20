@@ -204,3 +204,115 @@ func TestGetPRAgeDisplayText(t *testing.T) {
 		})
 	}
 }
+
+func testPRWithLastActivity(number int, lastActivityAt *time.Time) prparser.PR {
+	pr := testPR(number, time.Time{}, time.Time{})
+	pr.LastActivityAt = lastActivityAt
+	return prparser.PR{PR: &pr}
+}
+
+func timePointer(t time.Time) *time.Time {
+	return &t
+}
+
+func TestGetActivityText(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name           string
+		lastActivityAt *time.Time
+		expected       string
+	}{
+		{name: "unknown activity", lastActivityAt: nil, expected: ""},
+		{
+			name:           "minutes ago",
+			lastActivityAt: timePointer(now.Add(-30 * time.Minute)),
+			expected:       "updated 30 minutes ago",
+		},
+		{
+			name:           "hours ago",
+			lastActivityAt: timePointer(now.Add(-5 * time.Hour)),
+			expected:       "updated 5 hours ago",
+		},
+		{
+			name:           "just under the day cutover",
+			lastActivityAt: timePointer(now.Add(-23*time.Hour - 30*time.Minute)),
+			expected:       "updated 24 hours ago",
+		},
+		{
+			name:           "just past the day cutover",
+			lastActivityAt: timePointer(now.Add(-24*time.Hour - 30*time.Minute)),
+			expected:       "idle 1 days",
+		},
+		{
+			name:           "idle for days",
+			lastActivityAt: timePointer(now.Add(-72 * time.Hour)),
+			expected:       "idle 3 days",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testPRWithLastActivity(1, tt.lastActivityAt)
+			if got := pr.GetActivityText(); got != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestIsIdle(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name           string
+		lastActivityAt *time.Time
+		expected       bool
+	}{
+		{name: "unknown activity is not idle", lastActivityAt: nil, expected: false},
+		{
+			name:           "active within 48 hours",
+			lastActivityAt: timePointer(now.Add(-47 * time.Hour)),
+			expected:       false,
+		},
+		{
+			name:           "inactive for over 48 hours",
+			lastActivityAt: timePointer(now.Add(-49 * time.Hour)),
+			expected:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testPRWithLastActivity(1, tt.lastActivityAt)
+			if got := pr.IsIdle(); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestSortPRsNewestFirst(t *testing.T) {
+	now := time.Now()
+	unknownActivity := testPRWithLastActivity(1, nil)
+	oldestActivity := testPRWithLastActivity(2, timePointer(now.Add(-72*time.Hour)))
+	newestActivity := testPRWithLastActivity(3, timePointer(now.Add(-1*time.Hour)))
+	alsoUnknownActivity := testPRWithLastActivity(4, nil)
+	middleActivity := testPRWithLastActivity(5, timePointer(now.Add(-24*time.Hour)))
+
+	given := []prparser.PR{unknownActivity, oldestActivity, newestActivity, alsoUnknownActivity, middleActivity}
+
+	sorted := prparser.SortPRsNewestFirst(given, func(pr prparser.PR) *time.Time {
+		return pr.LastActivityAt
+	})
+
+	want := []int{3, 5, 2, 1, 4}
+	for i, number := range want {
+		if sorted[i].GetNumber() != number {
+			t.Errorf("expected PR at position %d to be #%d, got #%d", i, number, sorted[i].GetNumber())
+		}
+	}
+
+	givenNumbers := utilities.Map(given, func(pr prparser.PR) int { return pr.GetNumber() })
+	if !slices.Equal(givenNumbers, []int{1, 2, 3, 4, 5}) {
+		t.Errorf("expected the given slice to keep its order, got %v", givenNumbers)
+	}
+}

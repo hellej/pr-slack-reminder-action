@@ -53,6 +53,13 @@ func (p *PullRequest) GetCreatedAt() time.Time {
 	return p.CreatedAt
 }
 
+func (p *PullRequest) GetLastActivityAt() *time.Time {
+	if p == nil {
+		return nil
+	}
+	return p.LastActivityAt
+}
+
 func (p *PullRequest) GetUpdatedAt() time.Time {
 	if p == nil {
 		return time.Time{}

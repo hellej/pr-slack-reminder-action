@@ -4,9 +4,7 @@
 package prparser
 
 import (
-	"fmt"
 	"maps"
-	"math"
 	"slices"
 	"time"
 
@@ -15,6 +13,9 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
+
+// A PR is marked idle once it has seen no activity for this long.
+const idleThreshold = 48 * time.Hour
 
 type PR struct {
 	*githubclient.PR
@@ -37,17 +38,14 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 }
 
 func (pr PR) GetPRAgeText() string {
-	duration := time.Since(pr.GetCreatedAt())
-	if duration.Hours() >= 24 {
-		days := int(math.Round(duration.Hours())) / 24
-		return fmt.Sprintf("%d days", days)
-	} else if duration.Hours() >= 1 {
-		hours := int(math.Round(duration.Hours()))
-		return fmt.Sprintf("%d hours", hours)
-	} else {
-		minutes := int(math.Round(duration.Minutes()))
-		return fmt.Sprintf("%d minutes", minutes)
-	}
+	return durationText(time.Since(pr.GetCreatedAt()))
+}
+
+// True when the PR has seen no activity for longer than idleThreshold. A PR with unknown
+// activity is not idle.
+func (pr PR) IsIdle() bool {
+	lastActivityAt := pr.GetLastActivityAt()
+	return lastActivityAt != nil && time.Since(*lastActivityAt) > idleThreshold
 }
 
 func (pr PR) IsMerged() bool {
@@ -112,6 +110,27 @@ func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
 			PRs:        prsByRepositoryPath[path],
 		}
 	})
+}
+
+// SortPRsNewestFirst returns the PRs ordered by the given timestamp, newest first. PRs whose
+// timestamp is nil are unknown rather than old, so they sort last, keeping their given order
+// among themselves. The given slice is left untouched.
+func SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR {
+	sorted := slices.Clone(prs)
+	slices.SortStableFunc(sorted, func(a, b PR) int {
+		timestampA, timestampB := timestamp(a), timestamp(b)
+		if timestampA == nil && timestampB == nil {
+			return 0
+		}
+		if timestampA == nil {
+			return 1
+		}
+		if timestampB == nil {
+			return -1
+		}
+		return timestampB.Compare(*timestampA)
+	})
+	return sorted
 }
 
 func sortPRsOldestToNewest(prs []PR) []PR {
