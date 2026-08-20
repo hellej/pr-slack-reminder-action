@@ -1,0 +1,13 @@
+## Open PRs
+
+- **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+
+## Work in Progress
+
+- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
+
+---
+
+_Showing the newest 50 open PRs and the newest 15 WIP PRs_
+
+_Updated 2026-08-08 06:15 UTC_

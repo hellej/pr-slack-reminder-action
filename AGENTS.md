@@ -91,7 +91,7 @@ Don't stack hedges:
 
 - `make test` — run all tests
 - `make test-with-coverage` — run tests with coverage report (clears cache first)
-- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/`
+- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
 - `make check-fmt` — fail if any file needs `gofmt`
