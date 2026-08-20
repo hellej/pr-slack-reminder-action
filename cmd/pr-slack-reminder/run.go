@@ -57,12 +57,14 @@ func runPostMode(
 	const prFetchTimeout = 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
-	prs, err := githubClient.FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository)
+	fetched, err := githubClient.FindOpenPRs(
+		ctx, cfg.Repositories, cfg.GetFiltersForRepository, githubclient.PRFetchOptions{},
+	)
 	if err != nil {
 		return err
 	}
 
-	parsedPRs := prparser.ParsePRs(prs, cfg.ContentInputs)
+	parsedPRs := prparser.ParsePRs(fetched.PRs, cfg.ContentInputs)
 	content := messagecontent.GetContent(parsedPRs, cfg.ContentInputs)
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("No PRs found and no message configured for this case, exiting")

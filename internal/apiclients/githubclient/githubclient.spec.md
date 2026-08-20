@@ -4,9 +4,12 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 
 ## Behaviour
 
-- `Client.FindOpenPRs` lists open PRs across configured repositories; `Client.GetPRs` fetches specific PR refs (used by "update" run mode), both returning enriched `PR`s
-- Results are filtered by `config.Filters`: author and label allow+block lists, plus ignored terms matched as case-sensitive substrings of the title; draft PRs are always excluded
+- `Client.FindOpenPRs` lists open PRs across configured repositories, returning an `OpenPRsResult`; `Client.GetPRs` fetches specific PR refs (used by "update" run mode), returning enriched `PR`s
+- Results are filtered by `config.Filters`: author and label allow+block lists, plus ignored terms matched as case-sensitive substrings of the title
+- Draft PRs are excluded, unless `FindOpenPRs` is called with `PRFetchOptions{IncludeDrafts: true}`. `GetPRs` always excludes them
 - Result count is capped at `MaxPRsToFetch` (50); when over the cap, only the newest PRs (by creation time, then update time) are kept
+- With `IncludeDrafts` on, drafts are capped in their own bucket at `MaxDraftPRsToFetch` (15) by update time (newest kept), so they can never displace open PRs; open PRs keep the cap and sort above
+- `OpenPRsResult` carries `OpenPRsCapped` and `DraftPRsCapped`, each true only when that bucket was trimmed to its cap
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
 - Both PR-reading paths use the GraphQL API: `FindOpenPRs` lists every repository's open PRs in one request, then fetches reviews and comments for the capped set; `GetPRs` fetches the referenced PRs directly. Both fetch in batches of 25 PRs per request. `FetchLatestArtifactByName` is the only path that uses REST
 - Batches run at most `defaultGitHubAPIConcurrencyLimit` (3) requests at a time
