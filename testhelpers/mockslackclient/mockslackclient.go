@@ -16,6 +16,7 @@ type MockSlackClientOptions struct {
 	PostMessageError   error
 	UpdateMessageError error
 	DeleteMessageError error
+	ReplaceCanvasError error
 }
 
 func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclient.Client {
@@ -47,6 +48,7 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		postMessageError:   opts.PostMessageError,
 		updateMessageError: opts.UpdateMessageError,
 		deleteMessageError: opts.DeleteMessageError,
+		replaceCanvasError: opts.ReplaceCanvasError,
 		postMessageResponse: PostMessageResponse{
 			Timestamp: "1234567890.123456",
 			Channel:   "C12345678",
@@ -60,6 +62,7 @@ type MockSlackAPI struct {
 	postMessageError    error
 	updateMessageError  error
 	deleteMessageError  error
+	replaceCanvasError  error
 	postMessageResponse PostMessageResponse
 	SentMessage         SentMessage
 	UpdatedMessage      UpdatedMessage
@@ -157,8 +160,13 @@ func (m *MockSlackAPI) DeleteMessage(channelID string, timestamp string) error {
 }
 
 func (m *MockSlackAPI) ReplaceCanvasContent(canvasID string, markdown string) error {
+	// Always record the attempt, even if it fails
+	m.ReplacedCanvas.Called = true
 	m.ReplacedCanvas.CanvasID = canvasID
 	m.ReplacedCanvas.Markdown = markdown
+	if m.replaceCanvasError != nil {
+		return fmt.Errorf("canvas update failed: %v", m.replaceCanvasError)
+	}
 	return nil
 }
 
@@ -192,6 +200,8 @@ type DeletedMessage struct {
 }
 
 type ReplacedCanvas struct {
+	// Called tells "never attempted" apart from "attempted with empty content"
+	Called   bool
 	CanvasID string
 	Markdown string
 }

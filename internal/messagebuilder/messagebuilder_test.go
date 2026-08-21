@@ -2,6 +2,7 @@ package messagebuilder_test
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -416,5 +417,131 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 	}
 	if authorElement.Text != "Test User" {
 		t.Errorf("expected author name 'Test User', got '%s'", authorElement.Text)
+	}
+}
+
+const testCanvasURL = "https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL"
+
+func canvasLinkText(t *testing.T, block slack.Block) (string, bool) {
+	t.Helper()
+	contextBlock, ok := block.(*slack.ContextBlock)
+	if !ok {
+		return "", false
+	}
+	textObject, ok := contextBlock.ContextElements.Elements[0].(*slack.TextBlockObject)
+	if !ok {
+		return "", false
+	}
+	return textObject.Text, true
+}
+
+func TestCanvasLinkFooter(t *testing.T) {
+	testCases := []struct {
+		name    string
+		content messagecontent.Content
+	}{
+		{
+			name: "flat list",
+			content: messagecontent.Content{
+				SummaryText:   "1 open PR is waiting for attention 👀",
+				PRListHeading: "There are 1 open PRs 🚀",
+				PRs:           getTestPRs().PRs,
+				CanvasURL:     testCanvasURL,
+			},
+		},
+		{
+			name: "grouped by repository",
+			content: messagecontent.Content{
+				SummaryText:         "1 open PR is waiting for attention 👀",
+				GroupedByRepository: true,
+				PRsGroupedByRepository: []messagecontent.PRsOfRepository{
+					newRepositoryList(1),
+				},
+				CanvasURL: testCanvasURL,
+			},
+		},
+		{
+			name: "no PRs message",
+			content: messagecontent.Content{
+				SummaryText: "No open PRs, happy coding! 🎉",
+				CanvasURL:   testCanvasURL,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			message, _ := messagebuilder.BuildMessage(tc.content)
+
+			blocks := message.Blocks.BlockSet
+			text, isContextBlock := canvasLinkText(t, blocks[len(blocks)-1])
+			if !isContextBlock {
+				t.Fatalf("expected the last block to be a context block, got %T", blocks[len(blocks)-1])
+			}
+			expectedText := "<" + testCanvasURL + "|📋 PR tracker canvas>"
+			if text != expectedText {
+				t.Errorf("expected canvas link text '%s', got '%s'", expectedText, text)
+			}
+		})
+	}
+
+	t.Run("no canvas URL means no footer", func(t *testing.T) {
+		message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+			SummaryText:   "1 open PR is waiting for attention 👀",
+			PRListHeading: "There are 1 open PRs 🚀",
+			PRs:           getTestPRs().PRs,
+		})
+
+		for _, block := range message.Blocks.BlockSet {
+			if _, isContextBlock := canvasLinkText(t, block); isContextBlock {
+				t.Error("expected no context block when the canvas URL is empty")
+			}
+		}
+	})
+}
+
+// A message of exactly 50 blocks (17 repositories) is where a limit compared against 50 but
+// sliced at 48 would still push the message over the Slack limit once the footer is added.
+func TestCanvasLinkFooterReservesBlocks(t *testing.T) {
+	testCases := []struct {
+		name            string
+		canvasURL       string
+		numRepositories int
+		expectedBlocks  int
+	}{
+		{name: "exactly at the limit without the footer", numRepositories: 17, expectedBlocks: 50},
+		{name: "exactly at the limit with the footer", canvasURL: testCanvasURL, numRepositories: 17, expectedBlocks: 49},
+		{name: "over the limit with the footer", canvasURL: testCanvasURL, numRepositories: 20, expectedBlocks: 49},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			repoLists := []messagecontent.PRsOfRepository{}
+			for repoId := 1; repoId <= tc.numRepositories; repoId++ {
+				repoLists = append(repoLists, newRepositoryList(repoId))
+			}
+
+			message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+				SummaryText:            "2 open PRs are waiting for attention 👀",
+				GroupedByRepository:    true,
+				PRsGroupedByRepository: repoLists,
+				CanvasURL:              tc.canvasURL,
+			})
+
+			blocks := message.Blocks.BlockSet
+			if len(blocks) != tc.expectedBlocks {
+				t.Fatalf("expected %d blocks, got %d", tc.expectedBlocks, len(blocks))
+			}
+			if tc.canvasURL == "" {
+				return
+			}
+			if _, isContextBlock := canvasLinkText(t, blocks[len(blocks)-1]); !isContextBlock {
+				t.Errorf("expected the canvas link as the last block, got %T", blocks[len(blocks)-1])
+			}
+			blockBeforeFooter, isRichText := blocks[len(blocks)-2].(*slack.RichTextBlock)
+			if isRichText && strings.HasPrefix(blockBeforeFooter.BlockID, "pr_list_heading") {
+				t.Errorf("expected the block before the footer not to be a repository heading, got '%s'", blockBeforeFooter.BlockID)
+			}
+		})
 	}
 }

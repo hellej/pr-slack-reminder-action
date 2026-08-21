@@ -298,11 +298,14 @@ The canvas is one markdown string, so golden files cover its formatting more che
 - Canvas refresh step: PRs (see fetch sharing below), then `prparser.ParsePRs`, then `canvascontent` (with `GeneratedAt: time.Now().UTC()` and the cap flags off the fetch result)/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
 - `ParsePRs` is what applies `old-pr-threshold-hours`; the Slack user IDs it resolves go unread on the canvas.
 - In `post` mode it runs twice per run, once on the message path's non-draft subset, once here on the full set. It touches no API and no clock beyond `time.Now()`, so the second pass is a copy, not a re-fetch.
-- Failure-isolation tests: canvas failure + message success → run fails, message still sent and state still saved; message failure + canvas success → run fails, canvas still written; both fail → both errors reported.
-- End-to-end tests in `main_test.go`, asserting the markdown `mockslackclient` recorded (Step 1), nothing else covers the wiring from input to canvas:
+- Failure-isolation tests: canvas failure + message success → run fails, message still sent and state still saved; message failure + canvas success → run fails, canvas still written; both fail → both errors reported. `testhelpers/mockslackclient` has no canvas-failure switch today, so `MockSlackClientOptions` gains `ReplaceCanvasError` alongside the message ones, and `ReplacedCanvas` gains a `Called` flag, so "never attempted" is asserted directly instead of inferred from an empty canvas ID.
+- End-to-end tests in `cmd/pr-slack-reminder/canvas_test.go` (a new file, leaving `main_test.go`'s tables alone), asserting the markdown `mockslackclient` recorded (Step 1), nothing else covers the wiring from input to canvas:
   - `post` mode with the canvas on, grouped and flat, with drafts in the fixtures: the canvas carries both sections, the message carries only the non-draft PRs.
-  - `update` mode with the canvas on: the canvas lists currently open PRs, not the state-tracked set, and the message still updates.
+  - `update` mode with the canvas on: the canvas lists currently open PRs, not the state-tracked set, and the message still updates. The two fetches get deliberately different fixtures (an open PR absent from state, a state-tracked PR now merged), or the assertion proves nothing.
   - canvas off: `ReplaceCanvasContent` never called.
+  - the fetch go/no-go, in three tests: a failed `post` fetch leaves the canvas untouched, a failed `update`-mode canvas fetch does the same while the message still updates, and a successful fetch of zero PRs refreshes the canvas. A wiped canvas is worse than a stale one, and "fetch failed" and "found nothing" are the same empty slice.
+  - an over-cap fetch puts the `_Showing the newest …_` note on the canvas, pinning the cap flags end to end.
+  - These assert on the parts of the markdown that matter (sections, rows, the footer line by pattern), not on the whole document: `GeneratedAt` is `time.Now().UTC()`, so an exact match is impossible here. `canvasbuilder`'s golden files (Step 6) cover the formatting.
 
 #### Fetch sharing
 
@@ -327,7 +330,7 @@ What keeps `post` mode's message byte-identical when the canvas is on:
 - Filters, snooze exclusion and every other fetch-path step are untouched, `IncludeDrafts` only removes the draft check.
 - `LastActivityAt` (Step 3) is populated for every PR regardless of the canvas, but the message never reads it, so its presence changes nothing observable.
 - Canvas off → zero-value `PRFetchOptions` → today's call exactly.
-- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
+- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both, comparing the sent blocks JSON element by element. The canvas link footer (Step 8) is the one block the canvas-on run has extra, so the comparison covers every block before it and asserts the count differs by exactly one. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
 
 ### 8. Reminder message: link to the canvas
 
@@ -355,6 +358,8 @@ What keeps `post` mode's message byte-identical when the canvas is on:
   Both option constructors do exactly `config.values.Set(...)` (v0.27.0 `chat.go`), so this reads what would go on the wire. The `Unsafe` name is about API stability, not correctness.
 - Existing messages are unaffected: PR titles are links inside rich text blocks, which Slack never unfurls.
 - Tests: link present in the grouped, flat and `no-prs-message` cases; absent when `CanvasURL` is empty; a grouped message over the limit ends at 49 blocks, the link last and the block before it not a repository heading; the same message without the link still ends at 50; a `post` run with no PRs and no `no-prs-message` sends nothing with the canvas on; both unfurl options passed on post and update.
+- The block-limit case to pin is the exact 50-block message (17 repositories, 3×17−1): that is where a limit compared against 50 but sliced at 48 still ends at 51 blocks with the footer, which `slackclient.SendMessage` rejects. A comfortably-over-limit case passes either way.
+- `Content.CanvasURL` reaching all three `GetContent` branches gets its own test, in a new `internal/messagecontent/messagecontent_test.go` (R2 found the package had no test file at all).
 
 ### 9. Docs & permissions
 

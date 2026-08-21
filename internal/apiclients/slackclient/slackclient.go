@@ -115,6 +115,10 @@ func (c *client) SendMessage(
 		channelID,
 		slack.MsgOptionBlocks(message.Blocks.BlockSet...),
 		slack.MsgOptionText(summaryText, false),
+		// The PR tracker canvas link would otherwise be expanded into a preview card
+		// dwarfing the message it is a footer of.
+		slack.MsgOptionDisableLinkUnfurl(),
+		slack.MsgOptionDisableMediaUnfurl(),
 	)
 	if err != nil {
 		return SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %v", err)
@@ -140,6 +144,8 @@ func (c *client) UpdateMessage(
 		messageTS,
 		slack.MsgOptionBlocks(message.Blocks.BlockSet...),
 		slack.MsgOptionText(summaryText, false),
+		slack.MsgOptionDisableLinkUnfurl(),
+		slack.MsgOptionDisableMediaUnfurl(),
 	)
 	if err != nil {
 		return SentMessageInfo{}, fmt.Errorf("failed to update Slack message: %v", err)

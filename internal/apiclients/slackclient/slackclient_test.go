@@ -138,6 +138,8 @@ type mockSlackAPI struct {
 	deleteMessageError   error
 	editCanvasError      error
 	editCanvasParams     []slack.EditCanvasParams
+	postedOptions        []slack.MsgOption
+	updatedOptions       []slack.MsgOption
 }
 
 func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -160,10 +162,12 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 }
 
 func (m *mockSlackAPI) PostMessage(channelID string, options ...slack.MsgOption) (string, string, error) {
+	m.postedOptions = options
 	return "timestamp", channelID, nil
 }
 
 func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, options ...slack.MsgOption) (string, string, string, error) {
+	m.updatedOptions = options
 	return channelID, timestamp, "updated_timestamp", nil
 }
 
@@ -389,4 +393,44 @@ func TestReplaceCanvasContent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A slack.MsgOption is an opaque function, so the options are applied and the resulting
+// request values read instead of compared.
+func assertUnfurlingDisabled(t *testing.T, options []slack.MsgOption) {
+	t.Helper()
+	_, values, err := slack.UnsafeApplyMsgOptions("", "", "", options...)
+	if err != nil {
+		t.Fatalf("Failed to apply message options: %v", err)
+	}
+	if values.Get("unfurl_links") != "false" {
+		t.Errorf("Expected unfurl_links to be \"false\", got %q", values.Get("unfurl_links"))
+	}
+	if values.Get("unfurl_media") != "false" {
+		t.Errorf("Expected unfurl_media to be \"false\", got %q", values.Get("unfurl_media"))
+	}
+}
+
+func TestLinkUnfurlingIsDisabled(t *testing.T) {
+	t.Run("on send", func(t *testing.T) {
+		mockAPI := &mockSlackAPI{}
+		client := slackclient.NewClient(mockAPI)
+
+		if _, err := client.SendMessage("C12345", slack.NewBlockMessage(), "Summary"); err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		assertUnfurlingDisabled(t, mockAPI.postedOptions)
+	})
+
+	t.Run("on update", func(t *testing.T) {
+		mockAPI := &mockSlackAPI{}
+		client := slackclient.NewClient(mockAPI)
+
+		if _, err := client.UpdateMessage("C12345", "1234567890.123456", slack.NewBlockMessage(), "Summary"); err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		assertUnfurlingDisabled(t, mockAPI.updatedOptions)
+	})
 }

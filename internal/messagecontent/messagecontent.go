@@ -19,6 +19,7 @@ type Content struct {
 	PRs                    []prparser.PR
 	GroupedByRepository    bool
 	PRsGroupedByRepository []PRsOfRepository
+	CanvasURL              string
 }
 
 func (c Content) HasPRs() bool {
@@ -37,12 +38,14 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 	case len(openPRs) == 0:
 		return Content{
 			SummaryText: contentInputs.NoPRsMessage,
+			CanvasURL:   contentInputs.CanvasURL,
 		}
 	case contentInputs.GroupByRepository:
 		return Content{
 			SummaryText:            getSummaryText(len(openPRs)),
 			PRsGroupedByRepository: groupPRsByRepositories(openPRs),
 			GroupedByRepository:    true,
+			CanvasURL:              contentInputs.CanvasURL,
 		}
 	default:
 		return Content{
@@ -50,6 +53,7 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 			PRListHeading:       formatListHeading(contentInputs.PRListHeading, len(openPRs)),
 			PRs:                 openPRs,
 			GroupedByRepository: false,
+			CanvasURL:           contentInputs.CanvasURL,
 		}
 	}
 }
