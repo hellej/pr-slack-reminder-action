@@ -1,7 +1,7 @@
 ---
 name: implement
-description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from docs/plans/, or the user runs /implement."
-argument-hint: "The plan file and step, e.g. docs/plans/001_GraphQL-migration.md step 3, or a task with no plan"
+description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from a plan file, or the user runs /implement."
+argument-hint: "The plan file and step, e.g. .local/plans/001_GraphQL-migration.md step 3, or a task with no plan"
 ---
 
 # Implement and Review Loop

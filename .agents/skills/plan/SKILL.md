@@ -14,7 +14,7 @@ Before drafting an implementation plan, read:
 
 ## Mandatory Plan Steps
 
-1. Create the plan file in `docs/plans/` (committed), unless the user wants a throwaway plan — then use `.local/plans/` (gitignored) instead
+1. Create the plan file in `.local/plans/` (gitignored), unless the user gives another path, e.g. `docs/plans/` (committed)
    - Name: `NNN_title-with-hyphens.md` — 3-digit sequence number, underscore, the H1 title lowercased with hyphens for spaces (acronyms like `PR` stay uppercase), e.g. `001_PR-tracker-canvas.md`
    - Right after the H1, add: `date: YYYY-MM-DD` then `status: draft` (or `ready`); bump `date` on substantial revisions or status changes
 2. Consider a pre-refactor step: for bigger features, restructuring existing code first — often renaming things so the new feature/concept lands as an explicit, self-evident diff — can make the real change smaller, safer, and more explicit. Propose it as a separate step before the main implementation when it earns its keep. Optional; skip for small changes. Assess test coverage of the touched code and close any gap found — the regression net for both the refactor and the feature work built on top of it
