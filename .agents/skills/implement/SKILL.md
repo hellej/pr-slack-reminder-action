@@ -152,9 +152,13 @@ Leave the changes uncommitted, unless the user asked you to commit between chain
 
 ## What the Run Taught
 
-Last, report what this run showed about the loop itself. Evidence from this run only.
+Last, two lists. Evidence from this run only.
 
-Examples, not a checklist:
+- Both lists empty is the normal outcome. Most agent slop has no fix
+- Report a lesson only if it cost this run something, or you have seen it on more than
+  one step
+
+**Lessons.** What this run showed about the loop. One line each, three at most. Examples:
 
 - A round spent on something the brief could have prevented
 - A finding the reviewer has now raised on more than one step
@@ -162,8 +166,12 @@ Examples, not a checklist:
 - Work an agent redid after a handover
 - A rule either agent ignored, or that made the work worse
 
-Say what happened, then propose the change: which file it points at (this skill,
-`implementer.md`, or `reviewer.md`), and what to add, cut or reword. A cut counts as much
-as an addition. Never edit these three mid-loop.
+**Proposed changes.** Only where a file edit would have prevented a lesson above.
 
-Nothing to report is the normal outcome.
+- Read the file first. These rules are mostly already written, and a duplicate proposal
+  is worse than none
+- Name the file: this skill, `implementer.md`, or `reviewer.md`
+- Say what to add, cut or reword. A cut counts as much as an addition
+- Small is fine: one sentence made explicit or less confusing is a real fix
+- A lesson with no proposed change is a complete entry
+- Never edit these three files mid-loop
