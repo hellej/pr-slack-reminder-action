@@ -51,8 +51,14 @@ Pick the targets yourself. A handful is usually enough. A pure refactor needs no
 The change under review is uncommitted, so never `git checkout`, `git stash` or
 `git restore`: git cannot recover what you destroy.
 
-For a `go test` mutation, mutate a copy of the Go source and build against it with
-`-overlay`, so the tree is never written to:
+`-overlay` never writes the tree, so prefer it wherever it reaches. It replaces files
+for the build only:
+
+- Go source read by `go test`: `-overlay`
+- A file read at run time (snapshot, golden file, `action.yml`): in place
+- A `deadcode` check: in place. It takes no `-overlay` flag
+
+**`-overlay`**
 
 1. Copy each file you want to mutate to your scratchpad directory, and mutate the copy
 2. Confirm the copy differs from the original. A `sed` or `perl` pattern that matches
@@ -66,15 +72,17 @@ For a `go test` mutation, mutate a copy of the Go source and build against it wi
    compile and proves nothing, yet gives the same exit 1 and screen of `FAIL` lines a
    real catch does
 
-`-overlay` reaches that build only. Map a snapshot or `action.yml` and the go command
-accepts it in silence, the check still reads the tree's copy, and the pass reads as a
-surviving mutation. `deadcode` takes no `-overlay` flag at all. Both cases mutate in
-place: keep the scratchpad copy pristine and record the file's `shasum`, mutate the file
-in the tree, run the check, copy the scratchpad copy back, then confirm the `shasum`
-matches. A `diff` against the copy you restored from proves only that `cp` ran.
+Map a snapshot or `action.yml` into an overlay and the go command accepts it in silence:
+the check still reads the tree's copy, and the pass reads as a surviving mutation.
 
-When you mutated in place, end with a full `make test` and a `git status`. If you cannot
-restore a file, say so first, before any finding.
+**In place**
+
+Keep the scratchpad copy pristine and record the file's `shasum`, mutate the file in the
+tree, run the check, copy the scratchpad copy back, then confirm the `shasum` matches. A
+`diff` against the copy you restored from proves only that `cp` ran.
+
+End with a full `make test` and a `git status`. If you cannot restore a file, say so
+first, before any finding.
 
 Classify every finding before reporting it:
 
