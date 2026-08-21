@@ -11,7 +11,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Both sections render through one `renderSection`, differing only in row renderer and empty text, so a third section costs one call
 - An empty section keeps its heading and shows one italic line, `_No open PRs_` or `_No work in progress_`. Grouped mode with no open PRs shows that same line and no sub-headings
 - Footer: a blank line, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC
-- A capped fetch adds an italic line above the `Updated` line naming what was cut, with the counts read from `githubclient.MaxPRsToFetch` and `MaxDraftPRsToFetch`. Both caps are named in one line
+- A capped fetch adds an italic line above the `Updated` line naming the fetch limit, with the counts read from `githubclient.MaxPRsToFetch` and `MaxDraftPRsToFetch`. Both caps are named in one line. It never claims how many rows the canvas shows: `canvascontent` prunes inactive drafts after the fetch
 - Everything coming from GitHub (PR titles, author and reviewer names, repository paths) is backslash-escaped for `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `>` and `&`, the backslash first so later replacements aren't double-escaped
 - The rendered markdown is covered by golden files in `testdata/`, re-recorded with `make update-test-snapshots`
 

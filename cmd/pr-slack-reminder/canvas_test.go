@@ -127,13 +127,13 @@ func TestPostModeCanvasReportsCappedFetch(t *testing.T) {
 			name:         "more drafts than the draft fetch cap",
 			openPRCount:  1,
 			draftPRCount: 16,
-			expectedNote: "_Showing the newest 15 WIP PRs_",
+			expectedNote: "_Fetch limited to the newest 15 WIP PRs_",
 		},
 		{
 			name:         "more open PRs than the open PR fetch cap",
 			openPRCount:  51,
 			draftPRCount: 1,
-			expectedNote: "_Showing the newest 50 open PRs_",
+			expectedNote: "_Fetch limited to the newest 50 open PRs_",
 		},
 	}
 

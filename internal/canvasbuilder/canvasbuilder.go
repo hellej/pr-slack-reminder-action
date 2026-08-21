@@ -112,18 +112,20 @@ func renderFooter(content canvascontent.Content) []string {
 	return []string{capText, updatedText}
 }
 
-// Without this note a capped canvas silently misses PRs, and only the run log says why.
+// Without this note a capped canvas silently misses PRs, and only the run log says why. It names
+// the fetch limit, not a row count: `canvascontent` prunes inactive drafts after the fetch, so
+// fewer rows than the cap can reach the canvas.
 func getCapText(content canvascontent.Content) string {
 	switch {
 	case content.OpenPRsCapped && content.WIPPRsCapped:
 		return fmt.Sprintf(
-			"_Showing the newest %d open PRs and the newest %d WIP PRs_",
+			"_Fetch limited to the newest %d open PRs and the newest %d WIP PRs_",
 			githubclient.MaxPRsToFetch, githubclient.MaxDraftPRsToFetch,
 		)
 	case content.OpenPRsCapped:
-		return fmt.Sprintf("_Showing the newest %d open PRs_", githubclient.MaxPRsToFetch)
+		return fmt.Sprintf("_Fetch limited to the newest %d open PRs_", githubclient.MaxPRsToFetch)
 	case content.WIPPRsCapped:
-		return fmt.Sprintf("_Showing the newest %d WIP PRs_", githubclient.MaxDraftPRsToFetch)
+		return fmt.Sprintf("_Fetch limited to the newest %d WIP PRs_", githubclient.MaxDraftPRsToFetch)
 	default:
 		return ""
 	}
