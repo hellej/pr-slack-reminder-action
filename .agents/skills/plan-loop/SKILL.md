@@ -27,6 +27,7 @@ Ask the user what no amount of reading can supply:
 - The problem, and who has it
 - What is out of scope
 - Constraints already settled: input names, "no new inputs", must land before another plan
+- Where the plan file goes: `.local/plans/` (gitignored) or `docs/plans/` (committed)
 
 Keep asking until the frame is clear. An answer routinely opens the next question, so
 batch what you have, read what comes back, and ask again. Skip anything the user's request
