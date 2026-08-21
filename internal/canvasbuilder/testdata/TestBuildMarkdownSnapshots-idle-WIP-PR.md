@@ -1,8 +1,8 @@
-## Open PRs
+## Open
 
 _No open PRs_
 
-## Work in Progress
+## WIP
 
 - **[Refactor state store](https://github.com/test-org/test-repo/pull/5)** by Carol Clark (💬 Erin Evans) `idle 3 days` 💤
 

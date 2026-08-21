@@ -4,8 +4,8 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 
 ## Behaviour
 
-- `BuildMarkdown(content)` renders a fixed `## Open PRs` heading and its list, then a fixed `## Work in Progress` heading and its list. Both headings always render
-- Grouped open PRs get one `###` sub-heading per repository, linking to `models.Repository.GetPullsURL()`, with no "Open PRs in " prefix: the parent heading already says it
+- `BuildMarkdown(content)` renders a fixed `## Open` heading and its list, then a fixed `## WIP` heading and its list. Both headings always render
+- Grouped open PRs get one `###` sub-heading per repository: the bare repository path, linking to `models.Repository.GetPullsURL()`. The `## Open` heading above it already scopes the rows
 - Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers
 - WIP PR row: linked title, author, commenters, the activity text as a code span, then `💤` when idle. Unknown activity renders neither the code span nor `💤`
 - Both sections render through one `renderSection`, differing only in row renderer and empty text, so a third section costs one call
@@ -17,7 +17,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 
 ## Doesn't Do
 
-- No top-level heading: the canvas title lives on the canvas tab in Slack and survives a full content replace
+- No top-level heading: the canvas title is its own field, set by a `rename` change on `canvases.edit`, so it survives a full content replace. Slack renders it as an H1 at the top of the document and doesn't dedupe a matching one from the body, so a body H1 would show the title twice
 - No Slack mentions: authors and reviewers render through `GetGitHubName()`, never `SlackUserID`, so refreshing the canvas notifies nobody
 - Never approvers on a WIP row, and never the old-PR `🚨` marker there: nobody has been asked to review a draft yet
 - No strike-through and no `🚀`: the canvas lists open PRs only, so a closed or merged PR can't reach a row

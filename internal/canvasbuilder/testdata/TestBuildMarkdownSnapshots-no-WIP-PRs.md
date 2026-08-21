@@ -1,8 +1,8 @@
-## Open PRs
+## Open
 
 - **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 
-## Work in Progress
+## WIP
 
 _No work in progress_
 

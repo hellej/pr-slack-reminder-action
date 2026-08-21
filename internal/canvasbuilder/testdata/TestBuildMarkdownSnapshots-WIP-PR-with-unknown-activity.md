@@ -1,8 +1,8 @@
-## Open PRs
+## Open
 
 _No open PRs_
 
-## Work in Progress
+## WIP
 
 - **[Prototype canvas rendering](https://github.com/test-org/test-repo/pull/6)** by Alice Anderson
 

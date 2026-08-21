@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	openPRsHeading = "## Open PRs"
-	wipPRsHeading  = "## Work in Progress"
+	openPRsHeading = "## Open"
+	wipPRsHeading  = "## WIP"
 	noOpenPRsText  = "_No open PRs_"
 	noWIPPRsText   = "_No work in progress_"
 )
 
-// The canvas has no top-level heading: its title lives on the canvas tab in Slack.
+// The canvas has no top-level heading: Slack renders the canvas title as its own H1 at the top
+// of the document, so a body H1 would show as a second title.
 func BuildMarkdown(content canvascontent.Content) string {
 	blocks := renderOpenPRsSection(content)
 	blocks = append(blocks, renderSection(wipPRsHeading, content.WIPPRs, renderWIPPRRow, noWIPPRsText))

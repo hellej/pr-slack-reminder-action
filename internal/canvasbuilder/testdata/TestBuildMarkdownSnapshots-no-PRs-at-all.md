@@ -1,8 +1,8 @@
-## Open PRs
+## Open
 
 _No open PRs_
 
-## Work in Progress
+## WIP
 
 _No work in progress_
 

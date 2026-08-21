@@ -194,12 +194,12 @@ Optional: keep a Slack canvas updated with a live view of the PRs across all mon
 The canvas is rewritten on every run of the action, in both `post` and `update` mode.
 
 ```markdown
-## Open PRs
+## Open
 
 - **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 - **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _30 minutes ago_ by Bob Brown
 
-## Work in Progress
+## WIP
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
@@ -213,8 +213,9 @@ Open PRs are listed oldest first, WIP PRs by most recent activity. Drafts with n
 ### Setup
 
 1. Add a canvas tab to the channel that gets the reminders.
-2. Open that canvas → ⋮ → **Copy link**.
-3. Paste the link into `pr-tracker-canvas-link`:
+2. Give the canvas a title, the action never sets one.
+3. Open that canvas → ⋮ → **Copy link**.
+4. Paste the link into `pr-tracker-canvas-link`:
 
 ```yaml
 pr-tracker-canvas-link: https://myworkspace.slack.com/docs/T01234ABCDE/F01234ABCDE

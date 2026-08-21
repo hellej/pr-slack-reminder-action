@@ -93,7 +93,7 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			}
 			markdown := mockSlackAPI.ReplacedCanvas.Markdown
 			assertCanvasContains(t, markdown,
-				"## Open PRs", "## Work in Progress", "Open PR one", "Open PR two", "Draft PR one",
+				"## Open\n", "## WIP\n", "Open PR one", "Open PR two", "Draft PR one",
 			)
 			if !canvasFooterLine.MatchString(markdown) {
 				t.Errorf("Expected an updated-at footer line on the canvas, got:\n%s", markdown)

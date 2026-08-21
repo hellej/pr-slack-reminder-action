@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -286,5 +287,57 @@ func assertMarkdownMatchesSnapshot(t *testing.T, markdown string) {
 			"Rendered canvas markdown does not match snapshot %s.\nSnapshot:\n%s\n\nRendered:\n%s",
 			snapshotFilePath, snapshot, markdown,
 		)
+	}
+}
+
+// A snapshot can't hold this: re-recording would silently accept an added title. Slack renders
+// the canvas title as its own sticky H1 and doesn't dedupe a matching one from the body, so a
+// top-level heading here shows the title twice.
+func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
+	openPR := testPR(prOptions{
+		number: 1, title: "Add pagination to the PR listing", authorName: "Alice Anderson",
+		age: hoursAge,
+	})
+	wipPR := testPR(prOptions{
+		number: 3, title: "Spike: replace mux with chi", authorName: "Carol Clark",
+		age: hoursAge, activityAge: durationPointer(hoursAge),
+	})
+
+	testCases := []struct {
+		name    string
+		content canvascontent.Content
+	}{
+		{
+			name: "flat",
+			content: canvascontent.Content{
+				OpenPRs: []prparser.PR{openPR}, WIPPRs: []prparser.PR{wipPR}, GeneratedAt: generatedAt,
+			},
+		},
+		{
+			name: "grouped by repository",
+			content: canvascontent.Content{
+				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositories([]prparser.PR{openPR}),
+				GroupedByRepository:        true,
+				WIPPRs:                     []prparser.PR{wipPR},
+				GeneratedAt:                generatedAt,
+			},
+		},
+		{
+			name:    "no PRs at all",
+			content: canvascontent.Content{GeneratedAt: generatedAt},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			markdown := canvasbuilder.BuildMarkdown(tc.content)
+			for lineNumber, line := range strings.Split(markdown, "\n") {
+				if strings.HasPrefix(line, "# ") {
+					t.Errorf(
+						"Expected no top-level heading, got one on line %d: %s", lineNumber+1, line,
+					)
+				}
+			}
+		})
 	}
 }
