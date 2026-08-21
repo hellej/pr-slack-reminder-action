@@ -71,3 +71,4 @@ runs:
         repository-filters: |
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
+        pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL

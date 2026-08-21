@@ -363,15 +363,14 @@ What keeps `post` mode's message byte-identical when the canvas is on:
 
 ### 9. Docs & permissions
 
-- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up: add a canvas tab to the reminder channel, then ⋮ → Copy link and paste it into `pr-tracker-canvas-link`. State the access requirement behind it (Step 1), so a canvas kept elsewhere can still be made to work. Add `canvases:write` to the Slack scope table (canvas-only). The GitHub permissions block stays as is: no new scope, the activity lookup rides the existing enrichment query (Step 3).
-- README: warn that the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost. Suggest a second canvas for those.
-- State that the canvas notifies nobody (see "Canvas content format").
-- Mention that the reminder message then carries a footer link to the canvas (Step 8).
-- Document the new input in the inputs table.
+- README: new "📋 PR Tracker Canvas" section, between "Filter Options" and "💡 Tips". It opens with what the canvas is and an example of the rendered markdown (copied from `internal/canvasbuilder/testdata/`, so it matches what the code renders, nothing enforces it), then a "Setup" sub-section (add a canvas tab to the reminder channel, ⋮ → Copy link, paste into `pr-tracker-canvas-link`, grant `canvases:write`) and a "Good to know" bullet list.
+- Setup states the access requirement behind the channel-tab path (Step 1), so a canvas kept elsewhere can still be made to work. `canvases:write` added to the Slack scope table, marked "Only with `pr-tracker-canvas-link`". The GitHub permissions block stays as is: no new scope, the activity lookup rides the existing enrichment query (Step 3).
+- "Good to know" carries: the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost, keep those on a second canvas; the canvas notifies nobody (see "Canvas content format"); the reminder message carries a footer link to the canvas (Step 8); one canvas per channel, since two workflows sharing one overwrite each other; which existing inputs shape canvas content (see "Existing inputs and the canvas"); and that a failed canvas write fails the run without stopping the reminder message (Step 7).
+- Document the new input in the inputs table, linking to the new section.
 - Exercise both the on and off paths end to end. No workflow-permission change needed.
   - The two workflows post to different channels, so they take **different** canvas links, each channel's own tab, not one shared canvas. Both would otherwise overwrite each other every run.
-  - `.github/workflows/pr-reminder.yml` (posts to `#github`): set `pr-tracker-canvas-link` to the `#github` canvas, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
-  - `.github/actions/e2e-tests/action.yml` (posts to `#pr-reminders-test`): set the `#pr-reminders-test` canvas on the "Run with filters" step only, the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
+  - `.github/workflows/pr-reminder.yml` (posts to `#github`): `pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BPS4FKCEL`, the `#github` canvas, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
+  - `.github/actions/e2e-tests/action.yml` (posts to `#pr-reminders-test`): `pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL`, the `#pr-reminders-test` canvas, on the "Run with filters" step only, the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
   - Leave it unset on the "Basic run" and "Multi-repository run" steps, so every release also verifies the action still behaves exactly as before when the input is absent.
   - The links go in as plain literals, like `slack-channel-name`, they aren't secrets, though they do carry the workspace name and team ID.
 - Manual prerequisites, not automatable here. All confirmed in place on 2026-08-08:
