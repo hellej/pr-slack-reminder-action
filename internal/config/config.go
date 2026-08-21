@@ -65,8 +65,7 @@ type Config struct {
 	RepositoryFilters map[string]Filters
 	ContentInputs     ContentInputs
 
-	PRTrackerCanvasID  string
-	PRTrackerCanvasURL string
+	PRTrackerCanvasID string
 }
 
 type ContentInputs struct {
@@ -75,7 +74,6 @@ type ContentInputs struct {
 	NoPRsMessage                string
 	OldPRThresholdHours         int
 	GroupByRepository           bool
-	CanvasURL                   string
 }
 
 func (c Config) Print() {
@@ -158,10 +156,8 @@ func GetConfig() (Config, error) {
 			NoPRsMessage:                noPRsMessage,
 			OldPRThresholdHours:         oldPRsThresholdHours,
 			GroupByRepository:           groupByRepository,
-			CanvasURL:                   prTrackerCanvasURL,
 		},
-		PRTrackerCanvasID:  prTrackerCanvasID,
-		PRTrackerCanvasURL: prTrackerCanvasURL,
+		PRTrackerCanvasID: prTrackerCanvasID,
 	}
 
 	if err := config.validate(); err != nil {

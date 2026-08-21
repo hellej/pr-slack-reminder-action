@@ -227,7 +227,6 @@ to be in the same channel as the canvas to have write access.
 
 - ⚠️ The action owns the whole canvas. Every run replaces all of its content, so anything typed there by hand is lost. Keep notes on a second canvas.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- The reminder message gets a 📋 PR tracker canvas footer link.
 - These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` (open PRs only, the WIP list is always flat) and `/snooze` comments. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent.
 

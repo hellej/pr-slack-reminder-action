@@ -418,7 +418,7 @@ func TestCanvasAndMessageFailuresAreIsolated(t *testing.T) {
 }
 
 // Turning the canvas on switches drafts into the fetch. They must reach the canvas only,
-// leaving every message block other than the canvas link footer byte-identical.
+// leaving the reminder message byte-identical.
 func TestCanvasDoesNotChangeMessageBlocks(t *testing.T) {
 	runAndGetSentBlocks := func(t *testing.T, canvasLink string) []json.RawMessage {
 		t.Helper()
@@ -455,9 +455,9 @@ func TestCanvasDoesNotChangeMessageBlocks(t *testing.T) {
 	blocksWithoutCanvas := runAndGetSentBlocks(t, "")
 	blocksWithCanvas := runAndGetSentBlocks(t, testCanvasLink)
 
-	if len(blocksWithCanvas) != len(blocksWithoutCanvas)+1 {
+	if len(blocksWithCanvas) != len(blocksWithoutCanvas) {
 		t.Fatalf(
-			"Expected the canvas link footer as the only extra block, got %d blocks against %d",
+			"Expected the same number of blocks, got %d with the canvas against %d without",
 			len(blocksWithCanvas), len(blocksWithoutCanvas),
 		)
 	}

@@ -19,17 +19,11 @@ import (
 // which doesn't need spacing block after it).
 const maximumBlocksInSlackMessage = 50
 
-// The canvas link footer reserves two blocks rather than the one it takes: cutting the
-// content at 49 would leave the 17th repository's heading with no PR list under it, whereas
-// 48 ends on the 16th repository's spacing block, which reads as spacing before the footer.
-const maximumBlocksWithCanvasLink = 48
-
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	var blocks []slack.Block
 
 	if !content.HasPRs() {
 		blocks = addNoPRsBlock(blocks, content.SummaryText)
-		blocks = addCanvasLinkBlock(blocks, content.CanvasURL)
 		return slack.NewBlockMessage(blocks...), content.SummaryText
 	}
 
@@ -39,41 +33,19 @@ func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 		blocks = addRepositoryPRListBlocks(blocks, content.PRsGroupedByRepository)
 	}
 
-	// The link goes on after the truncation, so a large message keeps it instead of
-	// dropping it as its first block over the limit.
-	blocks = limitMaximumMessageSize(blocks, getMaximumBlocks(content.CanvasURL))
-	blocks = addCanvasLinkBlock(blocks, content.CanvasURL)
+	blocks = limitMaximumMessageSize(blocks)
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
 
-func getMaximumBlocks(canvasURL string) int {
-	if canvasURL != "" {
-		return maximumBlocksWithCanvasLink
-	}
-	return maximumBlocksInSlackMessage
-}
-
-func limitMaximumMessageSize(blocks []slack.Block, maximumBlocks int) []slack.Block {
-	if len(blocks) > maximumBlocks {
+func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
+	if len(blocks) > maximumBlocksInSlackMessage {
 		log.Printf(
 			"Message content is too large (too many blocks: %v, dropping: %v)",
-			len(blocks), len(blocks)-maximumBlocks,
+			len(blocks), len(blocks)-maximumBlocksInSlackMessage,
 		)
-		blocks = blocks[:maximumBlocks]
+		blocks = blocks[:maximumBlocksInSlackMessage]
 	}
 	return blocks
-}
-
-// A context block reads as a subdued footer rather than as another list row.
-func addCanvasLinkBlock(blocks []slack.Block, canvasURL string) []slack.Block {
-	if canvasURL == "" {
-		return blocks
-	}
-	return append(blocks,
-		slack.NewContextBlock("canvas_link",
-			slack.NewTextBlockObject("mrkdwn", "<"+canvasURL+"|📋 PR tracker canvas>", false, false),
-		),
-	)
 }
 
 func addNoPRsBlock(blocks []slack.Block, noPRsText string) []slack.Block {

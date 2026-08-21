@@ -1162,12 +1162,6 @@ func TestGetConfig_PRTrackerCanvasLink(t *testing.T) {
 			if cfg.PRTrackerCanvasID != tt.expectedID {
 				t.Errorf("Expected PRTrackerCanvasID '%s', got '%s'", tt.expectedID, cfg.PRTrackerCanvasID)
 			}
-			if cfg.PRTrackerCanvasURL != tt.link {
-				t.Errorf("Expected PRTrackerCanvasURL '%s', got '%s'", tt.link, cfg.PRTrackerCanvasURL)
-			}
-			if cfg.ContentInputs.CanvasURL != tt.link {
-				t.Errorf("Expected ContentInputs.CanvasURL '%s', got '%s'", tt.link, cfg.ContentInputs.CanvasURL)
-			}
 		})
 	}
 }

@@ -15,7 +15,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - Draft PRs with no activity for 60 days are always excluded.
 - One new input, off by default, no other new configurability.
 - The input takes the canvas link the user copies from Slack. The action parses the ID out of it.
-- The reminder message links to the canvas, so the transient message is a way in to the persistent view.
+- The canvas is a tab in the reminder channel, so it is one click from the message. The message itself is unchanged (see Step 8).
 
 ### Canvas content format
 
@@ -90,12 +90,12 @@ A future third canvas section listing recently closed/merged PRs stays additive.
 ## Target shape
 
 - `action.yml`: new optional input `pr-tracker-canvas-link` (string, no default). Empty/unset means the feature is off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
-- `config`: parses the link once into a canvas ID + canvas URL, so no other package parses it again. Both are always known when the feature is on.
+- `config`: parses the link once into a canvas ID, so no other package parses it again.
 - `githubclient`: `Client.FindOpenPRs` gains an explicit `PRFetchOptions{IncludeDrafts bool}` parameter (zero value means today's behavior exactly) and returns `OpenPRsResult{PRs []PR; OpenPRsCapped, DraftPRsCapped bool}` instead of a bare slice. Draft staleness is not a fetch-time filter: `LastActivityAt` itself comes from enrichment, so it isn't known until after the fetch completes (Step 3). `canvascontent` prunes stale drafts afterward (Step 5). Every enriched `PR` already carries a head-commit date once Step 3 lands: the GraphQL enrichment query already selects `commits(last: 1)` for every PR (open or draft) as of [001](001_GraphQL-migration.md), so no extra API call is added for it. `PullRequest` gains `LastActivityAt *time.Time`.
 - `prparser`: `PR` gains activity display helpers (based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
 - New `canvascontent` package (mirrors `messagecontent`, Go code stays medium-named `canvas*`, no need to spell out "PR" internally): builds a canvas-ready `Content`, open PRs (oldest first, grouped/flat per `group-by-repository`) plus draft PRs (always flat regardless of that input, most-recent-activity first, drafts inactive over 2 months excluded).
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
-- `messagecontent`/`messagebuilder`: the reminder message gains a trailing canvas link row whenever the feature is on.
+- `messagecontent`/`messagebuilder`: unchanged. The reminder message is byte-identical whether the canvas is on or off (Step 8).
 - `slackclient`: gains a method that fully replaces a canvas's content by ID, one `canvases.edit` call, `replace` operation, `section_id` omitted.
 - `run.go`: if `pr-tracker-canvas-link` is set, gets open + draft PRs and overwrites the canvas. `post` mode shares the message's fetch (with drafts switched on); `update` mode fetches separately, since its message path is state-tracked (Step 7). The canvas refresh and the message path are independent attempts, either can fail without stopping the other, and their errors are joined at the end, so the action fails if either did.
 - Permissions:
@@ -118,7 +118,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 5. `canvascontent`: build canvas content
 6. `canvasbuilder`: render canvas content to markdown
 7. `run.go`: wire up the canvas refresh
-8. Reminder message: link to the canvas
+8. Reminder message: canvas link footer, built and then removed
 9. Docs & permissions: README, `pr-reminder.yml`, `e2e-tests/action.yml`
 10. Spec sync
 
@@ -189,16 +189,15 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
 ### 2. New input: `pr-tracker-canvas-link`
 
 - `action.yml`: add optional string input, no default. Description states the intent plainly, e.g. "Link to a Slack canvas to keep updated with a live tracker of open and work-in-progress pull requests. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default)."
-- `internal/config/config.go`: add constant `InputPRTrackerCanvasLink`, read via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID` and `Config.PRTrackerCanvasURL`, both empty when the input is unset.
-- `config.ContentInputs` gains `CanvasURL`, the same value as `Config.PRTrackerCanvasURL`. `messagecontent.GetContent` receives only `ContentInputs`, never the whole `Config`, and Step 8 needs the URL there. The ID stays off `ContentInputs`, only `run.go` reads it.
+- `internal/config/config.go`: add constant `InputPRTrackerCanvasLink`, read via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID`, empty when the input is unset. Only `run.go` reads it.
 - Link shape, confirmed against the real canvas tab in `#pr-reminders-test`: `https://<workspace>.slack.com/docs/<TEAM_ID>/<CANVAS_ID>`, e.g. `https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL`.
 - Parse in a new file `internal/config/canvaslink.go` (`getCanvasIDFromLink`), leaving `config.go` with the constant, the fields and the call: `url.Parse`, then require a `docs` segment in `URL.Path` and take the first segment after it matching `^F[A-Z0-9]+$`. Scanning survives a trailing title slug: `TEAM_ID` starts with `T` and slugs are lowercase, so neither can match. No length bound, real IDs already run to 13 characters. Reading `URL.Path` drops query params for free.
   - Requiring `docs` rejects other Slack links that carry an `F…` file ID (`/files/…`), which would otherwise parse and then fail at the `canvases.edit` call.
   - Assumed, on one verified link: every copy path gives a `docs` segment. Accepted for v1.
-  - Must be an absolute URL with a host, a bare `F…` ID is rejected. `PRTrackerCanvasURL` is the input as given, never rebuilt, and Step 8 puts it straight into the message footer, a bare ID there is a dead link.
+  - Must be an absolute URL with a host, a bare `F…` ID is rejected. The input is documented as a link copied from Slack, so anything else is a typo, even though only the ID is used.
   - A non-empty input that doesn't parse is a hard config error, joined like the other input validation. A typo would otherwise mean a silently missing canvas. The message names the expected shape and the Copy link path.
 - Test cases: the real link above, trailing slash, query params, a trailing title slug, `http`, an unrelated URL, a Slack `/files/F…` link (rejected), a bare `F…` ID (rejected), empty (feature off). They live in `internal/config/config_test.go` (`TestGetConfig_PRTrackerCanvasLink`) and go through `GetConfig`, since the parser is unexported and the config tests are an external `config_test` package.
-- `testhelpers/confighelpers.go`: mirror the new input.
+- `testhelpers/confighelpers.go`: mirror the new input. It needs no `TestConfig` field, every canvas test passes the link through the overrides map, so the helper sets the env var from `""`.
 - `go run .github/scripts/check_inputs.go` must still pass.
 
 ### 3. `githubclient`: last-activity mapping
@@ -330,42 +329,43 @@ What keeps `post` mode's message byte-identical when the canvas is on:
 - Filters, snooze exclusion and every other fetch-path step are untouched, `IncludeDrafts` only removes the draft check.
 - `LastActivityAt` (Step 3) is populated for every PR regardless of the canvas, but the message never reads it, so its presence changes nothing observable.
 - Canvas off → zero-value `PRFetchOptions` → today's call exactly.
-- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both, comparing the sent blocks JSON element by element. The canvas link footer (Step 8) is the one block the canvas-on run has extra, so the comparison covers every block before it and asserts the count differs by exactly one. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
+- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both, comparing the sent blocks JSON element by element. Since Step 8 removed the footer, the two block sets are identical, count included. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
 
-### 8. Reminder message: link to the canvas
+### 8. Reminder message: canvas link footer, built and then removed
 
-- `messagecontent.Content` gains `CanvasURL string`, from `contentInputs.CanvasURL` (Step 2). Set it in **all three** branches of `GetContent`'s switch, including the `len(openPRs) == 0` one: that branch carries the `no-prs-message` case below. Empty → nothing changes anywhere, so existing tests stay untouched.
-- `messagebuilder.BuildMessage` appends a trailing context block, `<URL|📋 PR tracker canvas>`, a context block, not rich text, so it reads as a subdued footer rather than another list row. The label matches the feature name in the README.
-- Append it **after** `limitMaximumMessageSize`, not before: that function truncates at 50 blocks, and a link appended earlier would be the first thing dropped on a large message.
-- `limitMaximumMessageSize` must reserve the block: one limit value, 48 when the footer follows and 50 when it doesn't, used for **both** the comparison and the slice.
-- Slicing at 48 while comparing against 50 still yields 51 blocks whenever the message is exactly 50 (17 repositories: 3×17−1), which `slackclient.SendMessage` rejects (`len(blocks) > 50`). A large message would fail to send instead of gaining a link. Update the constant's comment for the reserved block.
-- 48, not 49. Grouped blocks run heading, list, spacer per repository, so block 49 is the 17th repository's heading and block 50 its list. Cutting at 49 leaves that heading with no list under it, the exact case the existing 50 was chosen to avoid.
-- 48 ends on the 16th repository's spacer, which then reads as spacing before the footer.
-- The `no-prs-message` path gets the footer too: `BuildMessage`'s `!content.HasPRs()` branch appends it itself. That branch returns before `limitMaximumMessageSize`, so the reserved-block rule above doesn't apply to it (two blocks).
-- Never a footer-only message. `runPostMode`'s early return (`!content.HasPRs() && content.SummaryText == ""`) is unchanged: with `no-prs-message` unset and no open PRs, the run still sends nothing, canvas on or off.
-- A message carrying only a link would notify the channel on every scheduled run with no news, and `state.SavePostState` would store zero PRs behind it, which `runUpdateMode`'s "No PRs to update in state" early return then never cleans up.
-- `runUpdateMode`'s matching branch, which deletes the message, is unchanged. It fires when every PR the reminder tracked is closed or merged, and a message reduced to a bare link is worse there than no message.
-- The link is rendered optimistically, before the canvas refresh runs (Step 7). It stays correct either way: the canvas is the user's and exists whether or not our write succeeded.
-- No preview card: add `slack.MsgOptionDisableLinkUnfurl()` and `slack.MsgOptionDisableMediaUnfurl()` to `PostMessage` and `UpdateMessage` in `slackclient`, neither of which sets an unfurl option today. A `slack.com` link is exactly what Slack expands into a card, and the card would dwarf the one-line footer. Set both, because the default is to expand: "By default, we unfurl all links in messages posted by users and Slack apps" ([unfurling docs](https://docs.slack.dev/messaging/unfurling-links-in-messages/)). No bot-token exemption is documented for either parameter.
-- [`chat.update`](https://docs.slack.dev/reference/methods/chat.update/) documents neither option; `chat.postMessage` documents both. slack-go sends them anyway (no send-mode filtering in v0.27.0's `chat.go`), so passing them on update is safe but presumed inert. Test only that both options are passed.
-- `slack.MsgOption` is an opaque `func(*sendConfig) error`, so a captured option can't be compared to anything. Have `mockSlackAPI` (`slackclient_test.go`) record the `options` it receives, then apply them and read the resulting form values:
+Built as planned, then taken back out. The footer is gone; the reminder message is byte-identical whether the canvas is on or off.
 
-  ```go
-  _, values, err := slack.UnsafeApplyMsgOptions("", "", "", mockAPI.postedOptions...)
-  // values.Get("unfurl_links") == "false" && values.Get("unfurl_media") == "false"
-  ```
+What was built:
 
-  Both option constructors do exactly `config.values.Set(...)` (v0.27.0 `chat.go`), so this reads what would go on the wire. The `Unsafe` name is about API stability, not correctness.
-- Existing messages are unaffected: PR titles are links inside rich text blocks, which Slack never unfurls.
-- Tests: link present in the grouped, flat and `no-prs-message` cases; absent when `CanvasURL` is empty; a grouped message over the limit ends at 49 blocks, the link last and the block before it not a repository heading; the same message without the link still ends at 50; a `post` run with no PRs and no `no-prs-message` sends nothing with the canvas on; both unfurl options passed on post and update.
-- The block-limit case to pin is the exact 50-block message (17 repositories, 3×17−1): that is where a limit compared against 50 but sliced at 48 still ends at 51 blocks with the footer, which `slackclient.SendMessage` rejects. A comfortably-over-limit case passes either way.
-- `Content.CanvasURL` reaching all three `GetContent` branches gets its own test, in a new `internal/messagecontent/messagecontent_test.go` (R2 found the package had no test file at all).
+- `messagebuilder.BuildMessage` appended a trailing context block, `<URL|📋 PR tracker canvas>`, carried to it as `messagecontent.Content.CanvasURL` from `config.ContentInputs.CanvasURL`, and appended after truncation so a large message kept it.
+- `limitMaximumMessageSize` reserved two blocks for it, capping at 48 instead of 50: grouped blocks run heading, list, spacer per repository, so cutting at 49 would leave the 17th repository's heading with no list under it.
+- `slackclient` passed `slack.MsgOptionDisableLinkUnfurl()` and `slack.MsgOptionDisableMediaUnfurl()` on `PostMessage` and `UpdateMessage`, to keep the `slack.com` link from expanding into a preview card.
+
+Why it was removed:
+
+- Slack treats a canvas link as a **file share**, not a link unfurl, and attaches a canvas preview card under the message. Neither unfurl option affects file shares, so the card cannot be suppressed.
+- The card lists the same PRs the message just listed, so the reminder said everything twice, with the duplicate the taller half.
+- Nothing replaces it. The canvas is a tab in the same channel (Step 1), already one click from the message.
+
+What the removal took out:
+
+- `messagebuilder`: `addCanvasLinkBlock`, `getMaximumBlocks` and `maximumBlocksWithCanvasLink`, back to a single 50-block limit.
+- `messagecontent.Content.CanvasURL` and its assignment in all three `GetContent` branches, which left `internal/messagecontent/messagecontent_test.go` (added by this step for exactly that) with nothing to test, so the file went too.
+- `config.ContentInputs.CanvasURL`, and `Config.PRTrackerCanvasURL` with it: the footer was its only non-test reader, and it was never a parsed value, just the input echoed back. Its one remaining reader, `testhelpers/confighelpers.go`, passes `""` instead, since tests set the link through the overrides map anyway.
+- Both unfurl options in `slackclient`, and the `mockSlackAPI` option recording added for their tests. The message returns to Slack's default unfurling, which is what `main` does today. PR titles are links inside rich text blocks, which Slack never unfurls, but `no-prs-message` reaches the top-level `text` field verbatim, so a URL put there would preview.
+
+`Config.PRTrackerCanvasID` and `internal/config/canvaslink.go` stay untouched. The input still drives the canvas, only not the message.
+
+Tests kept:
+
+- A grouped over-limit message ends at exactly 50 blocks, and never on a repository heading with no PR list under it (`TestLimitMessageSizeByMaxBlocks`).
+- Step 7's equivalence test now asserts the canvas-on and canvas-off runs produce identical message blocks, count included, which is the regression the removal protects.
 
 ### 9. Docs & permissions
 
 - README: new "📋 PR Tracker Canvas" section, between "Filter Options" and "💡 Tips". It opens with what the canvas is and an example of the rendered markdown (copied from `internal/canvasbuilder/testdata/`, so it matches what the code renders, nothing enforces it), then a "Setup" sub-section (add a canvas tab to the reminder channel, ⋮ → Copy link, paste into `pr-tracker-canvas-link`, grant `canvases:write`) and a "Good to know" bullet list.
 - Setup states the access requirement behind the channel-tab path (Step 1), so a canvas kept elsewhere can still be made to work. `canvases:write` added to the Slack scope table, marked "Only with `pr-tracker-canvas-link`". The GitHub permissions block stays as is: no new scope, the activity lookup rides the existing enrichment query (Step 3).
-- "Good to know" carries: the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost, keep those on a second canvas; the canvas notifies nobody (see "Canvas content format"); the reminder message carries a footer link to the canvas (Step 8); one canvas per channel, since two workflows sharing one overwrite each other; which existing inputs shape canvas content (see "Existing inputs and the canvas"); and that a failed canvas write fails the run without stopping the reminder message (Step 7).
+- "Good to know" carries: the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost, keep those on a second canvas; the canvas notifies nobody (see "Canvas content format"); one canvas per channel, since two workflows sharing one overwrite each other; which existing inputs shape canvas content (see "Existing inputs and the canvas"); and that a failed canvas write fails the run without stopping the reminder message (Step 7).
 - Document the new input in the inputs table, linking to the new section.
 - Exercise both the on and off paths end to end. No workflow-permission change needed.
   - The two workflows post to different channels, so they take **different** canvas links, each channel's own tab, not one shared canvas. Both would otherwise overwrite each other every run.
@@ -398,7 +398,6 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 
 - An always-current PR/WIP view lives directly in Slack, with no need to open GitHub.
 - Draft/WIP visibility, absent from the main reminder message by design, becomes available to whoever wants it.
-- Every scheduled reminder carries a footer link into the canvas, so the transient message becomes the entry point to the persistent view, at no extra scope, since the user supplies the URL.
 - Fully additive and off by default: existing users see zero behavior change (zero-value fetch options, early-exit in `run.go`).
 - The R1-R3 refactors close pre-existing test-coverage gaps (draft filter, repository grouping, old-PR/author-fallback display paths) independent of whether the canvas feature itself is used.
 - Step 3 is a mapping change instead of a new per-PR API call, and the reviewer/comment fan-out needs no draft/open branching at all.
@@ -406,7 +405,6 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 ### Negative
 
 - Opted-in `post` runs add up to one extra phase-2 batch (see "Cost model"); `update` mode also fetches twice for the canvas, its own phase 1 + phase 2.
-- With the canvas on, a grouped message that fills the block limit shows one repository fewer, the footer link reserves two blocks (Step 8).
 - WIP rows can't show approvers by rendering choice (Step 6), even though the fetch now returns them for drafts too. Showing them is a rendering change only, no extra fetch needed.
 - `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
 - Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing.
@@ -419,5 +417,4 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 
 - Activity and draft-staleness thresholds are hardcoded, not configurable, in v1.
 - The canvas names people instead of mentioning them, so it notifies nobody. The reminder message stays the notifying surface.
-- Link unfurling is now explicitly disabled for the reminder message. No visible change today, but any future link in the message won't preview either.
 - `LastActivityAt` is now populated on every enriched PR, canvas on or off, since the underlying GraphQL field is always selected. Unused outside the canvas path.

@@ -10,7 +10,6 @@ Structures parsed PRs and content settings into a `Content` value ready for `mes
 - Flat case: the configured heading has its `<pr_count>` placeholder replaced with the PR count
 - Grouped case: PRs are bucketed by repository via `prparser.GroupPRsByRepositories` (alphabetical by repository path); this package adds each bucket's heading prefix, link label and link to the repository's GitHub pulls page (`models.Repository.GetPullsURL`)
 - `Content.HasPRs()` reports whether there's anything to show, in either mode
-- Every branch carries the PR tracker canvas URL through to `Content.CanvasURL`, empty when the canvas feature is off
 
 ## Doesn't Do
 
