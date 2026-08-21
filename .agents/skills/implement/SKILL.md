@@ -1,7 +1,7 @@
 ---
 name: implement
 description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from docs/plans/, or the user runs /implement."
-argument-hint: "The plan file and step, e.g. docs/plans/001_GraphQL-migration.md step 3"
+argument-hint: "The plan file and step, e.g. docs/plans/001_GraphQL-migration.md step 3, or a task with no plan"
 ---
 
 # Implement and Review Loop
@@ -18,6 +18,16 @@ findings.
 - Confirm the planned scope of the run with the user before starting
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the step
+
+## No Plan File
+
+Write one. The rest of this skill reads a plan step.
+
+- Draft one step to `.local/implement-<slug>.md`, already gitignored
+- Give it what this skill reads: brief motivation, what to change, the acceptance criteria, what it must not do, and the test cases
+- Verify its claims against the tree before showing it, per Acceptance Criteria below
+- Confirm it with the user before round 1
+- If drafting turns up more than one step's worth of work, stop and hand back to the [plan skill](../plan/SKILL.md)
 
 ## Acceptance Criteria
 
