@@ -431,10 +431,14 @@ func pullRequestWithLastActivity(pullRequest *PullRequest, node pullRequestNode)
 }
 
 // The update time overstates the last push, but bounds it from above, so a busy PR is never
-// mistaken for an inactive one.
+// mistaken for an inactive one. The head commit understates it instead: a PR opened today off an
+// old branch has an old head commit, so the commit date is raised to the PR's creation time.
 func lastActivityAt(pullRequest *PullRequest, node pullRequestNode) *time.Time {
 	if len(node.Commits.Nodes) > 0 {
 		committedDate := node.Commits.Nodes[0].Commit.CommittedDate
+		if createdAt := pullRequest.GetCreatedAt(); createdAt.After(committedDate) {
+			return &createdAt
+		}
 		return &committedDate
 	}
 	if updatedAt := pullRequest.GetUpdatedAt(); !updatedAt.IsZero() {

@@ -861,21 +861,39 @@ func rangeOfNumbers(first, count int) []int {
 func TestFindOpenPRs_LastActivityAt(t *testing.T) {
 	commitDate := time.Now().Add(-3 * time.Hour).UTC().Truncate(time.Second)
 	updatedAt := time.Now().Add(-9 * time.Hour).UTC().Truncate(time.Second)
+	createdBeforeCommit := time.Now().Add(-40 * time.Hour).UTC().Truncate(time.Second)
+	createdAfterCommit := time.Now().Add(-1 * time.Hour).UTC().Truncate(time.Second)
 
 	tests := []struct {
 		name                   string
+		createdAt              time.Time
 		updatedAt              time.Time
 		commitDate             *time.Time
 		expectedLastActivityAt *time.Time
 	}{
 		{
 			name:                   "head commit date wins over the update time",
+			createdAt:              createdBeforeCommit,
+			updatedAt:              updatedAt,
+			commitDate:             &commitDate,
+			expectedLastActivityAt: &commitDate,
+		},
+		{
+			name:                   "a head commit older than the PR falls back to the creation time",
+			createdAt:              createdAfterCommit,
+			updatedAt:              updatedAt,
+			commitDate:             &commitDate,
+			expectedLastActivityAt: &createdAfterCommit,
+		},
+		{
+			name:                   "an unknown creation time leaves the head commit date",
 			updatedAt:              updatedAt,
 			commitDate:             &commitDate,
 			expectedLastActivityAt: &commitDate,
 		},
 		{
 			name:                   "no commits falls back to the update time",
+			createdAt:              createdBeforeCommit,
 			updatedAt:              updatedAt,
 			expectedLastActivityAt: &updatedAt,
 		},
@@ -887,7 +905,7 @@ func TestFindOpenPRs_LastActivityAt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := mockgithubclient.MockGitHubClientOptions{
-				PRs: []*github.PullRequest{makePRFixture(7, false, time.Time{}, tt.updatedAt)},
+				PRs: []*github.PullRequest{makePRFixture(7, false, tt.createdAt, tt.updatedAt)},
 			}
 			if tt.commitDate != nil {
 				opts.CommitsByPRNumber = map[int]time.Time{7: *tt.commitDate}
