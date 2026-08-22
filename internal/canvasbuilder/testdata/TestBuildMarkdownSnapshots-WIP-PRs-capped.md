@@ -6,6 +6,10 @@
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
+## Merged
+
+_No merged PRs_
+
 ---
 
 _Fetch limited to the newest 15 WIP PRs_

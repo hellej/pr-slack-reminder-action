@@ -260,6 +260,46 @@ func TestGetActivityText(t *testing.T) {
 	}
 }
 
+func testMergedPR(mergedAt *time.Time) prparser.PR {
+	pr := testPR(1, time.Time{}, time.Time{})
+	pr.MergedAt = mergedAt
+	return prparser.PR{PR: &pr}
+}
+
+func TestGetMergedText(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name     string
+		mergedAt *time.Time
+		expected string
+	}{
+		{name: "never merged", mergedAt: nil, expected: ""},
+		{
+			name:     "minutes ago",
+			mergedAt: timePointer(now.Add(-30 * time.Minute)),
+			expected: "merged 30 minutes ago",
+		},
+		{
+			name:     "hours ago",
+			mergedAt: timePointer(now.Add(-2 * time.Hour)),
+			expected: "merged 2 hours ago",
+		},
+		{
+			name:     "days ago",
+			mergedAt: timePointer(now.Add(-72 * time.Hour)),
+			expected: "merged 3 days ago",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := testMergedPR(tt.mergedAt).GetMergedText(); got != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, got)
+			}
+		})
+	}
+}
+
 func TestIsIdle(t *testing.T) {
 	now := time.Now()
 	tests := []struct {

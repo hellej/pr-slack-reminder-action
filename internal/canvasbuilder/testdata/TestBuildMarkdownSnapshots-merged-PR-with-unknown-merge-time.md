@@ -8,7 +8,7 @@ _No work in progress_
 
 ## Merged
 
-_No merged PRs_
+- **[Restore the deleted branch](https://github.com/test-org/test-repo/pull/10)** by Carol Clark 🚀
 
 ---
 

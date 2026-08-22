@@ -72,7 +72,7 @@ func Run(
 	}
 
 	if canvasEnabled && canvasPRsFetched {
-		canvasErr = refreshPRTrackerCanvas(slackClient, cfg, canvasPRs)
+		canvasErr = refreshPRTrackerCanvas(githubClient, slackClient, cfg, canvasPRs)
 	}
 	if canvasErr != nil {
 		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
@@ -80,19 +80,52 @@ func Run(
 	return errors.Join(messageErr, canvasErr)
 }
 
-// Refreshes the canvas from already fetched PRs, so that both run modes share one code path.
+// Refreshes the canvas from already fetched open PRs, and fetches the merged ones itself, so that
+// both run modes share one code path and one "now". A failed merged fetch costs that section only:
+// the canvas is written without it and the error is carried out to the run's exit code.
 func refreshPRTrackerCanvas(
+	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
 	fetched githubclient.OpenPRsResult,
 ) error {
+	generatedAt := time.Now().UTC()
+
+	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(githubClient, cfg, generatedAt)
+	if mergedPRsErr != nil {
+		log.Printf("Failed to fetch recently merged PRs: %v", mergedPRsErr)
+	}
+
 	parsedPRs := prparser.ParsePRs(fetched.PRs, cfg.ContentInputs)
-	content := canvascontent.GetContent(parsedPRs, cfg.ContentInputs, canvascontent.GetContentOptions{
-		OpenPRsCapped: fetched.OpenPRsCapped,
-		WIPPRsCapped:  fetched.DraftPRsCapped,
-		GeneratedAt:   time.Now().UTC(),
-	})
-	return slackClient.ReplaceCanvasContent(cfg.PRTrackerCanvasID, canvasbuilder.BuildMarkdown(content))
+	content := canvascontent.GetContent(
+		parsedPRs,
+		prparser.ParsePRs(mergedPRs, cfg.ContentInputs),
+		cfg.ContentInputs,
+		canvascontent.GetContentOptions{
+			OpenPRsCapped:        fetched.OpenPRsCapped,
+			WIPPRsCapped:         fetched.DraftPRsCapped,
+			MergedPRsUnavailable: mergedPRsErr != nil,
+			GeneratedAt:          generatedAt,
+		},
+	)
+
+	writeErr := slackClient.ReplaceCanvasContent(
+		cfg.PRTrackerCanvasID, canvasbuilder.BuildMarkdown(content),
+	)
+	return errors.Join(writeErr, mergedPRsErr)
+}
+
+func findRecentlyMergedPRs(
+	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+) ([]githubclient.PR, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
+	defer cancel()
+	return githubClient.FindRecentlyMergedPRs(
+		ctx,
+		cfg.Repositories,
+		cfg.GetFiltersForRepository,
+		generatedAt.Add(-githubclient.RecentlyMergedWindow),
+	)
 }
 
 func findOpenPRs(

@@ -25,16 +25,17 @@ import (
 )
 
 type GetTestPROptions struct {
-	Number      int
-	Title       string
-	HTMLURL     string // left unset by default
-	AuthorLogin string
-	AuthorName  string
-	Labels      []string
-	AgeHours    float32
-	Draft       *bool  // nil means unset, github.Ptr(true) means draft, github.Ptr(false) means not draft
-	State       string // "open", "closed"
-	Merged      bool   // true if PR is merged
+	Number         int
+	Title          string
+	HTMLURL        string // left unset by default
+	AuthorLogin    string
+	AuthorName     string
+	Labels         []string
+	AgeHours       float32
+	Draft          *bool  // nil means unset, github.Ptr(true) means draft, github.Ptr(false) means not draft
+	State          string // "open", "closed"
+	Merged         bool   // true if PR is merged
+	MergedHoursAgo float32
 }
 
 var now = time.Now()
@@ -64,6 +65,13 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 
 	state := cmp.Or(options.State, "open")
 
+	var mergedAt *github.Timestamp
+	if options.MergedHoursAgo > 0 {
+		mergedAt = &github.Timestamp{
+			Time: now.Add(-time.Duration(options.MergedHoursAgo * float32(time.Hour))),
+		}
+	}
+
 	return &github.PullRequest{
 		Number:  &number,
 		Title:   &title,
@@ -77,6 +85,7 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 		Draft:     options.Draft,
 		State:     &state,
 		Merged:    &options.Merged,
+		MergedAt:  mergedAt,
 	}
 }
 

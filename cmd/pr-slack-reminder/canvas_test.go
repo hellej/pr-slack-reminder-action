@@ -54,6 +54,18 @@ func canvasTestPRs() []*github.PullRequest {
 	}
 }
 
+// Merged PRs come from their own search, never from the open PR listing.
+func canvasTestMergedPRs() []*github.PullRequest {
+	return []*github.PullRequest{
+		getTestPR(GetTestPROptions{
+			Number: 11, Title: "Merged PR one", AuthorLogin: "alice", MergedHoursAgo: 30,
+		}),
+		getTestPR(GetTestPROptions{
+			Number: 12, Title: "Merged PR two", AuthorLogin: "bob", MergedHoursAgo: 2,
+		}),
+	}
+}
+
 func TestPostModeCanvasRefresh(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -75,6 +87,7 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 					PRs:               prs,
+					MergedPRs:         canvasTestMergedPRs(),
 					CommitsByPRNumber: map[int]time.Time{3: now.Add(-5 * time.Hour)},
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
@@ -93,8 +106,13 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			}
 			markdown := mockSlackAPI.ReplacedCanvas.Markdown
 			assertCanvasContains(t, markdown,
-				"## Open\n", "## WIP\n", "Open PR one", "Open PR two", "Draft PR one",
+				"## Open\n", "## WIP\n", "## Merged\n",
+				"Open PR one", "Open PR two", "Draft PR one",
+				"**[Merged PR two]", "_merged 2 hours ago_ by Bob 🚀",
 			)
+			if strings.Index(markdown, "Merged PR two") > strings.Index(markdown, "Merged PR one") {
+				t.Errorf("Expected the newest merge first on the canvas, got:\n%s", markdown)
+			}
 			if !canvasFooterLine.MatchString(markdown) {
 				t.Errorf("Expected an updated-at footer line on the canvas, got:\n%s", markdown)
 			}
@@ -104,6 +122,9 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 
 			if mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Draft PR one") {
 				t.Error("Expected the draft PR to be left out of the reminder message")
+			}
+			if mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Merged PR two") {
+				t.Error("Expected a merged PR to be left out of the reminder message")
 			}
 			if mockSlackAPI.SentMessage.Blocks.GetPRCount() != 2 {
 				t.Errorf(
@@ -257,7 +278,10 @@ func TestPostModeCanvasIsRefreshedWhenNoPRsAreFound(t *testing.T) {
 	if !mockSlackAPI.ReplacedCanvas.Called {
 		t.Fatal("Expected the canvas to be refreshed when the fetch found no PRs")
 	}
-	assertCanvasContains(t, mockSlackAPI.ReplacedCanvas.Markdown, "_No open PRs_", "_No work in progress_")
+	assertCanvasContains(
+		t, mockSlackAPI.ReplacedCanvas.Markdown,
+		"_No open PRs_", "_No work in progress_", "_No merged PRs_",
+	)
 }
 
 func TestCanvasIsNotRefreshedWhenLinkIsUnset(t *testing.T) {
@@ -302,6 +326,7 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 			PRsByNumber:            map[int]*github.PullRequest{1: trackedOpenPR, 2: trackedMergedPR},
 			PRs:                    []*github.PullRequest{trackedOpenPR, untrackedOpenPR, untrackedDraftPR},
+			MergedPRs:              canvasTestMergedPRs(),
 			MockStateForUpdateMode: &mockState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
@@ -314,7 +339,10 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 		t.Fatal("Expected the canvas to be refreshed in update mode")
 	}
 	markdown := mockSlackAPI.ReplacedCanvas.Markdown
-	assertCanvasContains(t, markdown, "Tracked open PR", "Untracked open PR", "Untracked draft PR")
+	assertCanvasContains(
+		t, markdown,
+		"Tracked open PR", "Untracked open PR", "Untracked draft PR", "Merged PR one", "Merged PR two",
+	)
 	assertCanvasDoesNotContain(t, markdown, "Tracked merged PR")
 
 	updatedMessage := mockSlackAPI.UpdatedMessage.Blocks
@@ -324,6 +352,104 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	if updatedMessage.SomePRItemContainsText("Untracked open PR") {
 		t.Error("Expected an open PR that is not in state to stay out of the updated message")
 	}
+	if updatedMessage.SomePRItemContainsText("Merged PR one") {
+		t.Error("Expected a searched merged PR to stay out of the updated message")
+	}
+}
+
+// The search cutoff is a day, so it returns up to one extra day of merges.
+func TestCanvasLeavesOutMergesOlderThanTheWindow(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: canvasTestPRs(),
+			MergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 11, Title: "Merged inside the window", AuthorLogin: "alice",
+					MergedHoursAgo: 7*24 - 1,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 12, Title: "Merged before the window", AuthorLogin: "bob",
+					MergedHoursAgo: 7*24 + 1,
+				}),
+			},
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	assertCanvasContains(t, mockSlackAPI.ReplacedCanvas.Markdown, "Merged inside the window")
+	assertCanvasDoesNotContain(t, mockSlackAPI.ReplacedCanvas.Markdown, "Merged before the window")
+}
+
+// Each repository's merges are searched under their own alias, so a repository filter has to
+// land on the merges of that repository only.
+func TestCanvasAppliesRepositoryFiltersToMergedPRs(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.InputGithubRepositories:  "some-org/repo1; some-org/repo2",
+		config.InputRepositoryFilters:   "repo1: {\"ignored-authors\": [\"alice\"]}",
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRsByRepo: map[string][]*github.PullRequest{"repo1": {}, "repo2": {}},
+			MergedPRsByRepo: map[string][]*github.PullRequest{
+				"repo1": {getTestPR(GetTestPROptions{
+					Number: 11, Title: "Merged in repo1 by Alice", AuthorLogin: "alice",
+					MergedHoursAgo: 2,
+				})},
+				"repo2": {getTestPR(GetTestPROptions{
+					Number: 12, Title: "Merged in repo2 by Alice", AuthorLogin: "alice",
+					MergedHoursAgo: 3,
+				})},
+			},
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	assertCanvasContains(t, mockSlackAPI.ReplacedCanvas.Markdown, "Merged in repo2 by Alice")
+	assertCanvasDoesNotContain(t, mockSlackAPI.ReplacedCanvas.Markdown, "Merged in repo1 by Alice")
+}
+
+// A failed merged search degrades one section instead of the whole canvas, and still fails the run.
+func TestCanvasIsWrittenWhenTheMergedFetchFails(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                  canvasTestPRs(),
+			MergedPRs:            canvasTestMergedPRs(),
+			MergedPRsSearchError: errors.New("unable to search merged PRs"),
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err == nil {
+		t.Fatal("Expected Run to fail when the merged PR fetch fails")
+	}
+	if !strings.Contains(err.Error(), "unable to search merged PRs") {
+		t.Errorf("Expected the merged fetch error to be reported, got: %v", err)
+	}
+	if !mockSlackAPI.ReplacedCanvas.Called {
+		t.Fatal("Expected the canvas to be refreshed anyway")
+	}
+	markdown := mockSlackAPI.ReplacedCanvas.Markdown
+	assertCanvasContains(t, markdown, "Open PR one", "_Merged PRs could not be fetched_")
+	assertCanvasDoesNotContain(t, markdown, "Merged PR one", "_No merged PRs_")
 }
 
 // The canvas refresh and the message path are independent attempts: either failing must not

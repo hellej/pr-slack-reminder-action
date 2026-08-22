@@ -47,6 +47,7 @@ type pullRequestNode struct {
 	IsDraft    bool                    `json:"isDraft"`
 	CreatedAt  time.Time               `json:"createdAt"`
 	UpdatedAt  time.Time               `json:"updatedAt"`
+	MergedAt   *time.Time              `json:"mergedAt"`
 	HeadRefOID string                  `json:"headRefOid"`
 	State      string                  `json:"state"`
 	Merged     bool                    `json:"merged"`

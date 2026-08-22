@@ -35,6 +35,17 @@ func (pr PR) GetActivityText() string {
 	return "updated " + durationText(inactivity) + " ago"
 }
 
+// GetMergedText renders how long ago the PR was merged as "merged N minutes/hours/days ago".
+// The prefix keeps it apart from the age an open row shows in the same style. A PR that was
+// never merged yields no text.
+func (pr PR) GetMergedText() string {
+	mergedAt := pr.GetMergedAt()
+	if mergedAt == nil {
+		return ""
+	}
+	return "merged " + durationText(time.Since(*mergedAt)) + " ago"
+}
+
 // GetPRAgeDisplayText renders the PR's age as "N days old" past the old-PR threshold and
 // "N days ago" otherwise. The warning marker that goes with an old PR belongs to the renderer.
 func (pr PR) GetPRAgeDisplayText() string {

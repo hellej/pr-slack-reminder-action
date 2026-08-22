@@ -1,6 +1,6 @@
-// Package canvascontent structures parsed PRs into the two sections a PR tracker canvas
-// shows: open PRs and work-in-progress (draft) PRs. It carries no rendering, that belongs
-// to canvasbuilder.
+// Package canvascontent structures parsed PRs into the three sections a PR tracker canvas
+// shows: open PRs, work-in-progress (draft) PRs and recently merged PRs. It carries no
+// rendering, that belongs to canvasbuilder.
 package canvascontent
 
 import (
@@ -20,8 +20,10 @@ type Content struct {
 	OpenPRsGroupedByRepository []prparser.RepositoryPRs
 	GroupedByRepository        bool
 	WIPPRs                     []prparser.PR
+	MergedPRs                  []prparser.PR
 	OpenPRsCapped              bool
 	WIPPRsCapped               bool
+	MergedPRsUnavailable       bool
 	GeneratedAt                time.Time
 }
 
@@ -29,16 +31,21 @@ type GetContentOptions struct {
 	// Reported by the fetch, never derived from how many PRs reach the canvas.
 	OpenPRsCapped bool
 	WIPPRsCapped  bool
+	// Set when the merged PR fetch failed, so the section can say so instead of claiming
+	// that nothing was merged.
+	MergedPRsUnavailable bool
 	// The moment the canvas is generated: shown in the footer and used as "now" when
 	// pruning inactive drafts.
 	GeneratedAt time.Time
 }
 
-// GetContent splits the given PRs into an open section and a work-in-progress section. Open
-// PRs keep their given order (oldest first) and are grouped by repository when configured;
-// WIP PRs are always a flat list, most recent activity first, with long-inactive ones dropped.
+// GetContent splits the given PRs into an open section and a work-in-progress section, and takes
+// the merged section from its own list. Open PRs keep their given order (oldest first) and are
+// grouped by repository when configured; WIP PRs are always a flat list, most recent activity
+// first, with long-inactive ones dropped; merged PRs are always a flat list, newest merge first.
 func GetContent(
 	prs []prparser.PR,
+	mergedPRs []prparser.PR,
 	contentInputs config.ContentInputs,
 	options GetContentOptions,
 ) Content {
@@ -47,18 +54,23 @@ func GetContent(
 	activeDrafts := utilities.Filter(drafts, isActiveEnoughForCanvas(options.GeneratedAt))
 
 	log.Printf(
-		"Putting %d open pull requests and %d work-in-progress pull requests on the canvas (%d drafts left out as inactive)",
-		len(openPRs), len(activeDrafts), len(drafts)-len(activeDrafts),
+		"Putting %d open pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas (%d drafts left out as inactive)",
+		len(openPRs), len(activeDrafts), len(mergedPRs), len(drafts)-len(activeDrafts),
 	)
 
 	content := Content{
 		WIPPRs: prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
 			return pr.GetLastActivityAt()
 		}),
-		GroupedByRepository: contentInputs.GroupByRepository,
-		OpenPRsCapped:       options.OpenPRsCapped,
-		WIPPRsCapped:        options.WIPPRsCapped,
-		GeneratedAt:         options.GeneratedAt,
+		// ParsePRs re-sorts every PR oldest first, so the merge order is made here.
+		MergedPRs: prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
+			return pr.GetMergedAt()
+		}),
+		GroupedByRepository:  contentInputs.GroupByRepository,
+		OpenPRsCapped:        options.OpenPRsCapped,
+		WIPPRsCapped:         options.WIPPRsCapped,
+		MergedPRsUnavailable: options.MergedPRsUnavailable,
+		GeneratedAt:          options.GeneratedAt,
 	}
 
 	if contentInputs.GroupByRepository {

@@ -8,6 +8,10 @@
 
 - **[Draft: \&amp; \<https://example.com\> \\\_escaped\_](https://github.com/test-org/test-repo/pull/8)** by B\`ob \& Brown `updated 30 minutes ago`
 
+## Merged
+
+_No merged PRs_
+
 ---
 
 _Updated 2026-08-08 06:15 UTC_

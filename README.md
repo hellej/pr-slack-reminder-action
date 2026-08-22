@@ -173,7 +173,7 @@ jobs:
 | `no-prs-message`                    | ❌       | Message when no PRs are found (if not set, no empty message gets sent)<br>Example: `All caught up! 🎉`                                                                                     |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository headings (defaults to `false`). When enabled, `pr-list-heading` is ignored.                                                                        |
-| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open and work-in-progress PRs (see [PR Tracker Canvas](#-pr-tracker-canvas)). Leave empty to disable (default).              |
+| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, work-in-progress and recently merged PRs (see [PR Tracker Canvas](#-pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
 
@@ -189,7 +189,7 @@ Both `filters` and `repository-filters` support:
 
 ## 📋 PR Tracker Canvas
 
-Optional: keep a Slack canvas updated with a live view of the PRs across all monitored repositories. The reminder message is transient and never lists drafts; the canvas is persistent, readable on demand, and has a section for work-in-progress PRs too.
+Optional: keep a Slack canvas updated with a live view of the PRs across all monitored repositories. The reminder message is transient and never lists drafts; the canvas is persistent, readable on demand, and has sections for work-in-progress and recently merged PRs too.
 
 The canvas is rewritten on every run of the action, in both `post` and `update` mode.
 
@@ -203,12 +203,17 @@ The canvas is rewritten on every run of the action, in both `post` and `update` 
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
+## Merged
+
+- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown 🚀
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson 🚀
+
 ---
 
 _Updated 2026-08-08 06:15 UTC_
 ```
 
-Open PRs are listed oldest first, WIP PRs by most recent activity. Drafts with no activity for 60 days are left out.
+Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. Drafts with no activity for 60 days are left out. The merged section lists at most 15 PRs merged within the last 7 days, and names no reviewers.
 
 ### Setup
 
@@ -228,7 +233,7 @@ to be in the same channel as the canvas to have write access.
 
 - ⚠️ The action owns the whole canvas. Every run replaces all of its content, so anything typed there by hand is lost. Keep notes on a second canvas.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` (open PRs only, the WIP list is always flat) and `/snooze` comments. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
+- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` (open PRs only, the WIP and merged lists are always flat) and `/snooze` comments, which don't apply to merged PRs. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent.
 
 ## 💡 Tips

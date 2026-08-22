@@ -48,6 +48,7 @@ type prOptions struct {
 	isOldPR     bool
 	age         time.Duration
 	activityAge *time.Duration
+	mergeAge    *time.Duration
 }
 
 func testPR(options prOptions) prparser.PR {
@@ -60,6 +61,11 @@ func testPR(options prOptions) prparser.PR {
 		timestamp := time.Now().Add(-*options.activityAge)
 		lastActivityAt = &timestamp
 	}
+	var mergedAt *time.Time
+	if options.mergeAge != nil {
+		timestamp := time.Now().Add(-*options.mergeAge)
+		mergedAt = &timestamp
+	}
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
@@ -68,6 +74,7 @@ func testPR(options prOptions) prparser.PR {
 				HTMLURL:        fmt.Sprintf("https://github.com/%s/pull/%d", repository.GetPath(), options.number),
 				CreatedAt:      time.Now().Add(-options.age),
 				LastActivityAt: lastActivityAt,
+				MergedAt:       mergedAt,
 			},
 			Repository: repository,
 		},
@@ -99,6 +106,15 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		number: 3, title: "Spike: replace mux with chi", authorName: "Carol Clark",
 		age: hoursAge, activityAge: durationPointer(hoursAge),
 	})
+	mergedPR := testPR(prOptions{
+		number: 9, title: "Drop the REST fallback", authorName: "Alice Anderson",
+		age: oldAge, mergeAge: durationPointer(idleAge),
+		approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
+	})
+	otherMergedPR := testPR(prOptions{
+		number: 2, title: "Bump the Slack SDK", repository: "repo-two", authorName: "Bob Brown",
+		age: idleAge, mergeAge: durationPointer(hoursAge),
+	})
 
 	testCases := []struct {
 		name    string
@@ -109,7 +125,17 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			content: canvascontent.Content{
 				OpenPRs:     []prparser.PR{openPR, otherOpenPR},
 				WIPPRs:      []prparser.PR{wipPR},
+				MergedPRs:   []prparser.PR{otherMergedPR, mergedPR},
 				GeneratedAt: generatedAt,
+			},
+		},
+		{
+			name: "merged PRs could not be fetched",
+			content: canvascontent.Content{
+				OpenPRs:              []prparser.PR{openPR},
+				WIPPRs:               []prparser.PR{wipPR},
+				MergedPRsUnavailable: true,
+				GeneratedAt:          generatedAt,
 			},
 		},
 		{
@@ -182,6 +208,18 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 					testPR(prOptions{
 						number: 6, title: "Prototype canvas rendering", authorName: "Alice Anderson",
 						age: idleAge,
+					}),
+				},
+				GeneratedAt: generatedAt,
+			},
+		},
+		{
+			name: "merged PR with unknown merge time",
+			content: canvascontent.Content{
+				MergedPRs: []prparser.PR{
+					testPR(prOptions{
+						number: 10, title: "Restore the deleted branch", authorName: "Carol Clark",
+						age: oldAge,
 					}),
 				},
 				GeneratedAt: generatedAt,
@@ -302,6 +340,10 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 		number: 3, title: "Spike: replace mux with chi", authorName: "Carol Clark",
 		age: hoursAge, activityAge: durationPointer(hoursAge),
 	})
+	mergedPR := testPR(prOptions{
+		number: 9, title: "Drop the REST fallback", authorName: "Alice Anderson",
+		age: oldAge, mergeAge: durationPointer(idleAge),
+	})
 
 	testCases := []struct {
 		name    string
@@ -310,7 +352,10 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 		{
 			name: "flat",
 			content: canvascontent.Content{
-				OpenPRs: []prparser.PR{openPR}, WIPPRs: []prparser.PR{wipPR}, GeneratedAt: generatedAt,
+				OpenPRs:     []prparser.PR{openPR},
+				WIPPRs:      []prparser.PR{wipPR},
+				MergedPRs:   []prparser.PR{mergedPR},
+				GeneratedAt: generatedAt,
 			},
 		},
 		{
@@ -319,6 +364,7 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositories([]prparser.PR{openPR}),
 				GroupedByRepository:        true,
 				WIPPRs:                     []prparser.PR{wipPR},
+				MergedPRs:                  []prparser.PR{mergedPR},
 				GeneratedAt:                generatedAt,
 			},
 		},

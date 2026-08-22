@@ -25,6 +25,12 @@ type Client interface {
 		getFiltersForRepository func(repo models.Repository) config.Filters,
 		fetchOptions PRFetchOptions,
 	) (OpenPRsResult, error)
+	FindRecentlyMergedPRs(
+		ctx context.Context,
+		repositories []models.Repository,
+		getFiltersForRepository func(repo models.Repository) config.Filters,
+		mergedSince time.Time,
+	) ([]PR, error)
 	GetPRs(
 		ctx context.Context,
 		references []models.PullRequestRef,
@@ -106,6 +112,11 @@ const MaxPRsToFetch = 50
 // Drafts are capped lower than open PRs: only the most recently updated ones are worth showing.
 const MaxDraftPRsToFetch = 15
 
+// The canvas lists the newest merges of the past week, and no more than this many of them.
+const MaxMergedPRsToFetch = 15
+
+const RecentlyMergedWindow = 7 * 24 * time.Hour
+
 type PRFetchOptions struct {
 	IncludeDrafts bool
 }
@@ -154,6 +165,71 @@ func (c *client) FindOpenPRs(
 		OpenPRsCapped:  openPRsCapped,
 		DraftPRsCapped: draftPRsCapped,
 	}, nil
+}
+
+// Returns the PRs merged since the given moment, newest merge first. The window is a parameter
+// rather than a clock read, so the canvas footer and the merged list share one "now". The PRs
+// carry no reviewers and no snooze: a merged row names neither.
+func (c *client) FindRecentlyMergedPRs(
+	ctx context.Context,
+	repositories []models.Repository,
+	getFiltersForRepository func(repo models.Repository) config.Filters,
+	mergedSince time.Time,
+) ([]PR, error) {
+	log.Printf("Fetching recently merged pull requests for repositories: %v", repositories)
+
+	foundPRs, err := c.searchMergedPRs(ctx, repositories, mergedSince)
+	if err != nil {
+		return nil, err
+	}
+
+	// The search cutoff is a day, so it returns up to one extra day of merges.
+	inWindowPRs := utilities.Filter(foundPRs, isMergedSince(mergedSince))
+	mergedPRs := utilities.Filter(
+		inWindowPRs, getPRFilterFunc[PRResult](getFiltersForRepository, false),
+	)
+	mergedPRs = capMergedPRResultsToLimit(sortByMergeTimeNewestFirst(mergedPRs))
+	logFoundMergedPRs(mergedPRs)
+
+	return utilities.Map(mergedPRs, mergedPR), nil
+}
+
+func isMergedSince(mergedSince time.Time) func(result PRResult) bool {
+	return func(result PRResult) bool {
+		mergedAt := result.getPullRequest().GetMergedAt()
+		return mergedAt != nil && !mergedAt.Before(mergedSince)
+	}
+}
+
+// Search cannot order by merge time, so the order is made here.
+func sortByMergeTimeNewestFirst(mergedPRs []PRResult) []PRResult {
+	sorted := slices.Clone(mergedPRs)
+	slices.SortStableFunc(sorted, func(a, b PRResult) int {
+		return b.getPullRequest().GetMergedAt().Compare(*a.getPullRequest().GetMergedAt())
+	})
+	return sorted
+}
+
+func capMergedPRResultsToLimit(mergedPRs []PRResult) []PRResult {
+	if len(mergedPRs) <= MaxMergedPRsToFetch {
+		return mergedPRs
+	}
+	log.Printf(
+		"More than %d recently merged pull requests found (%d), including only the %d newest",
+		MaxMergedPRsToFetch, len(mergedPRs), MaxMergedPRsToFetch,
+	)
+	return mergedPRs[:MaxMergedPRsToFetch]
+}
+
+func logFoundMergedPRs(mergedPRs []PRResult) {
+	log.Printf("Found %d recently merged pull requests:", len(mergedPRs))
+	for _, result := range mergedPRs {
+		log.Printf("%s/%v", result.getRepository().GetPath(), result.getPullRequest().GetNumber())
+	}
+}
+
+func mergedPR(result PRResult) PR {
+	return PR{PullRequest: result.pr, Repository: result.repository}
 }
 
 func (c *client) GetPRs(

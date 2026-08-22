@@ -13,10 +13,13 @@ import (
 )
 
 const (
-	openPRsHeading = "## Open"
-	wipPRsHeading  = "## WIP"
-	noOpenPRsText  = "_No open PRs_"
-	noWIPPRsText   = "_No work in progress_"
+	openPRsHeading           = "## Open"
+	wipPRsHeading            = "## WIP"
+	mergedPRsHeading         = "## Merged"
+	noOpenPRsText            = "_No open PRs_"
+	noWIPPRsText             = "_No work in progress_"
+	noMergedPRsText          = "_No merged PRs_"
+	mergedPRsUnavailableText = "_Merged PRs could not be fetched_"
 )
 
 // The canvas has no top-level heading: Slack renders the canvas title as its own H1 at the top
@@ -24,6 +27,9 @@ const (
 func BuildMarkdown(content canvascontent.Content) string {
 	blocks := renderOpenPRsSection(content)
 	blocks = append(blocks, renderSection(wipPRsHeading, content.WIPPRs, renderWIPPRRow, noWIPPRsText))
+	blocks = append(blocks, renderSection(
+		mergedPRsHeading, content.MergedPRs, renderMergedPRRow, emptyMergedPRsText(content),
+	))
 	blocks = append(blocks, "---")
 	blocks = append(blocks, renderFooter(content)...)
 	return strings.Join(blocks, "\n\n") + "\n"
@@ -86,6 +92,26 @@ func renderWIPPRRow(pr prparser.PR) string {
 		row += " 💤"
 	}
 	return row
+}
+
+// A failed merged fetch is not an empty week, so the section says which of the two it is.
+func emptyMergedPRsText(content canvascontent.Content) string {
+	if content.MergedPRsUnavailable {
+		return mergedPRsUnavailableText
+	}
+	return noMergedPRsText
+}
+
+// A merged PR shows when it landed instead of its age, and never its reviewers: the section
+// answers what landed, not who reviewed it. Unknown merge time drops just that segment.
+func renderMergedPRRow(pr prparser.PR) string {
+	row := renderTitleLink(pr)
+
+	mergedText := pr.GetMergedText()
+	if mergedText != "" {
+		row += " _" + mergedText + "_"
+	}
+	return row + renderAuthor(pr) + " 🚀"
 }
 
 func renderTitleLink(pr prparser.PR) string {

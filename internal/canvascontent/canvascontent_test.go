@@ -20,6 +20,7 @@ type testPROptions struct {
 	draft          bool
 	createdAt      time.Time
 	lastActivityAt *time.Time
+	mergedAt       *time.Time
 }
 
 func testPR(options testPROptions) prparser.PR {
@@ -34,6 +35,7 @@ func testPR(options testPROptions) prparser.PR {
 				Draft:          options.draft,
 				CreatedAt:      options.createdAt,
 				LastActivityAt: options.lastActivityAt,
+				MergedAt:       options.mergedAt,
 			},
 			Repository: repository,
 		},
@@ -68,7 +70,7 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 		testPR(testPROptions{number: 3}),
 	}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
@@ -82,7 +84,7 @@ func TestGetContentKeepsGivenOpenPROrder(t *testing.T) {
 		testPR(testPROptions{number: 8, createdAt: generatedAt.Add(-30 * time.Hour)}),
 	}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
@@ -99,6 +101,7 @@ func TestGetContentGroupsOpenPRsByRepositoryAndKeepsWIPPRsFlat(t *testing.T) {
 
 	content := canvascontent.GetContent(
 		prs,
+		nil,
 		config.ContentInputs{GroupByRepository: true},
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
@@ -137,7 +140,7 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 		}),
 	}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
@@ -161,7 +164,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 				testPR(testPROptions{number: 1, draft: true, lastActivityAt: activityAgo(tc.inactivity)}),
 			}
 
-			content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+			content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 				GeneratedAt: generatedAt,
 			})
 
@@ -175,7 +178,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 	prs := []prparser.PR{testPR(testPROptions{number: 1, draft: true})}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
@@ -188,7 +191,7 @@ func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 		testPR(testPROptions{number: 2, draft: true, lastActivityAt: activityAgo(time.Hour)}),
 	}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt:   generatedAt,
 		OpenPRsCapped: true,
 		WIPPRsCapped:  true,
@@ -210,7 +213,7 @@ func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
 		testPR(testPROptions{number: 2, draft: true, lastActivityAt: activityAgo(time.Hour)}),
 	}
 
-	content := canvascontent.GetContent(prs, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
@@ -221,8 +224,55 @@ func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
 	}
 }
 
+// The merged PRs come from their own fetch, so they are never derived from the open PR list.
+func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
+	mergedPRs := []prparser.PR{
+		testPR(testPROptions{number: 1, mergedAt: activityAgo(3 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, mergedAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 3, mergedAt: activityAgo(24 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(
+		nil, mergedPRs, config.ContentInputs{}, canvascontent.GetContentOptions{
+			GeneratedAt: generatedAt,
+		},
+	)
+
+	assertNumbers(t, "merged PRs", prNumbers(content.MergedPRs), []int{2, 3, 1})
+}
+
+// Grouping shapes the open section only, as it does for the WIP section.
+func TestGetContentKeepsMergedPRsFlatWhenGrouping(t *testing.T) {
+	mergedPRs := []prparser.PR{
+		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(2 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(
+		nil,
+		mergedPRs,
+		config.ContentInputs{GroupByRepository: true},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	assertNumbers(t, "merged PRs", prNumbers(content.MergedPRs), []int{1, 2})
+}
+
+func TestGetContentTakesMergedPRsUnavailableFromOptions(t *testing.T) {
+	content := canvascontent.GetContent(
+		nil, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+			GeneratedAt:          generatedAt,
+			MergedPRsUnavailable: true,
+		},
+	)
+
+	if !content.MergedPRsUnavailable {
+		t.Error("expected the merged PRs to be reported as unavailable")
+	}
+}
+
 func TestGetContentTakesGeneratedAtFromOptions(t *testing.T) {
-	content := canvascontent.GetContent(nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+	content := canvascontent.GetContent(nil, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
