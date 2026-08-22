@@ -1,6 +1,7 @@
 // Package prparser enriches raw GitHub PR data with additional metadata
-// for message display. It handles Slack user ID mapping, age calculation,
-// and sorting of PRs for presentation.
+// for message and canvas display. It handles Slack user ID mapping, age and
+// idleness calculation, sorting, and grouping by repository. It also renders
+// the reviewer, activity and merged-time texts a PR row shows.
 package prparser
 
 import (

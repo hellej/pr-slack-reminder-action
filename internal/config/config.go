@@ -1,6 +1,7 @@
 // Package config handles GitHub Action input parsing and validation.
 // It converts environment variables to structured configuration with
-// support for repository-specific filters, user mappings, and content settings.
+// support for the run mode, repository-specific filters, user mappings,
+// content settings, and the PR tracker canvas link.
 package config
 
 import (

@@ -1,6 +1,8 @@
-// Package githubclient provides GitHub API integration for fetching PR data.
-// It fetches PR and review data in concurrent batches, and applies
-// repository-specific and global filters.
+// Package githubclient provides GitHub API integration for reading PR data.
+// It lists open PRs, fetches PRs by reference, and searches recently merged ones,
+// enriching the first two with reviews and comments in concurrent batches. It applies
+// repository-specific and global filters, detects snooze comments, and fetches the
+// prior run's state from a GitHub Actions artifact.
 package githubclient
 
 import (
