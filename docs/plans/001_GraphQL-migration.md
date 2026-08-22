@@ -461,13 +461,12 @@ Only after Step 7 is green.
 ### 9. Docs and spec sync (`githubclient.spec.md`, `prparser.spec.md`, `messagebuilder.spec.md`, `README.md`)
 
 - `githubclient.spec.md`: two-phase GraphQL fetch, the new per-PR caps (100 reviews, 100 timeline comments, review comments no longer fetched, so the "100 PR comments" cap is gone), the 100-label page, the four error classes, the collaborator mapper's null/bot/other-type handling, bot login normalization, the raised `PullRequestListTimeout`, the transport retry, and that the artifact path remains REST. The "throttled to 3 concurrent calls" line now describes phase-2 batches.
-- `prparser.spec.md` and `messagebuilder.spec.md`: author and reviewer rendering now shows display names where available, login otherwise.
+- `messagebuilder.spec.md`: author and reviewer rendering now shows display names where available, login otherwise. `prparser.spec.md` gets no such bullet: it only attaches Slack IDs keyed by login, so the name resolution belongs to `githubclient.spec.md` and the rendering to `messagebuilder.spec.md`.
 - README: note in the permissions section that PR data is read via the GraphQL API and that the permissions are unchanged. `README.md:216`'s trailing comment — `pull-requests: read # listing/fetching PRs, reviews and review comments` — drops the review comments. `README.md:217` (`issues: read # reading PR comments (incl. /snooze comments)`) is unchanged: GraphQL reads the same timeline through `pullRequest.comments`, and no doc establishes that `pull-requests: read` alone covers it (see "Target shape"). Release notes call out that reviewer names, and unmapped author names, start rendering as GitHub display names instead of logins.
 - No `action.yml` change, so `go run .github/scripts/check_inputs.go` is unaffected.
 - Done, 2026-08-17. Beyond the listed items, the sync added bullets the migrated code made visible: per-call timeouts, the unpaginated first-100 open PRs per repository, an enrichment failure also losing that PR's snooze, `PENDING` reviews contributing no reviewer, an approval never being cancelled by a later `CHANGES_REQUESTED`, and the non-closed state fallback.
 - A review pass over the written specs then fixed inaccuracies they inherited: the filters bullet claimed a term allow-list that `config.Filters` never had, `GetPRs`'s failure scoping ignored field errors, the zero-timestamp old-PR bullet ignored the threshold-0 guard, and `messagebuilder.spec.md` called truncation silent while the code logs it.
-- Deviation: `prparser.spec.md` got no display-name bullet after all. It only attaches Slack IDs keyed by login; the name resolution belongs to `githubclient.spec.md` and the rendering to `messagebuilder.spec.md`, where both now sit.
-- Deviation: `README.md`'s example screenshot (`docs/examples/example_1.png`) still shows reviewer logins, which now render as display names. Not re-recorded.
+- `README.md`'s example screenshot (`docs/examples/example_1.png`) keeps showing reviewer logins, which now render as display names. Not re-recorded.
 
 ## Consequences
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/slack-go/slack"
 )
 
@@ -115,11 +116,11 @@ func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 	if pr.IsOldPR {
 		ageElements = append(ageElements,
 			slack.NewRichTextSectionTextElement(" 🚨 ", &slack.RichTextSectionTextStyle{}),
-			slack.NewRichTextSectionTextElement(pr.GetPRAgeText()+" old", &slack.RichTextSectionTextStyle{Bold: true, Code: true}),
+			slack.NewRichTextSectionTextElement(pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Bold: true, Code: true}),
 		)
 	} else {
 		ageElements = append(ageElements,
-			slack.NewRichTextSectionTextElement(" "+pr.GetPRAgeText()+" ago", &slack.RichTextSectionTextStyle{Italic: true}),
+			slack.NewRichTextSectionTextElement(" "+pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Italic: true}),
 		)
 	}
 
@@ -158,57 +159,10 @@ func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
 }
 
 func getReviewersElements(pr prparser.PR) []slack.RichTextSectionElement {
-	var elements []slack.RichTextSectionElement
-	approverCount := len(pr.Approvers)
-	commenterCount := len(pr.Commenters)
-
-	if approverCount == 0 && commenterCount == 0 {
-		return elements
-	}
-
-	reviewerTextPrefix := " (💬 "
-	if len(pr.Approvers) > 0 {
-		reviewerTextPrefix = " (✅ "
-	}
-	elements = append(elements, slack.NewRichTextSectionTextElement(
-		reviewerTextPrefix, &slack.RichTextSectionTextStyle{},
-	))
-
-	for idx, approver := range pr.Approvers {
-		if idx > 0 {
-			elements = append(elements, slack.NewRichTextSectionTextElement(
-				", ", &slack.RichTextSectionTextStyle{},
-			))
-		}
-		elements = append(elements, slack.NewRichTextSectionTextElement(
-			approver.GetGitHubName(), &slack.RichTextSectionTextStyle{},
-		))
-	}
-
-	if commenterCount == 0 {
-		return append(elements, slack.NewRichTextSectionTextElement(
-			")", &slack.RichTextSectionTextStyle{},
-		))
-	}
-
-	if reviewerTextPrefix == " (✅ " {
-		elements = append(elements, slack.NewRichTextSectionTextElement(
-			" / 💬 ", &slack.RichTextSectionTextStyle{},
-		))
-	}
-
-	for idx, commenter := range pr.Commenters {
-		if idx > 0 {
-			elements = append(elements, slack.NewRichTextSectionTextElement(
-				", ", &slack.RichTextSectionTextStyle{},
-			))
-		}
-		elements = append(elements, slack.NewRichTextSectionTextElement(
-			commenter.GetGitHubName(), &slack.RichTextSectionTextStyle{},
-		))
-	}
-
-	return append(elements, slack.NewRichTextSectionTextElement(
-		")", &slack.RichTextSectionTextStyle{},
-	))
+	return utilities.Map(
+		prparser.GetReviewersTextSegments(pr.Approvers, pr.Commenters),
+		func(segment string) slack.RichTextSectionElement {
+			return slack.NewRichTextSectionTextElement(segment, &slack.RichTextSectionTextStyle{})
+		},
+	)
 }

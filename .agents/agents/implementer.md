@@ -13,9 +13,14 @@ Follow the `coding` skill's rules exactly. They are mandatory, not advice.
 
 Implement only what was asked.
 
-Record every deviation from a plan step in that step's own text in the plan file, not
-only in your report. A stale file list, call-site count or line number is a deviation.
-Keep the edit inside the step you are implementing.
+When the code deviates from a plan step, update that step's own text in the plan file, not
+only your report. A stale file list, call-site count or line number counts. Rewrite the
+step to describe what you built, keeping the reasoning: a plan reads as one piece written
+at once, never as text plus a note contradicting it. Keep the edit inside the step you
+are implementing.
+
+A test deriving its expectation from the value under test asserts nothing. Pin the value
+literally, and feed the boundary itself.
 
 Do not commit. Leave the changes in the working tree for review.
 
@@ -24,6 +29,6 @@ failing test first, then the fix. Say so if a finding is wrong instead of changi
 working code to satisfy it.
 
 Report back: every file you changed or added, including untracked ones, the test result,
-each deviation from the plan and where you recorded it, and anything you had to decide
-that the task left open. Write it for a reviewer who has no context beyond the diff, so
-state facts that feel obvious to you.
+each deviation from the plan, and anything you had to decide that the task left open.
+Write it for a reviewer who has no context beyond the diff, so state facts that feel
+obvious to you.

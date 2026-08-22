@@ -25,9 +25,13 @@ type MockGitHubClientOptions struct {
 	ErrByPRNumber              map[int]error
 	PRs                        []*github.PullRequest
 	PRsByRepo                  map[string][]*github.PullRequest
+	MergedPRs                  []*github.PullRequest
+	MergedPRsByRepo            map[string][]*github.PullRequest
+	MergedPRsSearchError       error // fails the merged PR search only
 	ListPRsResponseStatus      int
 	ReviewsByPRNumber          map[int][]*github.PullRequestReview
 	TimelineCommentsByPRNumber map[int][]*github.IssueComment
+	CommitsByPRNumber          map[int]time.Time // head commit date per PR; unset renders an empty commits connection
 	PRServiceError             error
 	IssueServiceError          error
 	MockStateForUpdateMode     *state.State
@@ -95,7 +99,8 @@ func newUser(login, name string, userType ...string) *github.User {
 }
 
 // Renders the fixture options into GraphQL responses. The phase is read off the query text, and
-// each alias is bound from the request variables: rN to ownerN/nameN, pN to ownerN/nameN/numN.
+// each alias is bound from the request variables: rN to ownerN/nameN, pN to ownerN/nameN/numN,
+// sN to the repository named in the qN search query string.
 type GraphQLTransport struct {
 	opts MockGitHubClientOptions
 }
@@ -117,6 +122,9 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
 		return t.enrichedPRsResponse(request.Variables)
+	}
+	if strings.Contains(request.Query, "search(") {
+		return t.mergedPRsResponse(request.Variables)
 	}
 	return 0, nil, errors.New("unrecognized GraphQL query: " + request.Query)
 }
@@ -199,6 +207,34 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 	return marshalResponse(response)
 }
 
+// The merged PR search has its own failure knob: a canvas refresh fetches merged PRs and open
+// PRs separately, and only one of the two failing is the interesting case.
+func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.MergedPRsSearchError != nil {
+		body, err := json.Marshal(
+			map[string]string{"message": t.opts.MergedPRsSearchError.Error()},
+		)
+		return http.StatusInternalServerError, body, err
+	}
+
+	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
+	for index, repoName := range searchedRepositoryNames(variables) {
+		mergedPRs := t.mergedPRs(repoName)
+		response.Data[fmt.Sprintf("s%d", index)] = map[string]any{
+			"issueCount": len(mergedPRs),
+			"nodes":      utilities.Map(mergedPRs, mergedPullRequestNodeJSON),
+		}
+	}
+	return marshalResponse(response)
+}
+
+func (t GraphQLTransport) mergedPRs(repoName string) []*github.PullRequest {
+	if t.opts.MergedPRsByRepo != nil {
+		return t.opts.MergedPRsByRepo[repoName]
+	}
+	return t.opts.MergedPRs
+}
+
 func (t GraphQLTransport) openPRs(repoName string) []*github.PullRequest {
 	if t.opts.PRsByRepo != nil {
 		return t.opts.PRsByRepo[repoName]
@@ -234,10 +270,20 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["state"] = pullRequestNodeState(pr)
 	node["merged"] = pr.GetMerged()
 	node["labels"] = labelsJSON(pr)
-	node["commits"] = connectionJSON([]map[string]any{})
+	node["commits"] = t.commitsJSON(number)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)
 	return node
+}
+
+func (t GraphQLTransport) commitsJSON(number int) map[string]any {
+	committedDate, isSet := t.opts.CommitsByPRNumber[number]
+	if !isSet {
+		return connectionJSON([]map[string]any{})
+	}
+	return connectionJSON([]map[string]any{
+		{"commit": map[string]any{"committedDate": committedDate}},
+	})
 }
 
 func pullRequestNodeState(pr *github.PullRequest) string {
@@ -262,6 +308,27 @@ func openPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
 	node := pullRequestScalarsJSON(pr)
 	node["labels"] = labelsJSON(pr)
 	return node
+}
+
+// The search selects neither isDraft, updatedAt nor headRefOid.
+func mergedPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
+	return map[string]any{
+		"number":    pr.GetNumber(),
+		"title":     pr.GetTitle(),
+		"url":       pr.GetHTMLURL(),
+		"createdAt": pr.GetCreatedAt().Time,
+		"mergedAt":  mergedAtJSON(pr),
+		"author":    authorNodeJSON(pr.GetUser()),
+		"labels":    labelsJSON(pr),
+	}
+}
+
+// A PR fixture with no merge timestamp renders the null GitHub returns for an unmerged PR.
+func mergedAtJSON(pr *github.PullRequest) any {
+	if pr.MergedAt == nil {
+		return nil
+	}
+	return pr.MergedAt.Time
 }
 
 func labelsJSON(pr *github.PullRequest) map[string]any {
@@ -349,6 +416,31 @@ func postedRepositoryNames(variables map[string]any) []string {
 		}
 		names = append(names, name)
 	}
+}
+
+// The search query declares no name variable, since GraphQL rejects an operation declaring a
+// variable it never uses. The repository comes out of the qN query string's repo: qualifier.
+func searchedRepositoryNames(variables map[string]any) []string {
+	names := []string{}
+	for index := 0; ; index++ {
+		searchQuery, isSet := variables[fmt.Sprintf("q%d", index)].(string)
+		if !isSet {
+			return names
+		}
+		names = append(names, repositoryNameOfSearchQuery(searchQuery))
+	}
+}
+
+func repositoryNameOfSearchQuery(searchQuery string) string {
+	for _, qualifier := range strings.Fields(searchQuery) {
+		path, isRepositoryQualifier := strings.CutPrefix(qualifier, "repo:")
+		if !isRepositoryQualifier {
+			continue
+		}
+		_, name, _ := strings.Cut(path, "/")
+		return name
+	}
+	return ""
 }
 
 func postedPullRequestRefs(variables map[string]any) []pullRequestRef {

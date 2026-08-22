@@ -8,7 +8,7 @@ Structures parsed PRs and content settings into a `Content` value ready for `mes
 - No-PRs case: only the "no PRs" message is set
 - Otherwise a summary line reports the open PR count (singular phrasing for exactly 1)
 - Flat case: the configured heading has its `<pr_count>` placeholder replaced with the PR count
-- Grouped case: PRs are bucketed by repository, each bucket links to that repository's GitHub pulls page, buckets are ordered alphabetically by repository path
+- Grouped case: PRs are bucketed by repository via `prparser.GroupPRsByRepositories` (alphabetical by repository path); this package adds each bucket's heading prefix, link label and link to the repository's GitHub pulls page (`models.Repository.GetPullsURL`)
 - `Content.HasPRs()` reports whether there's anything to show, in either mode
 
 ## Doesn't Do

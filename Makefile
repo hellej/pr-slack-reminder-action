@@ -2,6 +2,8 @@ TEST=go test -race ./...
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
+SNAPSHOT_PACKAGES=./cmd/pr-slack-reminder ./internal/canvasbuilder
+SNAPSHOT_DIRS=cmd/pr-slack-reminder/testdata internal/canvasbuilder/testdata
 SEMVER =
 
 
@@ -41,8 +43,8 @@ clean-test-cache:
 	@echo "Cleared Go test and build caches"
 
 update-test-snapshots:
-	go test ./cmd/pr-slack-reminder -count=1 -update-snapshots
-	@git add -N cmd/pr-slack-reminder/testdata && git diff --stat -- cmd/pr-slack-reminder/testdata
+	go test $(SNAPSHOT_PACKAGES) -count=1 -update-snapshots
+	@git add -N $(SNAPSHOT_DIRS) && git diff --stat -- $(SNAPSHOT_DIRS)
 
 test-with-coverage: clean-test-cache
 	$(TEST) -coverprofile=coverage.out -covermode=atomic -coverpkg=./cmd/...,./internal/...

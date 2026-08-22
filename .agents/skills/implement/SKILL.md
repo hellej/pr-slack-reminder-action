@@ -1,7 +1,7 @@
 ---
 name: implement
-description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from docs/plans/, or the user runs /implement."
-argument-hint: "The plan file and step, e.g. docs/plans/001_GraphQL-migration.md step 3"
+description: "Run an implementer and reviewer sub-agent loop over one plan step, up to four rounds, until the reviewer returns PASS. Use when: implementing a step from a plan file, or the user runs /implement."
+argument-hint: "The plan file and step, e.g. .local/plans/001_GraphQL-migration.md step 3, or a task with no plan"
 ---
 
 # Implement and Review Loop
@@ -13,11 +13,21 @@ findings.
 
 ## Scope
 
-- One plan step (or planned batch) per run. If the user names several, run this loop once per step, in order
-- Round 1 starts on a tree holding only this step's work. Between chained steps, commit or
-  hand back, otherwise the next reviewer reads two steps as one diff
+- Check what of the plan is already implemented, and continue from there
+- One plan step or phase (a group of related steps) per run
+- Confirm the planned scope of the run with the user before starting
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the step
+
+## No Plan File
+
+Write one. The rest of this skill reads a plan step.
+
+- Draft one step to `.local/implement-<slug>.md`, already gitignored
+- Give it what this skill reads: brief motivation, what to change, the acceptance criteria, what it must not do, and the test cases
+- Verify its claims against the tree before showing it, per Acceptance Criteria below
+- Confirm it with the user before round 1
+- If drafting turns up more than one step's worth of work, stop and hand back to the [plan skill](../plan/SKILL.md)
 
 ## Acceptance Criteria
 
@@ -30,9 +40,13 @@ the whole step:
 - A regression net the step must leave untouched, snapshots and golden files above all
 - Wording the step says is preserved verbatim
 - What the step must **not** do, usually a later step's work
+- Test cases the step lists are a minimum. A guard they don't cover needs one too
 
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
+
+Work out where the regression net is blind before round 1 and give it to both agents:
+the implementer tests those spots, the reviewer mutates them.
 
 If the step states no criteria, say so and carry on. Do not invent them.
 
@@ -49,9 +63,9 @@ implementer where the plan has gone stale.
    - The contracts it consumes from steps already landed, by file and symbol
    - Findings carried forward from the previous step's review
 2. When it reports, spawn the `reviewer` agent. Give it the same step, the implementer's
-   report, and where the regression net is blind: name the check that should catch a
-   regression here, and what it cannot see. A mock renders whatever the code asks it for,
-   so a wrong query shape or page size passes it
+   report, and the blind spots above. Tell it to check the report's claims against the
+   tree. A mock renders whatever the code asks it for, so a wrong query shape or page
+   size passes it
 3. Read the verdict:
    - `PASS`: clear any open nits as below, then stop
    - `CHANGES NEEDED`: send the findings to the implementer, then ask the reviewer to
@@ -140,7 +154,7 @@ Report to the user:
 - Each acceptance criterion, and whether it holds. Check them yourself, do not relay
   either agent's word for it
 - What changed, by file
-- Each deviation from the plan, and where the implementer recorded it
+- Each deviation from the plan, and how the step now reads
 - Nits, cleared or left, and why any was left
 - Any finding the implementer rejected, and any the reviewer labelled `unverified`
 
@@ -148,9 +162,13 @@ Leave the changes uncommitted, unless the user asked you to commit between chain
 
 ## What the Run Taught
 
-Last, report what this run showed about the loop itself. Evidence from this run only.
+Last, two lists. Evidence from this run only.
 
-Examples, not a checklist:
+- Both lists empty is the normal outcome. Most agent slop has no fix
+- Report a lesson only if it cost this run something, or you have seen it on more than
+  one step
+
+**Lessons.** What this run showed about the loop. One line each, three at most. Examples:
 
 - A round spent on something the brief could have prevented
 - A finding the reviewer has now raised on more than one step
@@ -158,8 +176,12 @@ Examples, not a checklist:
 - Work an agent redid after a handover
 - A rule either agent ignored, or that made the work worse
 
-Say what happened, then propose the change: which file it points at (this skill,
-`implementer.md`, or `reviewer.md`), and what to add, cut or reword. A cut counts as much
-as an addition. Never edit these three mid-loop.
+**Proposed changes.** Only where a file edit would have prevented a lesson above.
 
-Nothing to report is the normal outcome.
+- Read the file first. These rules are mostly already written, and a duplicate proposal
+  is worse than none
+- Name the file: this skill, `implementer.md`, or `reviewer.md`
+- Say what to add, cut or reword. A cut counts as much as an addition
+- Small is fine: one sentence made explicit or less confusing is a real fix
+- A lesson with no proposed change is a complete entry
+- Never edit these three files mid-loop

@@ -88,6 +88,39 @@ func TestCollaboratorFromAuthorNode(t *testing.T) {
 	}
 }
 
+func TestPullRequestFromNodeMapsStateAndMerged(t *testing.T) {
+	tests := []struct {
+		name           string
+		nodeState      string
+		nodeMerged     bool
+		expectedState  string
+		expectedMerged bool
+	}{
+		{name: "open PR", nodeState: "OPEN", expectedState: "open"},
+		{name: "closed PR without merge", nodeState: "CLOSED", expectedState: "closed"},
+		{
+			name: "merged PR", nodeState: "MERGED", nodeMerged: true,
+			expectedState: "closed", expectedMerged: true,
+		},
+		{name: "missing state renders as open", expectedState: "open"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pullRequest := pullRequestFromNode(
+				pullRequestNode{State: tt.nodeState, Merged: tt.nodeMerged},
+			)
+
+			if pullRequest.GetState() != tt.expectedState {
+				t.Errorf("GetState() = %q, expected %q", pullRequest.GetState(), tt.expectedState)
+			}
+			if pullRequest.GetMerged() != tt.expectedMerged {
+				t.Errorf("GetMerged() = %t, expected %t", pullRequest.GetMerged(), tt.expectedMerged)
+			}
+		})
+	}
+}
+
 func TestTimelineCommentFromNode(t *testing.T) {
 	createdAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 

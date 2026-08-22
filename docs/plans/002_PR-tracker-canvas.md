@@ -15,7 +15,7 @@ The "PR tracker canvas": a Slack canvas this action keeps updated with a live vi
 - Draft PRs with no activity for 60 days are always excluded.
 - One new input, off by default, no other new configurability.
 - The input takes the canvas link the user copies from Slack. The action parses the ID out of it.
-- The reminder message links to the canvas, so the transient message is a way in to the persistent view.
+- The canvas is a tab in the reminder channel, so it is one click from the message. The message itself is unchanged (see Step 8).
 
 ### Canvas content format
 
@@ -37,7 +37,7 @@ _Updated 2026-08-08 06:15 UTC_
 
 The two section headings are fixed strings, rendered as `## Open PRs` and `## Work in Progress` (shown bold above only so this example renders). When grouping is on, each repository is an `###` sub-heading under `## Open PRs`, no repeated top-level heading per repository.
 
-The canvas closes with a blank line, a `---` divider and a `_Updated <YYYY-MM-DD HH:MM UTC>_` line, preceded by a `_Showing the newest …_` line when a fetch cap trimmed a section (Step 6). A canvas nobody has refreshed (action disabled, failing, or not yet run) otherwise looks identical to a current one, which defeats the point of a live view. UTC because there is no timezone input.
+The canvas closes with a blank line, a `---` divider and a `_Updated <YYYY-MM-DD HH:MM UTC>_` line, preceded by a `_Fetch limited to the newest …_` line when a fetch cap trimmed a section (Step 6). A canvas nobody has refreshed (action disabled, failing, or not yet run) otherwise looks identical to a current one, which defeats the point of a live view. UTC because there is no timezone input.
 
 No top-level heading. The canvas title lives on the tab, not in the document, and survives a full content replace (verified on `#pr-reminders-test`, 2026-08-08).
 
@@ -90,12 +90,12 @@ A future third canvas section listing recently closed/merged PRs stays additive.
 ## Target shape
 
 - `action.yml`: new optional input `pr-tracker-canvas-link` (string, no default). Empty/unset means the feature is off, matching the "empty means unused" requirement literally. The user creates and owns the canvas entirely themselves (see Non-goals).
-- `config`: parses the link once into a canvas ID + canvas URL, so no other package parses it again. Both are always known when the feature is on.
+- `config`: parses the link once into a canvas ID, so no other package parses it again.
 - `githubclient`: `Client.FindOpenPRs` gains an explicit `PRFetchOptions{IncludeDrafts bool}` parameter (zero value means today's behavior exactly) and returns `OpenPRsResult{PRs []PR; OpenPRsCapped, DraftPRsCapped bool}` instead of a bare slice. Draft staleness is not a fetch-time filter: `LastActivityAt` itself comes from enrichment, so it isn't known until after the fetch completes (Step 3). `canvascontent` prunes stale drafts afterward (Step 5). Every enriched `PR` already carries a head-commit date once Step 3 lands: the GraphQL enrichment query already selects `commits(last: 1)` for every PR (open or draft) as of [001](001_GraphQL-migration.md), so no extra API call is added for it. `PullRequest` gains `LastActivityAt *time.Time`.
 - `prparser`: `PR` gains activity display helpers (based on `LastActivityAt`) and a most-recent-activity sort, used only by the draft section.
 - New `canvascontent` package (mirrors `messagecontent`, Go code stays medium-named `canvas*`, no need to spell out "PR" internally): builds a canvas-ready `Content`, open PRs (oldest first, grouped/flat per `group-by-repository`) plus draft PRs (always flat regardless of that input, most-recent-activity first, drafts inactive over 2 months excluded).
 - New `canvasbuilder` package (mirrors `messagebuilder`): renders `canvascontent.Content` to Slack canvas markdown, reusing display-text helpers extracted from `messagebuilder` in the pre-refactor.
-- `messagecontent`/`messagebuilder`: the reminder message gains a trailing canvas link row whenever the feature is on.
+- `messagecontent`/`messagebuilder`: unchanged. The reminder message is byte-identical whether the canvas is on or off (Step 8).
 - `slackclient`: gains a method that fully replaces a canvas's content by ID, one `canvases.edit` call, `replace` operation, `section_id` omitted.
 - `run.go`: if `pr-tracker-canvas-link` is set, gets open + draft PRs and overwrites the canvas. `post` mode shares the message's fetch (with drafts switched on); `update` mode fetches separately, since its message path is state-tracked (Step 7). The canvas refresh and the message path are independent attempts, either can fail without stopping the other, and their errors are joined at the end, so the action fails if either did.
 - Permissions:
@@ -118,7 +118,7 @@ Non-breaking / **minor** release. New optional input, default off, no change to 
 5. `canvascontent`: build canvas content
 6. `canvasbuilder`: render canvas content to markdown
 7. `run.go`: wire up the canvas refresh
-8. Reminder message: link to the canvas
+8. Reminder message: canvas link footer, built and then removed
 9. Docs & permissions: README, `pr-reminder.yml`, `e2e-tests/action.yml`
 10. Spec sync
 
@@ -132,8 +132,10 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
 
 - Add `PRFetchOptions{IncludeDrafts bool}` and thread it through `Client.FindOpenPRs` and `getPRFilterFunc`, replacing the hardcoded `!pullRequest.GetDraft()` in `getPRFilterFunc[T repositoryPullRequest]` (`githubclient.go`). `Client.GetPRs` does not take it: update mode re-fetches state-tracked refs, which are never drafts, since `state.SavePostState` only ever records the message path's non-draft PRs.
 - GraphQL's phase-1 listing already returns drafts. `openPullRequestsFragment` (`graphqlfetch.go`) already selects `isDraft` for every `states: OPEN` PR, draft or not: today's exclusion is entirely client-side, in `getPRFilterFunc`. No query change is needed to include drafts in `listOpenPRs`, only a parameterized filter.
-- Update the two call sites in `run.go` to pass `PRFetchOptions{}` (zero value). Behavior must stay byte-for-byte identical to today.
-- Add `capOpenPRResultsToLimit(prResults []PRResult, includeDrafts bool) ([]PRResult, capFlags)`, called from `FindOpenPRs` in place of today's `capPRsToLimit(prResults)`. When `includeDrafts` is off, it delegates straight to the existing generic `capPRsToLimit[PRResult]`, unchanged. When on, it splits the input by `pr.GetDraft()` (two `utilities.Filter` calls, `PRResult` carries no partition helper today) and caps each bucket separately: non-drafts through the existing `capPRsToLimit` at `MaxPRsToFetch` (50, unchanged), drafts through the same function at a new `MaxDraftPRsToFetch` (15). `capPRsToLimit` itself is untouched either way, since a shared capped slice would let drafts displace open PRs the message would otherwise show.
+- Update the one `FindOpenPRs` call site in `run.go` (line 60) to pass `PRFetchOptions{}` (zero value). The other GitHub call there is `GetPRs`, which doesn't take the options. Behavior must stay byte-for-byte identical to today.
+- Add `capOpenPRResultsToLimit(prResults []PRResult, includeDrafts bool) (capped []PRResult, openPRsCapped, draftPRsCapped bool)`, called from `FindOpenPRs` in place of today's `capPRsToLimit(prResults)`. When `includeDrafts` is off, it delegates straight to the existing generic `capPRsToLimit[PRResult]`, unchanged. When on, it splits the input by `pr.GetDraft()` (two `utilities.Filter` calls, `PRResult` carries no partition helper today) and caps each bucket separately: non-drafts through the existing `capPRsToLimit` at `MaxPRsToFetch` (50, unchanged), drafts through a new `capDraftPRResultsToLimit([]PRResult) []PRResult` at `MaxDraftPRsToFetch` (15). `capPRsToLimit` itself is untouched either way, since a shared capped slice would let drafts displace open PRs the message would otherwise show.
+  - Drafts get their own capping function instead of a parameterized `capPRsToLimit`: that one hardcodes both its limit and its sort (created desc, then updated desc), and the draft bucket needs a different limit and an updated-desc sort. A second concrete function keeps `capPRsToLimit` literally untouched and adds no limit/sort parameters, at the cost of ~6 duplicated lines (AGENTS.md: minor duplication over speculative parameterization).
+  - Three return values rather than a `capFlags` struct, which would be built once and immediately copied into `OpenPRsResult`.
 - `Client.GetPRs` keeps calling `capPRsToLimit[PR]` directly, unmodified: it never sees drafts (see above), so it needs no per-kind split.
 - 15, not 50: a WIP list that long is unreadable, the section is ordered newest-activity-first precisely because only its top is interesting. This is a readability choice, not a GraphQL cost-saving one (see Consequences).
 - The draft bucket sorts by `updated_at` desc, not creation date, so an over-cap draft fetch keeps the most recently active ones (the set the canvas orders and prunes by, Steps 4-5). Not the head-commit date: capping runs on `PRResult`, before enrichment (Step 3), so `LastActivityAt` doesn't exist yet, and `updated_at` is the best proxy available at that point. The non-draft bucket keeps today's `capPRsToLimit` sort (creation date, then update date).
@@ -147,14 +149,15 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
 - Extract `messagecontent.groupPRsByRepositories`'s bucketing (by repository path, alphabetical) into an exported helper on `prparser`, since `canvascontent` needs identical grouping for its open-PR section.
 - The helper returns `[]prparser.RepositoryPRs` (`{Repository models.Repository; PRs []PR}`) and no display strings. `HeadingPrefix` and `RepositoryLinkLabel` stay in `messagecontent`, which maps the groups into its existing `PRsOfRepository`. `messagecontent.PRsOfRepository` and `messagebuilder` are untouched, and Block Kit wording stays out of `prparser`.
 - Move the pulls-page URL onto `models.Repository` as `GetPullsURL()` (`https://github.com/<path>/pulls`), next to `GetPath()`. `messagecontent` and `canvasbuilder` (Step 6) both call it, so the format string isn't written out in two packages. `messagecontent.groupPRsByRepositories` builds this URL inline today (`fmt.Sprintf("https://github.com/%s/pulls", repo.GetPath())`); this step is where it moves.
-- Test coverage gap found: there is no `messagecontent_test.go` at all. Grouping is only exercised indirectly through `messagebuilder_test.go`'s fixed two-repository example and `main_test.go`'s integration cases. Add a direct unit test for the extracted helper (alphabetical ordering with out-of-order input, link format, single- and multi-repository bucketing) before/while moving it, so the extraction has a real safety net instead of only indirect coverage.
+- Test coverage gap found: there is no `messagecontent_test.go` at all. Grouping is only exercised indirectly through `messagebuilder_test.go`'s fixed two-repository example and `main_test.go`'s integration cases. Add a direct unit test for the extracted helper (alphabetical ordering with out-of-order input, single- and multi-repository bucketing) before/while moving it, so the extraction has a real safety net instead of only indirect coverage. The helper returns no URL once the format string moves onto `models.Repository`, so the link format is covered on its own in `internal/models/repository_test.go` (`TestRepositoryGetPullsURL`) and no `messagecontent_test.go` is added.
 - `messagecontent` calls the extracted helper. Behavior and existing tests unchanged.
 
 ### R3. Refactor: shared PR display text
 
 - Extract from `messagebuilder` into methods on `prparser.PR` (or a small shared helper file), as plain strings/booleans instead of `slack.RichTextSectionElement`s:
-  - reviewers summary text (✅/💬 grouping of approvers/commenters), taking approvers and commenters as explicit parameters rather than reading `pr.Approvers`/`pr.Commenters` directly, so the canvas's WIP rows (Step 6) can call it with an empty approvers slice and get the commenters-only 💬 rendering without a second code path.
-  - age text: `N days old` when `PR.IsOldPR`, `N days ago` otherwise. Text only, the 🚨 marker stays in each builder, which places it outside its own styled element (bold+code in `messagebuilder`, a code span in `canvasbuilder`). Open PR rows only, the WIP section must not call it (see Goals).
+  - reviewers summary text (✅/💬 grouping of approvers/commenters) as `GetReviewersTextSegments(approvers, commenters []Collaborator) []string`, taking approvers and commenters as explicit parameters rather than reading `pr.Approvers`/`pr.Commenters` directly, so the canvas's WIP rows (Step 6) can call it with an empty approvers slice and get the commenters-only 💬 rendering without a second code path.
+    - One text run per segment (`" (✅ "`, `"Alice"`, `", "`, …), not a single joined string. `messagebuilder` emits one Block Kit text element per run today, so a joined string would collapse them into one element and change every payload that lists reviewers, which the `cmd/pr-slack-reminder/testdata/snapshots/` golden files pin. Payloads with no reviewers stay byte-identical either way. Segments are still plain strings. Step 6 joins them, and can escape every segment, since no glue segment contains an escapable character.
+  - age text as `PR.GetPRAgeDisplayText()`: `N days old` when `PR.IsOldPR`, `N days ago` otherwise. It sits alongside the existing `GetPRAgeText()`, which still returns the bare magnitude (Step 4 reuses that one). Text only, the 🚨 marker stays in each builder, which places it outside its own styled element (bold+code in `messagebuilder`, a code span in `canvasbuilder`), and the leading/trailing spaces stay there too, being Block Kit element boundaries rather than text. Open PR rows only, the WIP section must not call it (see Goals).
 
   The closed-but-not-merged and merged markers stay in `messagebuilder`, only the message ever renders a closed or merged PR (see Step 6).
 - Author display is not extracted: the message prefers a `<@ID>` mention and falls back to `GetGitHubName()`, the canvas always uses `GetGitHubName()` (see Step 6). Both fields are exported, so each builder reads them directly.
@@ -186,16 +189,15 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
 ### 2. New input: `pr-tracker-canvas-link`
 
 - `action.yml`: add optional string input, no default. Description states the intent plainly, e.g. "Link to a Slack canvas to keep updated with a live tracker of open and work-in-progress pull requests. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default)."
-- `internal/config/config.go`: add constant `InputPRTrackerCanvasLink`, read via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID` and `Config.PRTrackerCanvasURL`, both empty when the input is unset.
-- `config.ContentInputs` gains `CanvasURL`, the same value as `Config.PRTrackerCanvasURL`. `messagecontent.GetContent` receives only `ContentInputs`, never the whole `Config`, and Step 8 needs the URL there. The ID stays off `ContentInputs`, only `run.go` reads it.
+- `internal/config/config.go`: add constant `InputPRTrackerCanvasLink`, read via `inputhelpers.GetInput`, add `Config.PRTrackerCanvasID`, empty when the input is unset. Only `run.go` reads it.
 - Link shape, confirmed against the real canvas tab in `#pr-reminders-test`: `https://<workspace>.slack.com/docs/<TEAM_ID>/<CANVAS_ID>`, e.g. `https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL`.
-- Parse: `url.Parse`, then require a `docs` segment in `URL.Path` and take the first segment after it matching `^F[A-Z0-9]+$`. Scanning survives a trailing title slug: `TEAM_ID` starts with `T` and slugs are lowercase, so neither can match. No length bound, real IDs already run to 13 characters. Reading `URL.Path` drops query params for free.
+- Parse in a new file `internal/config/canvaslink.go` (`getCanvasIDFromLink`), leaving `config.go` with the constant, the fields and the call: `url.Parse`, then require a `docs` segment in `URL.Path` and take the first segment after it matching `^F[A-Z0-9]+$`. Scanning survives a trailing title slug: `TEAM_ID` starts with `T` and slugs are lowercase, so neither can match. No length bound, real IDs already run to 13 characters. Reading `URL.Path` drops query params for free.
   - Requiring `docs` rejects other Slack links that carry an `F…` file ID (`/files/…`), which would otherwise parse and then fail at the `canvases.edit` call.
   - Assumed, on one verified link: every copy path gives a `docs` segment. Accepted for v1.
-  - Must be an absolute URL with a host, a bare `F…` ID is rejected. `PRTrackerCanvasURL` is the input as given, never rebuilt, and Step 8 puts it straight into the message footer, a bare ID there is a dead link.
+  - Must be an absolute URL with a host, a bare `F…` ID is rejected. The input is documented as a link copied from Slack, so anything else is a typo, even though only the ID is used.
   - A non-empty input that doesn't parse is a hard config error, joined like the other input validation. A typo would otherwise mean a silently missing canvas. The message names the expected shape and the Copy link path.
-- Test cases: the real link above, trailing slash, query params, a trailing title slug, `http`, an unrelated URL, a Slack `/files/F…` link (rejected), a bare `F…` ID (rejected), empty (feature off).
-- `testhelpers/confighelpers.go`: mirror the new input.
+- Test cases: the real link above, trailing slash, query params, a trailing title slug, `http`, an unrelated URL, a Slack `/files/F…` link (rejected), a bare `F…` ID (rejected), empty (feature off). They live in `internal/config/config_test.go` (`TestGetConfig_PRTrackerCanvasLink`) and go through `GetConfig`, since the parser is unexported and the config tests are an external `config_test` package.
+- `testhelpers/confighelpers.go`: mirror the new input. It needs no `TestConfig` field, every canvas test passes the link through the overrides map, so the helper sets the env var from `""`.
 - `go run .github/scripts/check_inputs.go` must still pass.
 
 ### 3. `githubclient`: last-activity mapping
@@ -203,40 +205,43 @@ All steps land on one feature branch and merge as a single PR, not on `main`. Th
 The GraphQL migration already changed the ground under this step. `enrichedPullRequestSelection` and `fullPullRequestSelection` (`graphqlfetch.go`) both select `commits(last: 1){ nodes { commit { oid committedDate } } }` today, for every enriched PR, open or draft, with the query comment "commits are selected for the PR tracker canvas and are not read yet." There is no separate REST-style commit-lookup call to add: the data already arrives with every enrichment response, decoded into `pullRequestNode.Commits` and simply unread. This step is a mapping change, not a fetch change.
 
 - Add `PullRequest.LastActivityAt *time.Time` (`models.go`).
-- In `prWithReviewers` (`graphqlfetch.go`), read `node.Commits.Nodes`: if non-empty, take its one node's `Commit.CommittedDate` as `LastActivityAt`. `commits(last: 1)` returns at most one node, so there is nothing to page through and no SHA to cross-check against `headRefOid`, unlike REST's paginated `ListCommits` scan (the SHA check existed there because the endpoint's ordering wasn't documented and it capped at 250 commits with no way to select "just the last one"; GraphQL's `last: 1` argument does that server-side). Unverified: whether GraphQL's `commits(last: 1)` reliably resolves to the PR's actual head commit in every case (e.g. an empty-history PR, a PR on a repository with unusual ref state). [001](001_GraphQL-migration.md)'s live verification (Step 7 there) did not specifically confirm this field; it is carried into this plan as a design assumption made explicit in that plan's Goals ("`commits(last: 1)` … replaces a paginated commit scan with a SHA cross-check … That timestamp is what 002's WIP section sorts, marks and prunes by").
+- In `prWithReviewers` (`graphqlfetch.go`), read `node.Commits.Nodes`: if non-empty, take its one node's `Commit.CommittedDate` as `LastActivityAt`, raised to `pr.GetCreatedAt()` when that is later. A PR opened today off an old branch has an old head commit, so the raw commit date would understate its freshness and the staleness rule (Step 5) would drop a fresh draft off the canvas. `commits(last: 1)` returns at most one node, so there is nothing to page through and no SHA to cross-check against `headRefOid`, unlike REST's paginated `ListCommits` scan (the SHA check existed there because the endpoint's ordering wasn't documented and it capped at 250 commits with no way to select "just the last one"; GraphQL's `last: 1` argument does that server-side). Unverified: whether GraphQL's `commits(last: 1)` reliably resolves to the PR's actual head commit in every case (e.g. an empty-history PR, a PR on a repository with unusual ref state). [001](001_GraphQL-migration.md)'s live verification (Step 7 there) did not specifically confirm this field; it is carried into this plan as a design assumption made explicit in that plan's Goals ("`commits(last: 1)` … replaces a paginated commit scan with a SHA cross-check … That timestamp is what 002's WIP section sorts, marks and prunes by").
+  - `prWithReviewers` doesn't write the field into the `*PullRequest` it is given. `pullRequestWithLastActivity` copies the struct and puts the copy on the returned `PR`, leaving the caller-owned `PRResult.pr` untouched (AGENTS.md: return new structs rather than mutating input pointers).
+  - No getter here. Nothing reads the field until Step 4, which adds one.
 - Fall back to `pr.GetUpdatedAt()` when `node.Commits.Nodes` is empty (a PR with no commits, or a field-level error on the `commits` connection folding the whole node to its zero value, see 001's error classification). It overstates freshness, but it's an upper bound on the last push, so a busy long-lived draft never drops off the canvas via the staleness rule.
 - Leave `LastActivityAt` nil when both `Commits` is empty and `UpdatedAt` is zero. Today's `getTestPR`-style fixtures set neither, so this is the default in tests, not a corner case.
 - `LastActivityAt` is populated unconditionally, for every enriched PR, not gated behind a canvas-specific option. The field is already fetched for every PR regardless of whether the canvas is on, so a `FetchActivityTimestamps` toggle would add a flag that gates nothing on the wire. The message path simply never reads the field.
 - No branching on `pr.GetDraft()` anywhere in `enrichPRs`/`enrichPRBatch`/`prWithReviewers`: reviews, comments and commits are fetched uniformly for every PR in a batch already, open or draft, since GraphQL batches cost the same (roughly 1-2 points per 25-alias batch, see "Cost model" in Consequences) regardless of which connections are populated for which alias. There is no separate per-draft call to skip. What stays true is the *rendering* choice: `canvasbuilder` (Step 6) still never shows approvers on WIP rows (see "Canvas content format").
-- Add `LastActivityAt` to `PRResult`/`PR`/`PullRequest` fixtures used by canvas-specific tests, with `Commits` set on the mock transport (see below).
+- Cover the mapping with one table-driven test, `TestFindOpenPRs_LastActivityAt` (`githubclient_test.go`), over all five outcomes: commit date newer than the creation time, commit date older than it (creation time wins), commit date with an unknown creation time, update-time fallback, nil. No canvas-specific fixtures yet, since the first canvas tests arrive in Step 5; they set `LastActivityAt` on their `PRResult`/`PR`/`PullRequest` fixtures and `Commits` on the mock transport (see below).
 - `testhelpers/mockgithubclient.GraphQLTransport.enrichedPullRequestNodeJSON` hardcodes `node["commits"] = connectionJSON([]map[string]any{})` today, an always-empty commits connection. Extend `MockGitHubClientOptions` with a `CommitsByPRNumber map[int]time.Time` (or similar), rendered as a single `commit.committedDate` node, so tests can exercise the non-fallback path. `getPRBatchByRef`'s rendering path (`GetPRs`, same renderer function) picks it up too, for free.
 - `run.go`'s `prFetchTimeout` needs no change (see "Cost model" in Consequences): batching at `enrichBatchSize` (25) under `defaultGitHubAPIConcurrencyLimit` (3) means the canvas's extra up-to-15 drafts add at most one more batch, and that batch runs concurrently with the others rather than after them, so worst-case wall time is unchanged from today's 2-batch case.
 
 ### 4. `prparser`: activity text + activity sort
 
-- Extract `GetPRAgeText`'s minutes/hours/days formatting into a duration → text helper. It reads `CreatedAt` directly today, so the activity chip can't reuse it as is. Wording stays as it is, including the `1 days` it produces at 24h: the chip inherits it as `idle 1 days`, matching the message's `1 days old`.
-- Add `PR.GetActivityText() string`, from `LastActivityAt` via that helper: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above.
-- Add `PR.IsIdle() bool`: true when `LastActivityAt` is older than a hardcoded 48h.
+- Extract `GetPRAgeText`'s minutes/hours/days formatting into an unexported duration → text helper, `durationText` (`displaytext.go`). It reads `CreatedAt` directly today, so the activity chip can't reuse it as is. Wording stays as it is, including the `1 days` it produces at 24h: the chip inherits it as `idle 1 days`, matching the message's `1 days old`.
+- Add a nil-receiver-safe `PullRequest.GetLastActivityAt() *time.Time` in `githubclient` (`models.go`), the accessor Step 3 leaves to this step, matching the other getters there. `githubclient.spec.md`'s "no reader yet" line goes with it.
+- Add `PR.GetActivityText() string` (`displaytext.go`), from `GetLastActivityAt()` via that helper: `updated N minutes/hours ago` under 24h, `idle N days` at 24h and above.
+- Add `PR.IsIdle() bool` (`prparser.go`): true when `LastActivityAt` is older than a hardcoded `idleThreshold` of 48h.
 - `LastActivityAt` can be nil even with the canvas on (Step 3). Nil means unknown, not stale: empty chip text, not idle, never dropped by the staleness rule (Step 5), sorted after every PR with a real timestamp.
-- Add an exported newest-first sort for use by the draft section, distinct from `ParsePRs`'s existing oldest-first sort. Take the timestamp as a key function (`func(PR) *time.Time`) rather than reading `LastActivityAt` directly, so sorting by any other timestamp needs no second sort. Nil keys sort last.
-- Tests: the duration helper's three magnitudes and their boundaries, both chip wordings, `IsIdle` around 48h, and the sort with a nil key mixed in.
+- Add `SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR` (`prparser.go`) for the draft section, distinct from `ParsePRs`'s existing oldest-first sort, returning a sorted copy rather than sorting in place. Take the timestamp as a key function rather than reading `LastActivityAt` directly, so sorting by any other timestamp needs no second sort. Nil keys sort last.
+- Tests: the duration helper's three magnitudes and their boundaries, both chip wordings and the cutover between them, `IsIdle` around 48h, and the sort with a nil key mixed in. `GetActivityText` carries its own copy of the 24h threshold, so pin it from both sides or it can drift from the helper's. The helper is unexported, so its cases live in an internal test file, `internal/prparser/displaytext_internal_test.go` (`package prparser`), alongside the package's existing external `prparser_test` files.
 
 ### 5. `canvascontent` package
 
 - Mirrors `messagecontent.GetContent`'s shape but for canvas: takes all fetched PRs (open + draft) and content inputs, and produces open-PR content (oldest first, grouped/flat per `group-by-repository`, via the R2 helper) plus draft-PR content (always flat, most-recent-activity first, regardless of `group-by-repository`).
 - `GetContent` takes one `[]prparser.PR` and splits it itself on `pr.GetDraft()`, drafts to the WIP section, the rest to the open section. `run.go` passes the fetch result unsplit, so the split lives in one place and the caller stays the same in both run modes. Alongside it, the two cap flags and `GeneratedAt`, grouped in one `GetContentOptions` struct rather than growing the parameter list per section.
-- `Content` carries `GeneratedAt time.Time` for the footer line, set by the caller (Step 7) rather than read from the clock here, so `canvasbuilder`'s output is deterministic under test (Step 6).
-- Keep the two sections as separate named fields on `Content`, not one merged list with a per-PR kind flag, so a third section is a field rather than a rework.
+- `Content` carries `GeneratedAt time.Time` for the footer line, set by the caller (Step 7) rather than read from the clock here, so `canvasbuilder`'s output is deterministic under test (Step 6). It doubles as "now" for the staleness prune below, which is what makes the 60-day cutoff pinnable from both sides in a test: against the wall clock, a fixture built at exactly the cutoff is already past it by the time the comparison runs.
+- Keep the two sections as separate named fields on `Content`, not one merged list with a per-PR kind flag, so a third section is a field rather than a rework. The open section mirrors `messagecontent.Content`: `OpenPRs` when flat, `OpenPRsGroupedByRepository []prparser.RepositoryPRs` plus `GroupedByRepository bool` when grouped, only ever one of the two filled. `WIPPRs` is the third field.
 - Section headings are fixed strings owned by `canvasbuilder` (Step 6), so `contentInputs.PRListHeading` is unread here, no `<pr_count>` substitution, no "required when `group-by-repository` is false" coupling.
 - Excludes draft PRs whose `LastActivityAt` (not creation time) is older than a hardcoded `MaxDraftPRInactivity` (60 days). A nil `LastActivityAt` is kept, unknown is not stale (Step 4). Exported for the spec and for tests. Pruning happens only here, not inside the fetch: `LastActivityAt` comes from enrichment (Step 3), so it isn't known until after the fetch completes, and GraphQL's phase-1 listing already returns every draft regardless of staleness (R1), so there's no cheap way to skip per-draft work at fetch time either.
 - No whole-canvas "nothing to show" case: each section falls back on its own, so the both-empty canvas is just both fallbacks (see Step 6).
 - `Content` carries `OpenPRsCapped` / `WIPPRsCapped bool` for the footer note (Step 6), passed in by the caller (Step 7) from `githubclient.OpenPRsResult` (R1). Never derived from `len(section)` (R1), the staleness prune above shrinks the WIP list further still.
 - Log the counts put on the canvas: open PRs, drafts, and drafts dropped as inactive, otherwise a missing draft has no explanation.
-- Tests: the staleness cutoff on both sides, a nil-activity draft kept, drafts ordered newest-activity first, open PRs grouped and flat, and each cap flag reaching `Content` while its section holds fewer PRs than its cap.
+- Tests: the staleness cutoff on both sides and exactly at it (kept), a nil-activity draft kept, drafts ordered newest-activity first with a fixture set whose creation order disagrees with its activity order, drafts kept out of the open section and vice versa, open PRs grouped and flat, the WIP list flat with `group-by-repository` on, `GeneratedAt` taken from the options, and each cap flag reaching `Content` while its section holds fewer PRs than its cap.
 
 ### 6. `canvasbuilder` package
 
-- Renders `canvascontent.Content` to a Slack canvas markdown string (`slack.DocumentContent{Type: "markdown", ...}`), reusing the R3 display-text helpers.
+- `BuildMarkdown(content canvascontent.Content) string` renders a plain markdown string, reusing the R3 display-text helpers. No slack-go type here: `slackclient.ReplaceCanvasContent` (Step 1) takes the markdown and wraps it in `slack.DocumentContent{Type: "markdown", ...}` itself.
 - Canvas `document_content` takes real markdown, not Slack `mrkdwn`: `**bold**`, `_italic_`, `[label](url)`, backtick code spans, `~~strike~~`, `##`/`###` headings, `-` bullets, `---` dividers ([Canvases docs](https://docs.slack.dev/surfaces/canvases/)).
 - All of it rendered correctly in live `canvases.edit` replaces against the `#pr-reminders-test` canvas tab, 2026-08-08, including this plan's own fixed strings (`_No open PRs_`, `_Showing the newest 50 open PRs_`, the `---` divider and the italic `_Updated …_` footer).
 - No Slack mentions: `canvasbuilder` never reads `pr.Author.SlackUserID`, and renders authors and reviewers through `GetGitHubName()`. Canvas markdown does support `![](@USERID)`, don't switch to it (see "Canvas content format").
@@ -264,15 +269,16 @@ The GraphQL migration already changed the ground under this step. `enrichedPullR
 - Render both through one internal `renderSection(heading string, prs []prparser.PR, renderRow func(prparser.PR) string, emptyText string)`, not two bespoke paths. The two sections differ only in their row renderer and empty text, and a third section then costs one call.
 - Empty section: heading still renders, followed by one italic line: `_No open PRs_` / `_No work in progress_`. An empty section means "nothing here right now", which a missing heading can't say; it would read as a broken render instead. Grouped mode with no open PRs renders that same single line, with no repository sub-headings.
 - Footer, after both sections: blank line, `---`, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt` (see "Canvas content format").
-- Above the `Updated` line, when either cap flag is set (Step 5), one italic line naming what was cut: `_Showing the newest 50 open PRs_` / `_Showing the newest 15 WIP PRs_` / both in one line, the counts coming from `MaxPRsToFetch` and `MaxDraftPRsToFetch` (R1). Otherwise a capped canvas silently misses PRs, and only the run log says why.
+- Above the `Updated` line, when either cap flag is set (Step 5), one italic line naming the fetch limit: `_Fetch limited to the newest 50 open PRs_` / `_Fetch limited to the newest 15 WIP PRs_` / `_Fetch limited to the newest 50 open PRs and the newest 15 WIP PRs_` when both fired, the counts coming from `MaxPRsToFetch` and `MaxDraftPRsToFetch` (R1). Otherwise a capped canvas silently misses PRs, and only the run log says why. The line names the fetch limit, never a count of rows shown: Step 5 prunes inactive drafts after the fetch, so the canvas can carry fewer rows than the cap.
 
 #### Snapshot tests
 
 The canvas is one markdown string, so golden files cover its formatting more cheaply and more completely than element-level assertions.
 
-- `internal/canvasbuilder/testdata/*.md` hold the expected output, one file per case: grouped, flat, empty open section, empty WIP section, both empty, an old PR, an idle draft, a draft with unknown activity, a capped section, and a PR whose title and author name carry `_`, `*`, `[`, `]`, `~`, `` ` ``, `\`, `<`, `>` and `&amp;`.
-- The test compares byte-for-byte, and rewrites the golden file instead when `-update` is passed (`flag.Bool("update", false, …)`). A deliberate format change is then `make update-canvas-snapshots` plus a reviewable diff, not a hand-edited expectation.
-- Add that Makefile target: `go test ./internal/canvasbuilder -update`.
+- `internal/canvasbuilder/testdata/*.md` hold the expected output, one file per case: grouped, flat, grouped with no open PRs, empty open section, empty WIP section, both empty, an old PR, an idle draft, a draft with unknown activity, each cap flag and both together, a `GeneratedAt` outside UTC (the footer label says UTC, so the conversion needs a fixture that would print differently without it), and a PR whose title and author name carry `_`, `*`, `[`, `]`, `~`, `` ` ``, `\`, `<`, `>` and `&amp;`.
+- The test compares byte-for-byte, and rewrites the golden file instead when `-update-snapshots` is passed, the flag name `cmd/pr-slack-reminder/snapshot_test.go` already uses. A deliberate format change is then `make update-test-snapshots` plus a reviewable diff, not a hand-edited expectation.
+- No new Makefile target: the flag name matches, so `update-test-snapshots` re-records both packages in one `go test` call.
+- `escapeMarkdown` is unexported, so its own cases (each escapable character, and a backslash before one of them, which a backslash-last order would double-escape) live in an internal test file, `internal/canvasbuilder/escape_internal_test.go`.
 - Determinism: `Content.GeneratedAt` is fixed by the test (Step 5), and PR fixtures set `CreatedAt`/`LastActivityAt` as offsets from `time.Now()`, `prparser` reads the clock directly, and offsets keep the rendered age and activity text stable.
   - Keep those offsets clear of every boundary the rendering rounds or thresholds on: 1h and 24h (`GetPRAgeText`), 48h (`IsIdle`), `MaxDraftPRInactivity`, and any half-unit `math.Round` flips. `30m`, `5h`, `3d`, `10d` are safe; `24h` and `1h30m` flake, since the clock advances between fixture construction and render.
   - Give canvas fixtures a real `HTMLURL`. Fixtures built without one render `[title]()` into the golden file.
@@ -291,11 +297,14 @@ The canvas is one markdown string, so golden files cover its formatting more che
 - Canvas refresh step: PRs (see fetch sharing below), then `prparser.ParsePRs`, then `canvascontent` (with `GeneratedAt: time.Now().UTC()` and the cap flags off the fetch result)/`canvasbuilder`/`slackclient.ReplaceCanvasContent`.
 - `ParsePRs` is what applies `old-pr-threshold-hours`; the Slack user IDs it resolves go unread on the canvas.
 - In `post` mode it runs twice per run, once on the message path's non-draft subset, once here on the full set. It touches no API and no clock beyond `time.Now()`, so the second pass is a copy, not a re-fetch.
-- Failure-isolation tests: canvas failure + message success → run fails, message still sent and state still saved; message failure + canvas success → run fails, canvas still written; both fail → both errors reported.
-- End-to-end tests in `main_test.go`, asserting the markdown `mockslackclient` recorded (Step 1), nothing else covers the wiring from input to canvas:
+- Failure-isolation tests: canvas failure + message success → run fails, message still sent and state still saved; message failure + canvas success → run fails, canvas still written; both fail → both errors reported. `testhelpers/mockslackclient` has no canvas-failure switch today, so `MockSlackClientOptions` gains `ReplaceCanvasError` alongside the message ones, and `ReplacedCanvas` gains a `Called` flag, so "never attempted" is asserted directly instead of inferred from an empty canvas ID.
+- End-to-end tests in `cmd/pr-slack-reminder/canvas_test.go` (a new file, leaving `main_test.go`'s tables alone), asserting the markdown `mockslackclient` recorded (Step 1), nothing else covers the wiring from input to canvas:
   - `post` mode with the canvas on, grouped and flat, with drafts in the fixtures: the canvas carries both sections, the message carries only the non-draft PRs.
-  - `update` mode with the canvas on: the canvas lists currently open PRs, not the state-tracked set, and the message still updates.
+  - `update` mode with the canvas on: the canvas lists currently open PRs, not the state-tracked set, and the message still updates. The two fetches get deliberately different fixtures (an open PR absent from state, a state-tracked PR now merged), or the assertion proves nothing.
   - canvas off: `ReplaceCanvasContent` never called.
+  - the fetch go/no-go, in three tests: a failed `post` fetch leaves the canvas untouched, a failed `update`-mode canvas fetch does the same while the message still updates, and a successful fetch of zero PRs refreshes the canvas. A wiped canvas is worse than a stale one, and "fetch failed" and "found nothing" are the same empty slice.
+  - an over-cap fetch puts the `_Fetch limited to the newest …_` note on the canvas, pinning the cap flags end to end.
+  - These assert on the parts of the markdown that matter (sections, rows, the footer line by pattern), not on the whole document: `GeneratedAt` is `time.Now().UTC()`, so an exact match is impossible here. `canvasbuilder`'s golden files (Step 6) cover the formatting.
 
 #### Fetch sharing
 
@@ -320,46 +329,48 @@ What keeps `post` mode's message byte-identical when the canvas is on:
 - Filters, snooze exclusion and every other fetch-path step are untouched, `IncludeDrafts` only removes the draft check.
 - `LastActivityAt` (Step 3) is populated for every PR regardless of the canvas, but the message never reads it, so its presence changes nothing observable.
 - Canvas off → zero-value `PRFetchOptions` → today's call exactly.
-- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
+- Regression test: a `post` run with the canvas on produces the same message blocks as the same fixtures with it off, drafts present in both, comparing the sent blocks JSON element by element. Since Step 8 removed the footer, the two block sets are identical, count included. It runs on mocks, so it proves the wiring, not live query shape (that rests on 001's own live verification of the shared query paths).
 
-### 8. Reminder message: link to the canvas
+### 8. Reminder message: canvas link footer, built and then removed
 
-- `messagecontent.Content` gains `CanvasURL string`, from `contentInputs.CanvasURL` (Step 2). Set it in **all three** branches of `GetContent`'s switch, including the `len(openPRs) == 0` one: that branch carries the `no-prs-message` case below. Empty → nothing changes anywhere, so existing tests stay untouched.
-- `messagebuilder.BuildMessage` appends a trailing context block, `<URL|📋 PR tracker canvas>`, a context block, not rich text, so it reads as a subdued footer rather than another list row. The label matches the feature name in the README.
-- Append it **after** `limitMaximumMessageSize`, not before: that function truncates at 50 blocks, and a link appended earlier would be the first thing dropped on a large message.
-- `limitMaximumMessageSize` must reserve the block: one limit value, 48 when the footer follows and 50 when it doesn't, used for **both** the comparison and the slice.
-- Slicing at 48 while comparing against 50 still yields 51 blocks whenever the message is exactly 50 (17 repositories: 3×17−1), which `slackclient.SendMessage` rejects (`len(blocks) > 50`). A large message would fail to send instead of gaining a link. Update the constant's comment for the reserved block.
-- 48, not 49. Grouped blocks run heading, list, spacer per repository, so block 49 is the 17th repository's heading and block 50 its list. Cutting at 49 leaves that heading with no list under it, the exact case the existing 50 was chosen to avoid.
-- 48 ends on the 16th repository's spacer, which then reads as spacing before the footer.
-- The `no-prs-message` path gets the footer too: `BuildMessage`'s `!content.HasPRs()` branch appends it itself. That branch returns before `limitMaximumMessageSize`, so the reserved-block rule above doesn't apply to it (two blocks).
-- Never a footer-only message. `runPostMode`'s early return (`!content.HasPRs() && content.SummaryText == ""`) is unchanged: with `no-prs-message` unset and no open PRs, the run still sends nothing, canvas on or off.
-- A message carrying only a link would notify the channel on every scheduled run with no news, and `state.SavePostState` would store zero PRs behind it, which `runUpdateMode`'s "No PRs to update in state" early return then never cleans up.
-- `runUpdateMode`'s matching branch, which deletes the message, is unchanged. It fires when every PR the reminder tracked is closed or merged, and a message reduced to a bare link is worse there than no message.
-- The link is rendered optimistically, before the canvas refresh runs (Step 7). It stays correct either way: the canvas is the user's and exists whether or not our write succeeded.
-- No preview card: add `slack.MsgOptionDisableLinkUnfurl()` and `slack.MsgOptionDisableMediaUnfurl()` to `PostMessage` and `UpdateMessage` in `slackclient`, neither of which sets an unfurl option today. A `slack.com` link is exactly what Slack expands into a card, and the card would dwarf the one-line footer. Set both, because the default is to expand: "By default, we unfurl all links in messages posted by users and Slack apps" ([unfurling docs](https://docs.slack.dev/messaging/unfurling-links-in-messages/)). No bot-token exemption is documented for either parameter.
-- [`chat.update`](https://docs.slack.dev/reference/methods/chat.update/) documents neither option; `chat.postMessage` documents both. slack-go sends them anyway (no send-mode filtering in v0.27.0's `chat.go`), so passing them on update is safe but presumed inert. Test only that both options are passed.
-- `slack.MsgOption` is an opaque `func(*sendConfig) error`, so a captured option can't be compared to anything. Have `mockSlackAPI` (`slackclient_test.go`) record the `options` it receives, then apply them and read the resulting form values:
+Built as planned, then taken back out. The footer is gone; the reminder message is byte-identical whether the canvas is on or off.
 
-  ```go
-  _, values, err := slack.UnsafeApplyMsgOptions("", "", "", mockAPI.postedOptions...)
-  // values.Get("unfurl_links") == "false" && values.Get("unfurl_media") == "false"
-  ```
+What was built:
 
-  Both option constructors do exactly `config.values.Set(...)` (v0.27.0 `chat.go`), so this reads what would go on the wire. The `Unsafe` name is about API stability, not correctness.
-- Existing messages are unaffected: PR titles are links inside rich text blocks, which Slack never unfurls.
-- Tests: link present in the grouped, flat and `no-prs-message` cases; absent when `CanvasURL` is empty; a grouped message over the limit ends at 49 blocks, the link last and the block before it not a repository heading; the same message without the link still ends at 50; a `post` run with no PRs and no `no-prs-message` sends nothing with the canvas on; both unfurl options passed on post and update.
+- `messagebuilder.BuildMessage` appended a trailing context block, `<URL|📋 PR tracker canvas>`, carried to it as `messagecontent.Content.CanvasURL` from `config.ContentInputs.CanvasURL`, and appended after truncation so a large message kept it.
+- `limitMaximumMessageSize` reserved two blocks for it, capping at 48 instead of 50: grouped blocks run heading, list, spacer per repository, so cutting at 49 would leave the 17th repository's heading with no list under it.
+- `slackclient` passed `slack.MsgOptionDisableLinkUnfurl()` and `slack.MsgOptionDisableMediaUnfurl()` on `PostMessage` and `UpdateMessage`, to keep the `slack.com` link from expanding into a preview card.
+
+Why it was removed:
+
+- Slack treats a canvas link as a **file share**, not a link unfurl, and attaches a canvas preview card under the message. Neither unfurl option affects file shares, so the card cannot be suppressed.
+- The card lists the same PRs the message just listed, so the reminder said everything twice, with the duplicate the taller half.
+- Nothing replaces it. The canvas is a tab in the same channel (Step 1), already one click from the message.
+
+What the removal took out:
+
+- `messagebuilder`: `addCanvasLinkBlock`, `getMaximumBlocks` and `maximumBlocksWithCanvasLink`, back to a single 50-block limit.
+- `messagecontent.Content.CanvasURL` and its assignment in all three `GetContent` branches, which left `internal/messagecontent/messagecontent_test.go` (added by this step for exactly that) with nothing to test, so the file went too.
+- `config.ContentInputs.CanvasURL`, and `Config.PRTrackerCanvasURL` with it: the footer was its only non-test reader, and it was never a parsed value, just the input echoed back. Its one remaining reader, `testhelpers/confighelpers.go`, passes `""` instead, since tests set the link through the overrides map anyway.
+- Both unfurl options in `slackclient`, and the `mockSlackAPI` option recording added for their tests. The message returns to Slack's default unfurling, which is what `main` does today. PR titles are links inside rich text blocks, which Slack never unfurls, but `no-prs-message` reaches the top-level `text` field verbatim, so a URL put there would preview.
+
+`Config.PRTrackerCanvasID` and `internal/config/canvaslink.go` stay untouched. The input still drives the canvas, only not the message.
+
+Tests kept:
+
+- A grouped over-limit message ends at exactly 50 blocks, and never on a repository heading with no PR list under it (`TestLimitMessageSizeByMaxBlocks`).
+- Step 7's equivalence test now asserts the canvas-on and canvas-off runs produce identical message blocks, count included, which is the regression the removal protects.
 
 ### 9. Docs & permissions
 
-- README: new "📋 PR Tracker Canvas" section explaining what it is and how to set it up: add a canvas tab to the reminder channel, then ⋮ → Copy link and paste it into `pr-tracker-canvas-link`. State the access requirement behind it (Step 1), so a canvas kept elsewhere can still be made to work. Add `canvases:write` to the Slack scope table (canvas-only). The GitHub permissions block stays as is: no new scope, the activity lookup rides the existing enrichment query (Step 3).
-- README: warn that the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost. Suggest a second canvas for those.
-- State that the canvas notifies nobody (see "Canvas content format").
-- Mention that the reminder message then carries a footer link to the canvas (Step 8).
-- Document the new input in the inputs table.
+- README: new "📋 PR Tracker Canvas" section, between "Filter Options" and "💡 Tips". It opens with what the canvas is and an example of the rendered markdown (copied from `internal/canvasbuilder/testdata/`, so it matches what the code renders, nothing enforces it), then a "Setup" sub-section (add a canvas tab to the reminder channel, ⋮ → Copy link, paste into `pr-tracker-canvas-link`, grant `canvases:write`) and a "Good to know" bullet list.
+- Setup states the access requirement behind the channel-tab path (Step 1), so a canvas kept elsewhere can still be made to work. `canvases:write` added to the Slack scope table, marked "Only with `pr-tracker-canvas-link`". The GitHub permissions block stays as is: no new scope, the activity lookup rides the existing enrichment query (Step 3).
+- "Good to know" carries: the action owns the whole canvas, every run replaces all content (Step 1), so hand-typed notes are lost, keep those on a second canvas; the canvas notifies nobody (see "Canvas content format"); one canvas per channel, since two workflows sharing one overwrite each other; which existing inputs shape canvas content (see "Existing inputs and the canvas"); and that a failed canvas write fails the run without stopping the reminder message (Step 7).
+- Document the new input in the inputs table, linking to the new section.
 - Exercise both the on and off paths end to end. No workflow-permission change needed.
   - The two workflows post to different channels, so they take **different** canvas links, each channel's own tab, not one shared canvas. Both would otherwise overwrite each other every run.
-  - `.github/workflows/pr-reminder.yml` (posts to `#github`): set `pr-tracker-canvas-link` to the `#github` canvas, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
-  - `.github/actions/e2e-tests/action.yml` (posts to `#pr-reminders-test`): set the `#pr-reminders-test` canvas on the "Run with filters" step only, the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
+  - `.github/workflows/pr-reminder.yml` (posts to `#github`): `pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BPS4FKCEL`, the `#github` canvas, giving the scheduled runs a real, continuously refreshed canvas in both `post` and `update` mode.
+  - `.github/actions/e2e-tests/action.yml` (posts to `#pr-reminders-test`): `pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL`, the `#pr-reminders-test` canvas, on the "Run with filters" step only, the richest case (multi-repository, `group-by-repository: true`, filters), covering grouped open PRs next to the always-flat draft list.
   - Leave it unset on the "Basic run" and "Multi-repository run" steps, so every release also verifies the action still behaves exactly as before when the input is absent.
   - The links go in as plain literals, like `slack-channel-name`, they aren't secrets, though they do carry the workspace name and team ID.
 - Manual prerequisites, not automatable here. All confirmed in place on 2026-08-08:
@@ -387,7 +398,6 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 
 - An always-current PR/WIP view lives directly in Slack, with no need to open GitHub.
 - Draft/WIP visibility, absent from the main reminder message by design, becomes available to whoever wants it.
-- Every scheduled reminder carries a footer link into the canvas, so the transient message becomes the entry point to the persistent view, at no extra scope, since the user supplies the URL.
 - Fully additive and off by default: existing users see zero behavior change (zero-value fetch options, early-exit in `run.go`).
 - The R1-R3 refactors close pre-existing test-coverage gaps (draft filter, repository grouping, old-PR/author-fallback display paths) independent of whether the canvas feature itself is used.
 - Step 3 is a mapping change instead of a new per-PR API call, and the reviewer/comment fan-out needs no draft/open branching at all.
@@ -395,7 +405,6 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 ### Negative
 
 - Opted-in `post` runs add up to one extra phase-2 batch (see "Cost model"); `update` mode also fetches twice for the canvas, its own phase 1 + phase 2.
-- With the canvas on, a grouped message that fills the block limit shows one repository fewer, the footer link reserves two blocks (Step 8).
 - WIP rows can't show approvers by rendering choice (Step 6), even though the fetch now returns them for drafts too. Showing them is a rendering change only, no extra fetch needed.
 - `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
 - Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing.
@@ -408,5 +417,4 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 
 - Activity and draft-staleness thresholds are hardcoded, not configurable, in v1.
 - The canvas names people instead of mentioning them, so it notifies nobody. The reminder message stays the notifying surface.
-- Link unfurling is now explicitly disabled for the reminder message. No visible change today, but any future link in the message won't preview either.
 - `LastActivityAt` is now populated on every enriched PR, canvas on or off, since the underlying GraphQL field is always selected. Unused outside the canvas path.

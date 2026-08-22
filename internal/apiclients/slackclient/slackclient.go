@@ -1,5 +1,5 @@
-// Package slackclient provides Slack API integration for sending messages.
-// It handles channel resolution by name and message posting with Block Kit formatting.
+// Package slackclient provides Slack API integration for channel resolution by name,
+// message posting with Block Kit formatting, and full canvas content replacement by canvas ID.
 package slackclient
 
 import (
@@ -26,6 +26,7 @@ type Client interface {
 		channelID string, messageTS string, message slack.Message, summaryText string,
 	) (SentMessageInfo, error)
 	DeleteMessage(channelID string, messageTS string) error
+	ReplaceCanvasContent(canvasID string, markdown string) error
 }
 
 func GetAuthenticatedClient(token string) Client {
@@ -42,6 +43,7 @@ type SlackAPI interface {
 	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
 	UpdateMessage(channelID string, timestamp string, options ...slack.MsgOption) (string, string, string, error)
 	DeleteMessage(channelID string, timestamp string) (string, string, error)
+	EditCanvas(params slack.EditCanvasParams) error
 }
 
 type client struct {
@@ -162,6 +164,31 @@ func (c *client) DeleteMessage(channelID string, messageTS string) error {
 		return fmt.Errorf("failed to delete Slack message: %v", err)
 	}
 	log.Printf("Deleted message from Slack channel: %s", channelID)
+	return nil
+}
+
+// Replaces the whole content of the canvas: the change carries no section ID,
+// which makes Slack apply it to the entire canvas.
+func (c *client) ReplaceCanvasContent(canvasID string, markdown string) error {
+	log.Printf("Replacing content of canvas %s with %d characters of markdown", canvasID, len(markdown))
+	err := c.slackAPI.EditCanvas(slack.EditCanvasParams{
+		CanvasID: canvasID,
+		Changes: []slack.CanvasChange{{
+			Operation: "replace",
+			DocumentContent: slack.DocumentContent{
+				Type:     "markdown",
+				Markdown: markdown,
+			},
+		}},
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"canvas update failed: check that the bot has canvases:write permission "+
+				"and is invited to the channel where the canvas is: %v",
+			err,
+		)
+	}
+	log.Printf("Replaced content of canvas: %s", canvasID)
 	return nil
 }
 

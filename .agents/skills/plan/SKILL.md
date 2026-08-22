@@ -10,11 +10,12 @@ Before drafting an implementation plan, read:
 
 - **Package Specs** — every touched package's `<package>.spec.md` in full, plus any related package's spec needed to understand how the change fits
 - **Code** — only the parts still unclear after reading the specs
-- **Third-party APIs and libraries** — verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs — check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page at the point in the plan that depends on it. Never assume or guess
+- **Third-party APIs and libraries** — verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs — check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page at the point in the plan that depends on it. Never assume or guess. Read [`docs/third-party-facts.md`](../../../docs/third-party-facts.md) first: it may already name the source. Cite that source, not the file
+- **Unverified third-party claims** — a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
 
 ## Mandatory Plan Steps
 
-1. Create the plan file in `docs/plans/` (committed), unless the user wants a throwaway plan — then use `.local/plans/` (gitignored) instead
+1. Create the plan file in `.local/plans/` (gitignored), unless the user gives another path, e.g. `docs/plans/` (committed)
    - Name: `NNN_title-with-hyphens.md` — 3-digit sequence number, underscore, the H1 title lowercased with hyphens for spaces (acronyms like `PR` stay uppercase), e.g. `001_PR-tracker-canvas.md`
    - Right after the H1, add: `date: YYYY-MM-DD` then `status: draft` (or `ready`); bump `date` on substantial revisions or status changes
 2. Consider a pre-refactor step: for bigger features, restructuring existing code first — often renaming things so the new feature/concept lands as an explicit, self-evident diff — can make the real change smaller, safer, and more explicit. Propose it as a separate step before the main implementation when it earns its keep. Optional; skip for small changes. Assess test coverage of the touched code and close any gap found — the regression net for both the refactor and the feature work built on top of it

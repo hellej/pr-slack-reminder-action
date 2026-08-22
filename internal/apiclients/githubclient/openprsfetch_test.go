@@ -1,25 +1,16 @@
 package githubclient
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"maps"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 )
-
-var testRepositories = []models.Repository{
-	{Owner: "owner-one", Name: "repo-one"},
-	{Owner: "owner-two", Name: "repo-two"},
-}
 
 const testFragmentName = "prs"
 
@@ -287,213 +278,6 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 	}
 }
 
-const testFullFragmentName = "fullPr"
-
-func TestBuildGetPRsQuery(t *testing.T) {
-	references := []models.PullRequestRef{
-		{Repository: testRepositories[0], Number: 111},
-		{Repository: testRepositories[1], Number: 222},
-	}
-
-	query := buildPullRequestsQuery(references, fullPullRequestFragment)
-
-	requiredFragments := []string{
-		"query($owner0:String!,$name0:String!,$num0:Int!,$owner1:String!,$name1:String!,$num1:Int!)",
-		"rateLimit { cost remaining limit }",
-		"p0: repository(owner:$owner0,name:$name0){ pullRequest(number:$num0){ ..." +
-			testFullFragmentName + " } }",
-		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." +
-			testFullFragmentName + " } }",
-		"fragment " + testFullFragmentName + " on PullRequest {",
-		"number title url isDraft createdAt updatedAt headRefOid state merged",
-		"author { login __typename ... on User { name } }",
-		"labels(first: 100){ nodes { name } }",
-		"commits(last: 1){ nodes { commit { oid committedDate } } }",
-		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
-		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
-	}
-	for _, fragment := range requiredFragments {
-		if !strings.Contains(query.text, fragment) {
-			t.Errorf("query text is missing %q, got:\n%s", fragment, query.text)
-		}
-	}
-
-	forbiddenFragments := []string{
-		"pullRequests(", "owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
-	}
-	for _, fragment := range forbiddenFragments {
-		if strings.Contains(query.text, fragment) {
-			t.Errorf("query text contains %q, got:\n%s", fragment, query.text)
-		}
-	}
-
-	if aliasCount := strings.Count(query.text, ": repository(owner:"); aliasCount != len(references) {
-		t.Errorf("query text has %d aliased repositories, expected %d", aliasCount, len(references))
-	}
-	spreadCount := strings.Count(query.text, "..."+testFullFragmentName+" }")
-	if spreadCount != len(references) {
-		t.Errorf("query text spreads the fragment %d times, expected %d", spreadCount, len(references))
-	}
-
-	expectedVariables := map[string]any{
-		"owner0": "owner-one", "name0": "repo-one", "num0": 111,
-		"owner1": "owner-two", "name1": "repo-two", "num1": 222,
-	}
-	if !reflect.DeepEqual(query.variables, expectedVariables) {
-		t.Errorf("variables = %+v, expected %+v", query.variables, expectedVariables)
-	}
-	if !reflect.DeepEqual(query.aliases, []string{"p0", "p1"}) {
-		t.Errorf("aliases = %v, expected [p0 p1]", query.aliases)
-	}
-	if !reflect.DeepEqual(query.referenceByAlias["p1"], references[1]) {
-		t.Errorf("referenceByAlias[p1] = %+v, expected %+v", query.referenceByAlias["p1"], references[1])
-	}
-}
-
-func TestPullRequestFromNodeMapsStateAndMerged(t *testing.T) {
-	tests := []struct {
-		name           string
-		nodeState      string
-		nodeMerged     bool
-		expectedState  string
-		expectedMerged bool
-	}{
-		{name: "open PR", nodeState: "OPEN", expectedState: "open"},
-		{name: "closed PR without merge", nodeState: "CLOSED", expectedState: "closed"},
-		{
-			name: "merged PR", nodeState: "MERGED", nodeMerged: true,
-			expectedState: "closed", expectedMerged: true,
-		},
-		{name: "missing state renders as open", expectedState: "open"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pullRequest := pullRequestFromNode(
-				pullRequestNode{State: tt.nodeState, Merged: tt.nodeMerged},
-			)
-
-			if pullRequest.GetState() != tt.expectedState {
-				t.Errorf("GetState() = %q, expected %q", pullRequest.GetState(), tt.expectedState)
-			}
-			if pullRequest.GetMerged() != tt.expectedMerged {
-				t.Errorf("GetMerged() = %t, expected %t", pullRequest.GetMerged(), tt.expectedMerged)
-			}
-		})
-	}
-}
-
-// Unlike phase 2 under FindOpenPRs, an alias that carries no PR has nothing to fall back to.
-func TestGetPRsByRefFailsOnNullPullRequestWithoutError(t *testing.T) {
-	withoutRetryDelay(t)
-
-	transport := &fakeEnrichTransport{
-		fixtureByNumber: map[int]enrichFixture{2: {nullPullRequest: true}},
-	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
-
-	references := []models.PullRequestRef{
-		{Repository: testRepositories[0], Number: 1},
-		{Repository: testRepositories[0], Number: 2},
-	}
-	prs, err := testClient.getPRsByRef(context.Background(), references)
-
-	expectedMessage := "error fetching pull request owner-one/repo-one/2: no pull request returned"
-	if err == nil {
-		t.Fatalf("expected error %q, got %d PRs", expectedMessage, len(prs))
-	}
-	if !strings.Contains(err.Error(), expectedMessage) {
-		t.Errorf("error = %q, expected it to contain %q", err.Error(), expectedMessage)
-	}
-}
-
-type enrichFixture struct {
-	reviews         []map[string]any
-	comments        []map[string]any
-	nullPullRequest bool
-	errorType       string
-	errorPath       []any // path suffix after the alias; the field it points at comes back null
-	errorMessage    string
-	requestStatus   int // non-zero: the whole request carrying this PR fails with this status
-}
-
-func (f enrichFixture) aliasResponse(number int) any {
-	if f.errorType != "" && len(f.errorPath) == 0 {
-		return nil
-	}
-	if f.nullPullRequest || len(f.errorPath) == 1 {
-		return map[string]any{"pullRequest": nil}
-	}
-	pullRequest := map[string]any{
-		"number":   number,
-		"commits":  map[string]any{"nodes": []any{}},
-		"reviews":  map[string]any{"nodes": f.reviews},
-		"comments": map[string]any{"nodes": f.comments},
-	}
-	if len(f.errorPath) > 1 {
-		pullRequest[f.errorPath[len(f.errorPath)-1].(string)] = nil
-	}
-	return map[string]any{"pullRequest": pullRequest}
-}
-
-type fakeEnrichTransport struct {
-	fixtureByNumber  map[int]enrichFixture
-	mutex            sync.Mutex
-	requestedNumbers [][]int
-}
-
-func (t *fakeEnrichTransport) Post(_ context.Context, body []byte) (int, json.RawMessage, error) {
-	var request graphqlRequest
-	if err := json.Unmarshal(body, &request); err != nil {
-		return 0, nil, err
-	}
-	numbers := postedPRNumbers(request.Variables)
-
-	t.mutex.Lock()
-	t.requestedNumbers = append(t.requestedNumbers, numbers)
-	t.mutex.Unlock()
-
-	data := map[string]any{"rateLimit": map[string]any{"cost": 1, "remaining": 4999, "limit": 5000}}
-	responseErrors := []map[string]any{}
-
-	for index, number := range numbers {
-		fixture := t.fixtureByNumber[number]
-		if fixture.requestStatus != 0 {
-			return fixture.requestStatus, json.RawMessage(`{"message":"server error"}`), nil
-		}
-		alias := fmt.Sprintf("p%d", index)
-		data[alias] = fixture.aliasResponse(number)
-		if fixture.errorType != "" {
-			responseErrors = append(responseErrors, map[string]any{
-				"type":    fixture.errorType,
-				"path":    append([]any{alias}, fixture.errorPath...),
-				"message": fixture.errorMessage,
-			})
-		}
-	}
-
-	response := map[string]any{"data": data}
-	if len(responseErrors) > 0 {
-		response["errors"] = responseErrors
-	}
-	responseBody, err := json.Marshal(response)
-	if err != nil {
-		return 0, nil, err
-	}
-	return 200, responseBody, nil
-}
-
-func postedPRNumbers(variables map[string]any) []int {
-	numbers := []int{}
-	for index := 0; ; index++ {
-		value, isSet := variables[fmt.Sprintf("num%d", index)]
-		if !isSet {
-			return numbers
-		}
-		numbers = append(numbers, int(value.(float64)))
-	}
-}
-
 func authorNodeJSON(login string) map[string]any {
 	return map[string]any{"login": login, "__typename": "User", "name": strings.ToUpper(login)}
 }
@@ -568,15 +352,6 @@ func assertLogins(t *testing.T, label string, collaborators []Collaborator, expe
 	if !reflect.DeepEqual(logins, expected) {
 		t.Errorf("%s = %v, expected %v", label, logins, expected)
 	}
-}
-
-func captureLogOutput(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	var captured bytes.Buffer
-	original := log.Writer()
-	log.SetOutput(&captured)
-	t.Cleanup(func() { log.SetOutput(original) })
-	return &captured
 }
 
 func TestEnrichPRs(t *testing.T) {

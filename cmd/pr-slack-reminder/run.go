@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -13,7 +14,10 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
+
+const prFetchTimeout = 60 * time.Second
 
 func Run(
 	getGitHubClient func(token, tokenForState string) githubclient.Client,
@@ -38,47 +42,68 @@ func Run(
 
 	sentMessageHandler := getSentMessageHandler(cfg)
 
+	// The message path and the canvas refresh are independent attempts: a failing reminder
+	// says nothing about whether the canvas can be written, and a stale canvas is what this
+	// feature exists to prevent. Their errors are collected instead of short-circuited.
+	var messageErr, canvasErr error
+	var openPRs *githubclient.OpenPRsResult
+
 	switch cfg.RunMode {
 	case config.RunModePost:
-		return runPostMode(githubClient, slackClient, cfg, sentMessageHandler)
+		openPRs, messageErr = runPostMode(githubClient, slackClient, cfg, sentMessageHandler)
 	case config.RunModeUpdate:
-		return runUpdateMode(githubClient, slackClient, cfg, sentMessageHandler)
+		messageErr = runUpdateMode(githubClient, slackClient, cfg, sentMessageHandler)
 	default:
 		return fmt.Errorf("unsupported run mode: %s", cfg.RunMode)
 	}
+
+	if cfg.CanvasEnabled() {
+		canvasErr = refreshPRTrackerCanvas(githubClient, slackClient, openPRs, cfg)
+	}
+	if canvasErr != nil {
+		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
+	}
+	return errors.Join(messageErr, canvasErr)
 }
 
+// Returns the open PRs it fetched, for the canvas refresh to share. Nil when the fetch failed,
+// which leaves the canvas refresh to fetch its own.
 func runPostMode(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
-) error {
-	const prFetchTimeout = 60 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
-	defer cancel()
-	prs, err := githubClient.FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository)
+) (*githubclient.OpenPRsResult, error) {
+	// The canvas shares this fetch, only with drafts switched on.
+	fetched, err := findOpenPRs(githubClient, cfg, githubclient.PRFetchOptions{
+		IncludeDrafts: cfg.CanvasEnabled(),
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	parsedPRs := prparser.ParsePRs(prs, cfg.ContentInputs)
+	// The message never shows drafts: they are dropped by the same predicate that keeps them
+	// out of the fetch when the canvas is off, and before anything else sees the PRs.
+	nonDraftPRs := utilities.Filter(fetched.PRs, func(pr githubclient.PR) bool {
+		return !pr.GetDraft()
+	})
+	parsedPRs := prparser.ParsePRs(nonDraftPRs, cfg.ContentInputs)
 	content := messagecontent.GetContent(parsedPRs, cfg.ContentInputs)
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("No PRs found and no message configured for this case, exiting")
-		return nil
+		return &fetched, nil
 	}
 	message, summaryText := messagebuilder.BuildMessage(content)
 
 	sentMessageInfo, err := slackClient.SendMessage(cfg.SlackChannelID, message, summaryText)
 	if err != nil {
-		return err
+		return &fetched, err
 	}
 
 	if err := state.SavePostState(cfg.StateFilePath, parsedPRs, sentMessageInfo); err != nil {
-		return err
+		return &fetched, err
 	}
-	return sentMessageHandler(sentMessageInfo)
+	return &fetched, sentMessageHandler(sentMessageInfo)
 }
 
 func runUpdateMode(
@@ -102,7 +127,6 @@ func runUpdateMode(
 		return nil
 	}
 
-	const prFetchTimeout = 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
 	prs, err := githubClient.GetPRs(ctx, loadedState.PullRequests, cfg.GetFiltersForRepository)
@@ -141,6 +165,16 @@ func runUpdateMode(
 		return err
 	}
 	return sentMessageHandler(sentMessageInfo)
+}
+
+func findOpenPRs(
+	githubClient githubclient.Client,
+	cfg config.Config,
+	fetchOptions githubclient.PRFetchOptions,
+) (githubclient.OpenPRsResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
+	defer cancel()
+	return githubClient.FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository, fetchOptions)
 }
 
 // Returns a handler function that saves the sent Slack message blocks as a JSON file.
