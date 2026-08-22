@@ -11,10 +11,14 @@ inputs:
   slack-bot-token:
     description: 'Slack bot token for sending messages'
     required: true
-  slack-channel-name:
+  slack-channel-name-1:
     description: 'Slack channel name for test messages'
     required: false
     default: 'pr-reminders-test'
+  slack-channel-name-2:
+    description: 'Slack channel name for test messages grouped by repository'
+    required: false
+    default: 'pr-reminders-test-2'
 
 runs:
   using: composite
@@ -32,7 +36,7 @@ runs:
       with:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
-        slack-channel-name: ${{ inputs.slack-channel-name }}
+        slack-channel-name: ${{ inputs.slack-channel-name-1 }}
         github-user-slack-user-id-mapping: |
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
@@ -42,7 +46,7 @@ runs:
       with:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
-        slack-channel-name: ${{ inputs.slack-channel-name }}
+        slack-channel-name: ${{ inputs.slack-channel-name-1 }}
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
@@ -52,12 +56,25 @@ runs:
           bob: U08EVPGNWER
         old-pr-threshold-hours: 48
 
-    - name: Run with filters
+    - name: Run with canvas link
       uses: ./
       with:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
-        slack-channel-name: ${{ inputs.slack-channel-name }}
+        slack-channel-name: ${{ inputs.slack-channel-name-1 }}
+        github-repositories: |
+          hellej/pr-slack-reminder-action
+          hellej/pr-slack-reminder-test-repo-1
+          hellej/pr-slack-reminder-test-repo-2
+        old-pr-threshold-hours: 48
+        pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL
+
+    - name: Run with filters without canvas link
+      uses: ./
+      with:
+        github-token: ${{ steps.app-token.outputs.token }}
+        slack-bot-token: ${{ inputs.slack-bot-token }}
+        slack-channel-name: ${{ inputs.slack-channel-name-2 }}
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
@@ -71,4 +88,24 @@ runs:
         repository-filters: |
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
-        pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BMEPVR1DL
+
+    - name: Run with filters and canvas link
+      uses: ./
+      with:
+        github-token: ${{ steps.app-token.outputs.token }}
+        slack-bot-token: ${{ inputs.slack-bot-token }}
+        slack-channel-name: ${{ inputs.slack-channel-name-2 }}
+        github-repositories: |
+          hellej/pr-slack-reminder-action
+          hellej/pr-slack-reminder-test-repo-1
+          hellej/pr-slack-reminder-test-repo-2
+        old-pr-threshold-hours: 48
+        group-by-repository: true
+        filters: |
+          {
+            "ignored-labels": ["ignore-reminder"]
+          }
+        repository-filters: |
+          hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
+          hellej/pr-slack-reminder-test-repo-2: {}
+        pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BSUKTNB3J
