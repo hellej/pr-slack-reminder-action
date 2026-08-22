@@ -68,12 +68,19 @@ The heading list is the index, so a heading has to carry the whole claim on its 
 
 ## The GraphQL cost formula overestimates: read `rateLimit.cost` instead
 
-- Source: `gh api graphql`, two aliased `search(first: 100)` fields in one operation; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
+- Source: `gh api graphql` against `microsoft/vscode`, `rust-lang/rust`, `kubernetes/kubernetes`, `facebook/react`; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
 - Checked: 2026-08-22
-- The formula predicted 3 points for that query. GitHub charged 2, and 1 with the nested
-  `labels(first: 100)` removed
-- Cost is per operation, not per alias: adding repositories is nearly free, nested
-  connections are what cost
+- The formula predicted 3 points for a two-repository search. GitHub charged 2
+- A nested connection is what costs. Aliases carrying one are charged per alias; aliases
+  without one are nearly free
+- Measured costs of this action's query shapes, against 5,000 points an hour:
+
+| Query | Cost |
+|---|---|
+| Open PR listing, `pullRequests(first: 100)` + `labels(first: 100)` | 1 per repository |
+| Merged PR search, `search(first: 100)` + `labels(first: 100)` | 1 per repository |
+| Merged PR search, no `labels` | 1 total, any repository count |
+| Enrichment batch, 25 PRs, `commits(last: 1)` + `reviews(first: 100)` + `comments(first: 100)` | 1 |
 
 ## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error
 
