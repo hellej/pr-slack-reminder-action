@@ -43,36 +43,24 @@ func Run(
 	}
 
 	sentMessageHandler := getSentMessageHandler(cfg)
-	canvasEnabled := cfg.PRTrackerCanvasID != ""
 
 	// The message path and the canvas refresh are independent attempts: a failing reminder
 	// says nothing about whether the canvas can be written, and a stale canvas is what this
 	// feature exists to prevent. Their errors are collected instead of short-circuited.
 	var messageErr, canvasErr error
-	var canvasPRs githubclient.OpenPRsResult
-	canvasPRsFetched := false
+	var openPRs *githubclient.OpenPRsResult
 
 	switch cfg.RunMode {
 	case config.RunModePost:
-		var postResult postModeResult
-		postResult, messageErr = runPostMode(githubClient, slackClient, cfg, sentMessageHandler)
-		canvasPRs, canvasPRsFetched = postResult.fetched, postResult.prsFetched
+		openPRs, messageErr = runPostMode(githubClient, slackClient, cfg, sentMessageHandler)
 	case config.RunModeUpdate:
 		messageErr = runUpdateMode(githubClient, slackClient, cfg, sentMessageHandler)
-		if canvasEnabled {
-			// Update mode's message is state-tracked, so the canvas needs its own fetch of
-			// what is open right now.
-			canvasPRs, canvasErr = findOpenPRs(
-				githubClient, cfg, githubclient.PRFetchOptions{IncludeDrafts: true},
-			)
-			canvasPRsFetched = canvasErr == nil
-		}
 	default:
 		return fmt.Errorf("unsupported run mode: %s", cfg.RunMode)
 	}
 
-	if canvasEnabled && canvasPRsFetched {
-		canvasErr = refreshPRTrackerCanvas(githubClient, slackClient, cfg, canvasPRs)
+	if cfg.CanvasEnabled() {
+		canvasErr = refreshPRTrackerCanvas(githubClient, slackClient, openPRs, cfg)
 	}
 	if canvasErr != nil {
 		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
@@ -80,30 +68,42 @@ func Run(
 	return errors.Join(messageErr, canvasErr)
 }
 
-// Refreshes the canvas from already fetched open PRs, and fetches the merged ones itself, so that
-// both run modes share one code path and one "now". A failed merged fetch costs that section only:
-// the canvas is written without it and the error is carried out to the run's exit code.
+// Refreshes the canvas, and fetches the merged PRs itself, so that both run modes share one code
+// path and one "now". A failed merged fetch costs that section only: the canvas is written without
+// it and the error is carried out to the run's exit code.
+//
+// openPRs carries post mode's fetch, which the message path already made. Nil asks for a fetch
+// here, which is what update mode always needs: its message is state-tracked, so it never lists
+// what is open right now.
 func refreshPRTrackerCanvas(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
+	openPRs *githubclient.OpenPRsResult,
 	cfg config.Config,
-	fetched githubclient.OpenPRsResult,
 ) error {
 	generatedAt := time.Now().UTC()
+
+	if openPRs == nil {
+		fetched, err := findOpenPRs(githubClient, cfg, githubclient.PRFetchOptions{IncludeDrafts: true})
+		if err != nil {
+			return err
+		}
+		openPRs = &fetched
+	}
 
 	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(githubClient, cfg, generatedAt)
 	if mergedPRsErr != nil {
 		log.Printf("Failed to fetch recently merged PRs: %v", mergedPRsErr)
 	}
 
-	parsedPRs := prparser.ParsePRs(fetched.PRs, cfg.ContentInputs)
+	parsedPRs := prparser.ParsePRs(openPRs.PRs, cfg.ContentInputs)
 	content := canvascontent.GetContent(
 		parsedPRs,
 		prparser.ParsePRs(mergedPRs, cfg.ContentInputs),
 		cfg.ContentInputs,
 		canvascontent.GetContentOptions{
-			OpenPRsCapped:        fetched.OpenPRsCapped,
-			WIPPRsCapped:         fetched.DraftPRsCapped,
+			OpenPRsCapped:        openPRs.OpenPRsCapped,
+			WIPPRsCapped:         openPRs.DraftPRsCapped,
 			MergedPRsUnavailable: mergedPRsErr != nil,
 			GeneratedAt:          generatedAt,
 		},
@@ -138,28 +138,21 @@ func findOpenPRs(
 	return githubClient.FindOpenPRs(ctx, cfg.Repositories, cfg.GetFiltersForRepository, fetchOptions)
 }
 
-// What the canvas refresh needs from a "post" run: the PRs it shares with the message path,
-// and whether they were fetched at all. An empty PR list means "nothing open" only when the
-// fetch succeeded, and refreshing on a failed fetch would wipe the canvas.
-type postModeResult struct {
-	fetched    githubclient.OpenPRsResult
-	prsFetched bool
-}
-
+// Returns the open PRs it fetched, for the canvas refresh to share. Nil when the fetch failed,
+// which leaves the canvas refresh to fetch its own.
 func runPostMode(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
-) (postModeResult, error) {
+) (*githubclient.OpenPRsResult, error) {
 	// The canvas shares this fetch, only with drafts switched on.
 	fetched, err := findOpenPRs(githubClient, cfg, githubclient.PRFetchOptions{
-		IncludeDrafts: cfg.PRTrackerCanvasID != "",
+		IncludeDrafts: cfg.CanvasEnabled(),
 	})
 	if err != nil {
-		return postModeResult{}, err
+		return nil, err
 	}
-	result := postModeResult{fetched: fetched, prsFetched: true}
 
 	// The message never shows drafts: they are dropped by the same predicate that keeps them
 	// out of the fetch when the canvas is off, and before anything else sees the PRs.
@@ -170,19 +163,19 @@ func runPostMode(
 	content := messagecontent.GetContent(parsedPRs, cfg.ContentInputs)
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("No PRs found and no message configured for this case, exiting")
-		return result, nil
+		return &fetched, nil
 	}
 	message, summaryText := messagebuilder.BuildMessage(content)
 
 	sentMessageInfo, err := slackClient.SendMessage(cfg.SlackChannelID, message, summaryText)
 	if err != nil {
-		return result, err
+		return &fetched, err
 	}
 
 	if err := state.SavePostState(cfg.StateFilePath, parsedPRs, sentMessageInfo); err != nil {
-		return result, err
+		return &fetched, err
 	}
-	return result, sentMessageHandler(sentMessageInfo)
+	return &fetched, sentMessageHandler(sentMessageInfo)
 }
 
 func runUpdateMode(

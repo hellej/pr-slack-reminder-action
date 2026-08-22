@@ -11,7 +11,7 @@ Parses and validates GitHub Action inputs into a `Config`. See [AGENTS.md](../..
 - `Config.GetFiltersForRepository(repo)` looks up `repository-filters` by full path first, then bare name, else falls back to global filters
 - `RunMode` is `"post"` (default) or `"update"`
 - Validation enforces: a Slack channel (ID or name) is set; repository count ≤ `MaxRepositories` (30); no duplicate repositories; every `repository-filters` key matches exactly one configured repository; `pr-list-heading` is set unless `group-by-repository` is true; `state-artifact-name` is set when run mode is `"update"`
-- `pr-tracker-canvas-link` is parsed into `PRTrackerCanvasID`, the `F…` ID from the link's `/docs/<TEAM_ID>/<CANVAS_ID>` path. Empty input leaves it empty, which means the canvas feature is off
+- `pr-tracker-canvas-link` is parsed into `PRTrackerCanvasID`, the `F…` ID from the link's `/docs/<TEAM_ID>/<CANVAS_ID>` path. Empty input leaves it empty, which `Config.CanvasEnabled()` reports as the canvas feature being off
 - A non-empty canvas link that has no `docs` path segment followed by an `F[A-Z0-9]+` segment is a parse error, joined with the other input parse errors
 - `Config.Print()` logs the config as JSON with all tokens redacted
 - Input getters (string/int/bool/list/mapping) treat an input as required or optional depending on which getter is called

@@ -68,6 +68,10 @@ type Config struct {
 	PRTrackerCanvasID string
 }
 
+func (c Config) CanvasEnabled() bool {
+	return c.PRTrackerCanvasID != ""
+}
+
 type ContentInputs struct {
 	SlackUserIdByGitHubUsername map[string]string
 	PRListHeading               string
