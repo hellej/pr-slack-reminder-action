@@ -58,6 +58,39 @@ The heading list is the index, so a heading has to carry the whole claim on its 
 - Unverified: OR semantics for repeated `repo:` qualifiers, the alternative to one aliased
   search per repository
 
+## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts
+
+- Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` and `totalCount` per qualifier; `__type(name:"Repository")` introspection for the argument list
+- Checked: 2026-08-22
+
+`repository.pullRequests` takes `states`, `labels`, `headRefName`, `baseRefName`, `orderBy`
+and the four pagination arguments, introspected, nothing else. Of those only `labels`
+filters what this project filters on:
+
+- `labels: ["a","b"]` is OR: 5 + 6 = 11, matching an any-of allow-list
+- No author argument, no negation of either, no draft argument
+
+`search(type: ISSUE)` covers the rest, through qualifiers:
+
+- `label:a,b` is OR (11); `label:a label:b` is AND (0)
+- Repeated `author:` qualifiers are OR: 14 + 11 = 25
+- `-author:` and `-label:` exclude: 2491 down to 2477 for one bot author
+- `draft:true` / `draft:false` split the set, 678 / 1813
+
+## No GraphQL query filters PRs by a case-sensitive title substring
+
+- Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` per qualifier
+- Checked: 2026-08-22
+
+`repository.pullRequests` has no title argument at all, and `search` matches whole words,
+case-insensitively. Of 2491 open PRs: `epo in:title` matched 0 while `repo in:title`
+matched 15, and `Fix in:title` and `fix in:title` both matched 1005. A case-sensitive
+substring filter has to run client-side.
+
+Negating a free-text term needs `NOT`, not `-`: `NOT Fix in:title` matched 1486, the exact
+complement of 1005, while `-Fix in:title` matched 1005, the same as no negation at all. The
+`-` prefix does work on qualifiers such as `-label:` and `-author:`.
+
 ## The 30 requests/minute GitHub search limit is a REST figure
 
 - Source: [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
