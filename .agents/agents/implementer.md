@@ -19,6 +19,9 @@ step to describe what you built, keeping the reasoning: a plan reads as one piec
 at once, never as text plus a note contradicting it. Keep the edit inside the step you
 are implementing.
 
+A test deriving its expectation from the value under test asserts nothing. Pin the value
+literally, and feed the boundary itself.
+
 Do not commit. Leave the changes in the working tree for review.
 
 If you get review feedback on changes you already made, fix the issues the same way:
