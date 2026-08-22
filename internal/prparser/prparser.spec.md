@@ -16,6 +16,7 @@ Enriches fetched PRs with display-ready metadata.
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
 - `IsMerged` and `IsClosedButNotMerged` expose PR state for display styling
 - `GroupPRsByRepositories(prs)` buckets PRs into `[]RepositoryPRs`, ordered alphabetically by repository path; PRs keep their given order within a bucket. It carries no display text, so each renderer supplies its own headings and links
+- `GroupPRsByRepositoriesInGivenOrder(prs)` buckets the same way, but orders the buckets by each repository's first PR in the given list. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was
 
 ## Doesn't Do
 

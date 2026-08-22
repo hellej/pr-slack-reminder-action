@@ -1,6 +1,7 @@
 package canvascontent_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -51,15 +52,10 @@ func prNumbers(prs []prparser.PR) []int {
 	return utilities.Map(prs, func(pr prparser.PR) int { return pr.GetNumber() })
 }
 
-func assertNumbers(t *testing.T, what string, got []int, want []int) {
+func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
 	t.Helper()
-	if len(got) != len(want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("expected %s %v, got %v", what, want, got)
-	}
-	for idx := range want {
-		if got[idx] != want[idx] {
-			t.Fatalf("expected %s %v, got %v", what, want, got)
-		}
 	}
 }
 
@@ -74,8 +70,8 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertNumbers(t, "open PRs", prNumbers(content.OpenPRs), []int{1, 3})
-	assertNumbers(t, "WIP PRs", prNumbers(content.WIPPRs), []int{2})
+	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{1, 3})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{2})
 }
 
 func TestGetContentKeepsGivenOpenPROrder(t *testing.T) {
@@ -88,15 +84,23 @@ func TestGetContentKeepsGivenOpenPROrder(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertNumbers(t, "open PRs", prNumbers(content.OpenPRs), []int{7, 8})
+	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{7, 8})
 }
 
-func TestGetContentGroupsOpenPRsByRepositoryAndKeepsWIPPRsFlat(t *testing.T) {
+// The repository paths of a grouped section, so its whole group order is one expectation.
+func groupPaths(groups []prparser.RepositoryPRs) []string {
+	return utilities.Map(groups, func(group prparser.RepositoryPRs) string {
+		return group.Repository.GetPath()
+	})
+}
+
+// The open PRs come in oldest first, so the oldest PR's repository leads. It is not the
+// alphabetically first one here.
+func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{number: 1, repository: "repo-two"}),
 		testPR(testPROptions{number: 2, repository: "repo-one"}),
-		testPR(testPROptions{number: 3, repository: "repo-two", draft: true, lastActivityAt: activityAgo(time.Hour)}),
-		testPR(testPROptions{number: 4, repository: "repo-one", draft: true, lastActivityAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 3, repository: "repo-two"}),
 	}
 
 	content := canvascontent.GetContent(
@@ -112,15 +116,70 @@ func TestGetContentGroupsOpenPRsByRepositoryAndKeepsWIPPRsFlat(t *testing.T) {
 	if len(content.OpenPRs) != 0 {
 		t.Errorf("expected no flat open PRs when grouping, got %v", prNumbers(content.OpenPRs))
 	}
-	if len(content.OpenPRsGroupedByRepository) != 2 {
-		t.Fatalf("expected 2 repository groups, got %d", len(content.OpenPRsGroupedByRepository))
+	assertEqual(
+		t, "open PR group paths", groupPaths(content.OpenPRsGroupedByRepository),
+		[]string{"test-org/repo-two", "test-org/repo-one"},
+	)
+	assertEqual(t, "first group PRs", prNumbers(content.OpenPRsGroupedByRepository[0].PRs), []int{1, 3})
+	assertEqual(t, "second group PRs", prNumbers(content.OpenPRsGroupedByRepository[1].PRs), []int{2})
+}
+
+// The WIP PRs are sorted by activity first, so the most recently touched PR's repository leads.
+// repo-two sorts after repo-three alphabetically, so alphabetical bucketing fails this.
+func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, repository: "repo-two"}),
+		testPR(testPROptions{number: 2, repository: "repo-one"}),
+		testPR(testPROptions{
+			number: 3, repository: "repo-three", draft: true, lastActivityAt: activityAgo(3 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 4, repository: "repo-two", draft: true, lastActivityAt: activityAgo(time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 5, repository: "repo-three", draft: true, lastActivityAt: activityAgo(2 * time.Hour),
+		}),
 	}
-	firstGroup := content.OpenPRsGroupedByRepository[0]
-	if firstGroup.Repository.GetPath() != "test-org/repo-one" {
-		t.Errorf("expected first group to be test-org/repo-one, got %s", firstGroup.Repository.GetPath())
+
+	content := canvascontent.GetContent(
+		prs,
+		nil,
+		config.ContentInputs{GroupByRepository: true},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	if len(content.WIPPRs) != 0 {
+		t.Errorf("expected no flat WIP PRs when grouping, got %v", prNumbers(content.WIPPRs))
 	}
-	assertNumbers(t, "first group PRs", prNumbers(firstGroup.PRs), []int{2})
-	assertNumbers(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 4})
+	assertEqual(
+		t, "WIP PR group paths", groupPaths(content.WIPPRsGroupedByRepository),
+		[]string{"test-org/repo-two", "test-org/repo-three"},
+	)
+	assertEqual(t, "first group PRs", prNumbers(content.WIPPRsGroupedByRepository[0].PRs), []int{4})
+	assertEqual(t, "second group PRs", prNumbers(content.WIPPRsGroupedByRepository[1].PRs), []int{5, 3})
+}
+
+func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{
+			number: 3, repository: "repo-two", draft: true, lastActivityAt: activityAgo(time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 4, repository: "repo-one", draft: true, lastActivityAt: activityAgo(2 * time.Hour),
+		}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 4})
+	if len(content.WIPPRsGroupedByRepository) != 0 {
+		t.Errorf(
+			"expected no WIP PR groups without grouping, got %v",
+			groupPaths(content.WIPPRsGroupedByRepository),
+		)
+	}
 }
 
 func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
@@ -144,7 +203,7 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertNumbers(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 1, 2})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 1, 2})
 }
 
 func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
@@ -182,7 +241,7 @@ func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertNumbers(t, "WIP PRs", prNumbers(content.WIPPRs), []int{1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{1})
 }
 
 func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
@@ -238,14 +297,16 @@ func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 		},
 	)
 
-	assertNumbers(t, "merged PRs", prNumbers(content.MergedPRs), []int{2, 3, 1})
+	assertEqual(t, "merged PRs", prNumbers(content.MergedPRs), []int{2, 3, 1})
 }
 
-// Grouping shapes the open section only, as it does for the WIP section.
-func TestGetContentKeepsMergedPRsFlatWhenGrouping(t *testing.T) {
+// The merged PRs are sorted by merge time first, so the most recently merged PR's repository
+// leads. It is not the alphabetically first one here.
+func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *testing.T) {
 	mergedPRs := []prparser.PR{
-		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(time.Hour)}),
-		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(3 * time.Hour)}),
+		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 3, repository: "repo-one", mergedAt: activityAgo(4 * time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(
@@ -255,7 +316,36 @@ func TestGetContentKeepsMergedPRsFlatWhenGrouping(t *testing.T) {
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
-	assertNumbers(t, "merged PRs", prNumbers(content.MergedPRs), []int{1, 2})
+	if len(content.MergedPRs) != 0 {
+		t.Errorf("expected no flat merged PRs when grouping, got %v", prNumbers(content.MergedPRs))
+	}
+	assertEqual(
+		t, "merged PR group paths", groupPaths(content.MergedPRsGroupedByRepository),
+		[]string{"test-org/repo-two", "test-org/repo-one"},
+	)
+	assertEqual(t, "first group PRs", prNumbers(content.MergedPRsGroupedByRepository[0].PRs), []int{2})
+	assertEqual(t, "second group PRs", prNumbers(content.MergedPRsGroupedByRepository[1].PRs), []int{1, 3})
+}
+
+func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
+	mergedPRs := []prparser.PR{
+		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(2 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(
+		nil, mergedPRs, config.ContentInputs{}, canvascontent.GetContentOptions{
+			GeneratedAt: generatedAt,
+		},
+	)
+
+	assertEqual(t, "merged PRs", prNumbers(content.MergedPRs), []int{1, 2})
+	if len(content.MergedPRsGroupedByRepository) != 0 {
+		t.Errorf(
+			"expected no merged PR groups without grouping, got %v",
+			groupPaths(content.MergedPRsGroupedByRepository),
+		)
+	}
 }
 
 func TestGetContentTakesMergedPRsUnavailableFromOptions(t *testing.T) {

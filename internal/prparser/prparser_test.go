@@ -136,6 +136,77 @@ func TestGroupPRsByRepositories(t *testing.T) {
 	}
 }
 
+func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
+	repoA := models.Repository{Owner: "org", Name: "alpha"}
+	repoB := models.Repository{Owner: "org", Name: "beta"}
+	repoC := models.Repository{Owner: "another-org", Name: "gamma"}
+
+	tests := []struct {
+		name                string
+		prs                 []prparser.PR
+		expectedRepos       []models.Repository
+		expectedPRNumbersBy map[string][]int
+	}{
+		{
+			name:                "no PRs",
+			prs:                 []prparser.PR{},
+			expectedRepos:       []models.Repository{},
+			expectedPRNumbersBy: map[string][]int{},
+		},
+		{
+			name: "single repository keeps every PR in one group",
+			prs: []prparser.PR{
+				testPRInRepository(1, repoA),
+				testPRInRepository(2, repoA),
+			},
+			expectedRepos:       []models.Repository{repoA},
+			expectedPRNumbersBy: map[string][]int{"org/alpha": {1, 2}},
+		},
+		{
+			// Alphabetical order would be another-org/gamma, org/alpha, org/beta, so this case
+			// fails against alphabetical bucket ordering.
+			name: "multiple repositories are ordered by their first PR in the given list",
+			prs: []prparser.PR{
+				testPRInRepository(4, repoB),
+				testPRInRepository(2, repoC),
+				testPRInRepository(3, repoA),
+				testPRInRepository(1, repoB),
+			},
+			expectedRepos: []models.Repository{repoB, repoC, repoA},
+			expectedPRNumbersBy: map[string][]int{
+				// Not ascending by number, so an ascending within-bucket sort fails here; the
+				// single-repository case catches a descending one.
+				"org/beta":          {4, 1},
+				"another-org/gamma": {2},
+				"org/alpha":         {3},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groups := prparser.GroupPRsByRepositoriesInGivenOrder(tt.prs)
+
+			if len(groups) != len(tt.expectedRepos) {
+				t.Fatalf("expected %d groups, got %d", len(tt.expectedRepos), len(groups))
+			}
+			for i, expectedRepo := range tt.expectedRepos {
+				if groups[i].Repository != expectedRepo {
+					t.Errorf("expected group %d to be %v, got %v", i, expectedRepo, groups[i].Repository)
+				}
+				expectedNumbers := tt.expectedPRNumbersBy[expectedRepo.GetPath()]
+				numbers := utilities.Map(groups[i].PRs, func(pr prparser.PR) int { return pr.GetNumber() })
+				if !slices.Equal(numbers, expectedNumbers) {
+					t.Errorf(
+						"expected PR numbers %v for %s, got %v",
+						expectedNumbers, expectedRepo.GetPath(), numbers,
+					)
+				}
+			}
+		})
+	}
+}
+
 func testCollaborator(name string) prparser.Collaborator {
 	return prparser.Collaborator{Collaborator: &githubclient.Collaborator{Login: name, Name: name}}
 }

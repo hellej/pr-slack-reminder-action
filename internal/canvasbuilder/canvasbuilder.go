@@ -25,34 +25,66 @@ const (
 // The canvas has no top-level heading: Slack renders the canvas title as its own H1 at the top
 // of the document, so a body H1 would show as a second title.
 func BuildMarkdown(content canvascontent.Content) string {
-	blocks := renderOpenPRsSection(content)
-	blocks = append(blocks, renderSection(wipPRsHeading, content.WIPPRs, renderWIPPRRow, noWIPPRsText))
-	blocks = append(blocks, renderSection(
-		mergedPRsHeading, content.MergedPRs, renderMergedPRRow, emptyMergedPRsText(content),
-	))
+	blocks := renderSectionBlocks(section{
+		heading:             openPRsHeading,
+		prs:                 content.OpenPRs,
+		groups:              content.OpenPRsGroupedByRepository,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderOpenPRRow,
+		emptyText:           noOpenPRsText,
+	})
+	blocks = append(blocks, renderSectionBlocks(section{
+		heading:             wipPRsHeading,
+		prs:                 content.WIPPRs,
+		groups:              content.WIPPRsGroupedByRepository,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderWIPPRRow,
+		emptyText:           noWIPPRsText,
+	})...)
+	blocks = append(blocks, renderSectionBlocks(section{
+		heading:             mergedPRsHeading,
+		prs:                 content.MergedPRs,
+		groups:              content.MergedPRsGroupedByRepository,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderMergedPRRow,
+		emptyText:           emptyMergedPRsText(content),
+	})...)
 	blocks = append(blocks, "---")
 	blocks = append(blocks, renderFooter(content)...)
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
-// Grouped open PRs get one sub-heading block per repository, with no repeated section heading.
+// One canvas section: its PRs as the flat list or as repository buckets, and how to render a row
+// of it.
+type section struct {
+	heading             string
+	prs                 []prparser.PR
+	groups              []prparser.RepositoryPRs
+	groupedByRepository bool
+	renderRow           func(prparser.PR) string
+	emptyText           string
+}
+
+// Grouped PRs get one sub-heading block per repository, with no repeated section heading.
 // Grouping with nothing to show falls back to the same single line the flat section uses.
-func renderOpenPRsSection(content canvascontent.Content) []string {
-	if !content.GroupedByRepository || len(content.OpenPRsGroupedByRepository) == 0 {
-		return []string{renderSection(openPRsHeading, content.OpenPRs, renderOpenPRRow, noOpenPRsText)}
+func renderSectionBlocks(section section) []string {
+	if !section.groupedByRepository || len(section.groups) == 0 {
+		return []string{renderSection(section.heading, section.prs, section.renderRow, section.emptyText)}
 	}
 
 	return append(
-		[]string{openPRsHeading},
-		utilities.Map(content.OpenPRsGroupedByRepository, renderRepositoryGroup)...,
+		[]string{section.heading},
+		utilities.Map(section.groups, func(group prparser.RepositoryPRs) string {
+			return renderRepositoryGroup(group, section)
+		})...,
 	)
 }
 
-func renderRepositoryGroup(group prparser.RepositoryPRs) string {
+func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string {
 	heading := fmt.Sprintf(
 		"### [%s](%s)", escapeMarkdown(group.Repository.GetPath()), group.Repository.GetPullsURL(),
 	)
-	return renderSection(heading, group.PRs, renderOpenPRRow, noOpenPRsText)
+	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
 }
 
 // An empty section keeps its heading and shows the given line instead of rows: a missing

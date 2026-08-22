@@ -93,21 +93,44 @@ type RepositoryPRs struct {
 // Buckets PRs by repository, ordered alphabetically by repository path. PRs keep their given
 // order within a bucket.
 func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
-	repositoryByPath := make(map[string]models.Repository)
-	prsByRepositoryPath := make(map[string][]PR)
+	buckets := bucketPRsByRepository(prs)
+	return buckets.groupsForPaths(slices.Sorted(maps.Keys(buckets.repositoryByPath)))
+}
 
+// Buckets PRs by repository, ordered by each repository's first PR in the given list. PRs keep
+// their given order within a bucket, so an already-sorted list decides both orders.
+func GroupPRsByRepositoriesInGivenOrder(prs []PR) []RepositoryPRs {
+	buckets := bucketPRsByRepository(prs)
+	pathsInGivenOrder := utilities.UniqueFunc(
+		utilities.Map(prs, func(pr PR) string { return pr.Repository.GetPath() }),
+		func(a, b string) bool { return a == b },
+	)
+	return buckets.groupsForPaths(pathsInGivenOrder)
+}
+
+type repositoryBuckets struct {
+	repositoryByPath    map[string]models.Repository
+	prsByRepositoryPath map[string][]PR
+}
+
+func bucketPRsByRepository(prs []PR) repositoryBuckets {
+	buckets := repositoryBuckets{
+		repositoryByPath:    make(map[string]models.Repository),
+		prsByRepositoryPath: make(map[string][]PR),
+	}
 	for _, pr := range prs {
 		path := pr.Repository.GetPath()
-		repositoryByPath[path] = pr.Repository
-		prsByRepositoryPath[path] = append(prsByRepositoryPath[path], pr)
+		buckets.repositoryByPath[path] = pr.Repository
+		buckets.prsByRepositoryPath[path] = append(buckets.prsByRepositoryPath[path], pr)
 	}
+	return buckets
+}
 
-	paths := slices.Sorted(maps.Keys(repositoryByPath))
-
+func (buckets repositoryBuckets) groupsForPaths(paths []string) []RepositoryPRs {
 	return utilities.Map(paths, func(path string) RepositoryPRs {
 		return RepositoryPRs{
-			Repository: repositoryByPath[path],
-			PRs:        prsByRepositoryPath[path],
+			Repository: buckets.repositoryByPath[path],
+			PRs:        buckets.prsByRepositoryPath[path],
 		}
 	})
 }

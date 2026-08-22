@@ -16,15 +16,17 @@ import (
 const MaxDraftPRInactivity = 60 * 24 * time.Hour
 
 type Content struct {
-	OpenPRs                    []prparser.PR
-	OpenPRsGroupedByRepository []prparser.RepositoryPRs
-	GroupedByRepository        bool
-	WIPPRs                     []prparser.PR
-	MergedPRs                  []prparser.PR
-	OpenPRsCapped              bool
-	WIPPRsCapped               bool
-	MergedPRsUnavailable       bool
-	GeneratedAt                time.Time
+	OpenPRs                      []prparser.PR
+	OpenPRsGroupedByRepository   []prparser.RepositoryPRs
+	GroupedByRepository          bool
+	WIPPRs                       []prparser.PR
+	WIPPRsGroupedByRepository    []prparser.RepositoryPRs
+	MergedPRs                    []prparser.PR
+	MergedPRsGroupedByRepository []prparser.RepositoryPRs
+	OpenPRsCapped                bool
+	WIPPRsCapped                 bool
+	MergedPRsUnavailable         bool
+	GeneratedAt                  time.Time
 }
 
 type GetContentOptions struct {
@@ -40,9 +42,9 @@ type GetContentOptions struct {
 }
 
 // GetContent splits the given PRs into an open section and a work-in-progress section, and takes
-// the merged section from its own list. Open PRs keep their given order (oldest first) and are
-// grouped by repository when configured; WIP PRs are always a flat list, most recent activity
-// first, with long-inactive ones dropped; merged PRs are always a flat list, newest merge first.
+// the merged section from its own list. Open PRs keep their given order (oldest first); WIP PRs
+// are ordered most recent activity first, with long-inactive ones dropped; merged PRs are ordered
+// newest merge first. Each section is bucketed by repository when configured, in that same order.
 func GetContent(
 	prs []prparser.PR,
 	mergedPRs []prparser.PR,
@@ -58,14 +60,15 @@ func GetContent(
 		len(openPRs), len(activeDrafts), len(mergedPRs), len(drafts)-len(activeDrafts),
 	)
 
+	wipPRs := prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
+		return pr.GetLastActivityAt()
+	})
+	// ParsePRs re-sorts every PR oldest first, so the merge order is made here.
+	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
+		return pr.GetMergedAt()
+	})
+
 	content := Content{
-		WIPPRs: prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
-			return pr.GetLastActivityAt()
-		}),
-		// ParsePRs re-sorts every PR oldest first, so the merge order is made here.
-		MergedPRs: prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
-			return pr.GetMergedAt()
-		}),
 		GroupedByRepository:  contentInputs.GroupByRepository,
 		OpenPRsCapped:        options.OpenPRsCapped,
 		WIPPRsCapped:         options.WIPPRsCapped,
@@ -73,11 +76,17 @@ func GetContent(
 		GeneratedAt:          options.GeneratedAt,
 	}
 
+	// Each list is already in its section's order, so bucketing it in that order puts the
+	// repository holding the section's leading PR first.
 	if contentInputs.GroupByRepository {
-		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositories(openPRs)
+		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(openPRs)
+		content.WIPPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
+		content.MergedPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
 		return content
 	}
 	content.OpenPRs = openPRs
+	content.WIPPRs = wipPRs
+	content.MergedPRs = sortedMergedPRs
 	return content
 }
 

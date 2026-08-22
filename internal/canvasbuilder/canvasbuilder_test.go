@@ -111,6 +111,10 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		age: oldAge, mergeAge: durationPointer(idleAge),
 		approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
 	})
+	otherWIPPR := testPR(prOptions{
+		number: 11, title: "Draft the migration guide", repository: "repo-two",
+		authorName: "Bob Brown", age: hoursAge, activityAge: durationPointer(minutesAge),
+	})
 	otherMergedPR := testPR(prOptions{
 		number: 2, title: "Bump the Slack SDK", repository: "repo-two", authorName: "Bob Brown",
 		age: idleAge, mergeAge: durationPointer(hoursAge),
@@ -146,6 +150,24 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 				),
 				GroupedByRepository: true,
 				WIPPRs:              []prparser.PR{wipPR},
+				GeneratedAt:         generatedAt,
+			},
+		},
+		{
+			// Each section's groups come in their own order, so the repository leading one
+			// section need not lead the next.
+			name: "all sections grouped by repository",
+			content: canvascontent.Content{
+				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
+					[]prparser.PR{openPR, otherOpenPR},
+				),
+				WIPPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
+					[]prparser.PR{otherWIPPR, wipPR},
+				),
+				MergedPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
+					[]prparser.PR{otherMergedPR, mergedPR},
+				),
+				GroupedByRepository: true,
 				GeneratedAt:         generatedAt,
 			},
 		},
