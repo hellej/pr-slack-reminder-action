@@ -49,7 +49,7 @@ func BuildMarkdown(content canvascontent.Content) string {
 		renderRow:           renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),
 	})...)
-	blocks = append(blocks, "---")
+	blocks = append(blocks, "\n---")
 	blocks = append(blocks, renderFooter(content)...)
 	return strings.Join(blocks, "\n\n") + "\n"
 }
