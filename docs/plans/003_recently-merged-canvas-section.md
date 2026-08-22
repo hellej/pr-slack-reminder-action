@@ -52,7 +52,7 @@ _Updated 2026-08-08 06:15 UTC_
 - Merged fetch failed: the heading plus `_Merged PRs could not be fetched_`. The canvas is still written, so Open and WIP stay fresh, and the run still fails, like any other canvas failure.
 - No footer cap note. The section is "the 15 newest merges", so a 16th merge is not a surprise omission; the two existing cap lines stay as they are.
 - No `action.yml` change beyond the `pr-tracker-canvas-link` description wording.
-- No new GitHub token permission: the search results are PRs in the same repositories, covered by the `pull-requests: read` the action already documents. No enrichment, so nothing new touches `issues: read` either.
+- Expected to need no new GitHub token permission: the search returns PRs in the same repositories, which `pull-requests: read` already covers, and no enrichment means nothing new touches `issues: read`. GitHub does not document how search visibility into private repositories is granted, so Step 1 checks it live before anything is built on it.
 - No new Slack scope.
 
 ## Breaking change classification
@@ -74,13 +74,9 @@ _Updated 2026-08-08 06:15 UTC_
 
 Files: `internal/apiclients/githubclient/models.go`, `graphqlmodels.go`, `graphqlfetch.go`, `githubclient.go`.
 
-**Why not a `pullRequests` listing.** Merge time is not orderable: `Repository.pullRequests` takes an `IssueOrder`, whose `IssueOrderField` is `COMMENTS`, `CREATED_AT`, `UPDATED_AT` only ([IssueOrder input object](https://docs.github.com/en/graphql/reference/issues#input-object-issueorder)). Ordering by `UPDATED_AT DESC` and cutting the window client-side does not work, measured live on 2026-08-22 with `gh api graphql`:
+**Private repositories.** The query reaches them: run live on 2026-08-22 against a private repository, it returned the merged PR with `repository.isPrivate` true, for a classic token holding `repo`. Undocumented is which permission counts as access, and the failure mode is silent, since no-access and no-matches are both `issueCount: 0`. Repeat that query once during this step with a token holding only `pull-requests: read`, as `README.md`'s `permissions:` block documents. Verified done when it returns the merge. If it does not, find the permission that works and update the README's permission block as part of this plan.
 
-- `microsoft/vscode`: 348 PRs merged in the last 7 days, 33 of them present in the 100 most recently updated merged PRs. 90% missed.
-- `rust-lang/rust`: 218 merged in 7 days, 58 present. 73% missed.
-- `kubernetes/kubernetes`: that same 100-node page contained PRs merged in 2014, pulled to the top by later comments. It covered ~25 days of update activity and 12 years of merges.
-
-Any post-merge comment, label or cross-reference bumps `updatedAt`, so the page fills with old merges. Paging past it means walking every PR touched in the window.
+**Why not a `pullRequests` listing.** Merge time is not orderable: `Repository.pullRequests` takes an `IssueOrder`, whose `IssueOrderField` is `COMMENTS`, `CREATED_AT`, `UPDATED_AT` only ([IssueOrder input object](https://docs.github.com/en/graphql/reference/issues#input-object-issueorder)). Ordering by `UPDATED_AT DESC` and cutting the window client-side does not work either: any post-merge comment, label or cross-reference bumps `updatedAt`, so the first page fills with old merges. Measured live on 2026-08-22, one 100-node page caught 33 of the 348 PRs `microsoft/vscode` merged in 7 days. Paging past it means walking every PR touched in the window.
 
 **Use `search` instead.** It filters on merge date server-side, so one page per repository is the exact in-window set:
 
@@ -101,12 +97,14 @@ query($q0:String!,$q1:String!){
 
 - Query string per repository: `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`. `is:pr`, `is:merged` and `merged:>=` are documented qualifiers ([searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)).
 - The cutoff is passed at day granularity, so the search returns up to one extra day of merges, and the exact `mergedAt >= mergedSince` cut happens client-side. Day granularity avoids relying on the date-time form of the qualifier.
-- One alias per repository, `s0`, `s1`, so each result set maps back to its repository without selecting `repository { nameWithOwner }`. Aliases go to `graphqlClient.Do` as they do today, so `rootAlias` recognises them and a search-scoped error classifies as a repository error rather than a fatal query error.
+- One alias per repository, `s0`, `s1`, so each result set maps back to its repository without selecting `repository { nameWithOwner }`. The whole query shape, several aliased searches included, was run live on 2026-08-22. There is always at least one repository and so at least one search: `GetConfig` falls back to the current repository when `github-repositories` is empty.
+- No per-repository error handling, because there is none to have: `search` reports a nonexistent repository, one the token cannot read, and an empty window identically, as `{"issueCount": 0, "nodes": []}` with no `errors` key. The `NOT_FOUND` that `repository(owner:,name:)` raises has no counterpart here. Errors that do occur come back with no `data` at all, so any error fails the whole merged fetch and the section renders its unavailable line.
+- A misspelled repository is therefore silent on this path, but not overall: every canvas refresh lists open PRs through `repository(owner:,name:)` first, and that call already fails the run on an unreadable repository.
 - `labels` is selected because `ignored-labels` and `labels` filters apply to this section.
 - No `orderBy`: search cannot sort by merge date either ([sorting search results](https://docs.github.com/en/search-github/getting-started-with-searching-on-github/sorting-search-results) lists comments, created, interactions, reactions, relevance, updated). Ordering is client-side, on `mergedAt`, over the in-window set.
 - `issueCount` says how many merges the window really holds. Over 100, log that the repository's list is truncated.
 - `assembleQuery` appends a fragment; the search query needs none, since `... on PullRequest` is inline. Let it take an empty fragment rather than growing a second assembler.
-- Cost: one request per search connection plus one per potential node for `labels`, divided by 100 ([rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)). About 6 points for 5 repositories, against 5,000 an hour, the same shape as the open listing. The documented 30 requests/minute search limit is a REST figure and is no constraint at one request per canvas refresh.
+- Cost, measured live: **2 points** for a two-repository query, 1 without the `labels` selection. Cost is charged per operation, not per alias, so more repositories barely move it, against 5,000 points an hour. The documented 30 requests/minute search limit is a REST figure and is no constraint at one request per canvas refresh.
 - The selection is narrower than `openPullRequestsFragment`: no `updatedAt`, no `isDraft`, no `headRefOid`. Merged PRs therefore carry a zero `UpdatedAt`, `Draft: false` and an empty `HeadSHA` on a struct the other two fetch paths share. Nothing on the canvas reads them: the merged list is re-sorted on `MergedAt` in Step 3, and `LastActivityAt`, `SnoozedUntil` and the reviewer slices stay nil by design. Record it as an oddity in the spec.
 - `buildListOpenPRsQuery` and `listOpenPRs` are untouched.
 
@@ -127,7 +125,7 @@ FindRecentlyMergedPRs(
 
 Order of work inside it:
 
-1. Search, with `pullRequestListTimeout`, failing on an alias-scoped error as `listOpenPRs` does.
+1. Search, with `pullRequestListTimeout`. Any error fails the whole merged fetch, with no per-repository message: `listOpenPRsError`'s "repository not found - check the repository name and permissions" describes an error `search` never returns, and would mislabel the ones it does.
 2. Drop PRs whose `MergedAt` is nil or before `mergedSince`.
 3. Apply `getPRFilterFunc[PRResult](getFiltersForRepository, false)`. `includePR` reads only title, labels and author, never state, so it needs no change.
 4. Sort by `MergedAt` descending and cap at `MaxMergedPRsToFetch` (15), mirroring `capDraftPRResultsToLimit`.
@@ -189,7 +187,7 @@ Files: `cmd/pr-slack-reminder/run.go`, `testhelpers/mockgithubclient/mockgithubc
 
 Files: the four package specs, `README.md`, `action.yml`, package doc comments.
 
-- `internal/apiclients/githubclient/githubclient.spec.md`: the merged search, its window, cap and client-side ordering, why search rather than the PR listing, no enrichment so no reviewers and no snooze exclusion, the over-100 truncation, and the fields a merged PR leaves zero. Two existing lines go stale: "Both PR-reading paths use the GraphQL API" is now three paths, and the per-call timeouts line has to say `pullRequestListTimeout` covers the search too.
+- `internal/apiclients/githubclient/githubclient.spec.md`: the merged search, its window, cap and client-side ordering, why search rather than the PR listing, no enrichment so no reviewers and no snooze exclusion, the over-100 truncation, the seconds-long search index lag, and the fields a merged PR leaves zero. Two existing lines go stale: "Both PR-reading paths use the GraphQL API" is now three paths, and the per-call timeouts line has to say `pullRequestListTimeout` covers the search too.
 - `internal/prparser/prparser.spec.md`: `GetMergedAgoText`.
 - `internal/canvascontent/canvascontent.spec.md`: the merged section, its re-sort, no grouping, no pruning.
 - `internal/canvasbuilder/canvasbuilder.spec.md`: the merged row is new behaviour to document: merged-ago text instead of age, never reviewers, trailing 🚀, and a fallback line that differs when the fetch failed. Four existing lines flip: the `BuildMarkdown` description, "Both sections render through one `renderSection`", the empty-section line naming the two fallback texts, and "No strike-through and no 🚀: the canvas lists open PRs only".
@@ -204,7 +202,7 @@ Files: the four package specs, `README.md`, `action.yml`, package doc comments.
 
 - The canvas answers "what landed this week" without a GitHub visit per repository.
 - One extra request per canvas refresh, no matter how many repositories, and no enrichment.
-- The window is exact, because GitHub applies it, not the client.
+- The cutoff is exact, because GitHub applies it rather than the client.
 - A merged-fetch failure degrades one section instead of the whole canvas.
 
 ### Negative
@@ -218,3 +216,4 @@ Files: the four package specs, `README.md`, `action.yml`, package doc comments.
 - Merged rows name no reviewers, unlike open rows. The section answers "what landed", not "who reviewed it".
 - `MergedAt` is populated on the `GetPRs` path too, where nothing reads it yet. The reminder message's 🚀 keeps coming from `Merged`, not from the timestamp.
 - The window and cap are constants. Making them inputs stays additive.
+- Search is index-backed and lags a merge by seconds, measured at between 3 and 10 seconds on one live merge. Irrelevant to a scheduled reminder.

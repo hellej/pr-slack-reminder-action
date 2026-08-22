@@ -11,6 +11,7 @@ Before drafting an implementation plan, read:
 - **Package Specs** — every touched package's `<package>.spec.md` in full, plus any related package's spec needed to understand how the change fits
 - **Code** — only the parts still unclear after reading the specs
 - **Third-party APIs and libraries** — verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs — check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page at the point in the plan that depends on it. Never assume or guess. Read [`docs/third-party-facts.md`](../../../docs/third-party-facts.md) first: it may already name the source. Cite that source, not the file
+- **Unverified third-party claims** — a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
 
 ## Mandatory Plan Steps
 
