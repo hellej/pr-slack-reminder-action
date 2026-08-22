@@ -49,7 +49,9 @@ func BuildMarkdown(content canvascontent.Content) string {
 		renderRow:           renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),
 	})...)
-	blocks = append(blocks, "\n---")
+	// A blank block collapses to no space in Slack's canvas renderer: a non-breaking space
+	// forces the line to render, giving room above the divider.
+	blocks = append(blocks, " ", "---")
 	blocks = append(blocks, renderFooter(content)...)
 	return strings.Join(blocks, "\n\n") + "\n"
 }

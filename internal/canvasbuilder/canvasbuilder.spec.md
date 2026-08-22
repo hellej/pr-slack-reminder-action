@@ -11,7 +11,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Merged PR row: linked title, the merge text in italics, author, then a trailing `🚀`. Never reviewers: the section answers what landed, not who reviewed it. An unknown merge time drops that segment only
 - All three sections render through one path, differing only in heading, PR lists, row renderer and empty text, so a fourth section costs one call
 - An empty section keeps its heading and shows one italic line: `_No open PRs_`, `_No work in progress_`, or `_No merged PRs_`. A merged section whose fetch failed shows `_Merged PRs could not be fetched_` instead, so a failure never reads as an empty week. Grouped mode with an empty section shows that section's line and no sub-headings
-- Footer: two blank lines, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC
+- Footer: a blank line, a line holding a lone non-breaking space, another blank line, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC
 - No cap note for the merged section: it is the newest 15 merges by definition, so a 16th is no surprise omission. A capped open or WIP fetch adds an italic line above the `Updated` line naming the fetch limit, with the counts read from `githubclient.MaxPRsToFetch` and `MaxDraftPRsToFetch`. Both caps are named in one line. It never claims how many rows the canvas shows: `canvascontent` prunes inactive drafts after the fetch
 - Everything coming from GitHub (PR titles, author and reviewer names, repository paths) is backslash-escaped for `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `>` and `&`, the backslash first so later replacements aren't double-escaped
 - The rendered markdown is covered by golden files in `testdata/`, re-recorded with `make update-test-snapshots`
@@ -29,3 +29,4 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 ## Oddities
 
 - Escaping is context-free, so characters that would be inert anyway (a spaced `*`, a mid-word `_`) still get a backslash. The escape survives as the literal character, so this is invisible in the rendered canvas
+- Slack's canvas renderer collapses a truly empty markdown line, so the extra footer spacing above `---` uses a line holding one non-breaking space (`U+00A0`) instead of an empty string
