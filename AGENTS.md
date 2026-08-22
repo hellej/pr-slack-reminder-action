@@ -61,6 +61,13 @@ Don't stack hedges:
 - Update a package's spec file whenever its behaviour changes, in the same change
 - A `git commit` with staged `internal/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
 
+## Third-party Facts
+
+- [docs/third-party-facts.md](docs/third-party-facts.md) records what past work confirmed about external APIs and libraries, each entry with its source
+- Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
+- Add to it whenever you confirm such a fact, or rule an approach out
+- Cite the source an entry names, never the entry
+
 ## Git
 
 - Never amend commits or force push

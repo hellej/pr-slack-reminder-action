@@ -44,6 +44,8 @@ that it is there, not that it is true.
   is running on memory
 - A citation too vague to point at anything, or pointing at the wrong page: `Fix`, at the
   severity the claim's weight earns
+- A citation naming `docs/third-party-facts.md`: `Fix`. The plan cites the source that
+  entry names, not the entry
 
 Read a cited source yourself only when the claim looks wrong. Then the module cache
 (`go env GOMODCACHE`) at the version `go.mod` pins, a vendor dir, or the linked doc page.
@@ -104,5 +106,7 @@ Report back:
   `Ask`. Otherwise `PASS`, even with nits open
 - Then each finding: its kind, the plan's heading it sits under, what is wrong, why it
   matters. Most severe first
+- Then any interesting external fact you confirmed or disproved, with its source, for the
+  orchestrator to record in `docs/third-party-facts.md`
 - One line on anything you could not check, and why
 - Nothing else. No praise, no summary of the plan

@@ -36,6 +36,18 @@ already answers.
 Round 0 ends when you can state the goals and non-goals without guessing at any of them.
 They become the plan's first section.
 
+## The Facts File
+
+[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) holds what past plans
+confirmed about APIs outside this repo.
+
+- Grep its `##` headings before fanning out. An entry answers a question, or narrows it to
+  "confirm this still holds at the version `go.mod` pins now"
+- You write it, as you write the plan. Sub-agents report a fact and its source
+- File what outlives the plan: a method's shape, a scope, a limit, an approach the API
+  cannot support
+- Dead ends above all. Nothing else records them
+
 ## Research Fan-out
 
 Read the specs yourself. They are short, and you cannot draft without them.
@@ -65,7 +77,8 @@ rounds cheap.
 2. Read the findings and sort them before touching the plan. Three kinds, three
    destinations, in this order:
    - **Ask**: to the user first, batched as below
-   - **Verify**: out to a researcher, at the same time. Neither of these needs you
+   - **Verify**: out to a researcher, at the same time. Neither of these needs you. An
+     answer that outlives the plan goes to the facts file
    - **Fix**: you revise the plan, once the answers are in
 3. Revise, then re-review. That is one more round
 4. Three rounds maximum. At the cap, hand back with the open findings named and the plan
