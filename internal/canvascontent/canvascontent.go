@@ -51,22 +51,22 @@ func GetContent(
 	contentInputs config.ContentInputs,
 	options GetContentOptions,
 ) Content {
-	openPRs := utilities.Filter(prs, func(pr prparser.PR) bool { return !pr.GetDraft() })
-	drafts := utilities.Filter(prs, func(pr prparser.PR) bool { return pr.GetDraft() })
-	activeDrafts := utilities.Filter(drafts, isActiveEnoughForCanvas(options.GeneratedAt))
-
-	log.Printf(
-		"Putting %d open pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas (%d drafts left out as inactive)",
-		len(openPRs), len(activeDrafts), len(mergedPRs), len(drafts)-len(activeDrafts),
+	sortedOpenPRs := prparser.SortPRsOldestToNewest(utilities.Filter(prs, isOpen))
+	activeDrafts := utilities.Filter(
+		utilities.Filter(prs, isDraft),
+		isActiveEnoughForCanvas(options.GeneratedAt),
 	)
-
-	wipPRs := prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
+	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
 		return pr.GetLastActivityAt()
 	})
-	// ParsePRs re-sorts every PR oldest first, so the merge order is made here.
 	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
 		return pr.GetMergedAt()
 	})
+
+	log.Printf(
+		"Putting %d open pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas",
+		len(sortedOpenPRs), len(sortedActiveDraftPRs), len(sortedMergedPRs),
+	)
 
 	content := Content{
 		GroupedByRepository:  contentInputs.GroupByRepository,
@@ -79,13 +79,13 @@ func GetContent(
 	// Each list is already in its section's order, so bucketing it in that order puts the
 	// repository holding the section's leading PR first.
 	if contentInputs.GroupByRepository {
-		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(openPRs)
-		content.WIPPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
+		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedOpenPRs)
+		content.WIPPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedActiveDraftPRs)
 		content.MergedPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
 		return content
 	}
-	content.OpenPRs = openPRs
-	content.WIPPRs = wipPRs
+	content.OpenPRs = sortedOpenPRs
+	content.WIPPRs = sortedActiveDraftPRs
 	content.MergedPRs = sortedMergedPRs
 	return content
 }
@@ -98,3 +98,7 @@ func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 		return lastActivityAt == nil || !lastActivityAt.Before(inactiveBefore)
 	}
 }
+
+func isOpen(pr prparser.PR) bool { return !pr.GetDraft() }
+
+func isDraft(pr prparser.PR) bool { return pr.GetDraft() }

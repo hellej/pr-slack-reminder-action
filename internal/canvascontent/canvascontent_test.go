@@ -74,17 +74,17 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{2})
 }
 
-func TestGetContentKeepsGivenOpenPROrder(t *testing.T) {
+func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 	prs := []prparser.PR{
-		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-3 * time.Hour)}),
-		testPR(testPROptions{number: 8, createdAt: generatedAt.Add(-30 * time.Hour)}),
+		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-1 * time.Hour)}),
+		testPR(testPROptions{number: 8, createdAt: generatedAt.Add(-10 * time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{7, 8})
+	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{8, 7})
 }
 
 // The repository paths of a grouped section, so its whole group order is one expectation.

@@ -77,7 +77,7 @@ func SavePostState(
 		})
 }
 
-func SaveSentSlackBlocks(
+func SaveSentSlackBlocksToFile(
 	filePath string,
 	sentBlocks []string,
 ) error {

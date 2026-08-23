@@ -58,7 +58,7 @@ func (pr PR) IsClosedButNotMerged() bool {
 }
 
 func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return sortPRsOldestToNewest(utilities.Map(prs, getPRParser(config)))
+	return SortPRsOldestToNewest(utilities.Map(prs, getPRParser(config)))
 }
 
 func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {
@@ -157,7 +157,7 @@ func SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR {
 	return sorted
 }
 
-func sortPRsOldestToNewest(prs []PR) []PR {
+func SortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
 		if !a.GetCreatedAt().Equal(b.GetCreatedAt()) {
 			return a.GetCreatedAt().Compare(b.GetCreatedAt())

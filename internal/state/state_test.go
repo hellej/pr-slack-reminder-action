@@ -156,7 +156,7 @@ func TestLoadInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
+func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "sent-blocks.json")
 
@@ -165,9 +165,9 @@ func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
 		`{"type":"rich_text","block_id":"open_prs","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err != nil {
-		t.Fatalf("SaveSentSlackBlocks failed: %v", err)
+		t.Fatalf("SaveSentSlackBlocksToFile failed: %v", err)
 	}
 
 	fileContent, err := os.ReadFile(filePath)
@@ -201,13 +201,13 @@ func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksEmptySlice(t *testing.T) {
+func TestSaveSentSlackBlocksToFileEmptySlice(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "empty-blocks.json")
 
-	err := SaveSentSlackBlocks(filePath, []string{})
+	err := SaveSentSlackBlocksToFile(filePath, []string{})
 	if err != nil {
-		t.Fatalf("SaveSentSlackBlocks failed with empty slice: %v", err)
+		t.Fatalf("SaveSentSlackBlocksToFile failed with empty slice: %v", err)
 	}
 
 	fileContent, err := os.ReadFile(filePath)
@@ -226,7 +226,7 @@ func TestSaveSentSlackBlocksEmptySlice(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksInvalidJSON(t *testing.T) {
+func TestSaveSentSlackBlocksToFileInvalidJSON(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "invalid-blocks.json")
 
@@ -234,7 +234,7 @@ func TestSaveSentSlackBlocksInvalidJSON(t *testing.T) {
 		`{"type":"rich_text",`, // Incomplete JSON
 	}
 
-	err := SaveSentSlackBlocks(filePath, invalidJSON)
+	err := SaveSentSlackBlocksToFile(filePath, invalidJSON)
 	if err == nil {
 		t.Fatal("Expected error when saving invalid JSON, got nil")
 	}
@@ -259,14 +259,14 @@ func TestSaveDirectoryCreationFailure(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksDirectoryCreationFailure(t *testing.T) {
+func TestSaveSentSlackBlocksToFileDirectoryCreationFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "nested", "blocks.json")
 	slackBlocksJSON := []string{
 		`{"type":"rich_text","block_id":"test"}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
 		t.Fatal("Expected error when creating directory in read-only parent, got nil")
 	}
@@ -291,14 +291,14 @@ func TestSaveFileWriteFailure(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksFileWriteFailure(t *testing.T) {
+func TestSaveSentSlackBlocksToFileFileWriteFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "blocks.json")
 	slackBlocksJSON := []string{
 		`{"type":"rich_text","block_id":"test"}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
 		t.Fatal("Expected error when writing to read-only directory, got nil")
 	}
