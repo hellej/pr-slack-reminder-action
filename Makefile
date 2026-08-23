@@ -34,6 +34,8 @@ check-dead-code:
 check-vulnerabilities:
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+lint: check-fmt check-vet check-dead-code check-vulnerabilities
+
 install-hooks:
 	git config core.hooksPath githooks
 
