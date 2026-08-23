@@ -130,7 +130,7 @@ Order of work inside it:
 2. Drop PRs whose `MergedAt` is nil or before `mergedSince`.
 3. Apply `getPRFilterFunc[PRResult](getFiltersForRepository, false)`. `includePR` reads only title, labels and author, never state, so it needs no change.
 4. Sort by `MergedAt` descending and cap at `MaxMergedPRsToFetch` (15), mirroring `capDraftPRResultsToLimit`.
-5. Return `PR`s built straight from the search nodes, with `ApprovedByUsers` and `CommentedByUsers` nil. No `enrichPRs` call, and no `excludeSnoozedPRs`: nothing on a merged row needs reviews or comments.
+5. Return `PR`s built straight from the search nodes, with `ApprovedByUsers` and `CommentedByUsers` nil. No `enrichPRsWithReviewInfo` call, and no `excludeSnoozedPRs`: nothing on a merged row needs reviews or comments.
 
 `mergedSince` is a parameter, not a clock read, so the window is deterministic under test and shares one `now` with the canvas footer. The window length lives here as `RecentlyMergedWindow = 7 * 24 * time.Hour`, next to the cap.
 

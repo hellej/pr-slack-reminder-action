@@ -138,7 +138,7 @@ var enrichedPullRequestFragment = newPullRequestFragment("enrichedPr", enrichedP
 
 // Fetches reviews and comments for the given PRs and returns them enriched, in input order.
 // Enrichment failures scoped to one PR are logged and leave that PR without reviewer info.
-func (c *client) enrichPRs(ctx context.Context, prResults []PRResult) ([]PR, error) {
+func (c *client) enrichPRsWithReviewInfo(ctx context.Context, prResults []PRResult) ([]PR, error) {
 	log.Printf("\nFetching pull request reviews and comments for PRs")
 
 	batches := slices.Collect(slices.Chunk(prResults, enrichBatchSize))
@@ -171,7 +171,7 @@ func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, err
 	var data aliasedData[pullRequestWrapperNode]
 	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
 	if err != nil && !failsOnlyOnePullRequest(err) {
-		return nil, enrichPRsError(err, query.repositoryByAlias)
+		return nil, enrichPRsWithReviewInfoError(err, query.repositoryByAlias)
 	}
 	logRateLimit(data.RateLimit)
 
@@ -190,7 +190,7 @@ func failsOnlyOnePullRequest(err error) bool {
 	return errors.As(err, &prError)
 }
 
-func enrichPRsError(err error, repositoryByAlias map[string]models.Repository) error {
+func enrichPRsWithReviewInfoError(err error, repositoryByAlias map[string]models.Repository) error {
 	var repoError repositoryError
 	if errors.As(err, &repoError) {
 		if repository, isKnownAlias := repositoryByAlias[repoError.alias]; isKnownAlias {

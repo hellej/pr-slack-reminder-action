@@ -350,7 +350,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 
 ### 4. Phase 2: enrich the capped set (`graphqlfetch.go`, `graphqlfetch_test.go`)
 
-- `enrichPRs(ctx, []PRResult) ([]PR, error)` runs after filtering and capping, so it only ever covers PRs that will be shown. It returns PRs in input order, which is deterministic and matches `capPRsToLimit`'s, replacing today's arbitrary completion order. A test row asserts it.
+- `enrichPRsWithReviewInfo(ctx, []PRResult) ([]PR, error)` runs after filtering and capping, so it only ever covers PRs that will be shown. It returns PRs in input order, which is deterministic and matches `capPRsToLimit`'s, replacing today's arbitrary completion order. A test row asserts it.
 - Batches of 25 aliases, one request each, batches issued concurrently at `DefaultGitHubAPIConcurrencyLimit` (3), each with `ReviewsFetchTimeout` (10s, unchanged — 25 aliases measured ~2 s):
 
   ```graphql
@@ -379,7 +379,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 
 ### 5. `FindOpenPRs` on GraphQL (`githubclient.go`, `githubclient_test.go`, `fetchartifact_test.go`, `testhelpers/mockgithubclient/mockgithubclient.go`, `cmd/pr-slack-reminder/main_test.go`)
 
-- Same shape as today: `listOpenPRs` → `includePR` filter → `capPRsToLimit` → `enrichPRs` (which runs `deriveReviewers`) → `excludeSnoozedPRs`. Only the two fetch calls change.
+- Same shape as today: `listOpenPRs` → `includePR` filter → `capPRsToLimit` → `enrichPRsWithReviewInfo` (which runs `deriveReviewers`) → `excludeSnoozedPRs`. Only the two fetch calls change.
 - `capPRsToLimit`'s semantics are unchanged — newest by creation date, then update date; its body already changed in R1. `logFoundPRs` keeps its output.
 - The errgroup fan-out over repositories disappears — phase 1 is one request. `DefaultGitHubAPIConcurrencyLimit` now bounds phase 2's batches instead. `TestFindOpenPRs_ConcurrencyLimit` (`githubclient_test.go:811-866`) loses its subject: `MaxPRsToFetch` 50 at 25 per batch is at most 2 batches, so a limit of 3 never binds. It becomes `TestFindOpenPRs_EnrichmentIsBatched`; its `repoCount` setup becomes a PR count spanning two batches, and its one assertion — `len(prs) != repoCount` (`:863`) — becomes that count.
 - `testhelpers/mockgithubclient` changes in this step, not later, because `main_test.go` runs the whole pipeline. It gains a renderer, `NewGraphQLTransport(opts)`, that turns `PRs`, `PRsByRepo`, `ReviewsByPRNumber` and `TimelineCommentsByPRNumber` into phase-1 and phase-2 JSON. Field names, types and meaning are unchanged, so those cases need no rewriting. Step 1's `UnusedGraphQLTransport` stays beside it for `fetchartifact_test.go`, which must not reach GraphQL at all.

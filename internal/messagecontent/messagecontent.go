@@ -33,22 +33,24 @@ type PRsOfRepository struct {
 }
 
 func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Content {
+	sortedOpenPRs := prparser.SortPRsOldestToNewest(openPRs)
+
 	switch {
-	case len(openPRs) == 0:
+	case len(sortedOpenPRs) == 0:
 		return Content{
 			SummaryText: contentInputs.NoPRsMessage,
 		}
 	case contentInputs.GroupByRepository:
 		return Content{
-			SummaryText:            getSummaryText(len(openPRs)),
-			PRsGroupedByRepository: groupPRsByRepositories(openPRs),
+			SummaryText:            getSummaryText(len(sortedOpenPRs)),
+			PRsGroupedByRepository: groupPRsByRepositories(sortedOpenPRs),
 			GroupedByRepository:    true,
 		}
 	default:
 		return Content{
-			SummaryText:         getSummaryText(len(openPRs)),
-			PRListHeading:       formatListHeading(contentInputs.PRListHeading, len(openPRs)),
-			PRs:                 openPRs,
+			SummaryText:         getSummaryText(len(sortedOpenPRs)),
+			PRListHeading:       formatListHeading(contentInputs.PRListHeading, len(sortedOpenPRs)),
+			PRs:                 sortedOpenPRs,
 			GroupedByRepository: false,
 		}
 	}

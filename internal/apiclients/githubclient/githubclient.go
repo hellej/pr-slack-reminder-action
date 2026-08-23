@@ -158,7 +158,7 @@ func (c *client) FindOpenPRs(
 	)
 	logFoundPRs(prResults, fetchOptions.IncludeDrafts)
 
-	prs, err := c.enrichPRs(ctx, prResults)
+	prs, err := c.enrichPRsWithReviewInfo(ctx, prResults)
 	if err != nil {
 		return OpenPRsResult{}, err
 	}

@@ -58,7 +58,7 @@ func (pr PR) IsClosedButNotMerged() bool {
 }
 
 func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return SortPRsOldestToNewest(utilities.Map(prs, getPRParser(config)))
+	return utilities.Map(prs, getPRParser(config))
 }
 
 func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {

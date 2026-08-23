@@ -23,16 +23,66 @@ func testPR(number int, createdAt, updatedAt time.Time) githubclient.PR {
 	}
 }
 
-func TestParsePRsSortsOldestCreatedFirst(t *testing.T) {
-	now := time.Now()
-	oldest := testPR(1, now.Add(-48*time.Hour), now.Add(-48*time.Hour))
-	middle := testPR(2, now.Add(-24*time.Hour), now.Add(-24*time.Hour))
-	newest := testPR(3, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+func parsedPR(number int, createdAt, updatedAt time.Time) prparser.PR {
+	return prparser.PR{
+		PR: &githubclient.PR{
+			PullRequest: &githubclient.PullRequest{
+				Number:    number,
+				CreatedAt: createdAt,
+				UpdatedAt: updatedAt,
+				Author:    githubclient.Collaborator{Login: "author"},
+			},
+		},
+	}
+}
 
-	result := prparser.ParsePRs(
-		[]githubclient.PR{newest, oldest, middle},
-		config.ContentInputs{},
+func TestParsePRsReturnsGivenOrder(t *testing.T) {
+	now := time.Now()
+	pr1 := testPR(1, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
+	pr3 := testPR(2, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
+
+	parsed := prparser.ParsePRs([]githubclient.PR{pr1, pr3, pr2}, config.ContentInputs{})
+
+	want := []int{1, 2, 3}
+	got := utilities.Map(parsed, func(pr prparser.PR) int { return pr.GetNumber() })
+
+	if !slices.Equal(got, want) {
+		t.Errorf("expected parsed PRs to be in order %v, got %v", want, got)
+	}
+}
+
+func TestParsePRsIsOldPRFlagSetCorrectly(t *testing.T) {
+	now := time.Now()
+	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
+	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
+
+	parsed := prparser.ParsePRs(
+		[]githubclient.PR{pr1, pr3, pr2},
+		config.ContentInputs{OldPRThresholdHours: 35},
 	)
+
+	isOld := func(pr prparser.PR) bool {
+		return pr.IsOldPR
+	}
+
+	want := []bool{false, false, true}
+	got := utilities.Map(parsed, isOld)
+
+	if !slices.Equal(got, want) {
+		t.Errorf("expected parsed PRs to have IsOldPR flags %v, got %v", want, got)
+	}
+
+}
+
+func TestSortPRsOldestToNewest(t *testing.T) {
+	now := time.Now()
+	oldest := parsedPR(1, now.Add(-48*time.Hour), now.Add(-48*time.Hour))
+	middle := parsedPR(2, now.Add(-24*time.Hour), now.Add(-24*time.Hour))
+	newest := parsedPR(3, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+
+	result := prparser.SortPRsOldestToNewest([]prparser.PR{newest, oldest, middle})
 
 	want := []int{1, 2, 3}
 	for i, number := range want {
@@ -42,15 +92,14 @@ func TestParsePRsSortsOldestCreatedFirst(t *testing.T) {
 	}
 }
 
-func TestParsePRsBreaksCreatedAtTiesByUpdatedAtOldestFirst(t *testing.T) {
+func TestSortPRsOldestToNewestBreaksCreatedAtTiesByUpdatedAt(t *testing.T) {
 	now := time.Now()
 	sameCreatedAt := now.Add(-24 * time.Hour)
-	updatedLater := testPR(1, sameCreatedAt, now.Add(-1*time.Hour))
-	updatedEarlier := testPR(2, sameCreatedAt, now.Add(-2*time.Hour))
+	updatedLater := parsedPR(1, sameCreatedAt, now.Add(-1*time.Hour))
+	updatedEarlier := parsedPR(2, sameCreatedAt, now.Add(-2*time.Hour))
 
-	result := prparser.ParsePRs(
-		[]githubclient.PR{updatedLater, updatedEarlier},
-		config.ContentInputs{},
+	result := prparser.SortPRsOldestToNewest(
+		[]prparser.PR{updatedLater, updatedEarlier},
 	)
 
 	if result[0].GetNumber() != 2 || result[1].GetNumber() != 1 {

@@ -497,7 +497,7 @@ func TestEnrichPRs(t *testing.T) {
 			transport := &fakeEnrichTransport{fixtureByNumber: tt.fixtureByNumber}
 			testClient := &client{graphql: graphqlClient{transport: transport}}
 
-			prs, err := testClient.enrichPRs(context.Background(), testPRResults(tt.prCount))
+			prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), testPRResults(tt.prCount))
 
 			if tt.expectedErrorMsg != "" {
 				if err == nil {
@@ -540,7 +540,7 @@ func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
 	}}
 	testClient := &client{graphql: graphqlClient{transport: transport}}
 
-	prs, err := testClient.enrichPRs(context.Background(), testPRResults(1))
+	prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), testPRResults(1))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
