@@ -43,10 +43,10 @@ func (pr PR) GetPRAgeText() string {
 }
 
 // True when the PR has seen no activity for longer than idleThreshold. A PR with unknown
-// activity is not idle.
+// activity, a zero update time, is not idle.
 func (pr PR) IsIdle() bool {
-	lastActivityAt := pr.GetLastActivityAt()
-	return lastActivityAt != nil && time.Since(*lastActivityAt) > idleThreshold
+	updatedAt := pr.GetUpdatedAt()
+	return !updatedAt.IsZero() && time.Since(updatedAt) > idleThreshold
 }
 
 func (pr PR) IsMerged() bool {

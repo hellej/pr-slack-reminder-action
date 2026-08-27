@@ -17,7 +17,7 @@ import (
 const openPullRequestsFragment = `fragment prs on Repository {
   pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
     nodes {
-      number title url isDraft createdAt updatedAt headRefOid
+      number title url isDraft createdAt updatedAt
       author { login __typename ... on User { name } }
       labels(first: 100) { nodes { name } }
     }
@@ -128,9 +128,7 @@ func openPullRequestFromNode(node pullRequestNode) *PullRequest {
 	return pullRequest
 }
 
-// commits are selected for the PR tracker canvas, as the last-activity timestamp.
 const enrichedPullRequestSelection = `  number
-  commits(last: 1){ nodes { commit { oid committedDate } } }
   reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
   comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }`
 

@@ -31,7 +31,6 @@ type MockGitHubClientOptions struct {
 	ListPRsResponseStatus      int
 	ReviewsByPRNumber          map[int][]*github.PullRequestReview
 	TimelineCommentsByPRNumber map[int][]*github.IssueComment
-	CommitsByPRNumber          map[int]time.Time // head commit date per PR; unset renders an empty commits connection
 	PRServiceError             error
 	IssueServiceError          error
 	MockStateForUpdateMode     *state.State
@@ -270,20 +269,9 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["state"] = pullRequestNodeState(pr)
 	node["merged"] = pr.GetMerged()
 	node["labels"] = labelsJSON(pr)
-	node["commits"] = t.commitsJSON(number)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)
 	return node
-}
-
-func (t GraphQLTransport) commitsJSON(number int) map[string]any {
-	committedDate, isSet := t.opts.CommitsByPRNumber[number]
-	if !isSet {
-		return connectionJSON([]map[string]any{})
-	}
-	return connectionJSON([]map[string]any{
-		{"commit": map[string]any{"committedDate": committedDate}},
-	})
 }
 
 func pullRequestNodeState(pr *github.PullRequest) string {
@@ -310,7 +298,7 @@ func openPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
 	return node
 }
 
-// The search selects neither isDraft, updatedAt nor headRefOid.
+// The search selects neither isDraft nor updatedAt.
 func mergedPullRequestNodeJSON(pr *github.PullRequest) map[string]any {
 	return map[string]any{
 		"number":    pr.GetNumber(),
@@ -337,14 +325,13 @@ func labelsJSON(pr *github.PullRequest) map[string]any {
 
 func pullRequestScalarsJSON(pr *github.PullRequest) map[string]any {
 	return map[string]any{
-		"number":     pr.GetNumber(),
-		"title":      pr.GetTitle(),
-		"url":        pr.GetHTMLURL(),
-		"isDraft":    pr.GetDraft(),
-		"createdAt":  pr.GetCreatedAt().Time,
-		"updatedAt":  pr.GetUpdatedAt().Time,
-		"headRefOid": pr.GetHead().GetSHA(),
-		"author":     authorNodeJSON(pr.GetUser()),
+		"number":    pr.GetNumber(),
+		"title":     pr.GetTitle(),
+		"url":       pr.GetHTMLURL(),
+		"isDraft":   pr.GetDraft(),
+		"createdAt": pr.GetCreatedAt().Time,
+		"updatedAt": pr.GetUpdatedAt().Time,
+		"author":    authorNodeJSON(pr.GetUser()),
 	}
 }
 

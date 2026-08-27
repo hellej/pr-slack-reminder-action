@@ -27,10 +27,9 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." +
 			testFullFragmentName + " } }",
 		"fragment " + testFullFragmentName + " on PullRequest {",
-		"number title url isDraft createdAt updatedAt headRefOid state merged",
+		"number title url isDraft createdAt updatedAt state merged",
 		"author { login __typename ... on User { name } }",
 		"labels(first: 100){ nodes { name } }",
-		"commits(last: 1){ nodes { commit { oid committedDate } } }",
 		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
 	}
@@ -41,7 +40,8 @@ func TestBuildGetPRsQuery(t *testing.T) {
 	}
 
 	forbiddenFragments := []string{
-		"pullRequests(", "owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
+		"pullRequests(", "commits", "headRefOid",
+		"owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
 	}
 	for _, fragment := range forbiddenFragments {
 		if strings.Contains(query.text, fragment) {

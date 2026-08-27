@@ -36,7 +36,6 @@ func (f enrichFixture) aliasResponse(number int) any {
 	}
 	pullRequest := map[string]any{
 		"number":   number,
-		"commits":  map[string]any{"nodes": []any{}},
 		"reviews":  map[string]any{"nodes": f.reviews},
 		"comments": map[string]any{"nodes": f.comments},
 	}

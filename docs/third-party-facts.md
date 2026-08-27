@@ -113,7 +113,9 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 | Open PR listing, `pullRequests(first: 100)` + `labels(first: 100)` | 1 per repository |
 | Merged PR search, `search(first: 100)` + `labels(first: 100)` | 1 per repository |
 | Merged PR search, no `labels` | 1 total, any repository count |
-| Enrichment batch, 25 PRs, `commits(last: 1)` + `reviews(first: 100)` + `comments(first: 100)` | 1 |
+| Enrichment batch, 25 PRs, `reviews(first: 100)` + `comments(first: 100)` | 1 |
+
+- The enrichment batch was measured with a `commits(last: 1)` selection it no longer carries
 
 ## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error
 
@@ -197,3 +199,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Untested: a fine-grained token holding only `pull-requests: read`, which also carries the
   auto-granted `metadata: read`
 - The failure mode if that is not enough: silently empty results
+
+## Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented
+
+- Source: [community discussion 62476](https://github.com/orgs/community/discussions/62476); [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
+- Checked: 2026-08-27
+- No GitHub doc lists a permission for the `commits` connection on a `PullRequest`
+- The discussion's opening post says commit endpoints need `contents: read` while PR
+  endpoints show commits without it, and asks for that to be made consistent. No staff answer
+- One commenter (hkdobrev) reports reading commits off the PR timeline with `pull-requests:
+  read` alone
+- Untested here: this action never ran a token without `contents: read` against the
+  `commits(last: 1)` selection it used to carry, so the requirement was never observed
+- The selection was dropped anyway: `updatedAt` serves the canvas, and no permission
+  question rides on it

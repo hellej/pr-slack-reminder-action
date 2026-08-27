@@ -325,9 +325,8 @@ func TestGetPRAgeDisplayText(t *testing.T) {
 	}
 }
 
-func testPRWithLastActivity(number int, lastActivityAt *time.Time) prparser.PR {
-	pr := testPR(number, time.Time{}, time.Time{})
-	pr.LastActivityAt = lastActivityAt
+func testPRWithUpdatedAt(number int, updatedAt time.Time) prparser.PR {
+	pr := testPR(number, time.Time{}, updatedAt)
 	return prparser.PR{PR: &pr}
 }
 
@@ -338,41 +337,41 @@ func timePointer(t time.Time) *time.Time {
 func TestGetActivityText(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
-		name           string
-		lastActivityAt *time.Time
-		expected       string
+		name      string
+		updatedAt time.Time
+		expected  string
 	}{
-		{name: "unknown activity", lastActivityAt: nil, expected: ""},
+		{name: "unknown activity", updatedAt: time.Time{}, expected: ""},
 		{
-			name:           "minutes ago",
-			lastActivityAt: timePointer(now.Add(-30 * time.Minute)),
-			expected:       "updated 30 minutes ago",
+			name:      "minutes ago",
+			updatedAt: now.Add(-30 * time.Minute),
+			expected:  "updated 30 minutes ago",
 		},
 		{
-			name:           "hours ago",
-			lastActivityAt: timePointer(now.Add(-5 * time.Hour)),
-			expected:       "updated 5 hours ago",
+			name:      "hours ago",
+			updatedAt: now.Add(-5 * time.Hour),
+			expected:  "updated 5 hours ago",
 		},
 		{
-			name:           "just under the day cutover",
-			lastActivityAt: timePointer(now.Add(-23*time.Hour - 30*time.Minute)),
-			expected:       "updated 24 hours ago",
+			name:      "just under the day cutover",
+			updatedAt: now.Add(-23*time.Hour - 30*time.Minute),
+			expected:  "updated 24 hours ago",
 		},
 		{
-			name:           "just past the day cutover",
-			lastActivityAt: timePointer(now.Add(-24*time.Hour - 30*time.Minute)),
-			expected:       "idle 1 days",
+			name:      "just past the day cutover",
+			updatedAt: now.Add(-24*time.Hour - 30*time.Minute),
+			expected:  "idle 1 days",
 		},
 		{
-			name:           "idle for days",
-			lastActivityAt: timePointer(now.Add(-72 * time.Hour)),
-			expected:       "idle 3 days",
+			name:      "idle for days",
+			updatedAt: now.Add(-72 * time.Hour),
+			expected:  "idle 3 days",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := testPRWithLastActivity(1, tt.lastActivityAt)
+			pr := testPRWithUpdatedAt(1, tt.updatedAt)
 			if got := pr.GetActivityText(); got != tt.expected {
 				t.Errorf("expected '%s', got '%s'", tt.expected, got)
 			}
@@ -380,8 +379,8 @@ func TestGetActivityText(t *testing.T) {
 	}
 }
 
-func testMergedPR(mergedAt *time.Time) prparser.PR {
-	pr := testPR(1, time.Time{}, time.Time{})
+func testMergedPRWithNumber(number int, mergedAt *time.Time) prparser.PR {
+	pr := testPR(number, time.Time{}, time.Time{})
 	pr.MergedAt = mergedAt
 	return prparser.PR{PR: &pr}
 }
@@ -413,7 +412,7 @@ func TestGetMergedText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := testMergedPR(tt.mergedAt).GetMergedText(); got != tt.expected {
+			if got := testMergedPRWithNumber(1, tt.mergedAt).GetMergedText(); got != tt.expected {
 				t.Errorf("expected '%s', got '%s'", tt.expected, got)
 			}
 		})
@@ -423,26 +422,26 @@ func TestGetMergedText(t *testing.T) {
 func TestIsIdle(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
-		name           string
-		lastActivityAt *time.Time
-		expected       bool
+		name      string
+		updatedAt time.Time
+		expected  bool
 	}{
-		{name: "unknown activity is not idle", lastActivityAt: nil, expected: false},
+		{name: "unknown activity is not idle", updatedAt: time.Time{}, expected: false},
 		{
-			name:           "active within 48 hours",
-			lastActivityAt: timePointer(now.Add(-47 * time.Hour)),
-			expected:       false,
+			name:      "active within 48 hours",
+			updatedAt: now.Add(-47 * time.Hour),
+			expected:  false,
 		},
 		{
-			name:           "inactive for over 48 hours",
-			lastActivityAt: timePointer(now.Add(-49 * time.Hour)),
-			expected:       true,
+			name:      "inactive for over 48 hours",
+			updatedAt: now.Add(-49 * time.Hour),
+			expected:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := testPRWithLastActivity(1, tt.lastActivityAt)
+			pr := testPRWithUpdatedAt(1, tt.updatedAt)
 			if got := pr.IsIdle(); got != tt.expected {
 				t.Errorf("expected %t, got %t", tt.expected, got)
 			}
@@ -452,16 +451,16 @@ func TestIsIdle(t *testing.T) {
 
 func TestSortPRsNewestFirst(t *testing.T) {
 	now := time.Now()
-	unknownActivity := testPRWithLastActivity(1, nil)
-	oldestActivity := testPRWithLastActivity(2, timePointer(now.Add(-72*time.Hour)))
-	newestActivity := testPRWithLastActivity(3, timePointer(now.Add(-1*time.Hour)))
-	alsoUnknownActivity := testPRWithLastActivity(4, nil)
-	middleActivity := testPRWithLastActivity(5, timePointer(now.Add(-24*time.Hour)))
+	unknownMerge := testMergedPRWithNumber(1, nil)
+	oldestMerge := testMergedPRWithNumber(2, timePointer(now.Add(-72*time.Hour)))
+	newestMerge := testMergedPRWithNumber(3, timePointer(now.Add(-1*time.Hour)))
+	alsoUnknownMerge := testMergedPRWithNumber(4, nil)
+	middleMerge := testMergedPRWithNumber(5, timePointer(now.Add(-24*time.Hour)))
 
-	given := []prparser.PR{unknownActivity, oldestActivity, newestActivity, alsoUnknownActivity, middleActivity}
+	given := []prparser.PR{unknownMerge, oldestMerge, newestMerge, alsoUnknownMerge, middleMerge}
 
 	sorted := prparser.SortPRsNewestFirst(given, func(pr prparser.PR) *time.Time {
-		return pr.LastActivityAt
+		return pr.MergedAt
 	})
 
 	want := []int{3, 5, 2, 1, 4}

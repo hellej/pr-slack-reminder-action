@@ -56,9 +56,7 @@ func GetContent(
 		utilities.Filter(prs, isDraft),
 		isActiveEnoughForCanvas(options.GeneratedAt),
 	)
-	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, func(pr prparser.PR) *time.Time {
-		return pr.GetLastActivityAt()
-	})
+	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, lastActivityAt)
 	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
 		return pr.GetMergedAt()
 	})
@@ -90,13 +88,23 @@ func GetContent(
 	return content
 }
 
-// Unknown activity is not staleness, so a draft without a last activity time is kept.
+// Unknown activity is not staleness, so a draft without an update time is kept.
 func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
 	return func(pr prparser.PR) bool {
-		lastActivityAt := pr.GetLastActivityAt()
-		return lastActivityAt == nil || !lastActivityAt.Before(inactiveBefore)
+		updatedAt := pr.GetUpdatedAt()
+		return updatedAt.IsZero() || !updatedAt.Before(inactiveBefore)
 	}
+}
+
+// Names the update time as the activity the WIP section sorts on, and spells the unknown case
+// as the nil SortPRsNewestFirst documents. A zero time would sort last on its own, being year 1.
+func lastActivityAt(pr prparser.PR) *time.Time {
+	updatedAt := pr.GetUpdatedAt()
+	if updatedAt.IsZero() {
+		return nil
+	}
+	return &updatedAt
 }
 
 func isOpen(pr prparser.PR) bool { return !pr.GetDraft() }

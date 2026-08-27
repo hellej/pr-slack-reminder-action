@@ -8,8 +8,8 @@ Structures parsed PRs into the three sections of the PR tracker canvas, ready fo
 - Open PRs keep their given order (oldest first, as `prparser.ParsePRs` left them)
 - All three sections are bucketed by repository via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, into `OpenPRsGroupedByRepository`, `WIPPRsGroupedByRepository` and `MergedPRsGroupedByRepository`; otherwise they stay the flat `OpenPRs`, `WIPPRs` and `MergedPRs` lists. Only one of the two shapes is ever filled
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest open PR, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket
-- WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `LastActivityAt`
-- Drafts whose last activity is older than `MaxDraftPRInactivity` (60 days) are left out. A draft with unknown activity is kept: unknown is not stale
+- WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `UpdatedAt`. Unknown activity sorts last, keeping the given order among such PRs
+- Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out. A draft with a zero update time is kept: unknown is not stale
 - Merged PRs are sorted newest merge first via `prparser.SortPRsNewestFirst` on `MergedAt`. They are neither pruned nor capped here: the fetch already did both
 - `Content.MergedPRsUnavailable` comes from the options, and says the merged fetch failed rather than that nothing was merged
 - `Content.GeneratedAt`, `OpenPRsCapped` and `WIPPRsCapped` come from the options. The cap flags report what the fetch capped, and are never derived from section length: the staleness prune shrinks the WIP list further

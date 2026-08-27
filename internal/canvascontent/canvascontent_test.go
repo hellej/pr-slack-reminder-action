@@ -16,12 +16,12 @@ import (
 var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
-	number         int
-	repository     string
-	draft          bool
-	createdAt      time.Time
-	lastActivityAt *time.Time
-	mergedAt       *time.Time
+	number     int
+	repository string
+	draft      bool
+	createdAt  time.Time
+	updatedAt  time.Time
+	mergedAt   *time.Time
 }
 
 func testPR(options testPROptions) prparser.PR {
@@ -32,18 +32,22 @@ func testPR(options testPROptions) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
-				Number:         options.number,
-				Draft:          options.draft,
-				CreatedAt:      options.createdAt,
-				LastActivityAt: options.lastActivityAt,
-				MergedAt:       options.mergedAt,
+				Number:    options.number,
+				Draft:     options.draft,
+				CreatedAt: options.createdAt,
+				UpdatedAt: options.updatedAt,
+				MergedAt:  options.mergedAt,
 			},
 			Repository: repository,
 		},
 	}
 }
 
-func activityAgo(age time.Duration) *time.Time {
+func activityAgo(age time.Duration) time.Time {
+	return generatedAt.Add(-age)
+}
+
+func mergedAgo(age time.Duration) *time.Time {
 	timestamp := generatedAt.Add(-age)
 	return &timestamp
 }
@@ -62,7 +66,7 @@ func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
 func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{number: 1}),
-		testPR(testPROptions{number: 2, draft: true, lastActivityAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 		testPR(testPROptions{number: 3}),
 	}
 
@@ -131,13 +135,13 @@ func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *
 		testPR(testPROptions{number: 1, repository: "repo-two"}),
 		testPR(testPROptions{number: 2, repository: "repo-one"}),
 		testPR(testPROptions{
-			number: 3, repository: "repo-three", draft: true, lastActivityAt: activityAgo(3 * time.Hour),
+			number: 3, repository: "repo-three", draft: true, updatedAt: activityAgo(3 * time.Hour),
 		}),
 		testPR(testPROptions{
-			number: 4, repository: "repo-two", draft: true, lastActivityAt: activityAgo(time.Hour),
+			number: 4, repository: "repo-two", draft: true, updatedAt: activityAgo(time.Hour),
 		}),
 		testPR(testPROptions{
-			number: 5, repository: "repo-three", draft: true, lastActivityAt: activityAgo(2 * time.Hour),
+			number: 5, repository: "repo-three", draft: true, updatedAt: activityAgo(2 * time.Hour),
 		}),
 	}
 
@@ -162,10 +166,10 @@ func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *
 func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{
-			number: 3, repository: "repo-two", draft: true, lastActivityAt: activityAgo(time.Hour),
+			number: 3, repository: "repo-two", draft: true, updatedAt: activityAgo(time.Hour),
 		}),
 		testPR(testPROptions{
-			number: 4, repository: "repo-one", draft: true, lastActivityAt: activityAgo(2 * time.Hour),
+			number: 4, repository: "repo-one", draft: true, updatedAt: activityAgo(2 * time.Hour),
 		}),
 	}
 
@@ -187,15 +191,15 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{
 			number: 1, draft: true,
-			createdAt: generatedAt.Add(-10 * time.Hour), lastActivityAt: activityAgo(5 * time.Hour),
+			createdAt: generatedAt.Add(-10 * time.Hour), updatedAt: activityAgo(5 * time.Hour),
 		}),
 		testPR(testPROptions{
 			number: 2, draft: true,
-			createdAt: generatedAt.Add(-2 * time.Hour), lastActivityAt: activityAgo(9 * time.Hour),
+			createdAt: generatedAt.Add(-2 * time.Hour), updatedAt: activityAgo(9 * time.Hour),
 		}),
 		testPR(testPROptions{
 			number: 3, draft: true,
-			createdAt: generatedAt.Add(-6 * time.Hour), lastActivityAt: activityAgo(time.Hour),
+			createdAt: generatedAt.Add(-6 * time.Hour), updatedAt: activityAgo(time.Hour),
 		}),
 	}
 
@@ -206,21 +210,40 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 1, 2})
 }
 
+// Unknown activity is not staleness, so it sorts after every draft with a real update time
+// rather than at the old end of them. The unknown draft leads the given order, so an
+// unsorted list would leave it first.
+func TestGetContentSortsWIPPRsWithUnknownActivityLast(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, draft: true}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(9 * time.Hour)}),
+		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 2, 1})
+}
+
 func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 	testCases := []struct {
 		name       string
 		inactivity time.Duration
 		wantKept   bool
 	}{
+		{name: "a day inside the maximum", inactivity: 59 * 24 * time.Hour, wantKept: true},
 		{name: "just under the maximum", inactivity: canvascontent.MaxDraftPRInactivity - time.Hour, wantKept: true},
 		{name: "exactly at the maximum", inactivity: canvascontent.MaxDraftPRInactivity, wantKept: true},
 		{name: "just over the maximum", inactivity: canvascontent.MaxDraftPRInactivity + time.Hour, wantKept: false},
+		{name: "a day past the maximum", inactivity: 61 * 24 * time.Hour, wantKept: false},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			prs := []prparser.PR{
-				testPR(testPROptions{number: 1, draft: true, lastActivityAt: activityAgo(tc.inactivity)}),
+				testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(tc.inactivity)}),
 			}
 
 			content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -247,7 +270,7 @@ func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{number: 1}),
-		testPR(testPROptions{number: 2, draft: true, lastActivityAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -269,7 +292,7 @@ func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{number: 1}),
-		testPR(testPROptions{number: 2, draft: true, lastActivityAt: activityAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -286,9 +309,9 @@ func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
 // The merged PRs come from their own fetch, so they are never derived from the open PR list.
 func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 	mergedPRs := []prparser.PR{
-		testPR(testPROptions{number: 1, mergedAt: activityAgo(3 * 24 * time.Hour)}),
-		testPR(testPROptions{number: 2, mergedAt: activityAgo(2 * time.Hour)}),
-		testPR(testPROptions{number: 3, mergedAt: activityAgo(24 * time.Hour)}),
+		testPR(testPROptions{number: 1, mergedAt: mergedAgo(3 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, mergedAt: mergedAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 3, mergedAt: mergedAgo(24 * time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(
@@ -304,9 +327,9 @@ func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 // leads. It is not the alphabetically first one here.
 func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *testing.T) {
 	mergedPRs := []prparser.PR{
-		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(3 * time.Hour)}),
-		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(time.Hour)}),
-		testPR(testPROptions{number: 3, repository: "repo-one", mergedAt: activityAgo(4 * time.Hour)}),
+		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: mergedAgo(3 * time.Hour)}),
+		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: mergedAgo(time.Hour)}),
+		testPR(testPROptions{number: 3, repository: "repo-one", mergedAt: mergedAgo(4 * time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(
@@ -329,8 +352,8 @@ func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *tes
 
 func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
 	mergedPRs := []prparser.PR{
-		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: activityAgo(time.Hour)}),
-		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: mergedAgo(time.Hour)}),
+		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: mergedAgo(2 * time.Hour)}),
 	}
 
 	content := canvascontent.GetContent(

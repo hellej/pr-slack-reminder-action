@@ -34,7 +34,9 @@ func TestBuildMergedPRsSearchQuery(t *testing.T) {
 		}
 	}
 
-	forbiddenFragments := []string{"orderBy", "isDraft", "updatedAt", "headRefOid", "fragment "}
+	forbiddenFragments := []string{
+		"orderBy", "isDraft", "updatedAt", "commits", "headRefOid", "fragment ",
+	}
 	for _, fragment := range forbiddenFragments {
 		if strings.Contains(query.text, fragment) {
 			t.Errorf("query text contains %q, got:\n%s", fragment, query.text)

@@ -22,13 +22,14 @@ func durationText(duration time.Duration) string {
 }
 
 // GetActivityText renders how long ago the PR last saw activity: "updated N minutes/hours ago"
-// under a day, "idle N days" from a day onwards. Unknown activity yields no text.
+// under a day, "idle N days" from a day onwards. Unknown activity, a zero update time, yields
+// no text.
 func (pr PR) GetActivityText() string {
-	lastActivityAt := pr.GetLastActivityAt()
-	if lastActivityAt == nil {
+	updatedAt := pr.GetUpdatedAt()
+	if updatedAt.IsZero() {
 		return ""
 	}
-	inactivity := time.Since(*lastActivityAt)
+	inactivity := time.Since(updatedAt)
 	if inactivity.Hours() >= 24 {
 		return "idle " + durationText(inactivity)
 	}

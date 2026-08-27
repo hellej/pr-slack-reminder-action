@@ -11,7 +11,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - With `IncludeDrafts` on, drafts are capped in their own bucket at `MaxDraftPRsToFetch` (15) by update time (newest kept), so they can never displace open PRs; open PRs keep the cap and sort above
 - `OpenPRsResult` carries `OpenPRsCapped` and `DraftPRsCapped`, each true only when that bucket was trimmed to its cap
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
-- Each enriched PR carries `LastActivityAt`: the committer date of the single commit `commits(last: 1)` returns, raised to the PR's creation time when that is later, the PR's update time when the commits connection is empty, nil when neither is known, read through `GetLastActivityAt()`
+- The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
 - `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (15) the cap
 - The merged search runs one aliased `search(type: ISSUE, first: 100)` per repository in a single request, with the query string `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`. `search` filters on merge date server-side, which `Repository.pullRequests` cannot do: it orders by comments, creation or update time only, and any post-merge comment or label bumps the update time
 - The cutoff qualifier is a day, so the search returns up to one extra day of merges; the exact `mergedAt >= mergedSince` cut, the repository filters, the merge ordering and the cap are all applied client-side. `search` cannot sort by merge date either
@@ -36,7 +36,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 ## Oddities
 
 - `search` reports a nonexistent repository, one the token cannot read and an empty window identically, as an empty result with no error, so a misspelled repository is silent on the merged path. Not silent overall: every canvas refresh lists open PRs through `repository(owner:,name:)` first, and that fails the run on an unreadable repository
-- The merged search selects fewer fields than the other two paths, so a merged PR carries a zero `UpdatedAt`, `Draft: false` and an empty `HeadSHA` on the shared `PullRequest` struct. Nothing reads them: the merged list is ordered on `MergedAt`
+- The merged search selects fewer fields than the other two paths, so a merged PR carries a zero `UpdatedAt` and `Draft: false` on the shared `PullRequest` struct. Nothing reads them: the merged list is ordered on `MergedAt`
 - `MergedAt` is filled on the `GetPRs` path too, where nothing reads it yet. The reminder message's merged marker comes from `Merged`
 - GitHub's PR search index lags a merge by seconds, so a merge from the last moments before the run can be missing from the list
 - `GetAuthenticatedClient` accepts a second, optional GitHub token used only for artifact list/download calls, needed because the "update" run mode may require `actions: read` on a token/scope different from the main PR-fetching token
@@ -53,5 +53,5 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - A snooze comment must be exactly the command, matched against the untrimmed body, so surrounding text, a second line, a trailing space or a trailing newline all stop the match
 - A `/snooze ... for 0 days` comment matches and "succeeds" (expiration = comment creation time), but is already in the past so has no effect
 - Snooze day counts above 365 are silently capped to 365 rather than rejected
-- `LastActivityAt`'s fallback to the update time overstates freshness: a comment or a label change moves it without a push. It bounds the last push from above, so a PR is never wrongly dropped as inactive. The head commit date understates it, since a PR can be opened off an old branch, so it is raised to the creation time
+- `UpdatedAt` overstates freshness as an activity time: a comment or a label change moves it without a push. It bounds the last push from above, so a PR is never wrongly dropped as inactive
 - The JSON file inside the artifact zip is matched by base name, so the directory part of the given path is ignored

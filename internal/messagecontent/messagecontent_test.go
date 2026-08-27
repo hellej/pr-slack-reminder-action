@@ -15,12 +15,11 @@ import (
 var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
-	number         int
-	repository     string
-	draft          bool
-	createdAt      time.Time
-	lastActivityAt *time.Time
-	mergedAt       *time.Time
+	number     int
+	repository string
+	draft      bool
+	createdAt  time.Time
+	mergedAt   *time.Time
 }
 
 func testPR(options testPROptions) prparser.PR {
@@ -31,11 +30,10 @@ func testPR(options testPROptions) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
-				Number:         options.number,
-				Draft:          options.draft,
-				CreatedAt:      options.createdAt,
-				LastActivityAt: options.lastActivityAt,
-				MergedAt:       options.mergedAt,
+				Number:    options.number,
+				Draft:     options.draft,
+				CreatedAt: options.createdAt,
+				MergedAt:  options.mergedAt,
 			},
 			Repository: repository,
 		},

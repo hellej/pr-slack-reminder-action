@@ -24,13 +24,21 @@ func TestBuildListOpenPRsQuery(t *testing.T) {
 		"r1: repository(owner:$owner1,name:$name1){ ..." + testFragmentName + " }",
 		"fragment " + testFragmentName + " on Repository {",
 		"pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC})",
-		"number title url isDraft createdAt updatedAt headRefOid",
+		"number title url isDraft createdAt updatedAt",
 		"author { login __typename ... on User { name } }",
 		"labels(first: 100) { nodes { name } }",
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {
 			t.Errorf("query text is missing %q, got:\n%s", fragment, query.text)
+		}
+	}
+
+	// Neither is read any more. See docs/third-party-facts.md on the commits permission.
+	forbiddenFragments := []string{"commits", "headRefOid"}
+	for _, fragment := range forbiddenFragments {
+		if strings.Contains(query.text, fragment) {
+			t.Errorf("query text contains %q, got:\n%s", fragment, query.text)
 		}
 	}
 
@@ -69,7 +77,7 @@ func TestBuildListOpenPRsQuery(t *testing.T) {
 func pullRequestNodeJSON(number int, title string) string {
 	return fmt.Sprintf(
 		`{"number":%d,"title":%q,"url":"https://github.com/owner-one/repo-one/pull/%d","isDraft":false,`+
-			`"createdAt":"2026-05-01T12:00:00Z","updatedAt":"2026-05-02T12:00:00Z","headRefOid":"abc123",`+
+			`"createdAt":"2026-05-01T12:00:00Z","updatedAt":"2026-05-02T12:00:00Z",`+
 			`"author":{"login":"user1","__typename":"User","name":"User One"},`+
 			`"labels":{"nodes":[{"name":"bug"}]}}`,
 		number, title, number,
@@ -210,7 +218,6 @@ func TestListOpenPRsMapsNodeToPullRequest(t *testing.T) {
 		Draft:     false,
 		Labels:    []string{"bug"},
 		Author:    Collaborator{Login: "user1", Name: "User One"},
-		HeadSHA:   "abc123",
 	}
 	if !reflect.DeepEqual(*prResults[0].pr, expected) {
 		t.Errorf("pull request = %+v, expected %+v", *prResults[0].pr, expected)
@@ -236,8 +243,7 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"p0: repository(owner:$owner0,name:$name0){ pullRequest(number:$num0){ ..." + testEnrichFragmentName + " } }",
 		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." + testEnrichFragmentName + " } }",
 		"fragment " + testEnrichFragmentName + " on PullRequest {",
-		"number\n  commits(last: 1){ nodes { commit { oid committedDate } } }",
-		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
+		"number\n  reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
 	}
 	for _, fragment := range requiredFragments {
@@ -247,7 +253,8 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 	}
 
 	forbiddenFragments := []string{
-		"pullRequests(", "labels(", "owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
+		"pullRequests(", "labels(", "commits", "headRefOid",
+		"owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
 	}
 	for _, fragment := range forbiddenFragments {
 		if strings.Contains(query.text, fragment) {

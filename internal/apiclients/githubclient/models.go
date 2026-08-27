@@ -20,9 +20,6 @@ type PullRequest struct {
 	Draft     bool
 	Labels    []string
 	Author    Collaborator
-	HeadSHA   string
-	// Head commit date when known, the update time as a fallback, nil when neither is known.
-	LastActivityAt *time.Time
 	// Nil for a PR that was never merged.
 	MergedAt *time.Time
 }
@@ -53,13 +50,6 @@ func (p *PullRequest) GetCreatedAt() time.Time {
 		return time.Time{}
 	}
 	return p.CreatedAt
-}
-
-func (p *PullRequest) GetLastActivityAt() *time.Time {
-	if p == nil {
-		return nil
-	}
-	return p.LastActivityAt
 }
 
 func (p *PullRequest) GetMergedAt() *time.Time {

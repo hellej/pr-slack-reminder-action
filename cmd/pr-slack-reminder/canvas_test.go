@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-github/v78/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
@@ -86,9 +85,8 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRs:               prs,
-					MergedPRs:         canvasTestMergedPRs(),
-					CommitsByPRNumber: map[int]time.Time{3: now.Add(-5 * time.Hour)},
+					PRs:       prs,
+					MergedPRs: canvasTestMergedPRs(),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 			)

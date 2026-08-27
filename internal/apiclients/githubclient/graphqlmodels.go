@@ -50,33 +50,24 @@ type commentNode struct {
 	Author    *authorNode `json:"author"`
 }
 
-type commitNode struct {
-	Commit struct {
-		OID           string    `json:"oid"`
-		CommittedDate time.Time `json:"committedDate"`
-	} `json:"commit"`
-}
-
 type connection[T any] struct {
 	Nodes []T `json:"nodes"`
 }
 
 type pullRequestNode struct {
-	Number     int                     `json:"number"`
-	Title      string                  `json:"title"`
-	URL        string                  `json:"url"`
-	IsDraft    bool                    `json:"isDraft"`
-	CreatedAt  time.Time               `json:"createdAt"`
-	UpdatedAt  time.Time               `json:"updatedAt"`
-	MergedAt   *time.Time              `json:"mergedAt"`
-	HeadRefOID string                  `json:"headRefOid"`
-	State      string                  `json:"state"`
-	Merged     bool                    `json:"merged"`
-	Author     *authorNode             `json:"author"`
-	Labels     connection[labelNode]   `json:"labels"`
-	Commits    connection[commitNode]  `json:"commits"`
-	Reviews    connection[reviewNode]  `json:"reviews"`
-	Comments   connection[commentNode] `json:"comments"`
+	Number    int                     `json:"number"`
+	Title     string                  `json:"title"`
+	URL       string                  `json:"url"`
+	IsDraft   bool                    `json:"isDraft"`
+	CreatedAt time.Time               `json:"createdAt"`
+	UpdatedAt time.Time               `json:"updatedAt"`
+	MergedAt  *time.Time              `json:"mergedAt"`
+	State     string                  `json:"state"`
+	Merged    bool                    `json:"merged"`
+	Author    *authorNode             `json:"author"`
+	Labels    connection[labelNode]   `json:"labels"`
+	Reviews   connection[reviewNode]  `json:"reviews"`
+	Comments  connection[commentNode] `json:"comments"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -116,7 +107,6 @@ func pullRequestFromNode(node pullRequestNode) *PullRequest {
 		Draft:     node.IsDraft,
 		Labels:    utilities.Map(node.Labels.Nodes, func(label labelNode) string { return label.Name }),
 		Author:    collaboratorFromAuthorNode(node.Author),
-		HeadSHA:   node.HeadRefOID,
 		MergedAt:  node.MergedAt,
 	}
 }
@@ -154,36 +144,12 @@ func prWithReviewers(
 	)
 
 	return PR{
-		PullRequest:      pullRequestWithLastActivity(pullRequest, node),
+		PullRequest:      pullRequest,
 		Repository:       repository,
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),
 	}
-}
-
-// Copies the PullRequest instead of writing the timestamp into the caller's one.
-func pullRequestWithLastActivity(pullRequest *PullRequest, node pullRequestNode) *PullRequest {
-	withLastActivity := *pullRequest
-	withLastActivity.LastActivityAt = lastActivityAt(pullRequest, node)
-	return &withLastActivity
-}
-
-// The update time overstates the last push, but bounds it from above, so a busy PR is never
-// mistaken for an inactive one. The head commit understates it instead: a PR opened today off an
-// old branch has an old head commit, so the commit date is raised to the PR's creation time.
-func lastActivityAt(pullRequest *PullRequest, node pullRequestNode) *time.Time {
-	if len(node.Commits.Nodes) > 0 {
-		committedDate := node.Commits.Nodes[0].Commit.CommittedDate
-		if createdAt := pullRequest.GetCreatedAt(); createdAt.After(committedDate) {
-			return &createdAt
-		}
-		return &committedDate
-	}
-	if updatedAt := pullRequest.GetUpdatedAt(); !updatedAt.IsZero() {
-		return &updatedAt
-	}
-	return nil
 }
 
 func isSubmittedUserReview(review reviewNode) bool {

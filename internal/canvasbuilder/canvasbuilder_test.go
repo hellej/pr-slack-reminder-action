@@ -56,10 +56,9 @@ func testPR(options prOptions) prparser.PR {
 	if options.repository != "" {
 		repository = models.Repository{Owner: "test-org", Name: options.repository}
 	}
-	var lastActivityAt *time.Time
+	var updatedAt time.Time
 	if options.activityAge != nil {
-		timestamp := time.Now().Add(-*options.activityAge)
-		lastActivityAt = &timestamp
+		updatedAt = time.Now().Add(-*options.activityAge)
 	}
 	var mergedAt *time.Time
 	if options.mergeAge != nil {
@@ -69,12 +68,12 @@ func testPR(options prOptions) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
-				Number:         options.number,
-				Title:          options.title,
-				HTMLURL:        fmt.Sprintf("https://github.com/%s/pull/%d", repository.GetPath(), options.number),
-				CreatedAt:      time.Now().Add(-options.age),
-				LastActivityAt: lastActivityAt,
-				MergedAt:       mergedAt,
+				Number:    options.number,
+				Title:     options.title,
+				HTMLURL:   fmt.Sprintf("https://github.com/%s/pull/%d", repository.GetPath(), options.number),
+				CreatedAt: time.Now().Add(-options.age),
+				UpdatedAt: updatedAt,
+				MergedAt:  mergedAt,
 			},
 			Repository: repository,
 		},
