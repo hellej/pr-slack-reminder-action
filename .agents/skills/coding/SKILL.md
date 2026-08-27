@@ -24,6 +24,7 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 3. Run `make test`; refactor if needed
 4. Update the package's `.spec.md` in the same change if behaviour changed (use [spec-writer skill](../spec-writer/SKILL.md))
 5. If you knowingly leave a rough edge, because the fix would need significant complexity for a rare case, add it to that spec's **Oddities** section instead of leaving it undocumented
+6. Last, re-read the prose you wrote: `git diff -- '*.md'` and the changed comments. Apply AGENTS.md § Output Style and see if anything can be clearer or cut
 
 ## Implementing a Plan
 

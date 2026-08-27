@@ -16,6 +16,9 @@ implementer's report. Check it against:
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed?
 - AGENTS.md **Code Style**
+- AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
+  docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
+  `nit`
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially

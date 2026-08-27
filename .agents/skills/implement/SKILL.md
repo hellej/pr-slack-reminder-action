@@ -86,6 +86,10 @@ preload, so the TDD, spec-sync and mutation rules arrive no other way.
 Send the nits to the implementer in one batch. `nit` is a severity, not a size: a rename
 worth doing can touch many files.
 
+On a wording nit, name what is wrong and stop there. Replacement phrasing you supply
+outranks the style rules the implementer already carries, so a nit answered literally can
+breach them.
+
 The size of the fix decides what follows, not whether to make it.
 
 - A line or two: stop when the implementer reports, with no re-review. Check `make test`
