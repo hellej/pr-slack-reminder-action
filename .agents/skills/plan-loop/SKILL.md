@@ -70,6 +70,8 @@ Cite every third-party claim in the plan itself, at the point that depends on it
 skill's read sequence. The critic takes a cited claim as settled, so citing is what keeps
 rounds cheap.
 
+Before spawning the critic, re-read the draft against the plan skill's Structure and Style.
+
 ## Rounds
 
 1. Spawn `plan-critic`, with `run_in_background: false`. Brief it with the plan file path,
