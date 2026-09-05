@@ -210,9 +210,10 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			},
 		},
 		{
-			name: "idle WIP PR",
+			name: "recently updated and idle WIP PRs",
 			content: canvascontent.Content{
 				WIPPRs: []prparser.PR{
+					wipPR,
 					testPR(prOptions{
 						number: 5, title: "Refactor state store", authorName: "Carol Clark",
 						age: oldAge, activityAge: durationPointer(idleAge),

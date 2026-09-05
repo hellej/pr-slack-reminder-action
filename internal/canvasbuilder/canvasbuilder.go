@@ -113,7 +113,8 @@ func renderOpenPRRow(pr prparser.PR) string {
 }
 
 // A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
-// marker: nobody has been asked to review a draft yet.
+// marker: nobody has been asked to review a draft yet. The activity segment is a code span while
+// the draft is moving, italics once it is idle.
 func renderWIPPRRow(pr prparser.PR) string {
 	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters)
 
@@ -121,11 +122,10 @@ func renderWIPPRRow(pr prparser.PR) string {
 	if activityText == "" {
 		return row
 	}
-	row += " `" + activityText + "`"
-	if pr.IsIdle() {
-		row += " 💤"
+	if pr.IsRecentlyUpdated() {
+		return row + " `" + activityText + "`"
 	}
-	return row
+	return row + " _" + activityText + "_"
 }
 
 // A failed merged fetch is not an empty week, so the section says which of the two it is.

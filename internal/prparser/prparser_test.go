@@ -358,6 +358,17 @@ func TestGetActivityText(t *testing.T) {
 			expected:  "updated 24 hours ago",
 		},
 		{
+			name:      "one hour under the day cutover",
+			updatedAt: now.Add(-23 * time.Hour),
+			expected:  "updated 23 hours ago",
+		},
+		{
+			// The style threshold flips to italics here too, see TestIsRecentlyUpdated.
+			name:      "exactly at the day cutover",
+			updatedAt: now.Add(-24 * time.Hour),
+			expected:  "idle 1 days",
+		},
+		{
 			name:      "just past the day cutover",
 			updatedAt: now.Add(-24*time.Hour - 30*time.Minute),
 			expected:  "idle 1 days",
@@ -419,30 +430,35 @@ func TestGetMergedText(t *testing.T) {
 	}
 }
 
-func TestIsIdle(t *testing.T) {
+func TestIsRecentlyUpdated(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
 		name      string
 		updatedAt time.Time
 		expected  bool
 	}{
-		{name: "unknown activity is not idle", updatedAt: time.Time{}, expected: false},
+		{name: "unknown activity is not recent", updatedAt: time.Time{}, expected: false},
 		{
-			name:      "active within 48 hours",
-			updatedAt: now.Add(-47 * time.Hour),
+			name:      "just under the 24 hour threshold",
+			updatedAt: now.Add(-23 * time.Hour),
+			expected:  true,
+		},
+		{
+			name:      "exactly at the 24 hour threshold",
+			updatedAt: now.Add(-24 * time.Hour),
 			expected:  false,
 		},
 		{
-			name:      "inactive for over 48 hours",
-			updatedAt: now.Add(-49 * time.Hour),
-			expected:  true,
+			name:      "past the 24 hour threshold",
+			updatedAt: now.Add(-25 * time.Hour),
+			expected:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := testPRWithUpdatedAt(1, tt.updatedAt)
-			if got := pr.IsIdle(); got != tt.expected {
+			if got := pr.IsRecentlyUpdated(); got != tt.expected {
 				t.Errorf("expected %t, got %t", tt.expected, got)
 			}
 		})

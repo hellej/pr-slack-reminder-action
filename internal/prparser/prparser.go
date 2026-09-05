@@ -1,6 +1,6 @@
 // Package prparser enriches raw GitHub PR data with additional metadata
 // for message and canvas display. It handles Slack user ID mapping, age and
-// idleness calculation, sorting, and grouping by repository. It also renders
+// activity calculation, sorting, and grouping by repository. It also renders
 // the reviewer, activity and merged-time texts a PR row shows.
 package prparser
 
@@ -15,8 +15,9 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// A PR is marked idle once it has seen no activity for this long.
-const idleThreshold = 48 * time.Hour
+// A PR counts as recently updated until its last activity is this old. GetActivityText flips
+// its wording at the same boundary.
+const recentActivityThreshold = 24 * time.Hour
 
 type PR struct {
 	*githubclient.PR
@@ -42,11 +43,11 @@ func (pr PR) GetPRAgeText() string {
 	return durationText(time.Since(pr.GetCreatedAt()))
 }
 
-// True when the PR has seen no activity for longer than idleThreshold. A PR with unknown
-// activity, a zero update time, is not idle.
-func (pr PR) IsIdle() bool {
+// True when the PR saw activity less than recentActivityThreshold ago. A PR with unknown
+// activity, a zero update time, is not recently updated.
+func (pr PR) IsRecentlyUpdated() bool {
 	updatedAt := pr.GetUpdatedAt()
-	return !updatedAt.IsZero() && time.Since(updatedAt) > idleThreshold
+	return !updatedAt.IsZero() && time.Since(updatedAt) < recentActivityThreshold
 }
 
 func (pr PR) IsMerged() bool {
