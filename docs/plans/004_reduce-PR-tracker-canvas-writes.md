@@ -67,31 +67,14 @@ changes, a footer that stops moving and a state artifact from update runs, break
 
 ## Steps
 
-- **R1** Hand `post` mode's state back to `Run`
 - **1** Add a concurrency group to the reminder workflow
-- **2** Hand `update` mode's state back to `Run`, and save it
-- **3** Skip the canvas write when the markdown would be unchanged
-- **4** Update the README's canvas section
+- **2** Tell README readers a duplicated canvas is a rendering artifact
+- **R1** Hand `post` mode's state back to `Run`
+- **3** Hand `update` mode's state back to `Run`, and save it
+- **4** Skip the canvas write when the markdown would be unchanged
 
-## Step R1: Hand `post` mode's state back to `Run`
-
-Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.go`, `internal/state/state.spec.md`,
-`cmd/pr-slack-reminder/main_test.go`.
-
-- Split `SavePostState` into `state.NewPostState(parsedPRs, messageInfo) State` plus the existing
-  `state.Save`. `NewPostState` is the only place that stamps `SchemaVersion` and `CreatedAt`
-- Move the `failed to save state: %w` wrap and the `Saved state to %s with %d PRs` log to `Run`
-- `runPostMode` becomes `(*githubclient.OpenPRsResult, *state.State, error)`, returning a nil state
-  where it writes none today: the open-PR fetch failure, the early return with no PRs and no
-  `no-prs-message`, and a failed `SendMessage`
-- `Run` writes a non-nil state after the canvas refresh, joining any error into its existing
-  `errors.Join`
-
-Three accepted deltas: `sentMessageHandler` now runs before the state write; state lands after the
-canvas refresh, so a run cancelled inside the refresh loses it; a write error joins instead of
-short-circuiting.
-
-Tests: existing post-mode state assertions still hold, and a failed send still writes no state.
+Steps 1 and 2 are independent of the rest and carry most of the value, so they go first. R1 sits
+before the state work it enables rather than at the front.
 
 ## Step 1: Add a concurrency group to the reminder workflow
 
@@ -114,7 +97,40 @@ mid-send.
 
 No test. Done means two runs triggered seconds apart show one `in_progress` and one `queued`.
 
-## Step 2: Hand `update` mode's state back to `Run`, and save it
+## Step 2: Tell README readers a duplicated canvas is a rendering artifact
+
+Touches: `README.md`.
+
+Both parts are true before any of the Go work lands, which is why they come this early.
+
+- Add to `### Good to know`: a duplicated canvas is a rendering artifact in the Slack client, not
+  lost data. Reload it
+- Add Step 1's concurrency block to the "Advanced setup with update-mode enabled" example, the only
+  one with more than the schedule trigger and so the only one that can overlap
+
+No tests. Done means the bullet and the concurrency group are both in.
+
+## Step R1: Hand `post` mode's state back to `Run`
+
+Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.go`, `internal/state/state.spec.md`,
+`cmd/pr-slack-reminder/main_test.go`.
+
+- Split `SavePostState` into `state.NewPostState(parsedPRs, messageInfo) State` plus the existing
+  `state.Save`. `NewPostState` is the only place that stamps `SchemaVersion` and `CreatedAt`
+- Move the `failed to save state: %w` wrap and the `Saved state to %s with %d PRs` log to `Run`
+- `runPostMode` becomes `(*githubclient.OpenPRsResult, *state.State, error)`, returning a nil state
+  where it writes none today: the open-PR fetch failure, the early return with no PRs and no
+  `no-prs-message`, and a failed `SendMessage`
+- `Run` writes a non-nil state after the canvas refresh, joining any error into its existing
+  `errors.Join`
+
+Three accepted deltas: `sentMessageHandler` now runs before the state write; state lands after the
+canvas refresh, so a run cancelled inside the refresh loses it; a write error joins instead of
+short-circuiting.
+
+Tests: existing post-mode state assertions still hold, and a failed send still writes no state.
+
+## Step 3: Hand `update` mode's state back to `Run`, and save it
 
 Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.spec.md`,
 `cmd/pr-slack-reminder/main_test.go`. Nothing in `state.go`.
@@ -123,7 +139,7 @@ Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.spec.md`,
   has one, including both early returns: no PRs in the loaded state, and all PRs gone so the
   message was deleted. Nil when `state.Load` itself failed
 - Write it back as loaded: `SlackMessage`, `PullRequests`, `CreatedAt` and `SchemaVersion`
-  unchanged, only the hash set by Step 3. Refreshing the PR list would change which PRs update mode
+  unchanged, only the hash set by Step 4. Refreshing the PR list would change which PRs update mode
   tracks
 
 Saving on the delete path leaves state pointing at a deleted message, which is what already happens
@@ -138,11 +154,12 @@ Tests:
 - A run that deletes the message, and a run whose state has no PRs, both still save
 - A run whose state load fails saves nothing
 
-## Step 3: Skip the canvas write when the markdown would be unchanged
+## Step 4: Skip the canvas write when the markdown would be unchanged
 
 Touches: `internal/state/state.go`, `internal/state/state.spec.md`,
 `cmd/pr-slack-reminder/canvas.go`, `cmd/pr-slack-reminder/run.go`,
-`cmd/pr-slack-reminder/canvas_internal_test.go` (new), `cmd/pr-slack-reminder/canvas_test.go`.
+`cmd/pr-slack-reminder/canvas_internal_test.go` (new), `cmd/pr-slack-reminder/canvas_test.go`,
+`README.md`.
 
 - Add `CanvasContentHash` to `state.State`, JSON key `canvasContentHash`
 - Add `canvasContentHash`, per Target shape
@@ -173,26 +190,13 @@ digest:
 Keep fixture ages off a `durationText` rounding boundary, as the current ones are, so both runs in
 a test render identical row text.
 
-## Step 4: Update the README's canvas section
-
-Touches: `README.md`.
-
-Correct two statements this falsifies:
+The README statements this step falsifies are corrected in it, not left for later:
 
 - The canvas intro, "The canvas is rewritten on every run of the action, in both `post` and
   `update` mode"
 - The first `### Good to know` bullet, "Every run replaces all of its content, so anything typed
   there by hand is lost". Hand-typed content now survives until the next write
-
-Add to `### Good to know`:
-
-- A duplicated canvas is a rendering artifact in the Slack client, not lost data. Reload it
-- `_Updated <ts>_` says when the canvas was last written, not when the action last ran
-
-Add Step 1's concurrency block to the "Advanced setup with update-mode enabled" example. It is the
-only example with more than the schedule trigger, so it is the only one that can overlap.
-
-No tests. Done means both corrections, both bullets, and the concurrency group in that one example.
+- Add a bullet: `_Updated <ts>_` says when the canvas was last written, not when the action last ran
 
 ## Consequences
 
