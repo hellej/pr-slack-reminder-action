@@ -3,8 +3,10 @@ package main_test
 import (
 	"cmp"
 	"errors"
+	"maps"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +21,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
@@ -36,6 +39,7 @@ type GetTestPROptions struct {
 	State          string // "open", "closed"
 	Merged         bool   // true if PR is merged
 	MergedHoursAgo float32
+	UpdatedDaysAgo float32 // 0 leaves the update time unset, which reads as unknown activity
 }
 
 var now = time.Now()
@@ -72,6 +76,13 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 		}
 	}
 
+	var updatedAt *github.Timestamp
+	if options.UpdatedDaysAgo > 0 {
+		updatedAt = &github.Timestamp{
+			Time: now.Add(-time.Duration(options.UpdatedDaysAgo * float32(24*time.Hour))),
+		}
+	}
+
 	return &github.PullRequest{
 		Number:  &number,
 		Title:   &title,
@@ -82,6 +93,7 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 		},
 		Labels:    githubLabels,
 		CreatedAt: &github.Timestamp{Time: prTime},
+		UpdatedAt: updatedAt,
 		Draft:     options.Draft,
 		State:     &state,
 		Merged:    &options.Merged,
@@ -853,6 +865,155 @@ func TestPostModeStateSaving(t *testing.T) {
 			t.Logf("Failed to clean up test state file: %v", err)
 		}
 	}()
+}
+
+// State that points at a message Slack never accepted would make the next update run edit
+// somebody else's message, or nothing at all.
+func TestPostModeSavesNoStateWhenSendFails(t *testing.T) {
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:     config.RunModePost,
+		config.EnvStateFilePath: stateFilePath,
+	})
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: getTestPRs(GetTestPRsOptions{}).PRs,
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+				PostMessageError: errors.New("error in sending Slack message"),
+			}),
+		),
+	)
+
+	if err == nil {
+		t.Fatal("Expected Run to fail when sending the message fails")
+	}
+	if _, statErr := os.Stat(stateFilePath); !os.IsNotExist(statErr) {
+		t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+	}
+}
+
+// Update mode tracks the PR set of the message it edits, so the state it writes back has to be
+// the loaded one, not the PRs that survived this run's filters.
+func TestUpdateModeSavesTheLoadedState(t *testing.T) {
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:       config.RunModeUpdate,
+		config.EnvStateFilePath:   stateFilePath,
+		config.InputGlobalFilters: "{\"ignored-authors\": [\"bob\"]}",
+	})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRsByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Surviving PR", AuthorLogin: "alice"}),
+				2: getTestPR(GetTestPROptions{Number: 2, Title: "Filtered out PR", AuthorLogin: "bob"}),
+			},
+			MockStateForUpdateMode: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the saved state file: %v", loadErr)
+	}
+
+	savedPRNumbers := utilities.Map(savedState.PullRequests, func(ref models.PullRequestRef) int {
+		return ref.Number
+	})
+	if !slices.Equal(savedPRNumbers, []int{1, 2}) {
+		t.Errorf("Expected the loaded PRs 1 and 2 in the saved state, got %v", savedPRNumbers)
+	}
+	if savedState.SlackMessage != loadedState.SlackMessage {
+		t.Errorf(
+			"Expected the loaded Slack message ref %+v, got %+v",
+			loadedState.SlackMessage, savedState.SlackMessage,
+		)
+	}
+	if !savedState.CreatedAt.Equal(loadedState.CreatedAt) {
+		t.Errorf(
+			"Expected the loaded CreatedAt %v, got %v", loadedState.CreatedAt, savedState.CreatedAt,
+		)
+	}
+	if savedState.SchemaVersion != 1 {
+		t.Errorf("Expected schema version 1 in the saved state, got %d", savedState.SchemaVersion)
+	}
+}
+
+func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
+	testCases := []struct {
+		name              string
+		configOverrides   map[string]any
+		prNumbersInState  []int
+		prByNumber        map[int]*github.PullRequest
+		listArtifactError error
+		expectStateSaved  bool
+	}{
+		{
+			name:             "message deleted because all PRs are gone",
+			configOverrides:  map[string]any{config.InputGlobalFilters: "{\"ignored-authors\": [\"alice\"]}"},
+			prNumbersInState: []int{1},
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Filtered out PR", AuthorLogin: "alice"}),
+			},
+			expectStateSaved: true,
+		},
+		{
+			name:             "loaded state has no PRs",
+			prNumbersInState: []int{},
+			expectStateSaved: true,
+		},
+		{
+			name:              "state load fails",
+			prNumbersInState:  []int{1},
+			listArtifactError: errors.New("artifact listing error"),
+			expectStateSaved:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+			overrides := map[string]any{
+				config.InputRunMode:     config.RunModeUpdate,
+				config.EnvStateFilePath: stateFilePath,
+			}
+			maps.Copy(overrides, tc.configOverrides)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+			loadedState := getTestState(GetTestStateOptions{PRNumbers: tc.prNumbersInState})
+
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRsByNumber:            tc.prByNumber,
+					MockStateForUpdateMode: &loadedState,
+					ListArtifactsError:     tc.listArtifactError,
+				}),
+				mockslackclient.MakeSlackClientGetter(
+					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+				),
+			)
+
+			if tc.listArtifactError == nil && err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			_, statErr := os.Stat(stateFilePath)
+			if tc.expectStateSaved && statErr != nil {
+				t.Errorf("Expected the state file to be saved: %v", statErr)
+			}
+			if !tc.expectStateSaved && !os.IsNotExist(statErr) {
+				t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+			}
+		})
+	}
 }
 
 func TestScenariosUpdateMode(t *testing.T) {

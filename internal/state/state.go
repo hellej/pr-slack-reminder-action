@@ -22,6 +22,9 @@ type State struct {
 	CreatedAt     time.Time               `json:"createdAt"`
 	SlackMessage  SlackRef                `json:"slackMessage"`
 	PullRequests  []models.PullRequestRef `json:"pullRequests"`
+	// Hash of the markdown last written to the PR tracker canvas, so a run rendering the same
+	// content can leave the canvas alone. Empty when no canvas was written.
+	CanvasContentHash string `json:"canvasContentHash"`
 }
 
 type SlackRef struct {
@@ -63,18 +66,21 @@ func Load(
 	return &state, nil
 }
 
-func SavePostState(
-	filePath string,
+// NewPostState builds the state a "post" run leaves behind. The only place stamping
+// SchemaVersion and CreatedAt.
+func NewPostState(
 	parsedPRs []prparser.PR,
 	messageInfo slackclient.SentMessageInfo,
-) error {
-	return savePostState(
-		filePath,
-		utilities.Map(parsedPRs, PRToPullRequestRef),
-		SlackRef{
+) State {
+	return State{
+		SchemaVersion: CurrentSchemaVersion,
+		CreatedAt:     time.Now(),
+		SlackMessage: SlackRef{
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
-		})
+		},
+		PullRequests: utilities.Map(parsedPRs, PRToPullRequestRef),
+	}
 }
 
 func SaveSentSlackBlocksToFile(
@@ -108,21 +114,6 @@ func SaveSentSlackBlocksToFile(
 	return nil
 }
 
-func savePostState(filePath string, pullRequestRefs []models.PullRequestRef, slackRef SlackRef) error {
-	stateToSave := State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now(),
-		SlackMessage:  slackRef,
-		PullRequests:  pullRequestRefs,
-	}
-
-	if err := Save(filePath, stateToSave); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
-	}
-	log.Printf("Saved state to %s with %d PRs", filePath, len(pullRequestRefs))
-	return nil
-}
-
 func Save(filePath string, state State) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -137,6 +128,6 @@ func Save(filePath string, state State) error {
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write state file %s: %w", filePath, err)
 	}
-
+	log.Printf("Saved state to %s with %d PRs", filePath, len(state.PullRequests))
 	return nil
 }

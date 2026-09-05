@@ -1,6 +1,8 @@
 package main_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -13,6 +15,7 @@ import (
 	"github.com/google/go-github/v78/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
@@ -540,6 +543,305 @@ func TestCanvasAndMessageFailuresAreIsolated(t *testing.T) {
 			t.Errorf("Expected the canvas error to be reported, got: %v", err)
 		}
 	})
+}
+
+// A post run with the canvas on, returning the state it saved. Post mode loads no state, so it
+// always writes the canvas: its saved hash is the hash of what is on the canvas now.
+func runPostModeAndLoadSavedState(t *testing.T, prs []*github.PullRequest) state.State {
+	t.Helper()
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.EnvStateFilePath:         stateFilePath,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:       prs,
+			MergedPRs: canvasTestMergedPRs(),
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+	if err != nil {
+		t.Fatalf("Expected the post run to succeed, got error: %v", err)
+	}
+	if !mockSlackAPI.ReplacedCanvas.Called {
+		t.Fatal("Expected the post run to write the canvas")
+	}
+
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the state saved by the post run: %v", loadErr)
+	}
+	if savedState.CanvasContentHash == "" {
+		t.Fatal("Expected the post run to save the hash of what it put on the canvas")
+	}
+	return savedState
+}
+
+// The saved hash has to be the hash of the markdown that was written, footer timestamp aside.
+// A hash taken from a separately built Content would let the two drift, and the next run would
+// then skip a write the canvas needs. The long-idle draft is the case where they drift: a zero
+// "now" keeps it on the canvas, and its row wording no longer moves with age.
+func TestPostModeSavesTheHashOfTheWrittenCanvasMarkdown(t *testing.T) {
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.EnvStateFilePath:         stateFilePath,
+	})
+	longIdleDraftPR := getTestPR(GetTestPROptions{
+		Number: 4, Title: "Draft PR two", AuthorLogin: "dave", AgeHours: 10,
+		Draft: github.Ptr(true), UpdatedDaysAgo: 100,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:       append(canvasTestPRs(), longIdleDraftPR),
+			MergedPRs: canvasTestMergedPRs(),
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	assertCanvasDoesNotContain(t, mockSlackAPI.ReplacedCanvas.Markdown, "Draft PR two")
+
+	markdownWithZeroedFooter := canvasFooterLine.ReplaceAllString(
+		mockSlackAPI.ReplacedCanvas.Markdown, "_Updated 0001-01-01 00:00 UTC_",
+	)
+	digest := sha256.Sum256([]byte(markdownWithZeroedFooter))
+	expectedHash := hex.EncodeToString(digest[:])
+
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the saved state file: %v", loadErr)
+	}
+	if savedState.CanvasContentHash != expectedHash {
+		t.Errorf(
+			"Expected the hash of the written markdown %s, got %s",
+			expectedHash, savedState.CanvasContentHash,
+		)
+	}
+}
+
+// An update run whose canvas markdown is what is already on the canvas, using the state a post
+// run saved as the seed. The Slack canvas client mis-merges a replace that lands while someone
+// has the canvas open, so a write that would change nothing is worth skipping.
+func TestUpdateModeSkipsTheCanvasWriteWhenTheContentIsUnchanged(t *testing.T) {
+	prs := canvasTestPRs()
+	seedState := runPostModeAndLoadSavedState(t, prs)
+
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:             config.RunModeUpdate,
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.EnvStateFilePath:         stateFilePath,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                    prs,
+			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:              canvasTestMergedPRs(),
+			MockStateForUpdateMode: &seedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if mockSlackAPI.ReplacedCanvas.Called {
+		t.Errorf(
+			"Expected no canvas write when the content is unchanged, got:\n%s",
+			mockSlackAPI.ReplacedCanvas.Markdown,
+		)
+	}
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the saved state file: %v", loadErr)
+	}
+	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+		t.Errorf(
+			"Expected the saved hash to stay %s, got %s",
+			seedState.CanvasContentHash, savedState.CanvasContentHash,
+		)
+	}
+}
+
+func TestUpdateModeWritesTheCanvasWhenTheSeededHashDoesNotMatch(t *testing.T) {
+	prs := canvasTestPRs()
+	seedFromSamePRs := runPostModeAndLoadSavedState(t, prs)
+	seedWithoutHash := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+
+	testCases := []struct {
+		name      string
+		seedState state.State
+		prs       []*github.PullRequest
+	}{
+		{
+			name:      "the canvas content changed since the seeded run",
+			seedState: seedFromSamePRs,
+			prs: append(prs, getTestPR(GetTestPROptions{
+				Number: 4, Title: "Open PR three", AuthorLogin: "dave", AgeHours: 7,
+			})),
+		},
+		{
+			name:      "the seeded state carries no hash",
+			seedState: seedWithoutHash,
+			prs:       prs,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+				config.InputRunMode:             config.RunModeUpdate,
+				config.InputPRTrackerCanvasLink: testCanvasLink,
+				config.EnvStateFilePath:         stateFilePath,
+			})
+			seedState := tc.seedState
+
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs:                    tc.prs,
+					PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+					MergedPRs:              canvasTestMergedPRs(),
+					MockStateForUpdateMode: &seedState,
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			if !mockSlackAPI.ReplacedCanvas.Called {
+				t.Error("Expected the canvas to be written")
+			}
+			var savedState state.State
+			if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+				t.Fatalf("Failed to load the saved state file: %v", loadErr)
+			}
+			if savedState.CanvasContentHash == tc.seedState.CanvasContentHash {
+				t.Errorf(
+					"Expected the saved hash to be the written content's, got the seeded %s",
+					savedState.CanvasContentHash,
+				)
+			}
+			if savedState.CanvasContentHash == "" {
+				t.Error("Expected the written content's hash to be saved")
+			}
+		})
+	}
+}
+
+// Dropping the hash on a run that wrote nothing would make the next run rewrite the canvas.
+func TestUpdateModeCarriesTheSeededHashWhenNothingIsWritten(t *testing.T) {
+	prs := canvasTestPRs()
+	seedState := runPostModeAndLoadSavedState(t, prs)
+
+	testCases := []struct {
+		name           string
+		canvasLink     string
+		prFetchStatus  int
+		prServiceError error
+	}{
+		{name: "the canvas is disabled"},
+		{
+			name:           "the canvas PR fetch fails",
+			canvasLink:     testCanvasLink,
+			prFetchStatus:  500,
+			prServiceError: errors.New("unable to fetch PRs"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+				config.InputRunMode:             config.RunModeUpdate,
+				config.InputPRTrackerCanvasLink: tc.canvasLink,
+				config.EnvStateFilePath:         stateFilePath,
+			})
+			seedStateForRun := seedState
+
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+			// The fetch-failure case fails the run, and saves state either way.
+			_ = main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs:                    prs,
+					PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+					MergedPRs:              canvasTestMergedPRs(),
+					MockStateForUpdateMode: &seedStateForRun,
+					ListPRsResponseStatus:  tc.prFetchStatus,
+					PRServiceError:         tc.prServiceError,
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			)
+
+			if mockSlackAPI.ReplacedCanvas.Called {
+				t.Error("Expected no canvas write")
+			}
+			var savedState state.State
+			if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+				t.Fatalf("Failed to load the saved state file: %v", loadErr)
+			}
+			if savedState.CanvasContentHash != seedState.CanvasContentHash {
+				t.Errorf(
+					"Expected the saved hash to stay the seeded %s, got %s",
+					seedState.CanvasContentHash, savedState.CanvasContentHash,
+				)
+			}
+		})
+	}
+}
+
+// Recording a failed write as applied would leave the canvas stale until its content changes again.
+func TestUpdateModeKeepsTheSeededHashWhenTheCanvasWriteFails(t *testing.T) {
+	prs := canvasTestPRs()
+	seedState := runPostModeAndLoadSavedState(t, prs)
+
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:             config.RunModeUpdate,
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.EnvStateFilePath:         stateFilePath,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+		ReplaceCanvasError: errors.New("canvas_not_found"),
+	})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: append(prs, getTestPR(GetTestPROptions{
+				Number: 4, Title: "Open PR three", AuthorLogin: "dave", AgeHours: 7,
+			})),
+			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:              canvasTestMergedPRs(),
+			MockStateForUpdateMode: &seedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err == nil {
+		t.Fatal("Expected Run to fail when the canvas write fails")
+	}
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the saved state file: %v", loadErr)
+	}
+	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+		t.Errorf(
+			"Expected the saved hash to stay the seeded %s, got %s",
+			seedState.CanvasContentHash, savedState.CanvasContentHash,
+		)
+	}
 }
 
 // Turning the canvas on switches drafts into the fetch. They must reach the canvas only,

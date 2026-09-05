@@ -380,7 +380,7 @@ func TestLoadFetchError(t *testing.T) {
 	}
 }
 
-func TestSavePostStateSuccessful(t *testing.T) {
+func TestNewPostStateSaveAndLoad(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "post-state.json")
 
@@ -394,9 +394,8 @@ func TestSavePostStateSuccessful(t *testing.T) {
 		Timestamp: "1729123456.123456",
 	}
 
-	err := SavePostState(statePath, parsedPRs, messageInfo)
-	if err != nil {
-		t.Fatalf("SavePostState failed: %v", err)
+	if err := Save(statePath, NewPostState(parsedPRs, messageInfo)); err != nil {
+		t.Fatalf("Save failed: %v", err)
 	}
 
 	loadedState, err := LoadFromFile(statePath)
@@ -406,6 +405,10 @@ func TestSavePostStateSuccessful(t *testing.T) {
 
 	if loadedState.SchemaVersion != CurrentSchemaVersion {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, CurrentSchemaVersion)
+	}
+
+	if loadedState.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be stamped")
 	}
 
 	if loadedState.SlackMessage.ChannelID != messageInfo.ChannelID {
@@ -432,26 +435,6 @@ func TestSavePostStateSuccessful(t *testing.T) {
 		if pr.Number != 42 || pr.Repository.Owner != "owner2" || pr.Repository.Name != "repo2" {
 			t.Errorf("PR 1 mismatch: got %+v", pr)
 		}
-	}
-}
-
-func TestSavePostStateWriteFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	statePath := filepath.Join(readOnlyDir, "post-state.json")
-	parsedPRs := []prparser.PR{createTestPR(1, "owner1", "repo1")}
-
-	messageInfo := slackclient.SentMessageInfo{
-		ChannelID: "C123456789",
-		Timestamp: "1729123456.123456",
-	}
-
-	err := SavePostState(statePath, parsedPRs, messageInfo)
-	if err == nil {
-		t.Fatal("Expected error when writing to read-only directory, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to save state") {
-		t.Errorf("Expected save state error, got: %v", err)
 	}
 }
 

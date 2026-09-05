@@ -120,7 +120,8 @@ Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.go`, `internal/st
 - Collapse `SavePostState` and its unexported `savePostState` into
   `state.NewPostState(parsedPRs, messageInfo) State`, called alongside the existing `state.Save`.
   `NewPostState` is the only place that stamps `SchemaVersion` and `CreatedAt`
-- Move the `failed to save state: %w` wrap and the `Saved state to %s with %d PRs` log to `Run`
+- Move the `Saved state to %s with %d PRs` log into `Save`, which `Run` now calls directly. Drop
+  the `failed to save state: %w` wrap: `Save` already names the file in both of its errors
 - `runPostMode` becomes `(*githubclient.OpenPRsResult, *state.State, error)`, returning a nil state
   where it writes none today: the open-PR fetch failure, the early return with no PRs and no
   `no-prs-message`, and a failed `SendMessage`
@@ -134,11 +135,11 @@ short-circuiting.
 Tests:
 
 - `TestSavePostStateSuccessful` and `TestSavePostStateWriteFailure` both call the function being
-  split. Rewrite the first against `NewPostState` plus `Save`. Drop the second: it asserts the
-  `failed to save state` wrap, which moves to `Run`, and `TestSaveFileWriteFailure` already covers
-  `Save` failing to write
-- Existing post-mode state assertions in `main_test.go` still hold, and a failed send still writes
-  no state
+  split. Rewrite the first against `NewPostState` plus `Save`, as `TestNewPostStateSaveAndLoad`.
+  Drop the second: it asserts the `failed to save state` wrap, which moves to `Run`, and
+  `TestSaveFileWriteFailure` already covers `Save` failing to write
+- Existing post-mode state assertions in `main_test.go` still hold, and
+  `TestPostModeSavesNoStateWhenSendFails` covers a failed send writing no state
 
 ### 3. Hand `update` mode's state back to `Run`, and save it
 
@@ -197,7 +198,12 @@ digest:
 - Seeded hash matches: `ReplacedCanvas.Called` is false, saved state keeps the hash
 - Seeded hash differs, and seeded state has no hash: both write
 - `ReplaceCanvasError` set: saved state keeps the seeded hash
-- Post mode: writes, and saves the hash
+- Nothing written at all, with the canvas disabled and with a failed canvas PR fetch: saved state
+  keeps the seeded hash
+- Post mode: writes, and saves the hash. Asserted in the helper that seeds the other tests
+- The saved hash is the hash of the markdown that was written, with the footer line zeroed. Give
+  the fetch a draft idle for 100 days, which the canvas prunes and a hash built with a zeroed
+  `GeneratedAt` keeps. Needs an update time on the `getTestPR` fixture, which has none today
 
 Keep fixture ages off a `durationText` rounding boundary, as the current ones are, so both runs in
 a test render identical row text.

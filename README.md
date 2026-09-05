@@ -132,6 +132,10 @@ on:
     types: [submitted]
   issue_comment:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
+  cancel-in-progress: false
+
 jobs:
   send-or-update-pr-reminder:
     runs-on: ubuntu-latest
@@ -191,7 +195,7 @@ Both `filters` and `repository-filters` support:
 
 Optional: keep a Slack canvas updated with a live view of the PRs across all monitored repositories. The reminder message is transient and never lists drafts; the canvas is persistent, readable on demand, and has sections for work-in-progress and recently merged PRs too.
 
-The canvas is rewritten on every run of the action, in both `post` and `update` mode.
+Every `post` run rewrites the canvas. An `update` run rewrites it only when its content changed.
 
 ```markdown
 ## Open
@@ -231,10 +235,12 @@ to be in the same channel as the canvas to have write access.
 
 ### Good to know
 
-- ⚠️ The action owns the whole canvas. Every run replaces all of its content, so anything typed there by hand is lost. Keep notes on a second canvas.
+- ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
 - These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
+- The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
+- A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not lost data. Reload the canvas to see its real content.
 
 ## 💡 Tips
 
