@@ -10,7 +10,7 @@ Enriches fetched PRs with display-ready metadata.
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards
 - `GetMergedText` renders time since `MergedAt` as "merged N minutes/hours/days ago", prefixed like the activity text so a merge time cannot be misread as an age. A PR that was never merged yields no text
-- `IsRecentlyUpdated` is true when `UpdatedAt` is under 24 hours old. The threshold is hardcoded, and matches where `GetActivityText` flips from "updated" to "idle"
+- `IsRecentlyUpdated` is true when `UpdatedAt` is under 24 hours old, measured against the wall clock. The threshold is the exported `RecentActivityThreshold`, so other packages can bucket by the same boundary; it matches where `GetActivityText` flips from "updated" to "idle"
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text, and counts as not recently updated
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering

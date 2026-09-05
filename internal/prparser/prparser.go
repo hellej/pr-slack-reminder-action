@@ -17,7 +17,7 @@ import (
 
 // A PR counts as recently updated until its last activity is this old. GetActivityText flips
 // its wording at the same boundary.
-const recentActivityThreshold = 24 * time.Hour
+const RecentActivityThreshold = 24 * time.Hour
 
 type PR struct {
 	*githubclient.PR
@@ -43,11 +43,11 @@ func (pr PR) GetPRAgeText() string {
 	return durationText(time.Since(pr.GetCreatedAt()))
 }
 
-// True when the PR saw activity less than recentActivityThreshold ago. A PR with unknown
+// True when the PR saw activity less than RecentActivityThreshold ago. A PR with unknown
 // activity, a zero update time, is not recently updated.
 func (pr PR) IsRecentlyUpdated() bool {
 	updatedAt := pr.GetUpdatedAt()
-	return !updatedAt.IsZero() && time.Since(updatedAt) < recentActivityThreshold
+	return !updatedAt.IsZero() && time.Since(updatedAt) < RecentActivityThreshold
 }
 
 func (pr PR) IsMerged() bool {

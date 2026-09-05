@@ -213,3 +213,61 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `commits(last: 1)` selection it used to carry, so the requirement was never observed
 - The selection was dropped anyway: `updatedAt` serves the canvas, and no permission
   question rides on it
+
+## Rapid `canvases.edit` replaces duplicate headings and rows in an open canvas, until a reload
+
+- Source: measured against canvas `F0BPS4FKCEL` on 2026-09-05 with a scratch probe sending
+  the same form POST `ReplaceCanvasContent` sends
+- Reproduced: 15 full-canvas replaces 1.5s apart, each one reshaping the document (cycling
+  the grouped, flat and no-open-PRs golden files), with the canvas open in the desktop app
+  - `## Open` and `## WIP` each rendered twice, one PR row appeared under two sections,
+    `_No open PRs_` rendered next to real rows, and the `_Updated_` footer landed
+    mid-document with content below it
+  - A "New edits" badge showed while the view was wrong
+- It is a client-side merge artifact, not stored corruption. Cmd+R re-rendered the last
+  payload exactly, and a viewer's own typing survives as a real edit
+- Structural churn is the trigger, not a cursor. 12 replaces 2s apart that only moved the
+  footer timestamp rendered clean; the same 12 mangled the view when the first of them
+  reshaped the document. A parked cursor and typing straight through a write both stayed clean
+- No cap on write rate was hit: every replace in every run returned `ok: true`
+
+## Slack accepts simultaneous `canvases.edit` replaces, and documents no way to read a canvas back
+
+- Source: [`canvases.edit`](https://docs.slack.dev/reference/methods/canvases.edit/);
+  [canvases surface guide](https://docs.slack.dev/surfaces/canvases/); the 2026-09-05 probe
+- Two replaces fired from two threads at once both returned `ok: true`, as did two 1.5s
+  apart. `canvas_editing_locked` never appeared, so it can't be relied on to serialize writes
+- The docs describe `canvas_editing_locked` as "Another edit to this canvas is currently in
+  progress", which rejects a whole call. No documented path applies part of a `replace`
+- Nothing documents a viewer's open editor, cursor or selection shielding a section
+- No method returns a canvas's markdown, so a write cannot be verified by reading it back
+- `document_content.markdown` is capped at 1 MiB per object
+- `canvases.create` fails on a free workspace with `free_teams_cannot_create_standalone_canvases`,
+  and `conversations.canvases.create` with `free_team_canvas_tab_already_exists`
+
+## Slack's `replace` with a `section_id` has been reported to act like `insert_after`
+
+- Source: [slackapi/slack-mcp-plugin issue 30](https://github.com/slackapi/slack-mcp-plugin/issues/30)
+- Checked: 2026-09-05, one community report, not confirmed by Slack
+- The targeted section stays and the new content lands as a sibling after it, reproduced on
+  both a paragraph and a header section. The reporter blames the MCP server's mapping, not
+  the Slack method
+- A full-canvas `replace` keeps a sticky H1 carrying the canvas title, with an ID stable
+  across writes. A body H1 matching the title therefore reads back twice
+- Neither applies to this action: `ReplaceCanvasContent` sends no `section_id`, and
+  `canvasbuilder` renders no H1
+
+## An Actions artifact cannot be updated in place: each upload is a new artifact, owned by its run
+
+- Source: [upload-artifact README](https://github.com/actions/upload-artifact#readme);
+  [REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts)
+- Checked: 2026-09-05
+- "Artifacts created by upload-artifact@v4 are immutable". Overwriting one "will give the
+  Artifact a new ID, the previous one will no longer exist"
+- `overwrite: true` deletes a matching name within the same workflow run only. It cannot touch
+  an artifact belonging to an earlier run
+- The REST API has list, get, download and delete, and no upload, update or replace endpoint.
+  Uploading is the runner's own protocol, so only an in-run step can create an artifact
+- Deleting an artifact needs `actions: write`, above the `actions: read` an update run uses
+- So a state artifact re-uploaded every run accumulates one artifact per run until retention
+  expires them
