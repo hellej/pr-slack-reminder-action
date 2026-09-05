@@ -28,7 +28,7 @@ Non-goals:
 
 `action.yml`, token permissions and Slack scopes are untouched.
 
-`State` gains `CanvasMarkdownHash`. A run that renders matching markdown skips
+`State` gains `CanvasContentHash`. A run that renders matching markdown skips
 `ReplaceCanvasContent`.
 
 The hash comes from an unexported `canvasContentHash` in `cmd/pr-slack-reminder/canvas.go`: copy
@@ -144,7 +144,7 @@ Touches: `internal/state/state.go`, `internal/state/state.spec.md`,
 `cmd/pr-slack-reminder/canvas.go`, `cmd/pr-slack-reminder/run.go`,
 `cmd/pr-slack-reminder/canvas_internal_test.go` (new), `cmd/pr-slack-reminder/canvas_test.go`.
 
-- Add `CanvasMarkdownHash` to `state.State`, JSON key `canvasMarkdownHash`
+- Add `CanvasContentHash` to `state.State`, JSON key `canvasContentHash`
 - Add `canvasContentHash`, per Target shape
 - `refreshPRTrackerCanvas` takes the previous hash and returns what is now on the canvas: skip and
   return the previous hash on a match; write and return the new one otherwise. Return the previous
