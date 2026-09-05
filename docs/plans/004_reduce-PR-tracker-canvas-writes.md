@@ -6,105 +6,64 @@ status: draft
 ## Requirements
 
 Slack's canvas client mis-merges full-document replaces that land while someone has the canvas
-open, rendering duplicated headings and PR rows. Measured on 2026-09-05 against canvas
-`F0BPS4FKCEL`: 15 replaces 1.5s apart, each reshaping the document, produced `## Open` and
-`## WIP` twice, one PR row under two sections, empty-state text beside real rows, and the footer
-stranded mid-document. See the "Rapid `canvases.edit` replaces duplicate headings and rows in an
-open canvas" entry in [docs/third-party-facts.md](../third-party-facts.md) for the measurement.
+open, duplicating headings and PR rows. Client-side only: a reload shows the real content.
+Measured 2026-09-05, see the "Rapid `canvases.edit` replaces duplicate headings and rows in an open
+canvas" entry in [docs/third-party-facts.md](../third-party-facts.md).
 
-The corruption is client-side only. A reload re-renders the last payload exactly. Nothing can stop
-Slack from mis-merging, so the goal is to make the writes that trigger it rare, and to tell
-readers what a duplicated canvas means.
+Nothing can stop Slack mis-merging, so the goal is to make the writes that trigger it rare.
 
 Goals:
 
-- Stop two runs of the workflow from writing the canvas back to back
+- Stop two runs writing the canvas back to back
 - Stop rewriting the canvas when the markdown would be the same
-- Say in the README that a duplicated canvas is a rendering artifact, and that the canvas is no
-  longer rewritten on every run
+- Tell README readers a duplicated canvas is a rendering artifact
 
 Non-goals:
 
-- No new action inputs, and no way to switch either behaviour off
-- No retry, backoff or read-back verification of a canvas write. Slack documents no method that
-  returns a canvas's markdown
-- No change to how the reminder message is posted or updated
-- No change to what the canvas renders
+- No new inputs, and no way to switch either behaviour off
+- No retry or read-back verification. Slack has no method that returns a canvas's markdown
+- No change to the reminder message, or to what the canvas renders
 
 ## Target shape
 
-`action.yml` is untouched: no new, renamed or removed inputs, and no new GitHub token permission
-or Slack scope.
+`action.yml`, token permissions and Slack scopes are untouched.
 
-`State` carries the hash of the canvas markdown a run put on the canvas. A run that renders
-matching markdown skips `ReplaceCanvasContent`.
+`State` gains `CanvasMarkdownHash`. A run that renders matching markdown skips
+`ReplaceCanvasContent`.
 
-**What the hash covers.** An unexported `canvasContentHash(content)` in
-`cmd/pr-slack-reminder/canvas.go` copies the built `Content`, zeroes `GeneratedAt` on the copy,
-renders it through `canvasbuilder.BuildMarkdown`, and returns the SHA-256 hex of that string. It
-stays unexported with one caller, and a `package main` internal test file reaches it directly, as
-`internal/canvasbuilder/escape_internal_test.go` already does for that package.
+The hash comes from an unexported `canvasContentHash` in `cmd/pr-slack-reminder/canvas.go`: copy
+the built `Content`, zero `GeneratedAt` on the copy, render through `canvasbuilder.BuildMarkdown`,
+SHA-256 the result. Two constraints on it:
 
-Zeroing `GeneratedAt` neutralises the footer, which is rendered at minute resolution. Without it
-two runs that straddle a minute boundary render different markdown from identical PR data.
+- Zero `GeneratedAt` on a copy of the built `Content`, never by re-running
+  `canvascontent.GetContent` with a zeroed value. There it is also the "now" that
+  `isActiveEnoughForCanvas` prunes drafts against, so a zero keeps every dead draft
+- Row text still moves with the wall clock, since `prparser` reads `time.Since` directly. The hash
+  therefore moves as PRs age. That is fine: the target is runs seconds apart, which render
+  identical text
 
-The zeroing happens on a copy of the already-built `Content`, never by re-calling
-`canvascontent.GetContent` with a zeroed `GeneratedAt`. `GeneratedAt` is also the "now" that prunes
-inactive drafts (`isActiveEnoughForCanvas`, `canvascontent.go:92-98`), so a zero value there puts
-the cutoff in year 0 and keeps every dead draft. Copying also keeps the caller's `Content` intact,
-so the markdown actually sent still carries the real footer.
+State gets one writer. `runPostMode` writes it today before the canvas refresh produces a hash, so
+both modes now hand their state to `Run`, which writes it once, after the refresh.
 
-**What the hash does not cover.** Row text moves with the wall clock independently of
-`GeneratedAt`. `GetPRAgeText`, `IsOldPR` and `IsRecentlyUpdated` in `prparser`, and
-`GetActivityText` and `GetMergedText` in `displaytext.go`, all read `time.Since` or `time.Now`
-directly. `durationText` renders minutes under an hour, hours under a day, then days, and
-`IsRecentlyUpdated` flips a WIP row between a code span and italics at 24h. So the hash moves as
-PRs age: every minute while any listed PR is under an hour old, about hourly under a day, then
-daily.
+Update runs start uploading a state artifact. Today they upload nothing, because
+`FetchLatestArtifactByName` decodes the zip without ever writing `stateFilePath`. Without this the
+hash would only refresh on the daily `post` run.
 
-That is enough for the problem at hand. Two runs seconds apart render identical row text, so the
-second skips, and two runs seconds apart is exactly what corrupts the canvas. The skip is not a
-general "only write when PR data changes".
+The schedule gets its own concurrency group so nothing can cancel it. Everything else shares one
+and serializes.
 
-**One state writer.** Today `runPostMode` writes state mid-run, before the canvas refresh, so the
-hash does not exist yet at that point. After this, both run modes hand their state back to `Run`,
-which writes it once, after the canvas refresh.
+The footer now says when the canvas was last written, not when the action last ran. Wording
+unchanged.
 
-**Update runs start uploading a state artifact.** Today they upload nothing:
-`FetchLatestArtifactByName` streams the artifact zip to a temp file and decodes the entry from it,
-never writing `stateFilePath` (`internal/apiclients/githubclient/fetchartifact.go:70-113`), so the
-workflow's `upload-artifact` step finds no file after an update run. Without this the hash would
-only be refreshed by the daily `post` run, and every update run after the first content change
-would write again.
-
-**State file compatibility, both directions.** State decodes with a plain
-`json.NewDecoder(...).Decode(target)` (`fetchartifact.go:99-101`); `DisallowUnknownFields` is used
-only for the `filters` input (`internal/config/filters.go:55`).
-
-- A new run reading an artifact written before this change decodes an empty
-  `CanvasMarkdownHash`, which reads as "unknown, write the canvas"
-- A pinned older version reading an artifact written after it ignores the unknown key
-- `CurrentSchemaVersion` stays 1, so version 1 comes to describe two shapes. Deliberate: nothing
-  reads the version on load, per [the state spec](../../internal/state/state.spec.md), and a bump
-  with no reader is decoration
-
-**The workflow serializes its own runs.** GitHub cancels any pending run in a concurrency group
-when a new one queues, so a burst of triggers collapses to the run in progress plus the newest
-queued one ([workflow syntax: concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency)).
-`cancel-in-progress` stays `false`: `true` would kill an in-flight `post` run mid-send and lose
-both the reminder and the state artifact.
-
-**The footer changes meaning.** It says when the canvas was last written, not when the action last
-ran. Wording stays `_Updated <ts>_`.
+**State file compatibility.** `FetchLatestArtifactByName` decodes with a plain `json.Decoder`;
+`DisallowUnknownFields` is only used for the `filters` input. An old artifact decodes an empty
+hash, which reads as "write the canvas"; an older action version ignores the unknown key.
+`CurrentSchemaVersion` stays 1, since nothing reads it on load.
 
 ## Breaking change
 
-Minor. The action's contract is unchanged: no input renamed, removed or added, no config format
-change, and the canvas renders the same content from the same data. The release table's "changed
-default behavior" row under **major** is read here as covering the action's contract, not an
-internal write that produces the same result. The two behaviour changes a user can observe, a
-footer timestamp that stops moving while nothing changes and a state artifact from update runs,
-break no existing configuration.
+Minor. No input or config change, and the canvas renders the same content. The two observable
+changes, a footer that stops moving and a state artifact from update runs, break no configuration.
 
 ## Steps
 
@@ -119,86 +78,65 @@ break no existing configuration.
 Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.go`, `internal/state/state.spec.md`,
 `cmd/pr-slack-reminder/main_test.go`.
 
-`runPostMode` calls `state.SavePostState` before `Run` reaches the canvas refresh, so it cannot
-carry a hash the refresh has not produced yet.
+- Split `SavePostState` into `state.NewPostState(parsedPRs, messageInfo) State` plus the existing
+  `state.Save`. `NewPostState` is the only place that stamps `SchemaVersion` and `CreatedAt`
+- Move the `failed to save state: %w` wrap and the `Saved state to %s with %d PRs` log to `Run`
+- `runPostMode` becomes `(*githubclient.OpenPRsResult, *state.State, error)`, returning a nil state
+  where it writes none today: the open-PR fetch failure, the early return with no PRs and no
+  `no-prs-message`, and a failed `SendMessage`
+- `Run` writes a non-nil state after the canvas refresh, joining any error into its existing
+  `errors.Join`
 
-- Split `SavePostState` into a builder plus the existing write: `state.NewPostState(parsedPRs,
-  messageInfo) State`, written by `state.Save(filePath, state)`
-- `NewPostState` is the one place that stamps `SchemaVersion` and `CreatedAt`, exactly as
-  `savePostState` does today. `Save` keeps writing the struct as given and stamps nothing
-- The `failed to save state: %w` wrap and the `Saved state to %s with %d PRs` log move to the call
-  site in `Run`, so neither is lost
-- `runPostMode` becomes `(*githubclient.OpenPRsResult, *state.State, error)` and returns a `nil`
-  state on the paths that write none today: the open-PR fetch failure (`run.go:82`), the early
-  return with no PRs and no `no-prs-message` (`:95`), and a failed send (`:101`)
-- `Run` writes a non-nil returned state after the canvas refresh, and joins any write error into
-  the error it already returns from `errors.Join(messageErr, canvasErr)`
+Three accepted deltas: `sentMessageHandler` now runs before the state write; state lands after the
+canvas refresh, so a run cancelled inside the refresh loses it; a write error joins instead of
+short-circuiting.
 
-Three deltas this accepts, none of which change what a successful run produces:
-
-- `sentMessageHandler` now runs before the state write, not after. Today a state-write failure
-  returns before the handler runs (`run.go:103-106`)
-- State lands on disk after the canvas refresh instead of before it. A post run cancelled inside
-  the refresh loses the state artifact although the message was already sent
-- A state-write error now joins the run's other errors instead of short-circuiting
-
-Tests: the existing post-mode state assertions in `main_test.go` still hold, and a post run whose
-send fails still writes no state file.
+Tests: existing post-mode state assertions still hold, and a failed send still writes no state.
 
 ## Step 1: Add a concurrency group to the reminder workflow
 
 Touches: `.github/workflows/pr-reminder.yml`.
 
-Add at the top level:
-
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
   cancel-in-progress: false
 ```
 
-`github.workflow` is constant for this workflow, so every run lands in one group regardless of ref
-or event. Merging a PR fires `push` and `pull_request closed` seconds apart, and those two runs are
-what put two canvas writes back to back.
+A queued run cancels a pending one in the same group, so a shared group would let a `push` run
+cancel the pending scheduled run, silently costing the day's reminder and state artifact. Hence the
+split.
 
-Nothing in this repo lints workflow YAML, so this step has no test. Done means the next triggered
-run still starts and completes, and two runs triggered within seconds of each other show one
-`in_progress` and one `queued` in the Actions tab rather than two `in_progress`.
+Keying on the event, not the run mode, puts a `workflow_dispatch` with `run-mode: post` in the
+shared group. Deliberate: a manual run is visible and re-runnable, and sharing serializes it
+against update runs. `cancel-in-progress: false` because `true` would kill an in-flight post run
+mid-send.
+
+No test. Done means two runs triggered seconds apart show one `in_progress` and one `queued`.
 
 ## Step 2: Hand `update` mode's state back to `Run`, and save it
 
 Touches: `cmd/pr-slack-reminder/run.go`, `internal/state/state.spec.md`,
-`cmd/pr-slack-reminder/main_test.go`.
+`cmd/pr-slack-reminder/main_test.go`. Nothing in `state.go`.
 
-Step 3's skip reads the previous hash off the state update mode loaded, so update mode has to hand
-that state back first.
+- `runUpdateMode` becomes `(*state.State, error)`, returning the loaded state on every path that
+  has one, including both early returns: no PRs in the loaded state, and all PRs gone so the
+  message was deleted. Nil when `state.Load` itself failed
+- Write it back as loaded: `SlackMessage`, `PullRequests`, `CreatedAt` and `SchemaVersion`
+  unchanged, only the hash set by Step 3. Refreshing the PR list would change which PRs update mode
+  tracks
 
-- `runUpdateMode` becomes `(*state.State, error)` and hands back the state it loaded on every path
-  that has one, including both early returns: no PRs in the loaded state (`run.go:125-128`), and
-  all PRs gone so the message was deleted (`:140-150`). It returns `nil` when the load itself
-  failed (`:115-124`), which `Run` already skips
-- The loaded state is written back as loaded: `SlackMessage`, `PullRequests`, `CreatedAt` and
-  `SchemaVersion` unchanged, with only the canvas hash set by Step 3. Update mode tracks the PR set
-  the `post` run captured, and refreshing that list would change which PRs it tracks. Keeping
-  `CreatedAt` keeps it meaning what the state spec says, the time this PR set and message ref were
-  created
-- No change to `internal/state/state.go` in this step; `Save` and the struct are as R1 left them
+Saving on the delete path leaves state pointing at a deleted message, which is what already happens
+today via the pre-delete artifact.
 
-Saving on the delete path keeps state pointing at a message that was just deleted. That is what
-already happens: today the next update run loads the same pre-delete artifact, finds no PRs, and
-deletes again, which `DeleteMessage` treats as success. Saving here reproduces that rather than
-changing it, and it is what lets the canvas hash carry forward on a quiet day.
+Tests:
 
-Tests through `Run` with the existing mocks:
-
-- An update run saves a state file whose `SlackMessage` and `PullRequests` match what was loaded,
-  with a fixture where the loaded set and this run's fetched set differ: load PRs {1, 2} with PR 2
-  dropped by an `ignored-authors` filter, and assert the saved state still lists both. The existing
-  `TestScenariosUpdateMode` fixtures use the same set for `mockState` and `prByNumber`, so an
-  implementation saving this run's parsed PRs would pass against those
-- An update run that deletes the message still saves a state file
-- An update run whose loaded state has no PRs still saves a state file
-- An update run whose state load fails writes no state file
+- Saved `SlackMessage` and `PullRequests` match what was loaded. Use a fixture where the loaded and
+  fetched sets differ, e.g. load {1, 2} with PR 2 dropped by `ignored-authors`. `TestScenariosUpdateMode`'s
+  current fixtures use the same set for both, so they cannot catch an implementation saving this
+  run's PRs
+- A run that deletes the message, and a run whose state has no PRs, both still save
+- A run whose state load fails saves nothing
 
 ## Step 3: Skip the canvas write when the markdown would be unchanged
 
@@ -206,93 +144,79 @@ Touches: `internal/state/state.go`, `internal/state/state.spec.md`,
 `cmd/pr-slack-reminder/canvas.go`, `cmd/pr-slack-reminder/run.go`,
 `cmd/pr-slack-reminder/canvas_internal_test.go` (new), `cmd/pr-slack-reminder/canvas_test.go`.
 
-- Add `CanvasMarkdownHash string \`json:"canvasMarkdownHash"\`` to `state.State`
-- Add the unexported `canvasContentHash` described in Target shape
-- `refreshPRTrackerCanvas` takes the previous hash and returns the hash now on the canvas:
-  - Hash matches the previous one: skip `ReplaceCanvasContent`, log the skip, return the previous
-    hash
-  - Hash differs: write, and return the new hash on success
-  - Write fails: return the **previous** hash, so a failed write is never recorded as applied.
-    Recording it would make the next run skip and leave the canvas stale
-  - The function returns early before rendering anything when update mode's own open-PR fetch
-    fails (`canvas.go:32-38`). It returns the previous hash there too
-- `Run` passes the hash from the loaded state, and writes the returned hash into the state it saves
+- Add `CanvasMarkdownHash` to `state.State`, JSON key `canvasMarkdownHash`
+- Add `canvasContentHash`, per Target shape
+- `refreshPRTrackerCanvas` takes the previous hash and returns what is now on the canvas: skip and
+  return the previous hash on a match; write and return the new one otherwise. Return the previous
+  hash on a failed write, and on the early return when its own `findOpenPRs` fails, so a write that
+  never reached Slack is not recorded as applied
+- `Run` passes the loaded hash and saves the returned one. With the canvas disabled it carries the
+  loaded hash through
 
-Post runs carry no loaded state, so they always write. That is the daily scheduled run plus a
-manual dispatch, and it re-seeds the hash after the artifact expires.
+Post runs load no state, so they always write, re-seeding the hash after the artifact expires.
 
-Tests on `canvasContentHash` in `canvas_internal_test.go`:
+Tests on `canvasContentHash`:
 
-- Two `Content` values differing only in `GeneratedAt` hash the same
-- Two differing in one PR row hash differently
-- Two differing only in `MergedPRsUnavailable`, both with an empty merged list, hash differently.
-  That flag only feeds the merged section's empty text, so with merged rows present it changes no
-  markdown
-- The passed-in `Content` is unchanged after the call, and rendering it afterwards still produces
-  its real footer. This is what the copy buys, and it fails if the implementation zeroes
-  `GeneratedAt` on the caller's value
+- Differing only in `GeneratedAt` hashes the same; differing in a PR row hashes differently
+- Differing only in `MergedPRsUnavailable`, both with an empty merged list, hashes differently.
+  That flag only feeds the empty-section text, so with rows present it changes no markdown
+- The passed-in `Content` is unmutated and still renders its real footer afterwards
 
-Tests through `Run` in `canvas_test.go`, seeding the loaded state's hash from a first run's saved
-state file rather than hardcoding a digest:
+Tests through `Run`, seeding the hash from a first run's saved state file rather than a literal
+digest:
 
-- Update mode, seeded hash matches: `MockSlackAPI.ReplacedCanvas.Called` is false, and the saved
-  state keeps the hash
-- Update mode, seeded hash differs: the canvas is written, and the saved state carries the new hash
-- Update mode, seeded state has no hash: the canvas is written
-- Update mode, `ReplaceCanvasError` set: the saved state keeps the seeded hash, not the new one
-- Post mode: the canvas is written, and the saved state carries the hash
+- Seeded hash matches: `ReplacedCanvas.Called` is false, saved state keeps the hash
+- Seeded hash differs, and seeded state has no hash: both write
+- `ReplaceCanvasError` set: saved state keeps the seeded hash
+- Post mode: writes, and saves the hash
 
-Seeding from a first run works because both runs in a test render identical row text. Keep fixture
-ages away from a `durationText` rounding boundary, as `canvas_test.go`'s current ones are.
-
-A failed merged-PR fetch renders `_Merged PRs could not be fetched_`, which hashes differently from
-a section with rows, so the next successful run writes.
+Keep fixture ages off a `durationText` rounding boundary, as the current ones are, so both runs in
+a test render identical row text.
 
 ## Step 4: Update the README's canvas section
 
 Touches: `README.md`.
 
-Two existing statements become false and have to change, not just be added to:
+Correct two statements this falsifies:
 
-- In the PR Tracker Canvas intro, "The canvas is rewritten on every run of the action, in both
-  `post` and `update` mode": now rewritten only when the markdown would differ
+- The canvas intro, "The canvas is rewritten on every run of the action, in both `post` and
+  `update` mode"
 - The first `### Good to know` bullet, "Every run replaces all of its content, so anything typed
-  there by hand is lost": still true when it writes, but hand-typed content now survives until the
-  next write
+  there by hand is lost". Hand-typed content now survives until the next write
 
 Add to `### Good to know`:
 
-- A canvas showing duplicated headings or PR rows is a rendering artifact in the Slack client, not
-  lost data. Reload the canvas and it shows the real content
+- A duplicated canvas is a rendering artifact in the Slack client, not lost data. Reload it
 - `_Updated <ts>_` says when the canvas was last written, not when the action last ran
 
-No tests. Done means both existing statements are corrected and both bullets are in the
-`### Good to know` list under [PR Tracker Canvas](../../README.md#-pr-tracker-canvas).
+Add Step 1's concurrency block to the "Advanced setup with update-mode enabled" example. It is the
+only example with more than the schedule trigger, so it is the only one that can overlap.
+
+No tests. Done means both corrections, both bullets, and the concurrency group in that one example.
 
 ## Consequences
 
 ### Positive
 
-- Runs triggered seconds apart no longer write the canvas twice, which is the case that corrupted
-  it
-- Bursts of triggers collapse to two runs, and those two are serialized
-- A repository whose PRs are all more than a day old writes the canvas about once a day instead of
-  on every run
-- The state artifact becomes a record of what is on the canvas, which a later change could diff
-  against
+- Runs seconds apart no longer write twice, which is the case that corrupted the canvas
+- A repository whose PRs are all over a day old writes about once a day instead of every run
+- The state artifact becomes a record of what is on the canvas
 
 ### Negative
 
-- The footer timestamp no longer proves the action ran. A stale-looking canvas and a broken action
-  look the same
-- Update runs upload a state artifact where they uploaded none, so `Load` starts picking up
-  update-run artifacts
-- A canvas edited by hand keeps those edits until the next write, instead of losing them on the
-  next run
-- The skip weakens as PRs get younger. While any listed PR is under an hour old, row text changes
-  every minute and almost every run writes
+- The footer no longer proves the action ran. A stale canvas and a broken action look alike
+- A hand-edited canvas keeps those edits until the next write
+
+### Caveats
+
+- One state artifact per run instead of per day, until `retention-days: 1` expires them, since an
+  upload always creates a new artifact
+  ([upload-artifact README](https://github.com/actions/upload-artifact#readme)). `Load` takes the
+  newest, so this is noise, not incorrectness
+- The skip weakens as PRs get younger. Under an hour old, row text changes every minute
+- The scheduled run can still overlap an update run, since it sits in its own group. Once a day at
+  most, accepted against a cancellable scheduled run
 
 ### Neutral
 
-- Neither change prevents the corruption. Slack merges the writes; these only make them rare
-- `post` runs always write, since they load no state
+- Neither change prevents the corruption, they only make it rare

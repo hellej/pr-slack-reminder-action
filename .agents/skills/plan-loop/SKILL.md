@@ -80,7 +80,8 @@ rounds cheap.
    - **Verify**: out to a researcher, at the same time. Neither of these needs you. An
      answer that outlives the plan goes to the facts file
    - **Fix**: you revise the plan, once the answers are in
-3. Revise, then re-review. That is one more round
+3. Revise, then re-review. That is one more round. Revise so the plan reads as if the finding
+   never happened, and cut what the round grew
 4. Three rounds maximum. At the cap, hand back with the open findings named and the plan
    as it stands
 

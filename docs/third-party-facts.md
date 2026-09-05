@@ -14,7 +14,7 @@ GitHub GraphQL and search APIs, Slack methods and scopes, GitHub token permissio
 ## Entry format
 
 ```
-## <the fact, stated as a claim>
+## <the fact, stated as a claim> [YYYY-MM-DD]
 
 - Source: <module cache path at the pinned version, doc URL, or the command that was run>
 - Checked: <YYYY-MM-DD>, <what it is pinned to, if anything>
@@ -22,9 +22,11 @@ GitHub GraphQL and search APIs, Slack methods and scopes, GitHub token permissio
   - <the numbers, the query, what it rules out>
 ```
 
-The heading list is the index, so a heading has to carry the whole claim on its own.
+The heading list is the index, so a heading has to carry the whole claim on its own, and the
+date it was last checked. The bracketed date and the `Checked:` line always match. Re-checking an
+entry moves both.
 
-## `Repository.pullRequests` cannot order by merge date
+## `Repository.pullRequests` cannot order by merge date [2026-08-22]
 
 - Source: [IssueOrder input object](https://docs.github.com/en/graphql/reference/issues#input-object-issueorder)
 - Checked: 2026-08-22
@@ -37,7 +39,7 @@ The heading list is the index, so a heading has to carry the whole claim on its 
   - `kubernetes/kubernetes`: the page reached back to 2014. ~25 days of updates, 12 years
     of merges
 
-## GitHub search filters merged PRs by merge date server-side, but cannot sort by it
+## GitHub search filters merged PRs by merge date server-side, but cannot sort by it [2026-08-22]
 
 - Source: [searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests), [sorting search results](https://docs.github.com/en/search-github/getting-started-with-searching-on-github/sorting-search-results)
 - Checked: 2026-08-22
@@ -48,7 +50,7 @@ The heading list is the index, so a heading has to carry the whole claim on its 
 - Day granularity returns up to one extra day of merges, cut client-side
 - Unverified: the date-time form of the qualifier
 
-## A GitHub search query string is capped at 256 characters and five operators
+## A GitHub search query string is capped at 256 characters and five operators [2026-08-22]
 
 - Source: [REST search limits](https://docs.github.com/en/rest/search/search)
 - Checked: 2026-08-22
@@ -58,7 +60,7 @@ The heading list is the index, so a heading has to carry the whole claim on its 
 - Unverified: OR semantics for repeated `repo:` qualifiers, the alternative to one aliased
   search per repository
 
-## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts
+## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` and `totalCount` per qualifier; `__type(name:"Repository")` introspection for the argument list
 - Checked: 2026-08-22
@@ -77,7 +79,7 @@ filters what this project filters on:
 - `-author:` and `-label:` exclude: 2491 down to 2477 for one bot author
 - `draft:true` / `draft:false` split the set, 678 / 1813
 
-## No GraphQL query filters PRs by a case-sensitive title substring
+## No GraphQL query filters PRs by a case-sensitive title substring [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` per qualifier
 - Checked: 2026-08-22
@@ -91,7 +93,7 @@ Negating a free-text term needs `NOT`, not `-`: `NOT Fix in:title` matched 1486,
 complement of 1005, while `-Fix in:title` matched 1005, the same as no negation at all. The
 `-` prefix does work on qualifiers such as `-label:` and `-author:`.
 
-## The 30 requests/minute GitHub search limit is a REST figure
+## The 30 requests/minute GitHub search limit is a REST figure [2026-08-22]
 
 - Source: [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
 - Checked: 2026-08-22
@@ -99,7 +101,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   connection, divided by 100
 - The budget is 5,000 points an hour
 
-## The GraphQL cost formula overestimates: read `rateLimit.cost` instead
+## The GraphQL cost formula overestimates: read `rateLimit.cost` instead [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, `rust-lang/rust`, `kubernetes/kubernetes`, `facebook/react`; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
 - Checked: 2026-08-22
@@ -117,7 +119,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - The enrichment batch was measured with a `commits(last: 1)` selection it no longer carries
 
-## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error
+## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error [2026-08-22]
 
 - Source: `gh api graphql`, `search(type: ISSUE)` with a `repo:` qualifier
 - Checked: 2026-08-22
@@ -134,7 +136,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - Node-limit errors come back pathless
   - Neither carries `extensions.code`
 
-## Several aliased `search` fields work in one GraphQL operation
+## Several aliased `search` fields work in one GraphQL operation [2026-08-22]
 
 - Source: `gh api graphql`, `s0`/`s1` over `microsoft/vscode`, `kubernetes/kubernetes`, `rust-lang/rust`; [GraphQL queries reference](https://docs.github.com/en/graphql/reference/queries#search)
 - Checked: 2026-08-22
@@ -144,7 +146,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `labels(first: 100)` all come back populated
 - `first: 100` is the hard maximum, and the connection caps at 1,000 results
 
-## GitHub's PR search index lags a merge by seconds
+## GitHub's PR search index lags a merge by seconds [2026-08-22]
 
 - Source: `gh api graphql`, polling `NixOS/nixpkgs` and `ClickHouse/ClickHouse` every ~7s
 - Checked: 2026-08-22
@@ -152,7 +154,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - No GitHub doc acknowledges or quantifies a lag
 - Irrelevant to a scheduled job. Relevant to one triggered by a merge webhook
 
-## Merging a PR bumps its `updatedAt`, but GitHub never documents what does
+## Merging a PR bumps its `updatedAt`, but GitHub never documents what does [2026-08-22]
 
 - Source: `gh api graphql`, 301 merged PR nodes across `golang/go`, `kubernetes/kubernetes`, `microsoft/vscode`, `facebook/react`, `rust-lang/rust`; [PullRequest object](https://docs.github.com/en/graphql/reference/objects#pullrequest)
 - Checked: 2026-08-22
@@ -163,7 +165,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   reactions not bumping `updated_at`, so the triggers are ad hoc
 - An observation, not a contract. Ordering hints only, never correctness
 
-## `PullRequest.mergedAt` is a nullable `DateTime`
+## `PullRequest.mergedAt` is a nullable `DateTime` [2026-08-22]
 
 - Source: [PullRequest object](https://docs.github.com/en/graphql/reference/objects#pullrequest)
 - Checked: 2026-08-22
@@ -171,7 +173,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `state` is `OPEN`, `CLOSED` or `MERGED`; `merged` is a `Boolean!`
 - `states: MERGED` implies both, so neither has to be selected
 
-## `slack-go` v0.27.0 has `EditCanvas`, and one call replaces a whole canvas
+## `slack-go` v0.27.0 has `EditCanvas`, and one call replaces a whole canvas [2026-08-19]
 
 - Source: `slack-go/slack@v0.27.0/canvas.go` in `go env GOMODCACHE`; [`canvases.edit` content operations](https://docs.slack.dev/reference/methods/canvases.edit/#content-operations)
 - Checked: 2026-08-19, pinned to `slack-go` v0.27.0 in `go.mod`
@@ -179,7 +181,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Omitting `section_id` on a `replace` makes it the whole canvas
 - Needs only the `canvases:write` scope
 
-## A Slack canvas has its own access control, separate from OAuth scopes
+## A Slack canvas has its own access control, separate from OAuth scopes [2026-08-19]
 
 - Source: [`canvases.access.set`](https://docs.slack.dev/reference/methods/canvases.access.set)
 - Checked: 2026-08-19
@@ -187,7 +189,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Created outside a channel the bot is in: `canvases.edit` fails until it is shared
 - Created as a channel tab: writable
 
-## `search` returns private-repository PRs, but the permission granting it is undocumented
+## `search` returns private-repository PRs, but the permission granting it is undocumented [2026-08-22]
 
 - Source: `gh api graphql`, `repo:<private repo> is:pr is:merged merged:>=` and `is:pr is:merged is:private`; [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens); GitHub's docs data for `/search/issues` (`permissions: []`, `allowPermissionlessAccess: true`, `serverToServer: true`)
 - Checked: 2026-08-22
@@ -200,7 +202,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   auto-granted `metadata: read`
 - The failure mode if that is not enough: silently empty results
 
-## Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented
+## Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented [2026-08-27]
 
 - Source: [community discussion 62476](https://github.com/orgs/community/discussions/62476); [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
 - Checked: 2026-08-27
@@ -214,10 +216,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The selection was dropped anyway: `updatedAt` serves the canvas, and no permission
   question rides on it
 
-## Rapid `canvases.edit` replaces duplicate headings and rows in an open canvas, until a reload
+## Rapid `canvases.edit` replaces duplicate headings and rows in an open canvas, until a reload [2026-09-05]
 
 - Source: measured against canvas `F0BPS4FKCEL` on 2026-09-05 with a scratch probe sending
   the same form POST `ReplaceCanvasContent` sends
+- Checked: 2026-09-05
 - Reproduced: 15 full-canvas replaces 1.5s apart, each one reshaping the document (cycling
   the grouped, flat and no-open-PRs golden files), with the canvas open in the desktop app
   - `## Open` and `## WIP` each rendered twice, one PR row appeared under two sections,
@@ -231,10 +234,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   reshaped the document. A parked cursor and typing straight through a write both stayed clean
 - No cap on write rate was hit: every replace in every run returned `ok: true`
 
-## Slack accepts simultaneous `canvases.edit` replaces, and documents no way to read a canvas back
+## Slack accepts simultaneous `canvases.edit` replaces, and documents no way to read a canvas back [2026-09-05]
 
 - Source: [`canvases.edit`](https://docs.slack.dev/reference/methods/canvases.edit/);
   [canvases surface guide](https://docs.slack.dev/surfaces/canvases/); the 2026-09-05 probe
+- Checked: 2026-09-05
 - Two replaces fired from two threads at once both returned `ok: true`, as did two 1.5s
   apart. `canvas_editing_locked` never appeared, so it can't be relied on to serialize writes
 - The docs describe `canvas_editing_locked` as "Another edit to this canvas is currently in
@@ -245,7 +249,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `canvases.create` fails on a free workspace with `free_teams_cannot_create_standalone_canvases`,
   and `conversations.canvases.create` with `free_team_canvas_tab_already_exists`
 
-## Slack's `replace` with a `section_id` has been reported to act like `insert_after`
+## Slack's `replace` with a `section_id` has been reported to act like `insert_after` [2026-09-05]
 
 - Source: [slackapi/slack-mcp-plugin issue 30](https://github.com/slackapi/slack-mcp-plugin/issues/30)
 - Checked: 2026-09-05, one community report, not confirmed by Slack
@@ -257,7 +261,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Neither applies to this action: `ReplaceCanvasContent` sends no `section_id`, and
   `canvasbuilder` renders no H1
 
-## An Actions artifact cannot be updated in place: each upload is a new artifact, owned by its run
+## An Actions artifact cannot be updated in place: each upload is a new artifact, owned by its run [2026-09-05]
 
 - Source: [upload-artifact README](https://github.com/actions/upload-artifact#readme);
   [REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts)
@@ -271,3 +275,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Deleting an artifact needs `actions: write`, above the `actions: read` an update run uses
 - So a state artifact re-uploaded every run accumulates one artifact per run until retention
   expires them
+
+## A workflow-level `concurrency` key can read the `inputs` context, and cancels pending runs [2026-09-05]
+
+- Source: [context availability](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability);
+  [workflow syntax: concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency)
+- Checked: 2026-09-05
+- Available to `concurrency`: `github`, `inputs`, `vars`. So a group can be computed from the
+  event name and a `workflow_dispatch` input, and split one workflow's runs into several groups
+- `github.token` and `github.job` are the properties restricted to step execution. `run_id` is
+  not among them
+- For a non-`workflow_dispatch` event `inputs` is null, so `inputs.x == 'y'` is simply false
+- With `cancel-in-progress` unset or false, a newly queued run still cancels any *pending* run in
+  the group. Only the run in progress and the newest queued one survive a burst
+- A shared group therefore lets frequent triggers cancel a pending scheduled run
