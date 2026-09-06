@@ -263,8 +263,8 @@ func TestFindRecentlyMergedPRsCutsTheWindowClientSide(t *testing.T) {
 }
 
 func TestFindRecentlyMergedPRsKeepsTheNewestUpToTheCap(t *testing.T) {
-	if MaxMergedPRsToFetch != 10 {
-		t.Fatalf("MaxMergedPRsToFetch = %d, expected 10", MaxMergedPRsToFetch)
+	if MaxMergedPRsToFetch != 6 {
+		t.Fatalf("MaxMergedPRsToFetch = %d, expected 6", MaxMergedPRsToFetch)
 	}
 
 	mergedAts := make([]string, MaxMergedPRsToFetch+3)

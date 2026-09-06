@@ -216,7 +216,7 @@ Optional: keep a Slack canvas updated with a live view of open, work-in-progress
 _Updated 2026-08-08 06:15 UTC_
 ```
 
-Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 10 PRs merged within the last 7 days, and names no reviewers.
+Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days, and names no reviewers.
 
 ### Setup
 

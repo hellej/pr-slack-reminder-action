@@ -115,7 +115,7 @@ const MaxPRsToFetch = 50
 const MaxDraftPRsToFetch = 10
 
 // The canvas lists the newest merges of the past week, and no more than this many of them.
-const MaxMergedPRsToFetch = 10
+const MaxMergedPRsToFetch = 6
 
 const RecentlyMergedWindow = 7 * 24 * time.Hour
 
