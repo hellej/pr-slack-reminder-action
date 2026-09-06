@@ -78,20 +78,48 @@ gh run watch "$RUN_ID" --exit-status 2>&1 | tail -20
   ```
   Do not proceed with publishing.
 
-### 4. Publish the Release
+### 4. Clean Up the Draft Release Notes
 
-Once the workflow completes successfully:
+The generated notes list every commit. Rewrite them for someone reading the release page.
 
-1. Get the tag of the draft release:
-   ```bash
-   GH_PAGER=cat gh release list --limit=1 --json tagName,isDraft --jq '.[0].tagName'
-   ```
-2. Open it in the browser so the user can review the release notes:
-   ```bash
-   gh release view <tag> --web
-   ```
-3. Ask the user whether to publish the release now
-4. If yes:
-   ```bash
-   gh release edit <tag> --draft=false
-   ```
+Read the draft notes:
+
+```bash
+TAG=$(GH_PAGER=cat gh release list --limit=1 --json tagName --jq '.[0].tagName')
+GH_PAGER=cat gh release view "$TAG" --json body --jq '.body'
+```
+
+Drop bullets that mean nothing to a user of the action:
+
+- `Update action executables` and any other bot commit
+- README and docs-only commits
+- CI and workflow changes, including the dependabot `github-actions` group bump
+- Contributor-only material: `AGENTS.md`, `.agents/`, `.claude/`, `docs/plans/`, `docs/third-party-facts.md`, `*.spec.md`, test-only changes
+
+Rewrite what's left:
+
+- Say what changed for the user, not what the commit was called: `Lower the recently-merged canvas section cap from 10 to 6`, not `Lower the recently-merged canvas section cap to 6`
+- Keep dependency bumps that go into the compiled binary. Link the PR, not the commit
+- Drop the `## What's Changed` heading entirely if nothing survives
+
+Add a `## Migration Guide (optional)` section when the release asks users to change their own workflow or config. Name who it applies to, say no action is needed otherwise, link the relevant README section by anchor, and include the snippet to copy.
+
+Keep the `**Full Changelog**` line as generated.
+
+Write the new notes to the scratchpad directory, then apply:
+
+```bash
+GH_PAGER=cat gh release edit "$TAG" --notes-file <scratchpad-path>
+```
+
+`gh release edit` prints an `untagged-*` URL for a draft. That's expected, not a failure.
+
+### 5. Hand the Draft Over
+
+Open the draft so the user can review and publish it themselves:
+
+```bash
+gh release view "$TAG" --web
+```
+
+Never publish it and never ask to. The user always publishes manually on GitHub.
