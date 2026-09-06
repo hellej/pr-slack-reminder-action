@@ -209,6 +209,9 @@ Files: the four package specs, `README.md`, `action.yml`, package doc comments.
 ### Negative
 
 - A new query kind in `githubclient`: `search` is the only path that is not `repository(...)`-aliased, so its result decoding and the `... on PullRequest` inline fragment are one-off shapes.
+
+### Caveats
+
 - A repository merging more than 100 PRs a week gets a truncated list, visible only in the log.
 - Every canvas golden file changes, so the diff of this change is wide but shallow.
 

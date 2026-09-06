@@ -24,7 +24,8 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 **What's special about this action:**
 
 - Monitor up to 30 repositories
-- Option to ["refresh" the latest PR reminder](#3-advanced-setup-with-update-mode-enabled) when PRs get reviewed or merged (with run-mode: `update`)
+- Option to ["refresh" the latest PR reminder](#3-update-mode-enabled) when PRs get reviewed or merged (with run-mode: `update`)
+- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open, draft and recently merged PRs
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
@@ -108,13 +109,13 @@ jobs:
 
 (^ PRs from `mobile-app` repo won't be filtered by the global filters)
 
-#### 3. Advanced Setup with Update Mode Enabled
+#### 3. Update Mode Enabled
 
 Setup where the latest message is also updated when PRs get reviewed/merged.
 PRs that were merged since the original message are shown with 🚀 emoji suffix.
 However, the updated message will not contain new PRs published since the original message.
 
-Example:
+**Example:**
 
 <img src="docs/examples/example_2.png" alt="Example Slack message" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
@@ -131,6 +132,10 @@ on:
   pull_request_review:
     types: [submitted]
   issue_comment:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
+  cancel-in-progress: false
 
 jobs:
   send-or-update-pr-reminder:
@@ -173,7 +178,7 @@ jobs:
 | `no-prs-message`                    | ❌       | Message when no PRs are found (if not set, no empty message gets sent)<br>Example: `All caught up! 🎉`                                                                                     |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository headings (defaults to `false`). When enabled, `pr-list-heading` is ignored.                                                                        |
-| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, work-in-progress and recently merged PRs (see [PR Tracker Canvas](#-pr-tracker-canvas)). Leave empty to disable (default).              |
+| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
 
@@ -187,11 +192,9 @@ Both `filters` and `repository-filters` support:
 
 ⚠️ **Note**: You cannot use both `authors` and `ignored-authors` in the same filter.
 
-## 📋 PR Tracker Canvas
+## PR Tracker Canvas
 
-Optional: keep a Slack canvas updated with a live view of the PRs across all monitored repositories. The reminder message is transient and never lists drafts; the canvas is persistent, readable on demand, and has sections for work-in-progress and recently merged PRs too.
-
-The canvas is rewritten on every run of the action, in both `post` and `update` mode.
+Optional: keep a Slack canvas updated with a live view of open, draft and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
 
 ```markdown
 ## Open
@@ -213,7 +216,7 @@ The canvas is rewritten on every run of the action, in both `post` and `update` 
 _Updated 2026-08-08 06:15 UTC_
 ```
 
-Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. Drafts with no activity for 60 days are left out. The merged section lists at most 15 PRs merged within the last 7 days, and names no reviewers.
+Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days, and names no reviewers.
 
 ### Setup
 
@@ -231,10 +234,12 @@ to be in the same channel as the canvas to have write access.
 
 ### Good to know
 
-- ⚠️ The action owns the whole canvas. Every run replaces all of its content, so anything typed there by hand is lost. Keep notes on a second canvas.
+- ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
 - These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
+- The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
+- A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not lost data. Reload the canvas to see its real content.
 
 ## 💡 Tips
 
@@ -252,7 +257,7 @@ The bot token needs the scopes below. The bot must also be a member of the targe
 | `chat:write`       | ✅ Always                                                     | Sending, updating and deleting the reminder message     |
 | `channels:read`   | Only with `slack-channel-name` for a **public** channel     | Looking up the channel ID by name                       |
 | `groups:read`     | Only with `slack-channel-name` for a **private** channel    | Looking up the channel ID by name                        |
-| `canvases:write`  | Only with `pr-tracker-canvas-link`                          | Replacing the content of the [PR tracker canvas](#-pr-tracker-canvas) |
+| `canvases:write`  | Only with `pr-tracker-canvas-link`                          | Replacing the content of the [PR tracker canvas](#pr-tracker-canvas) |
 
 💡 You can skip `channels:read`/`groups:read` entirely by using `slack-channel-id` instead of `slack-channel-name` - then only `chat:write` is needed.
 

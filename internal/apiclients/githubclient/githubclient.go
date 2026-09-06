@@ -112,10 +112,10 @@ const defaultGitHubAPIConcurrencyLimit = 3
 const MaxPRsToFetch = 50
 
 // Drafts are capped lower than open PRs: only the most recently updated ones are worth showing.
-const MaxDraftPRsToFetch = 15
+const MaxDraftPRsToFetch = 10
 
 // The canvas lists the newest merges of the past week, and no more than this many of them.
-const MaxMergedPRsToFetch = 15
+const MaxMergedPRsToFetch = 6
 
 const RecentlyMergedWindow = 7 * 24 * time.Hour
 

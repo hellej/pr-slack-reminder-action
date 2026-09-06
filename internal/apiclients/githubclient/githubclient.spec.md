@@ -8,11 +8,11 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Results are filtered by `config.Filters`: author and label allow+block lists, plus ignored terms matched as case-sensitive substrings of the title
 - Draft PRs are excluded, unless `FindOpenPRs` is called with `PRFetchOptions{IncludeDrafts: true}`. `GetPRs` always excludes them
 - Result count is capped at `MaxPRsToFetch` (50); when over the cap, only the newest PRs (by creation time, then update time) are kept
-- With `IncludeDrafts` on, drafts are capped in their own bucket at `MaxDraftPRsToFetch` (15) by update time (newest kept), so they can never displace open PRs; open PRs keep the cap and sort above
+- With `IncludeDrafts` on, drafts are capped in their own bucket at `MaxDraftPRsToFetch` (10) by update time (newest kept), so they can never displace open PRs; open PRs keep the cap and sort above
 - `OpenPRsResult` carries `OpenPRsCapped` and `DraftPRsCapped`, each true only when that bucket was trimmed to its cap
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
 - The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
-- `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (15) the cap
+- `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (6) the cap
 - The merged search runs one aliased `search(type: ISSUE, first: 100)` per repository in a single request, with the query string `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`. `search` filters on merge date server-side, which `Repository.pullRequests` cannot do: it orders by comments, creation or update time only, and any post-merge comment or label bumps the update time
 - The cutoff qualifier is a day, so the search returns up to one extra day of merges; the exact `mergedAt >= mergedSince` cut, the repository filters, the merge ordering and the cap are all applied client-side. `search` cannot sort by merge date either
 - Merged PRs are never enriched: they carry no approvers, no commenters and no snooze exclusion. A merged row names no reviewers

@@ -788,7 +788,7 @@ func TestFindOpenPRs_CapsDraftsAndOpenPRsSeparately(t *testing.T) {
 			draftPRCount:           20,
 			includeDrafts:          true,
 			expectedOpenPRNumbers:  rangeOfNumbers(1, githubclient.MaxPRsToFetch),
-			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 15), // MaxDraftPRsToFetch, kept literal on purpose
+			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 10), // MaxDraftPRsToFetch, kept literal on purpose
 			expectedOpenPRsCapped:  true,
 			expectedDraftPRsCapped: true,
 		},
@@ -798,7 +798,7 @@ func TestFindOpenPRs_CapsDraftsAndOpenPRsSeparately(t *testing.T) {
 			draftPRCount:           20,
 			includeDrafts:          true,
 			expectedOpenPRNumbers:  rangeOfNumbers(1, 3),
-			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 15), // MaxDraftPRsToFetch, kept literal on purpose
+			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 10), // MaxDraftPRsToFetch, kept literal on purpose
 			expectedDraftPRsCapped: true,
 		},
 		{

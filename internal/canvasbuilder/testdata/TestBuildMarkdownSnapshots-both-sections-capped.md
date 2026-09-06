@@ -14,6 +14,6 @@ _No merged PRs_
 
 ---
 
-_Fetch limited to the newest 50 open PRs and the newest 15 WIP PRs_
+_Fetch limited to the newest 50 open PRs and the newest 10 WIP PRs_
 
 _Updated 2026-08-08 06:15 UTC_

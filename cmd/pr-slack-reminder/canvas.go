@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log"
 	"time"
@@ -21,18 +23,24 @@ import (
 // openPRs carries post mode's fetch, which the message path already made. Nil asks for a fetch
 // here, which is what update mode always needs: its message is state-tracked, so it never lists
 // what is open right now.
+//
+// previousHash is the hash of what the last run put on the canvas. Matching it skips the write:
+// Slack's canvas client mis-merges a replace that lands while somebody has the canvas open.
+// Returns the hash that is on the canvas afterwards, which is the previous one on every path
+// that wrote nothing, a failed write included.
 func refreshPRTrackerCanvas(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	openPRs *githubclient.OpenPRsResult,
 	cfg config.Config,
-) error {
+	previousHash string,
+) (string, error) {
 	generatedAt := time.Now().UTC()
 
 	if openPRs == nil {
 		fetched, err := findOpenPRs(githubClient, cfg, githubclient.PRFetchOptions{IncludeDrafts: true})
 		if err != nil {
-			return err
+			return previousHash, err
 		}
 		openPRs = &fetched
 	}
@@ -55,10 +63,28 @@ func refreshPRTrackerCanvas(
 		},
 	)
 
+	contentHash := canvasContentHash(content)
+	if contentHash == previousHash {
+		log.Println("Canvas content is unchanged since the last run, leaving the canvas as it is")
+		return previousHash, mergedPRsErr
+	}
+
 	writeErr := slackClient.ReplaceCanvasContent(
 		cfg.PRTrackerCanvasID, canvasbuilder.BuildMarkdown(content),
 	)
-	return errors.Join(writeErr, mergedPRsErr)
+	if writeErr != nil {
+		return previousHash, errors.Join(writeErr, mergedPRsErr)
+	}
+	return contentHash, mergedPRsErr
+}
+
+// Hashes the markdown the canvas would get, with the footer timestamp left out so that a run
+// rendering the same rows recognizes its own canvas.
+func canvasContentHash(content canvascontent.Content) string {
+	contentWithoutTimestamp := content
+	contentWithoutTimestamp.GeneratedAt = time.Time{}
+	digest := sha256.Sum256([]byte(canvasbuilder.BuildMarkdown(contentWithoutTimestamp)))
+	return hex.EncodeToString(digest[:])
 }
 
 func findRecentlyMergedPRs(

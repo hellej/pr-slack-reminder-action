@@ -257,6 +257,193 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 	}
 }
 
+// Inactive drafts, given oldest activity first, so keeping the first 5 given would keep the
+// wrong ones.
+func TestGetContentKeepsOnlyTheMostRecentlyActiveInactiveWIPPRs(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(9 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(8 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(7 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 4, draft: true, updatedAt: activityAgo(6 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 5, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 6, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 7, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{7, 6, 5, 4, 3})
+}
+
+func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 4, draft: true, updatedAt: activityAgo(2 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 5, draft: true, updatedAt: activityAgo(25 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{5, 4, 3, 2, 1})
+}
+
+// Recently active drafts are outside the cap, however many there are.
+func TestGetContentKeepsEveryRecentlyActiveWIPPR(t *testing.T) {
+	var prs []prparser.PR
+	for i := range 8 {
+		prs = append(prs, testPR(testPROptions{
+			number: 100 + i, draft: true, updatedAt: activityAgo(time.Duration(i+1) * time.Hour),
+		}))
+		prs = append(prs, testPR(testPROptions{
+			number: 200 + i, draft: true, updatedAt: activityAgo(time.Duration(i+2) * 24 * time.Hour),
+		}))
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(
+		t, "WIP PRs", prNumbers(content.WIPPRs),
+		[]int{100, 101, 102, 103, 104, 105, 106, 107, 200, 201, 202, 203, 204},
+	)
+}
+
+// The cap counts a draft as inactive from 24 hours of silence onwards, measured against
+// GeneratedAt. Draft 6 is the candidate, and always the most recently touched one. Counting it
+// as inactive fills the cap with drafts 6 to 2 and drops draft 1; counting it as active leaves
+// the cap to drafts 5 to 1 and keeps all six.
+func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
+	testCases := []struct {
+		name       string
+		inactivity time.Duration
+		wantWIPPRs []int
+	}{
+		{name: "an hour inside the threshold", inactivity: 23 * time.Hour, wantWIPPRs: []int{6, 5, 4, 3, 2, 1}},
+		{
+			name: "just inside the threshold", inactivity: 24*time.Hour - time.Second,
+			wantWIPPRs: []int{6, 5, 4, 3, 2, 1},
+		},
+		{name: "exactly at the threshold", inactivity: 24 * time.Hour, wantWIPPRs: []int{6, 5, 4, 3, 2}},
+		{
+			name: "just past the threshold", inactivity: 24*time.Hour + time.Second,
+			wantWIPPRs: []int{6, 5, 4, 3, 2},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			prs := []prparser.PR{
+				testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
+				testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
+				testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
+				testPR(testPROptions{number: 4, draft: true, updatedAt: activityAgo(2 * 24 * time.Hour)}),
+				testPR(testPROptions{number: 5, draft: true, updatedAt: activityAgo(36 * time.Hour)}),
+				testPR(testPROptions{number: 6, draft: true, updatedAt: activityAgo(tc.inactivity)}),
+			}
+
+			content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+				GeneratedAt: generatedAt,
+			})
+
+			assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), tc.wantWIPPRs)
+		})
+	}
+}
+
+// Unknown activity is not inactivity, so the cap never drops such a draft.
+func TestGetContentKeepsDraftWithUnknownActivityBesidesTheCappedInactiveOnes(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(6 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 4, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 5, draft: true, updatedAt: activityAgo(2 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 6, draft: true}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{5, 4, 3, 2, 1, 6})
+}
+
+// Drafts past MaxDraftPRInactivity never take one of the kept slots.
+func TestGetContentKeepsNoStaleDraftAmongTheCappedInactiveOnes(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(70 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(65 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(61 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 4, draft: true, updatedAt: activityAgo(10 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 5, draft: true, updatedAt: activityAgo(9 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 6, draft: true, updatedAt: activityAgo(8 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 7, draft: true, updatedAt: activityAgo(7 * 24 * time.Hour)}),
+		testPR(testPROptions{number: 8, draft: true, updatedAt: activityAgo(6 * 24 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{8, 7, 6, 5, 4})
+}
+
+// The cap is global, so three repositories with three inactive drafts each yield five rows
+// in total rather than five per repository.
+func TestGetContentCapsInactiveWIPPRsAcrossRepositories(t *testing.T) {
+	prs := []prparser.PR{
+		testPR(testPROptions{
+			number: 1, repository: "repo-one", draft: true, updatedAt: activityAgo(9 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 2, repository: "repo-one", draft: true, updatedAt: activityAgo(6 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 3, repository: "repo-one", draft: true, updatedAt: activityAgo(3 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 4, repository: "repo-two", draft: true, updatedAt: activityAgo(8 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 5, repository: "repo-two", draft: true, updatedAt: activityAgo(5 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 6, repository: "repo-two", draft: true, updatedAt: activityAgo(2 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 7, repository: "repo-three", draft: true, updatedAt: activityAgo(7 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 8, repository: "repo-three", draft: true, updatedAt: activityAgo(4 * 24 * time.Hour),
+		}),
+		testPR(testPROptions{
+			number: 9, repository: "repo-three", draft: true, updatedAt: activityAgo(25 * time.Hour),
+		}),
+	}
+
+	content := canvascontent.GetContent(
+		prs,
+		nil,
+		config.ContentInputs{GroupByRepository: true},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	assertEqual(
+		t, "WIP PR group paths", groupPaths(content.WIPPRsGroupedByRepository),
+		[]string{"test-org/repo-three", "test-org/repo-two", "test-org/repo-one"},
+	)
+	assertEqual(t, "first group PRs", prNumbers(content.WIPPRsGroupedByRepository[0].PRs), []int{9, 8})
+	assertEqual(t, "second group PRs", prNumbers(content.WIPPRsGroupedByRepository[1].PRs), []int{6, 5})
+	assertEqual(t, "third group PRs", prNumbers(content.WIPPRsGroupedByRepository[2].PRs), []int{3})
+}
+
 func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 	prs := []prparser.PR{testPR(testPROptions{number: 1, draft: true})}
 

@@ -481,11 +481,14 @@ Only after Step 7 is green.
 
 ### Negative
 
-- The fetch path's entire test suite is rewritten. Still the change's main cost, but no longer its main risk: R0's snapshots hold the rendered payload fixed across the rewrite, so what is left rests on the mock fixtures' fidelity rather than on the rewrite.
 - Failures arrive as HTTP 200 with an `errors` array, so error handling is more code than checking a status code, and getting it wrong fails silently rather than loudly.
-- The query-size ceiling that forces batching is undocumented, so the 25-alias batch size rests on measurement that could drift.
 - Phase 1 is one request covering all repositories: its transport failures lose the repository from the error message, and one slow response (8-11 s measured across 30) delays all of them.
 - `githubclient` runs two clients against two APIs, which is more surface than either alone.
+
+### Caveats
+
+- The fetch path's entire test suite is rewritten. Still the change's main cost, but no longer its main risk: R0's snapshots hold the rendered payload fixed across the rewrite, so what is left rests on the mock fixtures' fidelity rather than on the rewrite.
+- The query-size ceiling that forces batching is undocumented, so the 25-alias batch size rests on measurement that could drift.
 
 ### Neutral
 

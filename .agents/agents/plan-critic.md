@@ -89,6 +89,15 @@ means. A step you can only follow because you read the whole plan is a finding.
     plan breaks the plan skill's structure or AGENTS.md Code Style
   - **nit**: naming, wording, ordering inside a section, or a detail that drifted from the
     tree without changing what the step means
+  - Length is a **Fix**, not taste: a paragraph that argues instead of instructs, a
+    justification longer than the decision, anything Consequences repeats from a step. Quote it
+    and say what it cuts to. Multi-bullet reasoning belongs in Justification, linked from the step
+  - A choice a Justification heading settles is closed. Reopen it only by showing the reasoning
+    there is wrong, never by re-asking the question
+  - Judge length against `docs/plans/`, not in the abstract. Each paragraph looks fine alone,
+    so compare the whole plan to the nearest one of similar scope
+  - Rounds only add. From round 2, re-read what the last round touched for accreted prose
+  - A line citation where a symbol name exists is a **nit**
 - **Verify**: the plan rests on a claim nobody confirmed. Name the claim and where to
   confirm it
 - **Ask**: the plan settled something only the user can settle. Write the question as it

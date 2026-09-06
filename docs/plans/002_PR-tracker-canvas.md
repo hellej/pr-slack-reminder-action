@@ -404,14 +404,17 @@ Restating [001](001_GraphQL-migration.md)'s point-based GraphQL cost model for t
 
 ### Negative
 
+- `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
+- A canvas row is one markdown string, so every GitHub-sourced value needs escaping (Step 6), a class of bug the Block Kit message can't have, and one that only shows up on titles containing markdown characters.
+- Two new packages (`canvascontent`, `canvasbuilder`) largely mirror existing ones (`messagecontent`, `messagebuilder`), adding maintenance surface for a feature many users won't enable.
+
+### Caveats
+
 - Opted-in `post` runs add up to one extra phase-2 batch (see "Cost model"); `update` mode also fetches twice for the canvas, its own phase 1 + phase 2.
 - WIP rows can't show approvers by rendering choice (Step 6), even though the fetch now returns them for drafts too. Showing them is a rendering change only, no extra fetch needed.
-- `post` mode's message path now runs a fetch shaped by a canvas input. Kept safe by an explicit equivalence test and per-kind capping (Step 7), but it is a coupling that didn't exist before.
 - Canvas access can't be granted by the action itself. The intended setup (a canvas tab in the reminder channel) makes it implicit, but a canvas kept anywhere else needs manual sharing.
 - The canvas is a golden-file surface: any formatting change shows up as a snapshot diff to regenerate (Step 6). Intended, but it does make cosmetic tweaks a two-step change.
-- A canvas row is one markdown string, so every GitHub-sourced value needs escaping (Step 6), a class of bug the Block Kit message can't have, and one that only shows up on titles containing markdown characters.
 - Opting in adds a way for the run to fail: a canvas write that can't be done fails the action even though the reminder was posted (Step 7). Deliberate, the alternative is a feature that silently stops working, but it means a Slack-side access change turns scheduled runs red.
-- Two new packages (`canvascontent`, `canvasbuilder`) largely mirror existing ones (`messagecontent`, `messagebuilder`), adding maintenance surface for a feature many users won't enable.
 
 ### Neutral
 
