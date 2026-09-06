@@ -25,7 +25,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 
 - Monitor up to 30 repositories
 - Option to ["refresh" the latest PR reminder](#3-update-mode-enabled) when PRs get reviewed or merged (with run-mode: `update`)
-- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open, work-in-progress and recently merged PRs
+- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open, draft and recently merged PRs
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
@@ -178,7 +178,7 @@ jobs:
 | `no-prs-message`                    | ❌       | Message when no PRs are found (if not set, no empty message gets sent)<br>Example: `All caught up! 🎉`                                                                                     |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository headings (defaults to `false`). When enabled, `pr-list-heading` is ignored.                                                                        |
-| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, work-in-progress and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
+| `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
 
@@ -194,7 +194,7 @@ Both `filters` and `repository-filters` support:
 
 ## PR Tracker Canvas
 
-Optional: keep a Slack canvas updated with a live view of open, work-in-progress and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
+Optional: keep a Slack canvas updated with a live view of open, draft and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
 
 ```markdown
 ## Open
