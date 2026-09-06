@@ -15,16 +15,12 @@ func RandomPositiveInt() int {
 	return seededRand.Intn(100_000) + 1 // Ensures a positive integer
 }
 
-func RandomStringWithCharset(length int, charset string) string {
+func RandomString(length int) string {
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
-}
-
-func RandomString(length int) string {
-	return RandomStringWithCharset(length, charset)
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +

@@ -1,6 +1,9 @@
 name: Build
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -16,7 +19,12 @@ jobs:
       - name: Build application
         uses: ./.github/actions/build
 
+      # Fork and Dependabot PRs can't read these secrets
       - name: Smoke/E2E test
+        if: >-
+          github.actor != 'dependabot[bot]' &&
+          (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository)
         uses: ./.github/actions/e2e-tests
         with:
           github-app-client-id: ${{ secrets.APP_CLIENT_ID }}

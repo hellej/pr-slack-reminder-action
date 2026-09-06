@@ -17,7 +17,7 @@ inputs: {
   },
   github-token-for-state: {
     description: 'GitHub token that has read access to artifacts of the current repository (i.e. actions: read). Only needed if the run-mode is `update` and if the default github-token misses permissions.',
-    required: true,
+    required: false,
   },
   run-mode: {
     description: 'Run mode: post (default) posts a new reminder; update refreshes an existing reminder',
@@ -71,5 +71,9 @@ inputs: {
     description: 'Group PRs by repository with repository headings. When enabled, pr-list-heading is ignored.',
     required: false,
     default: 'false',
+  },
+  pr-tracker-canvas-link: {
+    description: 'Link to a Slack canvas to keep updated with a live tracker of open, work-in-progress and recently merged PRs. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default).',
+    required: false,
   },
 }

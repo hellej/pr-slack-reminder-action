@@ -174,7 +174,7 @@ func TestMapWithErrorToIter(t *testing.T) {
 	var results []int
 	var errors []error
 
-	for value, err := range MapWithErrorToIter(items, mapper) {
+	for value, err := range mapWithErrorToIter(items, mapper) {
 		results = append(results, value)
 		errors = append(errors, err)
 
@@ -199,49 +199,6 @@ func TestMapWithErrorToIter(t *testing.T) {
 
 	if errors[1] == nil {
 		t.Error("Second error should not be nil")
-	}
-}
-
-func TestUnique(t *testing.T) {
-	tests := []struct {
-		name     string
-		items    []int
-		expected []int
-	}{
-		{
-			name:     "remove duplicates",
-			items:    []int{1, 2, 2, 3, 1, 4, 3},
-			expected: []int{1, 2, 3, 4},
-		},
-		{
-			name:     "no duplicates",
-			items:    []int{1, 2, 3, 4},
-			expected: []int{1, 2, 3, 4},
-		},
-		{
-			name:     "all same",
-			items:    []int{5, 5, 5, 5},
-			expected: []int{5},
-		},
-		{
-			name:     "empty slice",
-			items:    []int{},
-			expected: nil,
-		},
-		{
-			name:     "single element",
-			items:    []int{42},
-			expected: []int{42},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := Unique(tt.items)
-			if !slices.Equal(result, tt.expected) {
-				t.Errorf("Unique() = %v, expected %v", result, tt.expected)
-			}
-		})
 	}
 }
 
@@ -383,7 +340,7 @@ func TestFlatMapToIter(t *testing.T) {
 	items := [][]int{{1, 2}, {3, 4}, {5}}
 	expected := []int{1, 2, 3, 4, 5}
 
-	result := slices.Collect(FlatMapToIter(items))
+	result := slices.Collect(flatMapToIter(items))
 	if !slices.Equal(result, expected) {
 		t.Errorf("FlatMapToIter() collected = %v, expected %v", result, expected)
 	}

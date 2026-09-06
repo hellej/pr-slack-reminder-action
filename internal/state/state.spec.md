@@ -4,20 +4,18 @@ Persists and reloads the "post" run's PR set and Slack message reference, so "up
 
 ## Behaviour
 
-- State carries a schema version, creation time, the sent Slack message's channel/timestamp, and the list of PRs it covered
+- State carries a schema version, creation time, the sent Slack message's channel/timestamp, the list of PRs it covered, and the hash of the markdown last written to the PR tracker canvas
 - `Load()` fetches the most recent saved state for a repository (via a GitHub Actions artifact)
-- `Validate()` checks only that the state's schema version matches what this version of the action understands
-- `SavePostState()` builds state from a "post" run's parsed PRs and Slack send result, and writes it for later reloading by `Load()`
-- `SaveSentSlackBlocks()` separately records the raw JSON actually sent to Slack, for inspection — not read back by this action
-- `Save()` writes any already-constructed state value directly, for callers that don't need `SavePostState`'s assembly step
+- `NewPostState()` builds state from a "post" run's parsed PRs and Slack send result. The only place stamping the schema version and creation time, and it leaves the canvas hash empty for the caller to fill in
+- `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
+- `SaveSentSlackBlocksToFile()` separately records the raw JSON actually sent to Slack, for inspection — not read back by this action
 
 ## Doesn't Do
 
-- `Validate()` doesn't check the state's contents (PR refs, Slack ref) are non-empty or well-formed — only the schema version
-- No migration path between schema versions — a mismatch is a hard error
+- No migration path between schema versions, and nothing checks the version on load — a mismatch goes unnoticed
 - Doesn't rotate or clean up old state/blocks files; each run overwrites in place
 
 ## Oddities
 
-- `SaveSentSlackBlocks`'s output is never loaded back by this codebase — it exists as a side-channel debug artifact only
-- `Load()` doesn't call `Validate()` itself — a caller that skips the explicit `Validate()` call can act on a state from an incompatible schema version
+- `SaveSentSlackBlocksToFile`'s output is never loaded back by this codebase — it exists as a side-channel debug artifact only
+- `CanvasContentHash` was added without bumping `CurrentSchemaVersion`. An artifact saved before it decodes an empty hash, which reads as "write the canvas"

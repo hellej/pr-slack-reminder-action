@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/google/go-github/v78/github"
@@ -69,6 +70,7 @@ func TestFindOneOrNoPRs(t *testing.T) {
 		mockReviews             map[int][]*github.PullRequestReview
 		mockTimelineComments    map[int][]*github.IssueComment
 		filters                 config.Filters
+		fetchOptions            githubclient.PRFetchOptions
 		expectedPRCount         int
 		expectedPRNumber        int
 		expectedApproverLogins  []string
@@ -117,6 +119,27 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			mockReviews:             map[int][]*github.PullRequestReview{},
 			mockTimelineComments:    map[int][]*github.IssueComment{},
 			expectedPRCount:         0,
+			expectedApproverLogins:  []string{},
+			expectedCommenterLogins: []string{},
+		},
+		{
+			name: "draft PR should be included when IncludeDrafts is on",
+			mockPRs: []*github.PullRequest{
+				{
+					Number:  github.Ptr(124),
+					Title:   github.Ptr("Draft PR"),
+					Draft:   github.Ptr(true),
+					HTMLURL: github.Ptr("https://github.com/owner/repo/pull/124"),
+					User: &github.User{
+						Login: github.Ptr("author"),
+						Name:  github.Ptr("PR Author"),
+					},
+				},
+			},
+			mockReviews:             map[int][]*github.PullRequestReview{},
+			mockTimelineComments:    map[int][]*github.IssueComment{},
+			fetchOptions:            githubclient.PRFetchOptions{IncludeDrafts: true},
+			expectedPRCount:         1,
 			expectedApproverLogins:  []string{},
 			expectedCommenterLogins: []string{},
 		},
@@ -352,19 +375,19 @@ func TestFindOneOrNoPRs(t *testing.T) {
 				return tt.filters
 			}
 
-			result, err := client.FindOpenPRs(context.Background(), repos, getFilters)
+			result, err := client.FindOpenPRs(context.Background(), repos, getFilters, tt.fetchOptions)
 
 			if err != nil {
 				t.Fatalf("FindOpenPRs() returned error: %v", err)
 			}
 
-			if len(result) != tt.expectedPRCount {
-				t.Errorf("Expected %d PRs, got %d", tt.expectedPRCount, len(result))
+			if len(result.PRs) != tt.expectedPRCount {
+				t.Errorf("Expected %d PRs, got %d", tt.expectedPRCount, len(result.PRs))
 				return
 			}
 
 			if tt.expectedPRCount > 0 {
-				pr := result[0]
+				pr := result.PRs[0]
 
 				expectedNumber := *tt.mockPRs[0].Number
 				if tt.expectedPRNumber > 0 {
@@ -442,14 +465,16 @@ func TestFetchManyPRs(t *testing.T) {
 			client := newTestClient(mockgithubclient.MockGitHubClientOptions{PRs: mockPRs})
 			repos := []models.Repository{{Owner: "testowner", Name: "testrepo"}}
 
-			result, err := client.FindOpenPRs(context.Background(), repos, noFilters)
+			result, err := client.FindOpenPRs(
+				context.Background(), repos, noFilters, githubclient.PRFetchOptions{},
+			)
 
 			if err != nil {
 				t.Fatalf("FindOpenPRs() returned error: %v", err)
 			}
 
-			if len(result) != tt.expectedPRCount {
-				t.Errorf("Expected %d PRs, got %d", tt.expectedPRCount, len(result))
+			if len(result.PRs) != tt.expectedPRCount {
+				t.Errorf("Expected %d PRs, got %d", tt.expectedPRCount, len(result.PRs))
 			}
 		})
 	}
@@ -480,15 +505,15 @@ func TestFindOpenPRs_MultipleRepositories(t *testing.T) {
 	})
 
 	repos := []models.Repository{{Owner: "o", Name: "repo1"}, {Owner: "o", Name: "repo2"}}
-	result, err := client.FindOpenPRs(context.Background(), repos, noFilters)
+	result, err := client.FindOpenPRs(context.Background(), repos, noFilters, githubclient.PRFetchOptions{})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Fatalf("expected 2 PRs, got %d", len(result))
+	if len(result.PRs) != 2 {
+		t.Fatalf("expected 2 PRs, got %d", len(result.PRs))
 	}
-	numbers := []int{result[0].GetNumber(), result[1].GetNumber()}
+	numbers := []int{result.PRs[0].GetNumber(), result.PRs[1].GetNumber()}
 	if !((numbers[0] == 1 && numbers[1] == 2) || (numbers[0] == 2 && numbers[1] == 1)) {
 		t.Errorf("expected PR numbers 1 and 2, got %v", numbers)
 	}
@@ -512,7 +537,7 @@ func TestFindOpenPRs_ErrorShortCircuits(t *testing.T) {
 	})
 
 	repos := []models.Repository{{Owner: "o", Name: "bad"}, {Owner: "o", Name: "good"}}
-	_, err := client.FindOpenPRs(context.Background(), repos, noFilters)
+	_, err := client.FindOpenPRs(context.Background(), repos, noFilters, githubclient.PRFetchOptions{})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -535,12 +560,12 @@ func TestFindOpenPRs_EnrichmentIsBatched(t *testing.T) {
 	client := newTestClient(mockgithubclient.MockGitHubClientOptions{PRs: mockPRs})
 	repos := []models.Repository{{Owner: "o", Name: "repo"}}
 
-	prs, err := client.FindOpenPRs(context.Background(), repos, noFilters)
+	result, err := client.FindOpenPRs(context.Background(), repos, noFilters, githubclient.PRFetchOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(prs) != prCount {
-		t.Fatalf("expected %d PRs, got %d", prCount, len(prs))
+	if len(result.PRs) != prCount {
+		t.Fatalf("expected %d PRs, got %d", prCount, len(result.PRs))
 	}
 }
 
@@ -563,10 +588,11 @@ func TestFindOpenPRs_ReviewsPartialErrors(t *testing.T) {
 	})
 
 	repos := []models.Repository{{Owner: "o", Name: "repo"}}
-	prs, err := client.FindOpenPRs(context.Background(), repos, noFilters)
+	result, err := client.FindOpenPRs(context.Background(), repos, noFilters, githubclient.PRFetchOptions{})
 	if err != nil {
 		t.Fatalf("did not expect error, got %v", err)
 	}
+	prs := result.PRs
 	if len(prs) != 2 {
 		t.Fatalf("expected 2 PRs, got %d", len(prs))
 	}
@@ -693,4 +719,168 @@ func slicesEqualIgnoreOrder(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func makePRFixture(number int, draft bool, createdAt, updatedAt time.Time) *github.PullRequest {
+	return &github.PullRequest{
+		Number:    github.Ptr(number),
+		Title:     github.Ptr(fmt.Sprintf("PR %d", number)),
+		Draft:     github.Ptr(draft),
+		CreatedAt: &github.Timestamp{Time: createdAt},
+		UpdatedAt: &github.Timestamp{Time: updatedAt},
+		HTMLURL:   github.Ptr(fmt.Sprintf("https://example.com/r/%d", number)),
+		User:      &github.User{Login: github.Ptr("author")},
+	}
+}
+
+// Numbers run from firstNumber+1 upwards, newest created first.
+func makeOpenPRFixtures(count, firstNumber int) []*github.PullRequest {
+	prs := make([]*github.PullRequest, 0, count)
+	for i := 1; i <= count; i++ {
+		createdAt := time.Now().Add(-time.Duration(i) * time.Hour)
+		prs = append(prs, makePRFixture(firstNumber+i, false, createdAt, createdAt))
+	}
+	return prs
+}
+
+// Numbers run from firstNumber+1 upwards, newest updated first but oldest created first, so a
+// creation-date cap would keep a different set than the update-date cap drafts are capped by.
+func makeDraftPRFixtures(count, firstNumber int) []*github.PullRequest {
+	prs := make([]*github.PullRequest, 0, count)
+	for i := 1; i <= count; i++ {
+		createdAt := time.Now().Add(-time.Duration(count-i) * time.Hour)
+		updatedAt := time.Now().Add(-time.Duration(i) * time.Hour)
+		prs = append(prs, makePRFixture(firstNumber+i, true, createdAt, updatedAt))
+	}
+	return prs
+}
+
+func prNumbers(prs []githubclient.PR) []int {
+	numbers := utilities.Map(prs, func(pr githubclient.PR) int { return pr.GetNumber() })
+	slices.Sort(numbers)
+	return numbers
+}
+
+func TestFindOpenPRs_CapsDraftsAndOpenPRsSeparately(t *testing.T) {
+	const draftFirstNumber = 1000
+
+	tests := []struct {
+		name                   string
+		openPRCount            int
+		draftPRCount           int
+		includeDrafts          bool
+		expectedOpenPRNumbers  []int
+		expectedDraftPRNumbers []int
+		expectedOpenPRsCapped  bool
+		expectedDraftPRsCapped bool
+	}{
+		{
+			name:                  "drafts excluded, open PRs capped at MaxPRsToFetch",
+			openPRCount:           60,
+			draftPRCount:          20,
+			includeDrafts:         false,
+			expectedOpenPRNumbers: rangeOfNumbers(1, githubclient.MaxPRsToFetch),
+			expectedOpenPRsCapped: true,
+		},
+		{
+			name:                   "both buckets over their caps",
+			openPRCount:            60,
+			draftPRCount:           20,
+			includeDrafts:          true,
+			expectedOpenPRNumbers:  rangeOfNumbers(1, githubclient.MaxPRsToFetch),
+			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 10), // MaxDraftPRsToFetch, kept literal on purpose
+			expectedOpenPRsCapped:  true,
+			expectedDraftPRsCapped: true,
+		},
+		{
+			name:                   "only the draft bucket overflows",
+			openPRCount:            3,
+			draftPRCount:           20,
+			includeDrafts:          true,
+			expectedOpenPRNumbers:  rangeOfNumbers(1, 3),
+			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 10), // MaxDraftPRsToFetch, kept literal on purpose
+			expectedDraftPRsCapped: true,
+		},
+		{
+			name:                   "only the open bucket overflows",
+			openPRCount:            60,
+			draftPRCount:           5,
+			includeDrafts:          true,
+			expectedOpenPRNumbers:  rangeOfNumbers(1, githubclient.MaxPRsToFetch),
+			expectedDraftPRNumbers: rangeOfNumbers(draftFirstNumber+1, 5),
+			expectedOpenPRsCapped:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockPRs := slices.Concat(
+				makeOpenPRFixtures(tt.openPRCount, 0),
+				makeDraftPRFixtures(tt.draftPRCount, draftFirstNumber),
+			)
+			client := newTestClient(mockgithubclient.MockGitHubClientOptions{PRs: mockPRs})
+			repos := []models.Repository{{Owner: "o", Name: "repo"}}
+
+			result, err := client.FindOpenPRs(
+				context.Background(),
+				repos,
+				noFilters,
+				githubclient.PRFetchOptions{IncludeDrafts: tt.includeDrafts},
+			)
+			if err != nil {
+				t.Fatalf("FindOpenPRs() returned error: %v", err)
+			}
+
+			openPRs := utilities.Filter(result.PRs, func(pr githubclient.PR) bool { return !pr.GetDraft() })
+			draftPRs := utilities.Filter(result.PRs, func(pr githubclient.PR) bool { return pr.GetDraft() })
+
+			if !slices.Equal(prNumbers(openPRs), tt.expectedOpenPRNumbers) {
+				t.Errorf("expected open PR numbers %v, got %v", tt.expectedOpenPRNumbers, prNumbers(openPRs))
+			}
+			if !slices.Equal(prNumbers(draftPRs), tt.expectedDraftPRNumbers) {
+				t.Errorf("expected draft PR numbers %v, got %v", tt.expectedDraftPRNumbers, prNumbers(draftPRs))
+			}
+			if result.OpenPRsCapped != tt.expectedOpenPRsCapped {
+				t.Errorf("expected OpenPRsCapped %v, got %v", tt.expectedOpenPRsCapped, result.OpenPRsCapped)
+			}
+			if result.DraftPRsCapped != tt.expectedDraftPRsCapped {
+				t.Errorf("expected DraftPRsCapped %v, got %v", tt.expectedDraftPRsCapped, result.DraftPRsCapped)
+			}
+		})
+	}
+}
+
+func rangeOfNumbers(first, count int) []int {
+	numbers := make([]int, 0, count)
+	for i := range count {
+		numbers = append(numbers, first+i)
+	}
+	return numbers
+}
+
+// The activity timestamp the canvas reads is the PR's own update time, carried through
+// enrichment untouched.
+func TestFindOpenPRsCarriesTheUpdateTimeThroughEnrichment(t *testing.T) {
+	createdAt := time.Now().Add(-40 * time.Hour).UTC().Truncate(time.Second)
+	updatedAt := time.Now().Add(-9 * time.Hour).UTC().Truncate(time.Second)
+
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{makePRFixture(7, false, createdAt, updatedAt)},
+	})
+
+	result, err := client.FindOpenPRs(
+		context.Background(),
+		[]models.Repository{{Owner: "o", Name: "repo"}},
+		noFilters,
+		githubclient.PRFetchOptions{},
+	)
+	if err != nil {
+		t.Fatalf("FindOpenPRs() returned error: %v", err)
+	}
+	if len(result.PRs) != 1 {
+		t.Fatalf("expected 1 PR, got %d", len(result.PRs))
+	}
+	if got := result.PRs[0].GetUpdatedAt(); !got.Equal(updatedAt) {
+		t.Errorf("expected UpdatedAt %v, got %v", updatedAt, got)
+	}
 }

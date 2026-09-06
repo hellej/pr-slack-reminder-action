@@ -200,7 +200,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 
 - The migration's regression net, recorded against today's REST output before anything moves. R1-R3 and Steps 5-6 are then checked by the git diff over `testdata/snapshots/`, which must be empty.
 - Nothing in production changes. New `snapshot_test.go` in `package main_test`, reusing `main_test.go`'s fixtures and mocks and driving the full pipeline through `main.Run`.
-- The payload is already plumbed end to end: `SendMessage`/`UpdateMessage` return `SentMessageInfo.JSONBlocks` (`slackclient.go:18`) and `run.go:151` passes them to `state.SaveSentSlackBlocks`, which writes them as indented JSON. Under the mocks the bytes come from `mockslackclient.getJSONBlocks` (`mockslackclient.go:202`), which marshals `message.Blocks.BlockSet` directly. The snapshot therefore pins blocks, not the summary text — that stays on `main_test.go`'s `expectedSummary` assertions (`:702-711`), which Steps 5-6 keep.
+- The payload is already plumbed end to end: `SendMessage`/`UpdateMessage` return `SentMessageInfo.JSONBlocks` (`slackclient.go:18`) and `run.go:151` passes them to `state.SaveSentSlackBlocksToFile`, which writes them as indented JSON. Under the mocks the bytes come from `mockslackclient.getJSONBlocks` (`mockslackclient.go:202`), which marshals `message.Blocks.BlockSet` directly. The snapshot therefore pins blocks, not the summary text — that stays on `main_test.go`'s `expectedSummary` assertions (`:702-711`), which Steps 5-6 keep.
 - The test points `config.EnvSentSlackBlocksFilePath` and `config.EnvStateFilePath` at `t.TempDir()` files — `confighelpers.go:42-43,67-68` defaults both under `/tmp`. The state file keeps the basename `pr-slack-reminder-state.json`: `FetchLatestArtifactByName` matches inside the artifact zip by basename (`fetchartifact.go:95`), and `mockgithubclient.createMockArtifactZip` (`mockgithubclient.go:251`) always writes that name, so any other basename fails update mode with *"json file … not found inside artifact zip"*.
 - Compare the blocks file against `cmd/pr-slack-reminder/testdata/snapshots/<slug>.json`, committed. Case names carry spaces and commas, so the slug is `t.Name()` with every non-alphanumeric run collapsed to `-`. A missing snapshot file fails the case, naming `make update-test-snapshots`.
 - One table with named scenario rows, each row a config + fixture set:
@@ -221,7 +221,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
   `git add -N` first: a first recording writes untracked files, which `git diff` does not show.
 
 - Set `Number`, `Title`, `AuthorLogin`, `AuthorName` and `Labels` on every PR. `getTestPR` (`main_test.go:41`) fills unset fields from `testhelpers.RandomString(10)` / `testhelpers.RandomPositiveInt()`, seeded from `time.Now().UnixNano()` (`testhelpers.go:14,26,33`). Labels never reach the payload, but leaving one field defaulted hides the rule.
-- Every PR in a case gets a **`CreatedAt` that stays distinct after minute rounding** — fixture ages at least a minute apart. `getTestPR` rounds to whole minutes (`ageMinutes = math.Round(AgeHours*60)`), so 0.083 and 0.084 both give 5 minutes. Ties order arbitrarily: `sortPRsOldestToNewest` (`prparser.go:88-96`) falls back to `UpdatedAt`, which the fixtures never set, and `addReviewerInfoToPRs` (`githubclient.go:327-397`) drains a buffered channel in completion order. `getTestPRs` (`main_test.go:96`) gives PR2 and PR3 the same `AgeHours: 3` and cannot be used unmodified. `SomePRItemTextIsEqualTo` (`mockslackclient/models.go:95`) is order-insensitive, which is why today's assertions pass.
+- Every PR in a case gets a **`CreatedAt` that stays distinct after minute rounding** — fixture ages at least a minute apart. `getTestPR` rounds to whole minutes (`ageMinutes = math.Round(AgeHours*60)`), so 0.083 and 0.084 both give 5 minutes. Ties order arbitrarily: `SortPRsOldestToNewest` (`prparser.go:88-96`) falls back to `UpdatedAt`, which the fixtures never set, and `addReviewerInfoToPRs` (`githubclient.go:327-397`) drains a buffered channel in completion order. `getTestPRs` (`main_test.go:96`) gives PR2 and PR3 the same `AgeHours: 3` and cannot be used unmodified. `SomePRItemTextIsEqualTo` (`mockslackclient/models.go:95`) is order-insensitive, which is why today's assertions pass.
 - Ages are not frozen: `GetPRAgeText` (`prparser.go:37-49`) and `isOlderThan` (`prparser.go:98-106`) read `time.Now()`, not `main_test.go:39`'s fixed `now`, so every rendered age grows with wall time. Keep ages clear of:
   - the branch's `math.Round` half-boundary — 30 s of headroom in minutes, 30 min in hours, up to 12 h in days at a bucket midpoint. Prefer hours and days.
   - the branch edges at 1 h and 24 h, from below: an age in [23.5 h, 24 h) renders "24 hours" now and "1 days" later.
@@ -240,7 +240,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 - Inside `githubclient`, five more places drop the go-github wrappers: `githubclient.go:304` and `githubclient.go:351,358,365` (`*pr.Number` → `pr.GetNumber()`), `githubclient.go:317-320` (`capPRsToLimit` loses the `.Time` reaches; sort semantics unchanged), `models.go:72` (`r.pr.GetUser().GetLogin()` → `r.pr.Author.Login`) and `models.go:94` (`newCollaboratorFromUser(r.pr.GetUser())` → `r.pr.Author`).
 - `includePR` (`prfilter.go:11`) retypes in the same step: `githubclient.go:240` passes `result.pr` to it, so leaving it on `*github.PullRequest` breaks the package. It takes `*PullRequest` and reads `Labels []string` and `Author.Login` instead of `[]*github.Label` and `GetUser().GetLogin()`.
 - No new `prfilter_test.go`. `main_test.go` already covers `includePR` end to end and Step 5 keeps every case: labels inclusion (`:355`) and exclusion (`:362`), `authors` (`:380`), `ignored-authors` (`:369`, `:387`), repository-scoped filters (`:414`, `:432`, `:450`). `IgnoredTerms` is covered only by `githubclient_test.go:458-490`, which survives Step 5 as a fixture change.
-- `prparser.go:90,91,93` — `sortPRsOldestToNewest`'s `GetCreatedAt().Time` / `GetUpdatedAt().Time` reaches lose the `.Time` too. `prparser.go:102,105` compile either way, since go-github's `Timestamp` embeds `time.Time`.
+- `prparser.go:90,91,93` — `SortPRsOldestToNewest`'s `GetCreatedAt().Time` / `GetUpdatedAt().Time` reaches lose the `.Time` too. `prparser.go:102,105` compile either way, since go-github's `Timestamp` embeds `time.Time`.
 - `messagecontent` and `messagebuilder` compile unchanged — they only call getters.
 - Test files that construct `githubclient.PR` directly move to the new type: `internal/prparser/prparser_test.go`, `internal/state/state_test.go`, `internal/messagebuilder/messagebuilder_test.go`. Their fixtures get shorter, since they stop needing `github.Ptr` for every field.
 - Fixtures that feed the REST service mocks stay on go-github types: `cmd/pr-slack-reminder/main_test.go`'s `getTestPR` and every `*github.*` field on `testhelpers/mockgithubclient`'s `MockGitHubClientOptions`. Those types are the mock's input format and survive the migration (Steps 5-6 render them into GraphQL JSON); go-github stays in `go.mod` for the artifact path regardless.
@@ -350,7 +350,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 
 ### 4. Phase 2: enrich the capped set (`graphqlfetch.go`, `graphqlfetch_test.go`)
 
-- `enrichPRs(ctx, []PRResult) ([]PR, error)` runs after filtering and capping, so it only ever covers PRs that will be shown. It returns PRs in input order, which is deterministic and matches `capPRsToLimit`'s, replacing today's arbitrary completion order. A test row asserts it.
+- `enrichPRsWithReviewInfo(ctx, []PRResult) ([]PR, error)` runs after filtering and capping, so it only ever covers PRs that will be shown. It returns PRs in input order, which is deterministic and matches `capPRsToLimit`'s, replacing today's arbitrary completion order. A test row asserts it.
 - Batches of 25 aliases, one request each, batches issued concurrently at `DefaultGitHubAPIConcurrencyLimit` (3), each with `ReviewsFetchTimeout` (10s, unchanged — 25 aliases measured ~2 s):
 
   ```graphql
@@ -379,7 +379,7 @@ Under a rule that treats "deeper than an alias" as field-level, both would be lo
 
 ### 5. `FindOpenPRs` on GraphQL (`githubclient.go`, `githubclient_test.go`, `fetchartifact_test.go`, `testhelpers/mockgithubclient/mockgithubclient.go`, `cmd/pr-slack-reminder/main_test.go`)
 
-- Same shape as today: `listOpenPRs` → `includePR` filter → `capPRsToLimit` → `enrichPRs` (which runs `deriveReviewers`) → `excludeSnoozedPRs`. Only the two fetch calls change.
+- Same shape as today: `listOpenPRs` → `includePR` filter → `capPRsToLimit` → `enrichPRsWithReviewInfo` (which runs `deriveReviewers`) → `excludeSnoozedPRs`. Only the two fetch calls change.
 - `capPRsToLimit`'s semantics are unchanged — newest by creation date, then update date; its body already changed in R1. `logFoundPRs` keeps its output.
 - The errgroup fan-out over repositories disappears — phase 1 is one request. `DefaultGitHubAPIConcurrencyLimit` now bounds phase 2's batches instead. `TestFindOpenPRs_ConcurrencyLimit` (`githubclient_test.go:811-866`) loses its subject: `MaxPRsToFetch` 50 at 25 per batch is at most 2 batches, so a limit of 3 never binds. It becomes `TestFindOpenPRs_EnrichmentIsBatched`; its `repoCount` setup becomes a PR count spanning two batches, and its one assertion — `len(prs) != repoCount` (`:863`) — becomes that count.
 - `testhelpers/mockgithubclient` changes in this step, not later, because `main_test.go` runs the whole pipeline. It gains a renderer, `NewGraphQLTransport(opts)`, that turns `PRs`, `PRsByRepo`, `ReviewsByPRNumber` and `TimelineCommentsByPRNumber` into phase-1 and phase-2 JSON. Field names, types and meaning are unchanged, so those cases need no rewriting. Step 1's `UnusedGraphQLTransport` stays beside it for `fetchartifact_test.go`, which must not reach GraphQL at all.
@@ -461,13 +461,12 @@ Only after Step 7 is green.
 ### 9. Docs and spec sync (`githubclient.spec.md`, `prparser.spec.md`, `messagebuilder.spec.md`, `README.md`)
 
 - `githubclient.spec.md`: two-phase GraphQL fetch, the new per-PR caps (100 reviews, 100 timeline comments, review comments no longer fetched, so the "100 PR comments" cap is gone), the 100-label page, the four error classes, the collaborator mapper's null/bot/other-type handling, bot login normalization, the raised `PullRequestListTimeout`, the transport retry, and that the artifact path remains REST. The "throttled to 3 concurrent calls" line now describes phase-2 batches.
-- `prparser.spec.md` and `messagebuilder.spec.md`: author and reviewer rendering now shows display names where available, login otherwise.
+- `messagebuilder.spec.md`: author and reviewer rendering now shows display names where available, login otherwise. `prparser.spec.md` gets no such bullet: it only attaches Slack IDs keyed by login, so the name resolution belongs to `githubclient.spec.md` and the rendering to `messagebuilder.spec.md`.
 - README: note in the permissions section that PR data is read via the GraphQL API and that the permissions are unchanged. `README.md:216`'s trailing comment — `pull-requests: read # listing/fetching PRs, reviews and review comments` — drops the review comments. `README.md:217` (`issues: read # reading PR comments (incl. /snooze comments)`) is unchanged: GraphQL reads the same timeline through `pullRequest.comments`, and no doc establishes that `pull-requests: read` alone covers it (see "Target shape"). Release notes call out that reviewer names, and unmapped author names, start rendering as GitHub display names instead of logins.
 - No `action.yml` change, so `go run .github/scripts/check_inputs.go` is unaffected.
 - Done, 2026-08-17. Beyond the listed items, the sync added bullets the migrated code made visible: per-call timeouts, the unpaginated first-100 open PRs per repository, an enrichment failure also losing that PR's snooze, `PENDING` reviews contributing no reviewer, an approval never being cancelled by a later `CHANGES_REQUESTED`, and the non-closed state fallback.
 - A review pass over the written specs then fixed inaccuracies they inherited: the filters bullet claimed a term allow-list that `config.Filters` never had, `GetPRs`'s failure scoping ignored field errors, the zero-timestamp old-PR bullet ignored the threshold-0 guard, and `messagebuilder.spec.md` called truncation silent while the code logs it.
-- Deviation: `prparser.spec.md` got no display-name bullet after all. It only attaches Slack IDs keyed by login; the name resolution belongs to `githubclient.spec.md` and the rendering to `messagebuilder.spec.md`, where both now sit.
-- Deviation: `README.md`'s example screenshot (`docs/examples/example_1.png`) still shows reviewer logins, which now render as display names. Not re-recorded.
+- `README.md`'s example screenshot (`docs/examples/example_1.png`) keeps showing reviewer logins, which now render as display names. Not re-recorded.
 
 ## Consequences
 
@@ -482,11 +481,14 @@ Only after Step 7 is green.
 
 ### Negative
 
-- The fetch path's entire test suite is rewritten. Still the change's main cost, but no longer its main risk: R0's snapshots hold the rendered payload fixed across the rewrite, so what is left rests on the mock fixtures' fidelity rather than on the rewrite.
 - Failures arrive as HTTP 200 with an `errors` array, so error handling is more code than checking a status code, and getting it wrong fails silently rather than loudly.
-- The query-size ceiling that forces batching is undocumented, so the 25-alias batch size rests on measurement that could drift.
 - Phase 1 is one request covering all repositories: its transport failures lose the repository from the error message, and one slow response (8-11 s measured across 30) delays all of them.
 - `githubclient` runs two clients against two APIs, which is more surface than either alone.
+
+### Caveats
+
+- The fetch path's entire test suite is rewritten. Still the change's main cost, but no longer its main risk: R0's snapshots hold the rendered payload fixed across the rewrite, so what is left rests on the mock fixtures' fidelity rather than on the rewrite.
+- The query-size ceiling that forces batching is undocumented, so the 25-alias batch size rests on measurement that could drift.
 
 ### Neutral
 

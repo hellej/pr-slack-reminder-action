@@ -61,6 +61,13 @@ Don't stack hedges:
 - Update a package's spec file whenever its behaviour changes, in the same change
 - A `git commit` with staged `internal/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
 
+## Third-party Facts
+
+- [docs/third-party-facts.md](docs/third-party-facts.md) records what past work confirmed about external APIs and libraries, each entry with its source
+- Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
+- Add to it whenever you confirm such a fact, or rule an approach out
+- Cite the source an entry names, never the entry
+
 ## Git
 
 - Never amend commits or force push
@@ -76,11 +83,13 @@ Don't stack hedges:
 - **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
+- **Keep exported type names exported:** Don't unexport a type just to shrink a package's API surface. Unexporting renames it, and lowercase type names read worse here. Funcs and consts are fine to unexport.
 
 ## Testing
 
 - **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
 - Use table-driven tests for functions with multiple input scenarios
+- Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go` — integration tests using full pipeline with mocks
 - `testhelpers/confighelpers.go` — `TestConfig` struct and `SetTestEnvironment()` for consistent test setup
@@ -90,7 +99,7 @@ Don't stack hedges:
 
 - `make test` — run all tests
 - `make test-with-coverage` — run tests with coverage report (clears cache first)
-- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/`
+- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
 - `make check-fmt` — fail if any file needs `gofmt`

@@ -22,7 +22,8 @@ type TestConfig struct {
 	// RepositoryFilters as a JSON string
 	// e.g. "test-repo: {\"labels\": [\"feature\", \"fix\"]}; test-repo2: {\"ignored-authors\": [\"alice\"]}"
 	RepositoryFiltersRaw string
-	GroupByRepository    bool
+	// The canvas link as given, which config parses into PRTrackerCanvasID
+	PRTrackerCanvasLink string
 }
 
 func GetDefaultConfigFull() TestConfig {
@@ -92,7 +93,8 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
 	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
 	setInputEnv(t, overrides, config.InputRepositoryFilters, c.RepositoryFiltersRaw)
-	setInputEnv(t, overrides, config.InputGroupByRepository, c.GroupByRepository)
+	setInputEnv(t, overrides, config.InputGroupByRepository, c.Config.ContentInputs.GroupByRepository)
+	setInputEnv(t, overrides, config.InputPRTrackerCanvasLink, c.PRTrackerCanvasLink)
 }
 
 func setEnv(t *testing.T, overrides *map[string]any, envName string, value any) {
@@ -124,8 +126,6 @@ func getValueAsString(
 	}
 
 	switch v := value.(type) {
-	case *map[string]string:
-		strValue = mappingAsString(v)
 	case map[string]string:
 		strValue = mappingAsString(&v)
 	case string:
@@ -134,12 +134,6 @@ func getValueAsString(
 		strValue = listAsString(v)
 	case int:
 		strValue = strconv.Itoa(v)
-	case *int:
-		if v == nil {
-			empty := ""
-			return &empty
-		}
-		strValue = strconv.Itoa(*v)
 	case bool:
 		strValue = strconv.FormatBool(v)
 	case config.RunMode:

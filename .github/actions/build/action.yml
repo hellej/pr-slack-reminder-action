@@ -2,10 +2,6 @@ name: 'Build Application'
 description: 'Build the Go application for all platforms and commit built binary'
 
 inputs:
-  target:
-    description: 'Build target (all, linux-amd64, etc.)'
-    required: false
-    default: 'all'
   commit-binary:
     description: 'Whether to commit the built binary to git'
     required: false
@@ -21,12 +17,7 @@ runs:
 
     - name: Build application
       shell: bash
-      run: |
-        if [ "${{ inputs.target }}" = "all" ]; then
-          make build
-        else
-          make build-${{ inputs.target }}
-        fi
+      run: make build
 
     - name: Configure Git
       if: inputs.commit-binary == 'true'

@@ -53,7 +53,7 @@ func createTestState() State {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
 		},
 	}
 }
@@ -62,7 +62,7 @@ func createTestPR(number int, owner, repo string) prparser.PR {
 	return prparser.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{Number: number},
-			Repository:  models.NewRepository(owner, repo),
+			Repository:  models.Repository{Owner: owner, Name: repo},
 		},
 	}
 }
@@ -79,9 +79,9 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 2},
-			{Repository: models.NewRepository("owner2", "repo2"), Number: 5},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 2},
+			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 5},
 		},
 	}
 
@@ -156,50 +156,7 @@ func TestLoadInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestStateValidateSchemaVersionMismatch(t *testing.T) {
-	state := State{
-		SchemaVersion: CurrentSchemaVersion + 1, // Wrong version
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
-			ChannelID: "C123456789",
-			MessageTS: "1729123456.123456",
-		},
-		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-		},
-	}
-
-	err := state.Validate()
-	if err == nil {
-		t.Fatal("Expected validation error for schema version mismatch, got nil")
-	}
-
-	expectedMsg := "unsupported schema version"
-	if !strings.Contains(err.Error(), expectedMsg) {
-		t.Errorf("Expected error message to contain %q, got: %v", expectedMsg, err)
-	}
-}
-
-func TestStateValidateValidState(t *testing.T) {
-	state := State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
-			ChannelID: "C123456789",
-			MessageTS: "1729123456.123456",
-		},
-		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-		},
-	}
-
-	err := state.Validate()
-	if err != nil {
-		t.Errorf("Expected valid state to pass validation, got error: %v", err)
-	}
-}
-
-func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
+func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "sent-blocks.json")
 
@@ -208,9 +165,9 @@ func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
 		`{"type":"rich_text","block_id":"open_prs","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err != nil {
-		t.Fatalf("SaveSentSlackBlocks failed: %v", err)
+		t.Fatalf("SaveSentSlackBlocksToFile failed: %v", err)
 	}
 
 	fileContent, err := os.ReadFile(filePath)
@@ -244,13 +201,13 @@ func TestSaveSentSlackBlocksProperJSON(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksEmptySlice(t *testing.T) {
+func TestSaveSentSlackBlocksToFileEmptySlice(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "empty-blocks.json")
 
-	err := SaveSentSlackBlocks(filePath, []string{})
+	err := SaveSentSlackBlocksToFile(filePath, []string{})
 	if err != nil {
-		t.Fatalf("SaveSentSlackBlocks failed with empty slice: %v", err)
+		t.Fatalf("SaveSentSlackBlocksToFile failed with empty slice: %v", err)
 	}
 
 	fileContent, err := os.ReadFile(filePath)
@@ -269,7 +226,7 @@ func TestSaveSentSlackBlocksEmptySlice(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksInvalidJSON(t *testing.T) {
+func TestSaveSentSlackBlocksToFileInvalidJSON(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "invalid-blocks.json")
 
@@ -277,7 +234,7 @@ func TestSaveSentSlackBlocksInvalidJSON(t *testing.T) {
 		`{"type":"rich_text",`, // Incomplete JSON
 	}
 
-	err := SaveSentSlackBlocks(filePath, invalidJSON)
+	err := SaveSentSlackBlocksToFile(filePath, invalidJSON)
 	if err == nil {
 		t.Fatal("Expected error when saving invalid JSON, got nil")
 	}
@@ -302,14 +259,14 @@ func TestSaveDirectoryCreationFailure(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksDirectoryCreationFailure(t *testing.T) {
+func TestSaveSentSlackBlocksToFileDirectoryCreationFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "nested", "blocks.json")
 	slackBlocksJSON := []string{
 		`{"type":"rich_text","block_id":"test"}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
 		t.Fatal("Expected error when creating directory in read-only parent, got nil")
 	}
@@ -334,14 +291,14 @@ func TestSaveFileWriteFailure(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksFileWriteFailure(t *testing.T) {
+func TestSaveSentSlackBlocksToFileFileWriteFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "blocks.json")
 	slackBlocksJSON := []string{
 		`{"type":"rich_text","block_id":"test"}`,
 	}
 
-	err := SaveSentSlackBlocks(filePath, slackBlocksJSON)
+	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
 		t.Fatal("Expected error when writing to read-only directory, got nil")
 	}
@@ -382,13 +339,13 @@ func TestLoadSuccessful(t *testing.T) {
 			MessageTS: "1729123456.123456",
 		},
 		PullRequests: []models.PullRequestRef{
-			{Repository: models.NewRepository("owner1", "repo1"), Number: 1},
-			{Repository: models.NewRepository("owner2", "repo2"), Number: 42},
+			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
+			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 42},
 		},
 	}
 
 	mockFetcher := &mockStateArtifactFetcher{state: expectedState}
-	repository := models.NewRepository("owner1", "repo1")
+	repository := models.Repository{Owner: "owner1", Name: "repo1"}
 
 	loadedState, err := Load(context.Background(), mockFetcher, repository, "test-artifact", "state.json")
 	if err != nil {
@@ -411,7 +368,7 @@ func TestLoadSuccessful(t *testing.T) {
 func TestLoadFetchError(t *testing.T) {
 	expectedError := errors.New("artifact fetch failed")
 	mockFetcher := &mockStateArtifactFetcher{fetchError: expectedError}
-	repository := models.NewRepository("owner1", "repo1")
+	repository := models.Repository{Owner: "owner1", Name: "repo1"}
 
 	_, err := Load(context.Background(), mockFetcher, repository, "test-artifact", "state.json")
 	if err == nil {
@@ -423,7 +380,7 @@ func TestLoadFetchError(t *testing.T) {
 	}
 }
 
-func TestSavePostStateSuccessful(t *testing.T) {
+func TestNewPostStateSaveAndLoad(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "post-state.json")
 
@@ -437,9 +394,8 @@ func TestSavePostStateSuccessful(t *testing.T) {
 		Timestamp: "1729123456.123456",
 	}
 
-	err := SavePostState(statePath, parsedPRs, messageInfo)
-	if err != nil {
-		t.Fatalf("SavePostState failed: %v", err)
+	if err := Save(statePath, NewPostState(parsedPRs, messageInfo)); err != nil {
+		t.Fatalf("Save failed: %v", err)
 	}
 
 	loadedState, err := LoadFromFile(statePath)
@@ -449,6 +405,10 @@ func TestSavePostStateSuccessful(t *testing.T) {
 
 	if loadedState.SchemaVersion != CurrentSchemaVersion {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, CurrentSchemaVersion)
+	}
+
+	if loadedState.CreatedAt.IsZero() {
+		t.Error("Expected CreatedAt to be stamped")
 	}
 
 	if loadedState.SlackMessage.ChannelID != messageInfo.ChannelID {
@@ -475,26 +435,6 @@ func TestSavePostStateSuccessful(t *testing.T) {
 		if pr.Number != 42 || pr.Repository.Owner != "owner2" || pr.Repository.Name != "repo2" {
 			t.Errorf("PR 1 mismatch: got %+v", pr)
 		}
-	}
-}
-
-func TestSavePostStateWriteFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	statePath := filepath.Join(readOnlyDir, "post-state.json")
-	parsedPRs := []prparser.PR{createTestPR(1, "owner1", "repo1")}
-
-	messageInfo := slackclient.SentMessageInfo{
-		ChannelID: "C123456789",
-		Timestamp: "1729123456.123456",
-	}
-
-	err := SavePostState(statePath, parsedPRs, messageInfo)
-	if err == nil {
-		t.Fatal("Expected error when writing to read-only directory, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to save state") {
-		t.Errorf("Expected save state error, got: %v", err)
 	}
 }
 

@@ -16,10 +16,15 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 ## Mandatory Implementation Steps
 
 1. Write a failing test for the change; run it and confirm it fails for the expected reason
+   - Exception: when a snapshot or golden file already covers the change's visible effect, that
+     file is the test. Change the code, read the failing diff to confirm it is what you meant,
+     then re-record. Add a separate assertion only for a mutant that fails it but passes the
+     goldens
 2. Implement the minimal code to make it pass
 3. Run `make test`; refactor if needed
 4. Update the package's `.spec.md` in the same change if behaviour changed (use [spec-writer skill](../spec-writer/SKILL.md))
 5. If you knowingly leave a rough edge, because the fix would need significant complexity for a rare case, add it to that spec's **Oddities** section instead of leaving it undocumented
+6. Last, re-read the prose you wrote: `git diff -- '*.md'` and the changed comments. Apply AGENTS.md § Output Style and see if anything can be clearer or cut
 
 ## Implementing a Plan
 

@@ -16,13 +16,10 @@ type MockSlackClientOptions struct {
 	PostMessageError   error
 	UpdateMessageError error
 	DeleteMessageError error
+	ReplaceCanvasError error
 }
 
-// creates the MockSlackAPI (for dependency injection) if nil is provided
 func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclient.Client {
-	if slackAPI == nil {
-		slackAPI = GetMockSlackAPI(MockSlackClientOptions{})
-	}
 	return func(token string) slackclient.Client {
 		return slackAPI
 	}
@@ -51,6 +48,7 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		postMessageError:   opts.PostMessageError,
 		updateMessageError: opts.UpdateMessageError,
 		deleteMessageError: opts.DeleteMessageError,
+		replaceCanvasError: opts.ReplaceCanvasError,
 		postMessageResponse: PostMessageResponse{
 			Timestamp: "1234567890.123456",
 			Channel:   "C12345678",
@@ -64,10 +62,12 @@ type MockSlackAPI struct {
 	postMessageError    error
 	updateMessageError  error
 	deleteMessageError  error
+	replaceCanvasError  error
 	postMessageResponse PostMessageResponse
 	SentMessage         SentMessage
 	UpdatedMessage      UpdatedMessage
 	DeletedMessage      DeletedMessage
+	ReplacedCanvas      ReplacedCanvas
 }
 
 func (m *MockSlackAPI) GetChannelIDByName(channelName string) (string, error) {
@@ -159,6 +159,17 @@ func (m *MockSlackAPI) DeleteMessage(channelID string, timestamp string) error {
 	return nil
 }
 
+func (m *MockSlackAPI) ReplaceCanvasContent(canvasID string, markdown string) error {
+	// Always record the attempt, even if it fails
+	m.ReplacedCanvas.Called = true
+	m.ReplacedCanvas.CanvasID = canvasID
+	m.ReplacedCanvas.Markdown = markdown
+	if m.replaceCanvasError != nil {
+		return fmt.Errorf("canvas update failed: %v", m.replaceCanvasError)
+	}
+	return nil
+}
+
 type SlackChannel struct {
 	ID   string
 	Name string
@@ -188,6 +199,13 @@ type DeletedMessage struct {
 	Timestamp string
 }
 
+type ReplacedCanvas struct {
+	// Called tells "never attempted" apart from "attempted with empty content"
+	Called   bool
+	CanvasID string
+	Markdown string
+}
+
 func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
 	blockBytes, err := json.Marshal(message.Blocks.BlockSet)
 	if err != nil {
@@ -196,7 +214,7 @@ func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
 	if len(blockBytes) == 0 {
 		return BlocksWrapper{}, nil
 	}
-	return ParseBlocks(blockBytes)
+	return parseBlocks(blockBytes)
 }
 
 func getJSONBlocks(message slack.Message) []string {

@@ -1,4 +1,4 @@
-// Package utilities provides helper functions for parsing GitHub Action inputs
+// Package inputhelpers provides helper functions for parsing GitHub Action inputs
 // from environment variables. It handles input name conversion, type parsing,
 // and structured data extraction from string inputs.
 package inputhelpers
@@ -131,13 +131,4 @@ func GetInputMapping(inputName string) (map[string]string, error) {
 	}
 
 	return mapping, nil
-}
-
-func removeLeadingAndTrailingQuotes(s string) string {
-	if len(s) >= 2 {
-		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
-			return s[1 : len(s)-1]
-		}
-	}
-	return s
 }

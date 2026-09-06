@@ -1,6 +1,7 @@
 // Package config handles GitHub Action input parsing and validation.
 // It converts environment variables to structured configuration with
-// support for repository-specific filters, user mappings, and content settings.
+// support for the run mode, repository-specific filters, user mappings,
+// content settings, and the PR tracker canvas link.
 package config
 
 import (
@@ -36,6 +37,7 @@ const (
 	InputNoPRsMessage                string = "no-prs-message"
 	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
 	InputGroupByRepository           string = "group-by-repository"
+	InputPRTrackerCanvasLink         string = "pr-tracker-canvas-link"
 
 	MaxRepositories int = 30
 
@@ -63,6 +65,12 @@ type Config struct {
 	GlobalFilters     Filters
 	RepositoryFilters map[string]Filters
 	ContentInputs     ContentInputs
+
+	PRTrackerCanvasID string
+}
+
+func (c Config) CanvasEnabled() bool {
+	return c.PRTrackerCanvasID != ""
 }
 
 type ContentInputs struct {
@@ -113,9 +121,11 @@ func GetConfig() (Config, error) {
 	noPRsMessage := inputhelpers.GetInput(InputNoPRsMessage)
 	oldPRsThresholdHours, err9 := inputhelpers.GetInputInt(InputOldPRThresholdHours)
 	groupByRepository, err10 := inputhelpers.GetInputBool(InputGroupByRepository)
+	prTrackerCanvasURL := inputhelpers.GetInput(InputPRTrackerCanvasLink)
+	prTrackerCanvasID, err11 := getCanvasIDFromLink(prTrackerCanvasURL)
 
 	if err := errors.Join(
-		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10,
+		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10, err11,
 	); err != nil {
 		return Config{}, err
 	}
@@ -152,6 +162,7 @@ func GetConfig() (Config, error) {
 			OldPRThresholdHours:         oldPRsThresholdHours,
 			GroupByRepository:           groupByRepository,
 		},
+		PRTrackerCanvasID: prTrackerCanvasID,
 	}
 
 	if err := config.validate(); err != nil {

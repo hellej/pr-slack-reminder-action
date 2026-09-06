@@ -1,18 +1,23 @@
 // Package prparser enriches raw GitHub PR data with additional metadata
-// for message display. It handles Slack user ID mapping, age calculation,
-// and sorting of PRs for presentation.
+// for message and canvas display. It handles Slack user ID mapping, age and
+// activity calculation, sorting, and grouping by repository. It also renders
+// the reviewer, activity and merged-time texts a PR row shows.
 package prparser
 
 import (
-	"fmt"
-	"math"
+	"maps"
 	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
+
+// A PR counts as recently updated until its last activity is this old. GetActivityText flips
+// its wording at the same boundary.
+const RecentActivityThreshold = 24 * time.Hour
 
 type PR struct {
 	*githubclient.PR
@@ -35,17 +40,14 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 }
 
 func (pr PR) GetPRAgeText() string {
-	duration := time.Since(pr.GetCreatedAt())
-	if duration.Hours() >= 24 {
-		days := int(math.Round(duration.Hours())) / 24
-		return fmt.Sprintf("%d days", days)
-	} else if duration.Hours() >= 1 {
-		hours := int(math.Round(duration.Hours()))
-		return fmt.Sprintf("%d hours", hours)
-	} else {
-		minutes := int(math.Round(duration.Minutes()))
-		return fmt.Sprintf("%d minutes", minutes)
-	}
+	return durationText(time.Since(pr.GetCreatedAt()))
+}
+
+// True when the PR saw activity less than RecentActivityThreshold ago. A PR with unknown
+// activity, a zero update time, is not recently updated.
+func (pr PR) IsRecentlyUpdated() bool {
+	updatedAt := pr.GetUpdatedAt()
+	return !updatedAt.IsZero() && time.Since(updatedAt) < RecentActivityThreshold
 }
 
 func (pr PR) IsMerged() bool {
@@ -57,7 +59,7 @@ func (pr PR) IsClosedButNotMerged() bool {
 }
 
 func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return sortPRsOldestToNewest(utilities.Map(prs, getPRParser(config)))
+	return utilities.Map(prs, getPRParser(config))
 }
 
 func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {
@@ -85,7 +87,78 @@ func withSlackUserIds(
 	})
 }
 
-func sortPRsOldestToNewest(prs []PR) []PR {
+type RepositoryPRs struct {
+	Repository models.Repository
+	PRs        []PR
+}
+
+// Buckets PRs by repository, ordered alphabetically by repository path. PRs keep their given
+// order within a bucket.
+func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
+	buckets := bucketPRsByRepository(prs)
+	return buckets.groupsForPaths(slices.Sorted(maps.Keys(buckets.repositoryByPath)))
+}
+
+// Buckets PRs by repository, ordered by each repository's first PR in the given list. PRs keep
+// their given order within a bucket, so an already-sorted list decides both orders.
+func GroupPRsByRepositoriesInGivenOrder(prs []PR) []RepositoryPRs {
+	buckets := bucketPRsByRepository(prs)
+	pathsInGivenOrder := utilities.UniqueFunc(
+		utilities.Map(prs, func(pr PR) string { return pr.Repository.GetPath() }),
+		func(a, b string) bool { return a == b },
+	)
+	return buckets.groupsForPaths(pathsInGivenOrder)
+}
+
+type repositoryBuckets struct {
+	repositoryByPath    map[string]models.Repository
+	prsByRepositoryPath map[string][]PR
+}
+
+func bucketPRsByRepository(prs []PR) repositoryBuckets {
+	buckets := repositoryBuckets{
+		repositoryByPath:    make(map[string]models.Repository),
+		prsByRepositoryPath: make(map[string][]PR),
+	}
+	for _, pr := range prs {
+		path := pr.Repository.GetPath()
+		buckets.repositoryByPath[path] = pr.Repository
+		buckets.prsByRepositoryPath[path] = append(buckets.prsByRepositoryPath[path], pr)
+	}
+	return buckets
+}
+
+func (buckets repositoryBuckets) groupsForPaths(paths []string) []RepositoryPRs {
+	return utilities.Map(paths, func(path string) RepositoryPRs {
+		return RepositoryPRs{
+			Repository: buckets.repositoryByPath[path],
+			PRs:        buckets.prsByRepositoryPath[path],
+		}
+	})
+}
+
+// SortPRsNewestFirst returns the PRs ordered by the given timestamp, newest first. PRs whose
+// timestamp is nil are unknown rather than old, so they sort last, keeping their given order
+// among themselves. The given slice is left untouched.
+func SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR {
+	sorted := slices.Clone(prs)
+	slices.SortStableFunc(sorted, func(a, b PR) int {
+		timestampA, timestampB := timestamp(a), timestamp(b)
+		if timestampA == nil && timestampB == nil {
+			return 0
+		}
+		if timestampA == nil {
+			return 1
+		}
+		if timestampB == nil {
+			return -1
+		}
+		return timestampB.Compare(*timestampA)
+	})
+	return sorted
+}
+
+func SortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
 		if !a.GetCreatedAt().Equal(b.GetCreatedAt()) {
 			return a.GetCreatedAt().Compare(b.GetCreatedAt())

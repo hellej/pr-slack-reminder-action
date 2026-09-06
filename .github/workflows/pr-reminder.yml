@@ -25,6 +25,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
+  cancel-in-progress: false
+
 jobs:
   reminder:
     runs-on: ubuntu-latest
@@ -48,6 +52,7 @@ jobs:
           github-user-slack-user-id-mapping: |
             hellej: U08SZJTJF0U
             bob: U08EVPGNWER
+          pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BPS4FKCEL
       
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:

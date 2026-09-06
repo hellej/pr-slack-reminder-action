@@ -1,0 +1,142 @@
+// Package canvascontent structures parsed PRs into the three sections a PR tracker canvas
+// shows: open PRs, work-in-progress (draft) PRs and recently merged PRs. It carries no
+// rendering, that belongs to canvasbuilder.
+package canvascontent
+
+import (
+	"log"
+	"time"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
+)
+
+// Drafts untouched for longer than this are left off the canvas.
+const MaxDraftPRInactivity = 60 * 24 * time.Hour
+
+// How many drafts without recent activity the WIP section shows. Recently touched drafts are
+// the point of the section, older ones only need a sample.
+const MaxInactiveWIPPRs = 5
+
+type Content struct {
+	OpenPRs                      []prparser.PR
+	OpenPRsGroupedByRepository   []prparser.RepositoryPRs
+	GroupedByRepository          bool
+	WIPPRs                       []prparser.PR
+	WIPPRsGroupedByRepository    []prparser.RepositoryPRs
+	MergedPRs                    []prparser.PR
+	MergedPRsGroupedByRepository []prparser.RepositoryPRs
+	OpenPRsCapped                bool
+	WIPPRsCapped                 bool
+	MergedPRsUnavailable         bool
+	GeneratedAt                  time.Time
+}
+
+type GetContentOptions struct {
+	// Reported by the fetch, never derived from how many PRs reach the canvas.
+	OpenPRsCapped bool
+	WIPPRsCapped  bool
+	// Set when the merged PR fetch failed, so the section can say so instead of claiming
+	// that nothing was merged.
+	MergedPRsUnavailable bool
+	// The moment the canvas is generated: shown in the footer and used as "now" when
+	// pruning inactive drafts.
+	GeneratedAt time.Time
+}
+
+// GetContent splits the given PRs into an open section and a work-in-progress section, and takes
+// the merged section from its own list. Open PRs keep their given order (oldest first); WIP PRs
+// are ordered most recent activity first, with long-inactive ones dropped and the rest of the
+// drafts without recent activity capped at MaxInactiveWIPPRs; merged PRs are ordered
+// newest merge first. Each section is bucketed by repository when configured, in that same order.
+func GetContent(
+	prs []prparser.PR,
+	mergedPRs []prparser.PR,
+	contentInputs config.ContentInputs,
+	options GetContentOptions,
+) Content {
+	sortedOpenPRs := prparser.SortPRsOldestToNewest(utilities.Filter(prs, isOpen))
+	activeDrafts := utilities.Filter(
+		utilities.Filter(prs, isDraft),
+		isActiveEnoughForCanvas(options.GeneratedAt),
+	)
+	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, lastActivityAt)
+	wipPRs := withInactiveDraftsCapped(sortedActiveDraftPRs, options.GeneratedAt)
+	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
+		return pr.GetMergedAt()
+	})
+
+	log.Printf(
+		"Putting %d open pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas, "+
+			"leaving out %d inactive work-in-progress pull requests",
+		len(sortedOpenPRs), len(wipPRs), len(sortedMergedPRs),
+		len(sortedActiveDraftPRs)-len(wipPRs),
+	)
+
+	content := Content{
+		GroupedByRepository:  contentInputs.GroupByRepository,
+		OpenPRsCapped:        options.OpenPRsCapped,
+		WIPPRsCapped:         options.WIPPRsCapped,
+		MergedPRsUnavailable: options.MergedPRsUnavailable,
+		GeneratedAt:          options.GeneratedAt,
+	}
+
+	// Each list is already in its section's order, so bucketing it in that order puts the
+	// repository holding the section's leading PR first.
+	if contentInputs.GroupByRepository {
+		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedOpenPRs)
+		content.WIPPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
+		content.MergedPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
+		return content
+	}
+	content.OpenPRs = sortedOpenPRs
+	content.WIPPRs = wipPRs
+	content.MergedPRs = sortedMergedPRs
+	return content
+}
+
+// Keeps every recently active draft and the MaxInactiveWIPPRs most recently active inactive
+// ones. The given list is sorted most recent activity first, so the drop hits the least
+// recently touched drafts.
+func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
+	inactiveKept := 0
+	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
+		if !isInactive(pr, generatedAt) {
+			return true
+		}
+		inactiveKept++
+		return inactiveKept <= MaxInactiveWIPPRs
+	})
+}
+
+// Inactive from prparser.RecentActivityThreshold of silence onwards, the boundary the WIP row
+// styling uses too. Unknown activity is not inactivity, so a draft without an update time is
+// never capped away.
+func isInactive(pr prparser.PR, generatedAt time.Time) bool {
+	updatedAt := pr.GetUpdatedAt()
+	return !updatedAt.IsZero() && !updatedAt.After(generatedAt.Add(-prparser.RecentActivityThreshold))
+}
+
+// Unknown activity is not staleness, so a draft without an update time is kept.
+func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
+	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
+	return func(pr prparser.PR) bool {
+		updatedAt := pr.GetUpdatedAt()
+		return updatedAt.IsZero() || !updatedAt.Before(inactiveBefore)
+	}
+}
+
+// Names the update time as the activity the WIP section sorts on, and spells the unknown case
+// as the nil SortPRsNewestFirst documents. A zero time would sort last on its own, being year 1.
+func lastActivityAt(pr prparser.PR) *time.Time {
+	updatedAt := pr.GetUpdatedAt()
+	if updatedAt.IsZero() {
+		return nil
+	}
+	return &updatedAt
+}
+
+func isOpen(pr prparser.PR) bool { return !pr.GetDraft() }
+
+func isDraft(pr prparser.PR) bool { return pr.GetDraft() }

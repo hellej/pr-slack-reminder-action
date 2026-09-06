@@ -9,6 +9,7 @@ Turns `messagecontent.Content` into a Slack message.
 - Ungrouped case: one heading followed by one bulleted list of all PRs
 - Grouped-by-repository case: per repository, a heading carrying the repository link from [internal/messagecontent](../messagecontent/messagecontent.spec.md), then its bulleted PR list, with a spacing block between repositories
 - Each PR entry shows: title (linked, struck through if closed-but-not-merged), age (warning marker when [internal/prparser](../prparser/prparser.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist), and a rocket marker if merged
+- The age and reviewer texts come from `prparser`; this package supplies the surrounding spacing, the Block Kit styling, and the old-PR, merged and closed-but-not-merged markers
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
 - The message is capped at 50 content blocks; blocks past the cap are dropped and logged
 
