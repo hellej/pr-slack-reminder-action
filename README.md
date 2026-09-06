@@ -128,10 +128,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [closed, ready_for_review]
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
   issue_comment:
+    types: [created, deleted]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}

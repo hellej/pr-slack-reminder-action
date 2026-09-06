@@ -17,19 +17,16 @@ GitHub GraphQL and search APIs, Slack methods and scopes, GitHub token permissio
 ## <the fact, stated as a claim> [YYYY-MM-DD]
 
 - Source: <module cache path at the pinned version, doc URL, or the command that was run>
-- Checked: <YYYY-MM-DD>, <what it is pinned to, if anything>
 - <one claim per bullet>
   - <the numbers, the query, what it rules out>
 ```
 
 The heading list is the index, so a heading has to carry the whole claim on its own, and the
-date it was last checked. The bracketed date and the `Checked:` line always match. Re-checking an
-entry moves both.
+date it was last checked. Re-checking an entry moves that date.
 
 ## `Repository.pullRequests` cannot order by merge date [2026-08-22]
 
 - Source: [IssueOrder input object](https://docs.github.com/en/graphql/reference/issues#input-object-issueorder)
-- Checked: 2026-08-22
 - `IssueOrderField` is `COMMENTS`, `CREATED_AT`, `UPDATED_AT`
 - `UPDATED_AT DESC` cut client-side is not an approximation of it. Any post-merge comment,
   label or cross-reference bumps `updatedAt`, so the first page fills with old merges
@@ -42,7 +39,6 @@ entry moves both.
 ## GitHub search filters merged PRs by merge date server-side, but cannot sort by it [2026-08-22]
 
 - Source: [searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests), [sorting search results](https://docs.github.com/en/search-github/getting-started-with-searching-on-github/sorting-search-results)
-- Checked: 2026-08-22
 - `search(type: ISSUE)` with `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`
   returns the in-window set in one page
 - Sort fields: comments, created, interactions, reactions, relevance, updated. Merge order
@@ -53,7 +49,6 @@ entry moves both.
 ## A GitHub search query string is capped at 256 characters and five operators [2026-08-22]
 
 - Source: [REST search limits](https://docs.github.com/en/rest/search/search)
-- Checked: 2026-08-22
 - The 256 count the query text, excluding operators and qualifiers
 - At most five `AND`, `OR` or `NOT`
 - Bounds how many repositories one query string can name
@@ -63,7 +58,6 @@ entry moves both.
 ## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` and `totalCount` per qualifier; `__type(name:"Repository")` introspection for the argument list
-- Checked: 2026-08-22
 
 `repository.pullRequests` takes `states`, `labels`, `headRefName`, `baseRefName`, `orderBy`
 and the four pagination arguments, introspected, nothing else. Of those only `labels`
@@ -82,7 +76,6 @@ filters what this project filters on:
 ## No GraphQL query filters PRs by a case-sensitive title substring [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, comparing `issueCount` per qualifier
-- Checked: 2026-08-22
 
 `repository.pullRequests` has no title argument at all, and `search` matches whole words,
 case-insensitively. Of 2491 open PRs: `epo in:title` matched 0 while `repo in:title`
@@ -96,7 +89,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## The 30 requests/minute GitHub search limit is a REST figure [2026-08-22]
 
 - Source: [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
-- Checked: 2026-08-22
 - A GraphQL search connection costs one request, plus one per potential node of a nested
   connection, divided by 100
 - The budget is 5,000 points an hour
@@ -104,7 +96,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## The GraphQL cost formula overestimates: read `rateLimit.cost` instead [2026-08-22]
 
 - Source: `gh api graphql` against `microsoft/vscode`, `rust-lang/rust`, `kubernetes/kubernetes`, `facebook/react`; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
-- Checked: 2026-08-22
 - The formula predicted 3 points for a two-repository search. GitHub charged 2
 - A nested connection is what costs. Aliases carrying one are charged per alias; aliases
   without one are nearly free
@@ -122,7 +113,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error [2026-08-22]
 
 - Source: `gh api graphql`, `search(type: ISSUE)` with a `repo:` qualifier
-- Checked: 2026-08-22
 - Indistinguishable: a nonexistent repository, a private one the token cannot read, and a
   genuinely empty window. All three are `{"issueCount": 0, "nodes": []}`, no `errors` key,
   `data` not null
@@ -139,7 +129,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## Several aliased `search` fields work in one GraphQL operation [2026-08-22]
 
 - Source: `gh api graphql`, `s0`/`s1` over `microsoft/vscode`, `kubernetes/kubernetes`, `rust-lang/rust`; [GraphQL queries reference](https://docs.github.com/en/graphql/reference/queries#search)
-- Checked: 2026-08-22
 - `Query.search(query: String!, type: SearchType!, first/last/after/before)` returns
   `SearchResultItemConnection!` with `issueCount`, `nodes`, `pageInfo`
 - `... on PullRequest` resolves inside `nodes`. `mergedAt`, `author` and
@@ -149,7 +138,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## GitHub's PR search index lags a merge by seconds [2026-08-22]
 
 - Source: `gh api graphql`, polling `NixOS/nixpkgs` and `ClickHouse/ClickHouse` every ~7s
-- Checked: 2026-08-22
 - One merge caught in flight: absent 3 seconds after its `mergedAt`, present at 10
 - No GitHub doc acknowledges or quantifies a lag
 - Irrelevant to a scheduled job. Relevant to one triggered by a merge webhook
@@ -157,7 +145,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## Merging a PR bumps its `updatedAt`, but GitHub never documents what does [2026-08-22]
 
 - Source: `gh api graphql`, 301 merged PR nodes across `golang/go`, `kubernetes/kubernetes`, `microsoft/vscode`, `facebook/react`, `rust-lang/rust`; [PullRequest object](https://docs.github.com/en/graphql/reference/objects#pullrequest)
-- Checked: 2026-08-22
 - Zero of the 301 had `updatedAt` earlier than `mergedAt`
 - The schema says only "the date and time when the object was last updated". REST says
   nothing at all
@@ -168,7 +155,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## `PullRequest.mergedAt` is a nullable `DateTime` [2026-08-22]
 
 - Source: [PullRequest object](https://docs.github.com/en/graphql/reference/objects#pullrequest)
-- Checked: 2026-08-22
 - `mergedAt` is `DateTime`, not `DateTime!`
 - `state` is `OPEN`, `CLOSED` or `MERGED`; `merged` is a `Boolean!`
 - `states: MERGED` implies both, so neither has to be selected
@@ -176,7 +162,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## `slack-go` v0.27.0 has `EditCanvas`, and one call replaces a whole canvas [2026-08-19]
 
 - Source: `slack-go/slack@v0.27.0/canvas.go` in `go env GOMODCACHE`; [`canvases.edit` content operations](https://docs.slack.dev/reference/methods/canvases.edit/#content-operations)
-- Checked: 2026-08-19, pinned to `slack-go` v0.27.0 in `go.mod`
+- Pinned to `slack-go` v0.27.0 in `go.mod`
 - `EditCanvasParams{CanvasID, Changes: []CanvasChange{{Operation: "replace", DocumentContent: ...}}}`
 - Omitting `section_id` on a `replace` makes it the whole canvas
 - Needs only the `canvases:write` scope
@@ -184,7 +170,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## A Slack canvas has its own access control, separate from OAuth scopes [2026-08-19]
 
 - Source: [`canvases.access.set`](https://docs.slack.dev/reference/methods/canvases.access.set)
-- Checked: 2026-08-19
 - `canvases:write` does not grant access to a given canvas
 - Created outside a channel the bot is in: `canvases.edit` fails until it is shared
 - Created as a channel tab: writable
@@ -192,7 +177,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## `search` returns private-repository PRs, but the permission granting it is undocumented [2026-08-22]
 
 - Source: `gh api graphql`, `repo:<private repo> is:pr is:merged merged:>=` and `is:pr is:merged is:private`; [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens); GitHub's docs data for `/search/issues` (`permissions: []`, `allowPermissionlessAccess: true`, `serverToServer: true`)
-- Checked: 2026-08-22
 - Confirmed with a classic token holding `repo`: the per-repository query returns a private
   repository's merged PRs, `repository.isPrivate` true, cost 1
 - The endpoint needs no fine-grained permission to call
@@ -205,7 +189,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented [2026-08-27]
 
 - Source: [community discussion 62476](https://github.com/orgs/community/discussions/62476); [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
-- Checked: 2026-08-27
 - No GitHub doc lists a permission for the `commits` connection on a `PullRequest`
 - The discussion's opening post says commit endpoints need `contents: read` while PR
   endpoints show commits without it, and asks for that to be made consistent. No staff answer
@@ -220,7 +203,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: measured against canvas `F0BPS4FKCEL` on 2026-09-05 with a scratch probe sending
   the same form POST `ReplaceCanvasContent` sends
-- Checked: 2026-09-05
 - Reproduced: 15 full-canvas replaces 1.5s apart, each one reshaping the document (cycling
   the grouped, flat and no-open-PRs golden files), with the canvas open in the desktop app
   - `## Open` and `## WIP` each rendered twice, one PR row appeared under two sections,
@@ -238,7 +220,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: [`canvases.edit`](https://docs.slack.dev/reference/methods/canvases.edit/);
   [canvases surface guide](https://docs.slack.dev/surfaces/canvases/); the 2026-09-05 probe
-- Checked: 2026-09-05
 - Two replaces fired from two threads at once both returned `ok: true`, as did two 1.5s
   apart. `canvas_editing_locked` never appeared, so it can't be relied on to serialize writes
 - The docs describe `canvas_editing_locked` as "Another edit to this canvas is currently in
@@ -252,7 +233,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## Slack's `replace` with a `section_id` has been reported to act like `insert_after` [2026-09-05]
 
 - Source: [slackapi/slack-mcp-plugin issue 30](https://github.com/slackapi/slack-mcp-plugin/issues/30)
-- Checked: 2026-09-05, one community report, not confirmed by Slack
+- One community report, not confirmed by Slack
 - The targeted section stays and the new content lands as a sibling after it, reproduced on
   both a paragraph and a header section. The reporter blames the MCP server's mapping, not
   the Slack method
@@ -265,7 +246,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: [upload-artifact README](https://github.com/actions/upload-artifact#readme);
   [REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts)
-- Checked: 2026-09-05
 - "Artifacts created by upload-artifact@v4 are immutable". Overwriting one "will give the
   Artifact a new ID, the previous one will no longer exist"
 - `overwrite: true` deletes a matching name within the same workflow run only. It cannot touch
@@ -280,7 +260,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: [context availability](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability);
   [workflow syntax: concurrency](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency)
-- Checked: 2026-09-05
 - Available to `concurrency`: `github`, `inputs`, `vars`. So a group can be computed from the
   event name and a `workflow_dispatch` input, and split one workflow's runs into several groups
 - `github.token` and `github.job` are the properties restricted to step execution. `run_id` is
@@ -289,3 +268,60 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - With `cancel-in-progress` unset or false, a newly queued run still cancels any *pending* run in
   the group. Only the run in progress and the newest queued one survive a burst
 - A shared group therefore lets frequent triggers cancel a pending scheduled run
+
+## A `pull_request` `types:` list replaces the default `opened, synchronize, reopened` [2026-09-06]
+
+- Source: [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+- "By default, a workflow only runs when a `pull_request` event's activity type is `opened`,
+  `synchronize`, or `reopened`". Naming any `types:` narrows the trigger to exactly that list,
+  so `types: [closed, ready_for_review]` never fires on a newly opened PR
+- The full type list: `assigned`, `unassigned`, `labeled`, `unlabeled`, `opened`, `edited`,
+  `closed`, `reopened`, `synchronize`, `converted_to_draft`, `locked`, `unlocked`, `enqueued`,
+  `dequeued`, `milestoned`, `demilestoned`, `ready_for_review`, `review_requested`,
+  `review_request_removed`, `auto_merge_enabled`, `auto_merge_disabled`
+- `closed` fires for a merge and for a close without merging. `github.event.pull_request.merged`
+  tells them apart
+- `pull_request_review` (`submitted`, `edited`, `dismissed`) and `pull_request_review_comment`
+  (`created`, `edited`, `deleted`): "By default, all activity types trigger workflows"
+
+## `issue_comment` fires for pull request comments, and `github.event.issue.pull_request` filters them [2026-09-06]
+
+- Source: [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+- "The `issue_comment` event occurs for comments on both issues and pull requests. You can use
+  the `github.event.issue.pull_request` property in a conditional to take different action
+  depending on whether the triggering object was an issue or pull request"
+- Actions documents three types for it: `created`, `edited`, `deleted`. A bare `issue_comment:`
+  takes all three, so an issue-only repository comment triggers a run unless the conditional
+  guards it
+
+## A fork's `pull_request` and `pull_request_review` runs get no secrets, and events fire only in the repo holding the workflow [2026-09-06]
+
+- Source: [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows);
+  [create a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event)
+- "With the exception of `GITHUB_TOKEN`, secrets are not passed to the runner when a workflow is
+  triggered from a forked repository. The `GITHUB_TOKEN` has read-only permissions in pull
+  requests from forked repositories". The page repeats this under `pull_request` and under
+  `pull_request_review`; the `issue_comment` section says nothing about forks or secrets
+- So a fork PR triggers the base repository's workflow with no `SLACK_BOT_TOKEN`
+- "For pull requests from a forked repository to the base repository, GitHub sends the
+  `pull_request`, `issue_comment`, `pull_request_review_comment`, `pull_request_review`, and
+  `pull_request_target` events to the base repository. No pull request events occur on the
+  forked repository"
+- A PR in another repository cannot trigger this repository's workflow. The documented
+  cross-repository path is `POST /repos/{owner}/{repo}/dispatches` (`repository_dispatch`) or
+  the `workflow_dispatch` API, both needing a PAT or App token, never `GITHUB_TOKEN`
+- Workflow file version per event: `pull_request` and `pull_request_review` run the PR merge
+  ref's copy; `issue_comment`, `schedule` and `push` run the copy on the ref the event names,
+  and "this event will only trigger a workflow run if the workflow file exists on the default
+  branch" for `issue_comment` and `schedule`
+
+## A single inline diff comment fires `pull_request_review: submitted` [2026-09-06]
+
+- Source: live test in this repository, PR #58 (closed), workflow run 34025576473
+- One comment posted with `POST /repos/{owner}/{repo}/pulls/58/comments`, the endpoint the
+  "Add single comment" button calls. No review started, none submitted
+- GitHub wrapped it in an implicit review: id 5124970470, `state: COMMENTED`, empty body
+- The `PR Reminder` workflow, whose only `pull_request_review` type is `submitted`, ran two
+  seconds later: comment at 09:46:12Z, run at 09:46:14Z. So the implicit review submits
+- A `pull_request_review_comment` trigger is therefore redundant for catching a lone diff comment
+- Not checked: the UI button itself, only the REST endpoint behind it

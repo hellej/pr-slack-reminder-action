@@ -18,10 +18,11 @@ on:
   schedule:
     - cron: '0 9 * * 0-6'  # at 09:00 every day
   pull_request:
-    types: [closed, ready_for_review]
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
   issue_comment:
+    types: [created, deleted]
   push:
     branches: [main]
 
