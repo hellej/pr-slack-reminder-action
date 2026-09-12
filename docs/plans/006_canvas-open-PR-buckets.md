@@ -1,7 +1,7 @@
 # Canvas open PR buckets
 
 date: 2026-09-12
-status: draft
+status: implemented
 
 ## Goals
 

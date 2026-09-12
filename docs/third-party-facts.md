@@ -385,6 +385,20 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The failure mode is silent: an ungranted connection can return empty rather than
   `FORBIDDEN`. Same gap as the `commits` entry above
 
+## `mergeable` and `reviewThreads` both populate under `pull-requests: read` on `GITHUB_TOKEN` [2026-09-12]
+
+- Source: workflow run 34711484631, `pr-reminder` on branch `canvas-open-pr-buckets`, whose
+  `reminder` job grants `contents: read`, `actions: read`, `pull-requests: read`
+- Both fields came back populated on a public repository: PR 61 logged 1 review thread with
+  `mergeable: "MERGEABLE"`, and PR 3 logged `mergeable: "CONFLICTING"`, so neither field is
+  the silent-empty failure the entry above warns about
+- `reviewThreads`' nested `comments(last: 1){ nodes { author { login __typename } } }`
+  resolved too: PR 61's own thread, last commented by the PR author, was read as answered
+  rather than as a thread with no comments
+- This narrows the gap above rather than closing it. The job grants `contents: read` as well,
+  so it does not isolate `pull-requests: read`, and the repository is public. Closing it still
+  needs a private repository under a fine-grained PAT holding only `pull-requests: read`
+
 ## `mergeable` rides on an endpoint needing Pull requests read OR Contents read, not both [2026-09-12]
 
 - Source: [REST get a pull request](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request); [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
