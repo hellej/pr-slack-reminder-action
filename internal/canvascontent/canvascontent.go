@@ -27,8 +27,6 @@ type PRSection struct {
 }
 
 type Content struct {
-	// The open PRs, bucketed by whose turn it is. A reader picks their next action off the
-	// heading, so the buckets replace one flat open section.
 	ReadyToMerge         PRSection
 	WaitingForAuthor     PRSection
 	WaitingForReview     PRSection

@@ -21,7 +21,6 @@ func durationText(duration time.Duration) string {
 	}
 }
 
-// pluralize returns unit unchanged for a count of 1, otherwise with an "s" appended.
 func pluralize(count int, unit string) string {
 	if count == 1 {
 		return unit

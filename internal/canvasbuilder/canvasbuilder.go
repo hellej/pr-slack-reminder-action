@@ -52,10 +52,8 @@ func BuildMarkdown(content canvascontent.Content) string {
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
-// The open PRs render as one section per turn, each vanishing while it holds nothing: a reader
-// scanning the headings sees only the buckets that ask something of them. All three empty leaves
-// nothing to scan, so the canvas falls back to the single heading it had before the split rather
-// than opening at ## WIP.
+// All three buckets empty falls back to the single heading the canvas had before the split,
+// so it does not open at ## WIP.
 func renderOpenSections(content canvascontent.Content) []string {
 	turnSections := []section{
 		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),

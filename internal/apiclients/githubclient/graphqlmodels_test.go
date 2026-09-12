@@ -178,8 +178,6 @@ func botAuthorNode(login string) *authorNode {
 	return &authorNode{Login: login, Typename: botTypename}
 }
 
-// comments(last: 1) returns a thread's last comment only, so a thread node carries one comment
-// at most. A nil author stands for the account GitHub no longer reports, such as a deleted one.
 func threadWithLastComment(isResolved bool, lastCommentAuthor *authorNode) reviewThreadNode {
 	return reviewThreadNode{
 		IsResolved: isResolved,
