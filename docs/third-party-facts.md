@@ -107,8 +107,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 | Merged PR search, `search(first: 100)` + `labels(first: 100)` | 1 per repository |
 | Merged PR search, no `labels` | 1 total, any repository count |
 | Enrichment batch, 25 PRs, `reviews(first: 100)` + `comments(first: 100)` | 1 |
+| Enrichment batch, 25 PRs, the same plus `reviewThreads(first: 100)` | 1 |
 
 - The enrichment batch was measured with a `commits(last: 1)` selection it no longer carries
+- A fourth nested connection per alias left the cost at 1, taking the batch from 7,500 to
+  10,000 requested nodes. Individual calls cap at 500,000 nodes, so that is 2% of it
 
 ## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error [2026-08-22]
 
@@ -325,3 +328,59 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   seconds later: comment at 09:46:12Z, run at 09:46:14Z. So the implicit review submits
 - A `pull_request_review_comment` trigger is therefore redundant for catching a lone diff comment
 - Not checked: the UI button itself, only the REST endpoint behind it
+
+## `PullRequest.reviewThreads` exposes `isResolved` and `isOutdated` as independent booleans, 100 per page [2026-09-12]
+
+- Source: GraphQL introspection of `PullRequestReviewThread`; [GraphQL pulls reference](https://docs.github.com/en/graphql/reference/pulls); `gh api graphql` against `kubernetes/kubernetes`
+- `reviewThreads(first: n)` returns `PullRequestReviewThreadConnection!`, with `totalCount`
+- `first: 101` fails with `EXCESSIVE_PAGINATION`, so 100 is the page maximum. `totalCount` is
+  the only way to see that a PR has more
+- `isResolved`, `isOutdated` and `isCollapsed` are all `Boolean!`
+  - `isResolved`: "Whether this thread has been resolved"
+  - `isOutdated`: "Indicates whether this thread was outdated by newer changes"
+- Outdated does not imply resolved. All four combinations occur across 30 sampled open
+  `kubernetes/kubernetes` PRs: PR 141851 held 3 threads outdated and unresolved, PR 141732
+  held 3 outdated and resolved
+- Which changes make a thread outdated is not documented beyond "newer changes"
+- `isCollapsed` matched `isResolved` on all threads in that sample, but GitHub never states
+  they are the same, so they are not interchangeable
+
+## `PullRequest.reviewDecision` is null on an approved PR in a repository without required-reviewer rules [2026-09-12]
+
+- Source: [community discussion 24375](https://github.com/orgs/community/discussions/24375); `gh api graphql` against `kubernetes/kubernetes` and `hellej/pr-slack-reminder-action`
+- Rules it out as an approval signal. Derive approval from `reviews.nodes[].state` instead
+- The field is nullable, with only `APPROVED`, `CHANGES_REQUESTED` and `REVIEW_REQUIRED`
+- 59 of 60 sampled open `kubernetes/kubernetes` PRs returned null, including PRs 141630 and
+  141345 which each carry an approving review. That repository enforces review through Prow
+  and OWNERS, not through GitHub
+- Every PR in `hellej/pr-slack-reminder-action` returned non-null, under a ruleset setting
+  `requiredApprovingReviewCount: 1`
+- GitHub Support states only that the field "will be null if it is not in one of the
+  following states", declining to name the setting that drives it. The link to
+  required-reviewer rules is this run's measurement, not a documented contract
+
+## `PullRequest.mergeable` returns `UNKNOWN` while GitHub computes it, and only REST documents the retry [2026-09-12]
+
+- Source: [MergeableState enum](https://docs.github.com/en/graphql/reference/pulls); [REST get a pull request](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request); `gh api graphql` against `kubernetes/kubernetes`
+- `mergeable: MergeableState!` is `MERGEABLE`, `CONFLICTING` or `UNKNOWN`, described as
+  "whether or not the pull request can be merged based on the existence of merge conflicts"
+- `UNKNOWN` means "the mergeability of the pull request is still being calculated"
+- A single query does return it: `kubernetes/kubernetes` PR 142050 came back `UNKNOWN` in a
+  30-PR batch, then `MERGEABLE` on each of the next three polls seconds later
+- REST says to resubmit after giving the background job time. No GraphQL page repeats that
+  advice, and the REST-null to GraphQL-`UNKNOWN` mapping is inferred from the enum
+  description rather than stated
+- `mergeStateStatus` carries richer detail, and returned `BLOCKED` for that PR. It has
+  needed a preview `Accept` header on some deployments, so it needs its own check
+
+## No GitHub page documents the token permission for any GraphQL field [2026-09-12]
+
+- Source: [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
+- That page is REST-endpoint only. It never mentions GraphQL
+- The closest signal for `reviews`, `comments` and `reviewThreads` is that their REST
+  equivalents, `pulls/{n}/reviews` and `pulls/{n}/comments`, both sit under Pull requests at
+  read with nothing additional
+- Confirming a field needs a run with a fine-grained PAT holding only `pull-requests: read`
+  plus the automatic `metadata: read`, checking the connection comes back populated
+- The failure mode is silent: an ungranted connection can return empty rather than
+  `FORBIDDEN`. Same gap as the `commits` entry above
