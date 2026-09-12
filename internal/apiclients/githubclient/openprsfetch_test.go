@@ -243,8 +243,9 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"p0: repository(owner:$owner0,name:$name0){ pullRequest(number:$num0){ ..." + testEnrichFragmentName + " } }",
 		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." + testEnrichFragmentName + " } }",
 		"fragment " + testEnrichFragmentName + " on PullRequest {",
-		"number\n  reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
+		"number mergeable\n  reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
+		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {

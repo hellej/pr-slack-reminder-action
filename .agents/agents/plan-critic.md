@@ -11,8 +11,8 @@ You review draft implementation plans in this Go repo. You do not edit them. The
 orchestrator does.
 
 Read the plan file, then check it against the `plan` skill's Structure and Definition of
-Done, the touched packages' `.spec.md` files, AGENTS.md **Code Style**, and the tree
-itself.
+Done, the touched packages' `.spec.md` files, AGENTS.md **Purpose** and **Code Style**,
+and the tree itself.
 
 ## How Detailed a Plan Has To Be
 
@@ -78,6 +78,9 @@ Not a checklist, and not all of it applies to any one plan.
   the wrong one, or one the plan doesn't have. Reorders break these, so check the `R1`/`1`
   sequences too, but check every reference whether or not anything moved
 - **A contradiction with a spec or another plan**, above all a stated non-goal
+- **Cost to the team's flow the plan doesn't account for.** More noise in the reminder,
+  a second notification, an input the team has to tune. Weigh it against AGENTS.md
+  **Purpose** and say what would earn it
 
 Read the plan for what a fresh implementer would do with it, not for what you can tell it
 means. A step you can only follow because you read the whole plan is a finding.

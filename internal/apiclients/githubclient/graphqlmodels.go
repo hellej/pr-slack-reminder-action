@@ -1,6 +1,7 @@
 package githubclient
 
 import (
+	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -24,6 +25,17 @@ const (
 )
 
 const approvedReviewState = "APPROVED"
+
+// The review states that ask the PR author for something. DISMISSED is left out: such a review
+// has been withdrawn and no longer blocks.
+const (
+	commentedReviewState        = "COMMENTED"
+	changesRequestedReviewState = "CHANGES_REQUESTED"
+)
+
+// The one mergeable state that cannot be merged. UNKNOWN is GitHub still computing
+// mergeability, and reads as not conflicting.
+const conflictingMergeableState = "CONFLICTING"
 
 // A pending review is visible only to its own author, so it contributes no reviewer.
 const pendingReviewState = "PENDING"
@@ -50,6 +62,13 @@ type commentNode struct {
 	Author    *authorNode `json:"author"`
 }
 
+// A review thread carries no author of its own, so its last comment supplies the one that
+// decides whose turn the thread is.
+type reviewThreadNode struct {
+	IsResolved bool                    `json:"isResolved"`
+	Comments   connection[commentNode] `json:"comments"`
+}
+
 type connection[T any] struct {
 	Nodes []T `json:"nodes"`
 }
@@ -68,6 +87,9 @@ type pullRequestNode struct {
 	Labels    connection[labelNode]   `json:"labels"`
 	Reviews   connection[reviewNode]  `json:"reviews"`
 	Comments  connection[commentNode] `json:"comments"`
+
+	Mergeable     string                       `json:"mergeable"`
+	ReviewThreads connection[reviewThreadNode] `json:"reviewThreads"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -85,7 +107,19 @@ func collaboratorFromAuthorNode(author *authorNode) Collaborator {
 }
 
 func hasValidAuthorNode(author *authorNode) bool {
-	return author != nil && author.Login != "" && author.Typename != botTypename
+	return !isUnknownAuthorNode(author) && author.Typename != botTypename
+}
+
+// GitHub reports no author at all for a deleted account, and a node without a login says as
+// little, so the two are one unknown to the pipeline.
+func isUnknownAuthorNode(author *authorNode) bool {
+	return author == nil || author.Login == ""
+}
+
+// hasValidAuthorNode turns down the unknown and the bots together, so a known author it turns
+// down is a bot.
+func isBotAuthorNode(author *authorNode) bool {
+	return !isUnknownAuthorNode(author) && !hasValidAuthorNode(author)
 }
 
 func timelineCommentFromNode(comment commentNode) TimelineComment {
@@ -149,7 +183,55 @@ func prWithReviewers(
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),
+		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
+			node.ReviewThreads.Nodes, pullRequest.Author,
+		),
+		Conflicting:           node.Mergeable == conflictingMergeableState,
+		HasNonApprovingReview: hasNonApprovingReview(submittedReviews, pullRequest.Author),
 	}
+}
+
+func hasThreadWaitingForPRAuthor(threads []reviewThreadNode, prAuthor Collaborator) bool {
+	return slices.ContainsFunc(threads, func(thread reviewThreadNode) bool {
+		return !thread.IsResolved && isWaitingForPRAuthor(thread, prAuthor)
+	})
+}
+
+// An unresolved thread's last comment says whose turn it is. The author replying hands it back
+// to the reviewer, and an author's own note on their own diff never waits on anyone. A bot's
+// thread waits on nobody either: with a review bot enabled, every new PR would otherwise arrive
+// already waiting on its author. A thread nobody has commented on, or one whose last commenter
+// GitHub no longer reports, is left waiting rather than assumed answered.
+func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
+	comments := thread.Comments.Nodes
+	if len(comments) == 0 {
+		return true
+	}
+
+	lastCommentAuthor := comments[len(comments)-1].Author
+	if isUnknownAuthorNode(lastCommentAuthor) {
+		return true
+	}
+	if isBotAuthorNode(lastCommentAuthor) {
+		return false
+	}
+	// The PR author's login came through collaboratorFromAuthorNode as well, so both sides
+	// spell the same account the same way.
+	return collaboratorFromAuthorNode(lastCommentAuthor).Login != prAuthor.Login
+}
+
+// The author's own reviews are left out: a bare inline comment on one's own diff arrives as a
+// COMMENTED review. The given reviews are the submitted ones, so bots are already out, keeping
+// a review bot's comment from handing the PR back to its author.
+func hasNonApprovingReview(submittedReviews []reviewNode, prAuthor Collaborator) bool {
+	return slices.ContainsFunc(submittedReviews, func(review reviewNode) bool {
+		return isNonApprovingReviewState(review.State) &&
+			collaboratorFromAuthorNode(review.Author).Login != prAuthor.Login
+	})
+}
+
+func isNonApprovingReviewState(state string) bool {
+	return state == commentedReviewState || state == changesRequestedReviewState
 }
 
 func isSubmittedUserReview(review reviewNode) bool {
