@@ -1,10 +1,3 @@
-## Ready to merge
-
-- **[Drop the deprecated input](https://github.com/test-org/repo-three/pull/23)** _3 days ago_ by Carol Clark (✅ Frank Foster / 💬 Erin Evans)
-- **[Cache the repository lookups](https://github.com/test-org/test-repo/pull/21)** _5 hours ago_ by Alice Anderson (✅ Dana Davis)
-- **[Pin the action digests](https://github.com/test-org/test-repo/pull/24)** _5 hours ago_ by Dana Davis (✅ Alice Anderson, Bob Brown / 💬 Carol Clark, Erin Evans)
-- **[Retry the artifact download](https://github.com/test-org/repo-two/pull/22)** _30 minutes ago_ by Bob Brown (✅ Dana Davis, Erin Evans)
-
 ## Waiting for author
 
 - **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/31)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
@@ -24,12 +17,10 @@
 ## WIP
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
-- **[Draft the migration guide](https://github.com/test-org/repo-two/pull/11)** by Bob Brown `updated 30 minutes ago`
 
 ## Merged
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown 🚀
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson 🚀
+_No merged PRs_
 
 ​
 

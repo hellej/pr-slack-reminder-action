@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	readyToMergeHeading      = "## Ready to merge"
+	waitingForAuthorHeading  = "## Waiting for author"
+	waitingForReviewHeading  = "## Waiting for review"
 	openPRsHeading           = "## Open"
 	wipPRsHeading            = "## WIP"
 	mergedPRsHeading         = "## Merged"
@@ -25,14 +28,7 @@ const (
 // The canvas has no top-level heading: Slack renders the canvas title as its own H1 at the top
 // of the document, so a body H1 would show as a second title.
 func BuildMarkdown(content canvascontent.Content) string {
-	blocks := renderSectionBlocks(section{
-		heading:             openPRsHeading,
-		prs:                 content.Open.PRs,
-		groups:              content.Open.Groups,
-		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderOpenPRRow,
-		emptyText:           noOpenPRsText,
-	})
+	blocks := renderOpenSections(content)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             wipPRsHeading,
 		prs:                 content.WIP.PRs,
@@ -56,6 +52,43 @@ func BuildMarkdown(content canvascontent.Content) string {
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
+// The open PRs render as one section per turn, each vanishing while it holds nothing: a reader
+// scanning the headings sees only the buckets that ask something of them. All three empty leaves
+// nothing to scan, so the canvas falls back to the single heading it had before the split rather
+// than opening at ## WIP.
+func renderOpenSections(content canvascontent.Content) []string {
+	turnSections := []section{
+		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
+		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
+		openSection(waitingForReviewHeading, content.WaitingForReview, content.GroupedByRepository),
+	}
+
+	blocks := utilities.FlatMap(utilities.Map(turnSections, renderSectionBlocks))
+	if len(blocks) > 0 {
+		return blocks
+	}
+	return renderSectionBlocks(section{
+		heading:             openPRsHeading,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderOpenPRRow,
+		emptyText:           noOpenPRsText,
+	})
+}
+
+// A turn section carries no empty text: it is hidden rather than rendered when it holds nothing.
+func openSection(
+	heading string, prs canvascontent.PRSection, groupedByRepository bool,
+) section {
+	return section{
+		heading:             heading,
+		prs:                 prs.PRs,
+		groups:              prs.Groups,
+		groupedByRepository: groupedByRepository,
+		renderRow:           renderOpenPRRow,
+		hideWhenEmpty:       true,
+	}
+}
+
 // One canvas section: its PRs as the flat list or as repository buckets, and how to render a row
 // of it.
 type section struct {
@@ -65,11 +98,22 @@ type section struct {
 	groupedByRepository bool
 	renderRow           func(prparser.PR) string
 	emptyText           string
+	// Renders nothing at all while the section holds no PRs, heading included, rather than
+	// falling back to emptyText.
+	hideWhenEmpty bool
+}
+
+func (section section) isEmpty() bool {
+	return len(section.prs) == 0 && len(section.groups) == 0
 }
 
 // Grouped PRs get one sub-heading block per repository, with no repeated section heading.
 // Grouping with nothing to show falls back to the same single line the flat section uses.
 func renderSectionBlocks(section section) []string {
+	// Nil rather than a blank block: strings.Join would keep an empty string as a gap.
+	if section.hideWhenEmpty && section.isEmpty() {
+		return nil
+	}
 	if !section.groupedByRepository || len(section.groups) == 0 {
 		return []string{renderSection(section.heading, section.prs, section.renderRow, section.emptyText)}
 	}
@@ -89,8 +133,9 @@ func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string
 	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
 }
 
-// An empty section keeps its heading and shows the given line instead of rows: a missing
-// heading would read as a broken render rather than as "nothing here right now".
+// An empty section shows the given line under its heading instead of rows: a missing heading
+// would read as a broken render rather than as "nothing here right now". A section set to hide
+// while empty never gets here, renderSectionBlocks having dropped it.
 func renderSection(
 	heading string,
 	prs []prparser.PR,

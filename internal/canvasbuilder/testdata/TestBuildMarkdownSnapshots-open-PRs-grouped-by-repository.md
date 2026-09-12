@@ -1,4 +1,4 @@
-## Open
+## Waiting for review
 
 ### [test-org/repo-two](https://github.com/test-org/repo-two/pulls)
 

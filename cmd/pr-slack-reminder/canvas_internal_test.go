@@ -32,8 +32,8 @@ func hashTestPR(number int, title string) prparser.PR {
 
 func hashTestContent(openPRs []prparser.PR, generatedAt time.Time) canvascontent.Content {
 	return canvascontent.Content{
-		Open:        canvascontent.PRSection{PRs: openPRs},
-		GeneratedAt: generatedAt,
+		WaitingForReview: canvascontent.PRSection{PRs: openPRs},
+		GeneratedAt:      generatedAt,
 	}
 }
 

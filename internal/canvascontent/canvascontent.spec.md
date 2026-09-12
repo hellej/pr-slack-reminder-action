@@ -1,27 +1,28 @@
 # canvascontent
 
-Structures parsed PRs into the three sections of the PR tracker canvas, ready for `canvasbuilder`.
+Structures parsed PRs into the sections of the PR tracker canvas, ready for `canvasbuilder`.
 
 ## Behaviour
 
-- `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `GetDraft()`: drafts go to the WIP section, everything else to the open section. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
-- Open PRs keep their given order (oldest first, as `prparser.ParsePRs` left them)
-- Each section is a `PRSection` on `Content`: `Open`, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. Only one of the two shapes is ever filled
-- Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest open PR, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket
+- `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `GetDraft()`: drafts go to the WIP section, everything else to the open sections. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
+- The open PRs are bucketed by `prparser.GetPRTurn` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
+- Bucketing filters the sorted list rather than sorting each bucket, so every bucket keeps the given order (oldest first, as `prparser.ParsePRs` left them)
+- Each section is a `PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. One `PRSection` constructor fills one shape, so both are never filled at once
+- Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket, and nothing dedupes a repository across sections
 - WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `UpdatedAt`. Unknown activity sorts last, keeping the given order among such PRs
 - Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out. A draft with a zero update time is kept: unknown is not stale
 - At most `MaxInactiveWIPPRs` (5) drafts without recent activity reach the WIP section, the 5 most recently touched of them. Inactive means the update time is at least `prparser.RecentActivityThreshold` (24 hours) before `GeneratedAt`, the boundary the WIP row styling uses. Recently touched drafts are never capped, nor are drafts with a zero update time. The cap runs after the staleness prune, on the whole WIP list rather than per repository
 - Merged PRs are sorted newest merge first via `prparser.SortPRsNewestFirst` on `MergedAt`. They are neither pruned nor capped here: the fetch already did both
 - `Content.MergedPRsUnavailable` comes from the options, and says the merged fetch failed rather than that nothing was merged
-- `Content.GeneratedAt`, `OpenPRsCapped` and `WIPPRsCapped` come from the options. The cap flags report what the fetch capped, and are never derived from section length: the staleness prune and the inactive cap shrink the WIP list further
-- Logs how many open PRs, WIP PRs and merged PRs the canvas ended up with, plus how many inactive drafts the cap left out, so a missing draft has an explanation
+- `Content.GeneratedAt`, `OpenPRsCapped` and `WIPPRsCapped` come from the options. `OpenPRsCapped` is one flag over all three open sections: it reports what the fetch capped, and the fetch knows nothing about buckets. The cap flags are never derived from section length: the staleness prune and the inactive cap shrink the WIP list further
+- Logs how many PRs each of the three open buckets, the WIP section and the merged section ended up with, plus how many inactive drafts the cap left out, so a missing draft has an explanation
 
 ## Doesn't Do
 
 - Doesn't read the clock: `GeneratedAt` is given by the caller, keeping `canvasbuilder`'s output deterministic under test
 - Doesn't read `PRListHeading` or `NoPRsMessage`: canvas headings and fallback lines are fixed strings owned by `canvasbuilder`, so there is no `<pr_count>` substitution either
-- Doesn't have a whole-canvas "nothing to show" case: each section falls back on its own
-- Doesn't filter or re-sort the open section
+- Doesn't have a whole-canvas "nothing to show" case: each section falls back on its own, and an empty open bucket is `canvasbuilder`'s to hide
+- Doesn't re-sort within a bucket, and filters the open PRs only by whose turn it is: no PR the fetch returned is dropped
 
 ## Oddities
 

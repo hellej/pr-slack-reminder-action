@@ -1,6 +1,6 @@
-// Package canvascontent structures parsed PRs into the three sections a PR tracker canvas
-// shows: open PRs, work-in-progress (draft) PRs and recently merged PRs. It carries no
-// rendering, that belongs to canvasbuilder.
+// Package canvascontent structures parsed PRs into the sections a PR tracker canvas shows: the
+// open PRs bucketed by whose turn it is, work-in-progress (draft) PRs and recently merged PRs.
+// It carries no rendering, that belongs to canvasbuilder.
 package canvascontent
 
 import (
@@ -27,7 +27,11 @@ type PRSection struct {
 }
 
 type Content struct {
-	Open                 PRSection
+	// The open PRs, bucketed by whose turn it is. A reader picks their next action off the
+	// heading, so the buckets replace one flat open section.
+	ReadyToMerge         PRSection
+	WaitingForAuthor     PRSection
+	WaitingForReview     PRSection
 	WIP                  PRSection
 	Merged               PRSection
 	GroupedByRepository  bool
@@ -49,11 +53,12 @@ type GetContentOptions struct {
 	GeneratedAt time.Time
 }
 
-// GetContent splits the given PRs into an open section and a work-in-progress section, and takes
-// the merged section from its own list. Open PRs keep their given order (oldest first); WIP PRs
-// are ordered most recent activity first, with long-inactive ones dropped and the rest of the
-// drafts without recent activity capped at MaxInactiveWIPPRs; merged PRs are ordered
-// newest merge first. Each section is bucketed by repository when configured, in that same order.
+// GetContent splits the given PRs into the three open sections and a work-in-progress section,
+// and takes the merged section from its own list. Open PRs are bucketed by whose turn it is,
+// each bucket keeping the given order (oldest first); WIP PRs are ordered most recent activity
+// first, with long-inactive ones dropped and the rest of the drafts without recent activity
+// capped at MaxInactiveWIPPRs; merged PRs are ordered newest merge first. Each section is
+// bucketed by repository when configured, in that same order.
 func GetContent(
 	prs []prparser.PR,
 	mergedPRs []prparser.PR,
@@ -71,33 +76,50 @@ func GetContent(
 		return pr.GetMergedAt()
 	})
 
+	readyToMerge := prsWaitingOn(sortedOpenPRs, prparser.TurnReadyToMerge)
+	waitingForAuthor := prsWaitingOn(sortedOpenPRs, prparser.TurnWaitingForAuthor)
+	waitingForReview := prsWaitingOn(sortedOpenPRs, prparser.TurnWaitingForReview)
+
 	log.Printf(
-		"Putting %d open pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas, "+
+		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
+			"%d work-in-progress pull requests and %d merged pull requests on the canvas, "+
 			"leaving out %d inactive work-in-progress pull requests",
-		len(sortedOpenPRs), len(wipPRs), len(sortedMergedPRs),
+		len(readyToMerge), len(waitingForAuthor), len(waitingForReview),
+		len(wipPRs), len(sortedMergedPRs),
 		len(sortedActiveDraftPRs)-len(wipPRs),
 	)
 
-	content := Content{
-		GroupedByRepository:  contentInputs.GroupByRepository,
+	groupByRepository := contentInputs.GroupByRepository
+	return Content{
+		ReadyToMerge:         prSection(readyToMerge, groupByRepository),
+		WaitingForAuthor:     prSection(waitingForAuthor, groupByRepository),
+		WaitingForReview:     prSection(waitingForReview, groupByRepository),
+		WIP:                  prSection(wipPRs, groupByRepository),
+		Merged:               prSection(sortedMergedPRs, groupByRepository),
+		GroupedByRepository:  groupByRepository,
 		OpenPRsCapped:        options.OpenPRsCapped,
 		WIPPRsCapped:         options.WIPPRsCapped,
 		MergedPRsUnavailable: options.MergedPRsUnavailable,
 		GeneratedAt:          options.GeneratedAt,
 	}
+}
 
-	// Each list is already in its section's order, so bucketing it in that order puts the
-	// repository holding the section's leading PR first.
-	if contentInputs.GroupByRepository {
-		content.Open.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(sortedOpenPRs)
-		content.WIP.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
-		content.Merged.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
-		return content
+// Filtering the sorted list rather than sorting each bucket is what keeps every bucket oldest
+// first.
+func prsWaitingOn(sortedOpenPRs []prparser.PR, turn prparser.PRTurn) []prparser.PR {
+	return utilities.Filter(sortedOpenPRs, func(pr prparser.PR) bool {
+		return prparser.GetPRTurn(pr) == turn
+	})
+}
+
+// Fills the one shape the canvas will read, never both. The given list is already in its
+// section's order, so bucketing it in that order puts the repository holding the section's
+// leading PR first.
+func prSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
+	if groupByRepository {
+		return PRSection{Groups: prparser.GroupPRsByRepositoriesInGivenOrder(sortedPRs)}
 	}
-	content.Open.PRs = sortedOpenPRs
-	content.WIP.PRs = wipPRs
-	content.Merged.PRs = sortedMergedPRs
-	return content
+	return PRSection{PRs: sortedPRs}
 }
 
 // Keeps every recently active draft and the MaxInactiveWIPPRs most recently active inactive
