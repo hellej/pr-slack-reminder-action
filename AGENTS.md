@@ -2,6 +2,15 @@
 
 GitHub Action written in Go that fetches open PRs from GitHub repositories and sends or updates a Slack reminder listing them.
 
+## Purpose
+
+Improve a software team's development velocity and flow.
+
+- Listing PRs so they get reviewed and merged is the current means, not the goal
+- Anything else that removes friction from the team's flow is in scope
+- Favour signal over noise: every notification interrupts the team, so it must earn the interruption
+- When planning or implementing, weigh changes against this goal, and propose new ideas serving it
+
 ## Output Style
 
 Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).

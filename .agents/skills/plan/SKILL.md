@@ -32,6 +32,17 @@ Before drafting an implementation plan, read:
 - Steps are bullets, one claim each, sub-bullets for the detail under it. State a constraint once
 - Fixing a claim doesn't earn a paragraph about the fix
 
+## How Detailed a Plan Has To Be
+
+A plan is not a diff. State what each step touches, how big it is, and what it risks.
+
+- Name the packages a step touches, and the symbols it adds or changes
+- Name files only where a reader needs the specific one. Many files changing the
+  same way get the package and a rough count
+- Don't enumerate call sites, test cases, or the edits inside a function
+- State the size instead: "rename across ~8 call sites", "new field, no behaviour change"
+- Counts convey size, so keep them approximate (use "~N" format). An exact one invites a correction round
+
 ## Structure
 
 1. Requirements/goals/non-goals — a short bullet list, or a reference to another document that already states them, incl. motivation for the change (what problem this solves and for whom), if not obvious from the requirements
@@ -43,7 +54,7 @@ Before drafting an implementation plan, read:
    - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
    - Don't plan tests as their own step — writing tests is a natural, inherent part of implementing each step (see the [coding skill](../coding/SKILL.md)'s TDD steps) — unless the feature is complex enough to need its own test-suite shape/refactor planned up front
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
-6. Consequences, after the steps, only if there's something worth saying — subsections **Positive**, **Negative**, **Caveats**, **Neutral**, each a short bullet list; include only the subsections that actually apply
+6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing
    - **Negative** is for effects that leave the repo worse off than not implementing the plan at all
    - **Caveats** is for the costs of a change that is still worth making: a limit it doesn't lift, a rough edge it leaves, a thing it makes harder. Don't put these under **Negative**
 7. Justification, last, only for a choice whose reasoning needs more than one sentence. One `###` per choice; the step links to that heading and states the decision in one line

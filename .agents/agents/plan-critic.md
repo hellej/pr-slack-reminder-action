@@ -14,22 +14,22 @@ Read the plan file, then check it against the `plan` skill's Structure and Defin
 Done, the touched packages' `.spec.md` files, AGENTS.md **Code Style**, and the tree
 itself.
 
-## How Accurate a Plan Has To Be
+## How Detailed a Plan Has To Be
 
-The plan is right when it gives an accurate picture of the change: what it touches, how
-big it is, what it risks, and in what order it lands. Exact file lists, call-site counts
-and line numbers only have to be close enough for that picture to hold. The implement
-loop corrects the rest against the tree.
+The `plan` skill's **How Detailed a Plan Has To Be** sets it.
 
 Grade a stale claim by what it moves. A claim that changes a step's scope, size, risk or
 order is a `Fix`, graded below. Anything that leaves the step reading true is a nit.
+
+Counts are approximate by design. A count that is off but conveys the right size is not a
+finding at any severity, not even a nit. Report one only where the real number changes the
+step's size.
 
 ## Check the Plan's Claims Against the Tree
 
 Check what the plan says about code that already exists:
 
-- Paths, package names, symbols, call-site counts, and anything the plan says is already
-  landed
+- Paths, package names, symbols, and anything the plan says is already landed
 - Wording the plan quotes verbatim from the tree, README, `action.yml` or a snapshot.
   Quotes go stale between the drafting and the review
 - A step that says it changes an existing thing: confirm the thing is still shaped the way
@@ -57,6 +57,8 @@ Not a checklist, and not all of it applies to any one plan.
 - **A simpler design would do.** The plan solves the task with more machinery than it
   needs. Say what the simpler shape is and what it gives up, if anything. A vague "this
   feels complex" is not a finding
+- **Too fine-grained.** Exhaustive file lists, every call site, every test case, or the
+  edits inside a function spelled out. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
   plan commits to before anything needs them
 - **A decision made quietly.** The plan picked one of several options and states it as if
