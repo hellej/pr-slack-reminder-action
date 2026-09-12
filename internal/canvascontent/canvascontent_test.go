@@ -74,8 +74,8 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{1, 3})
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{2})
+	assertEqual(t, "open PRs", prNumbers(content.Open.PRs), []int{1, 3})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{2})
 }
 
 func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
@@ -88,7 +88,7 @@ func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "open PRs", prNumbers(content.OpenPRs), []int{8, 7})
+	assertEqual(t, "open PRs", prNumbers(content.Open.PRs), []int{8, 7})
 }
 
 // The repository paths of a grouped section, so its whole group order is one expectation.
@@ -117,15 +117,15 @@ func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.
 	if !content.GroupedByRepository {
 		t.Error("expected content to be marked as grouped by repository")
 	}
-	if len(content.OpenPRs) != 0 {
-		t.Errorf("expected no flat open PRs when grouping, got %v", prNumbers(content.OpenPRs))
+	if len(content.Open.PRs) != 0 {
+		t.Errorf("expected no flat open PRs when grouping, got %v", prNumbers(content.Open.PRs))
 	}
 	assertEqual(
-		t, "open PR group paths", groupPaths(content.OpenPRsGroupedByRepository),
+		t, "open PR group paths", groupPaths(content.Open.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.OpenPRsGroupedByRepository[0].PRs), []int{1, 3})
-	assertEqual(t, "second group PRs", prNumbers(content.OpenPRsGroupedByRepository[1].PRs), []int{2})
+	assertEqual(t, "first group PRs", prNumbers(content.Open.Groups[0].PRs), []int{1, 3})
+	assertEqual(t, "second group PRs", prNumbers(content.Open.Groups[1].PRs), []int{2})
 }
 
 // The WIP PRs are sorted by activity first, so the most recently touched PR's repository leads.
@@ -152,15 +152,15 @@ func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
-	if len(content.WIPPRs) != 0 {
-		t.Errorf("expected no flat WIP PRs when grouping, got %v", prNumbers(content.WIPPRs))
+	if len(content.WIP.PRs) != 0 {
+		t.Errorf("expected no flat WIP PRs when grouping, got %v", prNumbers(content.WIP.PRs))
 	}
 	assertEqual(
-		t, "WIP PR group paths", groupPaths(content.WIPPRsGroupedByRepository),
+		t, "WIP PR group paths", groupPaths(content.WIP.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-three"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.WIPPRsGroupedByRepository[0].PRs), []int{4})
-	assertEqual(t, "second group PRs", prNumbers(content.WIPPRsGroupedByRepository[1].PRs), []int{5, 3})
+	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].PRs), []int{4})
+	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].PRs), []int{5, 3})
 }
 
 func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
@@ -177,11 +177,11 @@ func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 4})
-	if len(content.WIPPRsGroupedByRepository) != 0 {
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 4})
+	if len(content.WIP.Groups) != 0 {
 		t.Errorf(
 			"expected no WIP PR groups without grouping, got %v",
-			groupPaths(content.WIPPRsGroupedByRepository),
+			groupPaths(content.WIP.Groups),
 		)
 	}
 }
@@ -207,7 +207,7 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 1, 2})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 1, 2})
 }
 
 // Unknown activity is not staleness, so it sorts after every draft with a real update time
@@ -224,7 +224,7 @@ func TestGetContentSortsWIPPRsWithUnknownActivityLast(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{3, 2, 1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 2, 1})
 }
 
 func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
@@ -250,7 +250,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 				GeneratedAt: generatedAt,
 			})
 
-			if gotKept := len(content.WIPPRs) == 1; gotKept != tc.wantKept {
+			if gotKept := len(content.WIP.PRs) == 1; gotKept != tc.wantKept {
 				t.Errorf("expected draft kept: %v, got kept: %v", tc.wantKept, gotKept)
 			}
 		})
@@ -274,7 +274,7 @@ func TestGetContentKeepsOnlyTheMostRecentlyActiveInactiveWIPPRs(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{7, 6, 5, 4, 3})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{7, 6, 5, 4, 3})
 }
 
 func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
@@ -290,7 +290,7 @@ func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{5, 4, 3, 2, 1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{5, 4, 3, 2, 1})
 }
 
 // Recently active drafts are outside the cap, however many there are.
@@ -310,7 +310,7 @@ func TestGetContentKeepsEveryRecentlyActiveWIPPR(t *testing.T) {
 	})
 
 	assertEqual(
-		t, "WIP PRs", prNumbers(content.WIPPRs),
+		t, "WIP PRs", prNumbers(content.WIP.PRs),
 		[]int{100, 101, 102, 103, 104, 105, 106, 107, 200, 201, 202, 203, 204},
 	)
 }
@@ -352,7 +352,7 @@ func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
 				GeneratedAt: generatedAt,
 			})
 
-			assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), tc.wantWIPPRs)
+			assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), tc.wantWIPPRs)
 		})
 	}
 }
@@ -372,7 +372,7 @@ func TestGetContentKeepsDraftWithUnknownActivityBesidesTheCappedInactiveOnes(t *
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{5, 4, 3, 2, 1, 6})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{5, 4, 3, 2, 1, 6})
 }
 
 // Drafts past MaxDraftPRInactivity never take one of the kept slots.
@@ -392,7 +392,7 @@ func TestGetContentKeepsNoStaleDraftAmongTheCappedInactiveOnes(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{8, 7, 6, 5, 4})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{8, 7, 6, 5, 4})
 }
 
 // The cap is global, so three repositories with three inactive drafts each yield five rows
@@ -436,12 +436,12 @@ func TestGetContentCapsInactiveWIPPRsAcrossRepositories(t *testing.T) {
 	)
 
 	assertEqual(
-		t, "WIP PR group paths", groupPaths(content.WIPPRsGroupedByRepository),
+		t, "WIP PR group paths", groupPaths(content.WIP.Groups),
 		[]string{"test-org/repo-three", "test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.WIPPRsGroupedByRepository[0].PRs), []int{9, 8})
-	assertEqual(t, "second group PRs", prNumbers(content.WIPPRsGroupedByRepository[1].PRs), []int{6, 5})
-	assertEqual(t, "third group PRs", prNumbers(content.WIPPRsGroupedByRepository[2].PRs), []int{3})
+	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].PRs), []int{9, 8})
+	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].PRs), []int{6, 5})
+	assertEqual(t, "third group PRs", prNumbers(content.WIP.Groups[2].PRs), []int{3})
 }
 
 func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
@@ -451,7 +451,7 @@ func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIPPRs), []int{1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{1})
 }
 
 func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
@@ -466,7 +466,7 @@ func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 		WIPPRsCapped:  true,
 	})
 
-	if len(content.OpenPRs) >= githubclient.MaxPRsToFetch || len(content.WIPPRs) >= githubclient.MaxDraftPRsToFetch {
+	if len(content.Open.PRs) >= githubclient.MaxPRsToFetch || len(content.WIP.PRs) >= githubclient.MaxDraftPRsToFetch {
 		t.Fatal("expected both sections to hold fewer PRs than their caps")
 	}
 	if !content.OpenPRsCapped || !content.WIPPRsCapped {
@@ -507,7 +507,7 @@ func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 		},
 	)
 
-	assertEqual(t, "merged PRs", prNumbers(content.MergedPRs), []int{2, 3, 1})
+	assertEqual(t, "merged PRs", prNumbers(content.Merged.PRs), []int{2, 3, 1})
 }
 
 // The merged PRs are sorted by merge time first, so the most recently merged PR's repository
@@ -526,15 +526,15 @@ func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *tes
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
-	if len(content.MergedPRs) != 0 {
-		t.Errorf("expected no flat merged PRs when grouping, got %v", prNumbers(content.MergedPRs))
+	if len(content.Merged.PRs) != 0 {
+		t.Errorf("expected no flat merged PRs when grouping, got %v", prNumbers(content.Merged.PRs))
 	}
 	assertEqual(
-		t, "merged PR group paths", groupPaths(content.MergedPRsGroupedByRepository),
+		t, "merged PR group paths", groupPaths(content.Merged.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.MergedPRsGroupedByRepository[0].PRs), []int{2})
-	assertEqual(t, "second group PRs", prNumbers(content.MergedPRsGroupedByRepository[1].PRs), []int{1, 3})
+	assertEqual(t, "first group PRs", prNumbers(content.Merged.Groups[0].PRs), []int{2})
+	assertEqual(t, "second group PRs", prNumbers(content.Merged.Groups[1].PRs), []int{1, 3})
 }
 
 func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
@@ -549,11 +549,11 @@ func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
 		},
 	)
 
-	assertEqual(t, "merged PRs", prNumbers(content.MergedPRs), []int{1, 2})
-	if len(content.MergedPRsGroupedByRepository) != 0 {
+	assertEqual(t, "merged PRs", prNumbers(content.Merged.PRs), []int{1, 2})
+	if len(content.Merged.Groups) != 0 {
 		t.Errorf(
 			"expected no merged PR groups without grouping, got %v",
-			groupPaths(content.MergedPRsGroupedByRepository),
+			groupPaths(content.Merged.Groups),
 		)
 	}
 }

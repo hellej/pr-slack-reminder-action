@@ -6,7 +6,7 @@ Structures parsed PRs into the three sections of the PR tracker canvas, ready fo
 
 - `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `GetDraft()`: drafts go to the WIP section, everything else to the open section. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
 - Open PRs keep their given order (oldest first, as `prparser.ParsePRs` left them)
-- All three sections are bucketed by repository via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, into `OpenPRsGroupedByRepository`, `WIPPRsGroupedByRepository` and `MergedPRsGroupedByRepository`; otherwise they stay the flat `OpenPRs`, `WIPPRs` and `MergedPRs` lists. Only one of the two shapes is ever filled
+- Each section is a `PRSection` on `Content`: `Open`, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. Only one of the two shapes is ever filled
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest open PR, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket
 - WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `UpdatedAt`. Unknown activity sorts last, keeping the given order among such PRs
 - Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out. A draft with a zero update time is kept: unknown is not stale

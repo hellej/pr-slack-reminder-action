@@ -27,24 +27,24 @@ const (
 func BuildMarkdown(content canvascontent.Content) string {
 	blocks := renderSectionBlocks(section{
 		heading:             openPRsHeading,
-		prs:                 content.OpenPRs,
-		groups:              content.OpenPRsGroupedByRepository,
+		prs:                 content.Open.PRs,
+		groups:              content.Open.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderOpenPRRow,
 		emptyText:           noOpenPRsText,
 	})
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             wipPRsHeading,
-		prs:                 content.WIPPRs,
-		groups:              content.WIPPRsGroupedByRepository,
+		prs:                 content.WIP.PRs,
+		groups:              content.WIP.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderWIPPRRow,
 		emptyText:           noWIPPRsText,
 	})...)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             mergedPRsHeading,
-		prs:                 content.MergedPRs,
-		groups:              content.MergedPRsGroupedByRepository,
+		prs:                 content.Merged.PRs,
+		groups:              content.Merged.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),

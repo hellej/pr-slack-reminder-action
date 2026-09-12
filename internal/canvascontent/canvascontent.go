@@ -19,18 +19,22 @@ const MaxDraftPRInactivity = 60 * 24 * time.Hour
 // the point of the section, older ones only need a sample.
 const MaxInactiveWIPPRs = 5
 
+// One canvas section's PRs, either as the flat list or as repository buckets. Filling both
+// loses one of them: canvasbuilder renders the shape Content.GroupedByRepository names.
+type PRSection struct {
+	PRs    []prparser.PR
+	Groups []prparser.RepositoryPRs
+}
+
 type Content struct {
-	OpenPRs                      []prparser.PR
-	OpenPRsGroupedByRepository   []prparser.RepositoryPRs
-	GroupedByRepository          bool
-	WIPPRs                       []prparser.PR
-	WIPPRsGroupedByRepository    []prparser.RepositoryPRs
-	MergedPRs                    []prparser.PR
-	MergedPRsGroupedByRepository []prparser.RepositoryPRs
-	OpenPRsCapped                bool
-	WIPPRsCapped                 bool
-	MergedPRsUnavailable         bool
-	GeneratedAt                  time.Time
+	Open                 PRSection
+	WIP                  PRSection
+	Merged               PRSection
+	GroupedByRepository  bool
+	OpenPRsCapped        bool
+	WIPPRsCapped         bool
+	MergedPRsUnavailable bool
+	GeneratedAt          time.Time
 }
 
 type GetContentOptions struct {
@@ -85,14 +89,14 @@ func GetContent(
 	// Each list is already in its section's order, so bucketing it in that order puts the
 	// repository holding the section's leading PR first.
 	if contentInputs.GroupByRepository {
-		content.OpenPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedOpenPRs)
-		content.WIPPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
-		content.MergedPRsGroupedByRepository = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
+		content.Open.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(sortedOpenPRs)
+		content.WIP.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(wipPRs)
+		content.Merged.Groups = prparser.GroupPRsByRepositoriesInGivenOrder(sortedMergedPRs)
 		return content
 	}
-	content.OpenPRs = sortedOpenPRs
-	content.WIPPRs = wipPRs
-	content.MergedPRs = sortedMergedPRs
+	content.Open.PRs = sortedOpenPRs
+	content.WIP.PRs = wipPRs
+	content.Merged.PRs = sortedMergedPRs
 	return content
 }
 

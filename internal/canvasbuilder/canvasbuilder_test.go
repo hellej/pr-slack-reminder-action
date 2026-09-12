@@ -126,17 +126,17 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "flat open PRs and WIP PRs",
 			content: canvascontent.Content{
-				OpenPRs:     []prparser.PR{openPR, otherOpenPR},
-				WIPPRs:      []prparser.PR{wipPR},
-				MergedPRs:   []prparser.PR{otherMergedPR, mergedPR},
+				Open:        canvascontent.PRSection{PRs: []prparser.PR{openPR, otherOpenPR}},
+				WIP:         canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
+				Merged:      canvascontent.PRSection{PRs: []prparser.PR{otherMergedPR, mergedPR}},
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "merged PRs could not be fetched",
 			content: canvascontent.Content{
-				OpenPRs:              []prparser.PR{openPR},
-				WIPPRs:               []prparser.PR{wipPR},
+				Open:                 canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:                  canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				MergedPRsUnavailable: true,
 				GeneratedAt:          generatedAt,
 			},
@@ -144,11 +144,11 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "open PRs grouped by repository",
 			content: canvascontent.Content{
-				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositories(
-					[]prparser.PR{openPR, otherOpenPR},
-				),
+				Open: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositories([]prparser.PR{openPR, otherOpenPR}),
+				},
 				GroupedByRepository: true,
-				WIPPRs:              []prparser.PR{wipPR},
+				WIP:                 canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				GeneratedAt:         generatedAt,
 			},
 		},
@@ -157,15 +157,15 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			// section need not lead the next.
 			name: "all sections grouped by repository",
 			content: canvascontent.Content{
-				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
-					[]prparser.PR{openPR, otherOpenPR},
-				),
-				WIPPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
-					[]prparser.PR{otherWIPPR, wipPR},
-				),
-				MergedPRsGroupedByRepository: prparser.GroupPRsByRepositoriesInGivenOrder(
-					[]prparser.PR{otherMergedPR, mergedPR},
-				),
+				Open: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositoriesInGivenOrder([]prparser.PR{openPR, otherOpenPR}),
+				},
+				WIP: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositoriesInGivenOrder([]prparser.PR{otherWIPPR, wipPR}),
+				},
+				Merged: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositoriesInGivenOrder([]prparser.PR{otherMergedPR, mergedPR}),
+				},
 				GroupedByRepository: true,
 				GeneratedAt:         generatedAt,
 			},
@@ -173,7 +173,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "no open PRs",
 			content: canvascontent.Content{
-				WIPPRs:      []prparser.PR{wipPR},
+				WIP:         canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				GeneratedAt: generatedAt,
 			},
 		},
@@ -181,14 +181,14 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			name: "no open PRs while grouping by repository",
 			content: canvascontent.Content{
 				GroupedByRepository: true,
-				WIPPRs:              []prparser.PR{wipPR},
+				WIP:                 canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				GeneratedAt:         generatedAt,
 			},
 		},
 		{
 			name: "no WIP PRs",
 			content: canvascontent.Content{
-				OpenPRs:     []prparser.PR{openPR},
+				Open:        canvascontent.PRSection{PRs: []prparser.PR{openPR}},
 				GeneratedAt: generatedAt,
 			},
 		},
@@ -199,12 +199,14 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "old open PR",
 			content: canvascontent.Content{
-				OpenPRs: []prparser.PR{
-					testPR(prOptions{
-						number: 4, title: "Old PR past the threshold", authorName: "Bob Brown",
-						age: oldAge, isOldPR: true,
-					}),
-					openPR,
+				Open: canvascontent.PRSection{
+					PRs: []prparser.PR{
+						testPR(prOptions{
+							number: 4, title: "Old PR past the threshold", authorName: "Bob Brown",
+							age: oldAge, isOldPR: true,
+						}),
+						openPR,
+					},
 				},
 				GeneratedAt: generatedAt,
 			},
@@ -212,13 +214,15 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "recently updated and idle WIP PRs",
 			content: canvascontent.Content{
-				WIPPRs: []prparser.PR{
-					wipPR,
-					testPR(prOptions{
-						number: 5, title: "Refactor state store", authorName: "Carol Clark",
-						age: oldAge, activityAge: durationPointer(idleAge),
-						approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
-					}),
+				WIP: canvascontent.PRSection{
+					PRs: []prparser.PR{
+						wipPR,
+						testPR(prOptions{
+							number: 5, title: "Refactor state store", authorName: "Carol Clark",
+							age: oldAge, activityAge: durationPointer(idleAge),
+							approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
+						}),
+					},
 				},
 				GeneratedAt: generatedAt,
 			},
@@ -226,11 +230,13 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "WIP PR with unknown activity",
 			content: canvascontent.Content{
-				WIPPRs: []prparser.PR{
-					testPR(prOptions{
-						number: 6, title: "Prototype canvas rendering", authorName: "Alice Anderson",
-						age: idleAge,
-					}),
+				WIP: canvascontent.PRSection{
+					PRs: []prparser.PR{
+						testPR(prOptions{
+							number: 6, title: "Prototype canvas rendering", authorName: "Alice Anderson",
+							age: idleAge,
+						}),
+					},
 				},
 				GeneratedAt: generatedAt,
 			},
@@ -238,11 +244,13 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "merged PR with unknown merge time",
 			content: canvascontent.Content{
-				MergedPRs: []prparser.PR{
-					testPR(prOptions{
-						number: 10, title: "Restore the deleted branch", authorName: "Carol Clark",
-						age: oldAge,
-					}),
+				Merged: canvascontent.PRSection{
+					PRs: []prparser.PR{
+						testPR(prOptions{
+							number: 10, title: "Restore the deleted branch", authorName: "Carol Clark",
+							age: oldAge,
+						}),
+					},
 				},
 				GeneratedAt: generatedAt,
 			},
@@ -250,8 +258,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "open PRs capped",
 			content: canvascontent.Content{
-				OpenPRs:       []prparser.PR{openPR},
-				WIPPRs:        []prparser.PR{wipPR},
+				Open:          canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:           canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				OpenPRsCapped: true,
 				GeneratedAt:   generatedAt,
 			},
@@ -259,8 +267,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "WIP PRs capped",
 			content: canvascontent.Content{
-				OpenPRs:      []prparser.PR{openPR},
-				WIPPRs:       []prparser.PR{wipPR},
+				Open:         canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:          canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				WIPPRsCapped: true,
 				GeneratedAt:  generatedAt,
 			},
@@ -268,8 +276,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "both sections capped",
 			content: canvascontent.Content{
-				OpenPRs:       []prparser.PR{openPR},
-				WIPPRs:        []prparser.PR{wipPR},
+				Open:          canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:           canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				OpenPRsCapped: true,
 				WIPPRsCapped:  true,
 				GeneratedAt:   generatedAt,
@@ -278,8 +286,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "generated at a non-UTC time",
 			content: canvascontent.Content{
-				OpenPRs: []prparser.PR{openPR},
-				WIPPRs:  []prparser.PR{wipPR},
+				Open: canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:  canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
 				// The same moment as every other case's generatedAt, three hours east of UTC.
 				GeneratedAt: generatedAt.In(time.FixedZone("EEST", 3*60*60)),
 			},
@@ -287,25 +295,29 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "markdown characters in titles and names",
 			content: canvascontent.Content{
-				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositories([]prparser.PR{
-					testPR(prOptions{
-						number:     7,
-						title:      "Fix [ABC-123] crash in `make test` & **WIP** _debug_ ~legacy~ C:\\path <b>",
-						repository: "repo_two",
-						authorName: "Al*ice_And[erson]",
-						commenters: []string{"E~rin <Evans>"},
-						age:        hoursAge,
+				Open: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositories([]prparser.PR{
+						testPR(prOptions{
+							number:     7,
+							title:      "Fix [ABC-123] crash in `make test` & **WIP** _debug_ ~legacy~ C:\\path <b>",
+							repository: "repo_two",
+							authorName: "Al*ice_And[erson]",
+							commenters: []string{"E~rin <Evans>"},
+							age:        hoursAge,
+						}),
 					}),
-				}),
+				},
 				GroupedByRepository: true,
-				WIPPRs: []prparser.PR{
-					testPR(prOptions{
-						number:      8,
-						title:       "Draft: &amp; <https://example.com> \\_escaped_",
-						authorName:  "B`ob & Brown",
-						age:         hoursAge,
-						activityAge: durationPointer(minutesAge),
-					}),
+				WIP: canvascontent.PRSection{
+					PRs: []prparser.PR{
+						testPR(prOptions{
+							number:      8,
+							title:       "Draft: &amp; <https://example.com> \\_escaped_",
+							authorName:  "B`ob & Brown",
+							age:         hoursAge,
+							activityAge: durationPointer(minutesAge),
+						}),
+					},
 				},
 				GeneratedAt: generatedAt,
 			},
@@ -374,20 +386,22 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 		{
 			name: "flat",
 			content: canvascontent.Content{
-				OpenPRs:     []prparser.PR{openPR},
-				WIPPRs:      []prparser.PR{wipPR},
-				MergedPRs:   []prparser.PR{mergedPR},
+				Open:        canvascontent.PRSection{PRs: []prparser.PR{openPR}},
+				WIP:         canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
+				Merged:      canvascontent.PRSection{PRs: []prparser.PR{mergedPR}},
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "grouped by repository",
 			content: canvascontent.Content{
-				OpenPRsGroupedByRepository: prparser.GroupPRsByRepositories([]prparser.PR{openPR}),
-				GroupedByRepository:        true,
-				WIPPRs:                     []prparser.PR{wipPR},
-				MergedPRs:                  []prparser.PR{mergedPR},
-				GeneratedAt:                generatedAt,
+				Open: canvascontent.PRSection{
+					Groups: prparser.GroupPRsByRepositories([]prparser.PR{openPR}),
+				},
+				GroupedByRepository: true,
+				WIP:                 canvascontent.PRSection{PRs: []prparser.PR{wipPR}},
+				Merged:              canvascontent.PRSection{PRs: []prparser.PR{mergedPR}},
+				GeneratedAt:         generatedAt,
 			},
 		},
 		{
