@@ -130,10 +130,9 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
     this action, so counting its threads would hand each PR back to its author before a person
     had looked. A thread with no comments, or one whose last comment's author is null or has no
     login, counts as blocking
-  - "Is a bot" composes with `hasValidAuthorNode`, which turns down the unknown and the bots
-    together: a known author it turns down is a bot. A bot here is an account GraphQL types as
-    `Bot`, which means a GitHub App; a service account posting under a user login is a person
-    to both flags
+  - "Is a bot" is `__typename == "Bot"` on an author that is not unknown, mirroring
+    `hasKnownNonBotAuthorNode`. A bot is an account GraphQL types as `Bot`, which means a
+    GitHub App; a service account posting under a user login is a person to both flags
   - `Conflicting`: `mergeable == "CONFLICTING"`
   - `HasNonApprovingReview`: any `COMMENTED` or `CHANGES_REQUESTED` review not by the PR author.
     Naming those two states leaves out `DISMISSED`, which no longer blocks

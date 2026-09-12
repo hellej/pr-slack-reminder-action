@@ -83,8 +83,8 @@ func TestCollaboratorFromAuthorNode(t *testing.T) {
 			if gitHubName := collaborator.GetGitHubName(); gitHubName != tt.expectedGitHubName {
 				t.Errorf("GetGitHubName() = %s, expected %s", gitHubName, tt.expectedGitHubName)
 			}
-			if valid := hasValidAuthorNode(author); valid != tt.expectedValid {
-				t.Errorf("hasValidAuthorNode() = %t, expected %t", valid, tt.expectedValid)
+			if valid := hasKnownNonBotAuthorNode(author); valid != tt.expectedValid {
+				t.Errorf("hasKnownNonBotAuthorNode() = %t, expected %t", valid, tt.expectedValid)
 			}
 		})
 	}

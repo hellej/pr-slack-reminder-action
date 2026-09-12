@@ -33,8 +33,6 @@ const (
 	changesRequestedReviewState = "CHANGES_REQUESTED"
 )
 
-// The one mergeable state that cannot be merged. UNKNOWN is GitHub still computing
-// mergeability, and reads as not conflicting.
 const conflictingMergeableState = "CONFLICTING"
 
 // A pending review is visible only to its own author, so it contributes no reviewer.
@@ -106,12 +104,10 @@ func collaboratorFromAuthorNode(author *authorNode) Collaborator {
 	}
 }
 
-func hasValidAuthorNode(author *authorNode) bool {
+func hasKnownNonBotAuthorNode(author *authorNode) bool {
 	return !isUnknownAuthorNode(author) && author.Typename != botTypename
 }
 
-// GitHub reports no author at all for a deleted account, and a node without a login says as
-// little, so the two are one unknown to the pipeline.
 func isUnknownAuthorNode(author *authorNode) bool {
 	return author == nil || author.Login == ""
 }
@@ -185,7 +181,7 @@ func prWithReviewers(
 			node.ReviewThreads.Nodes, pullRequest.Author,
 		),
 		Conflicting:           node.Mergeable == conflictingMergeableState,
-		HasNonApprovingReview: hasNonApprovingReview(submittedReviews, pullRequest.Author),
+		HasNonApprovingReview: hasNonApprovingNonOwnReview(submittedReviews, pullRequest.Author),
 	}
 }
 
@@ -218,10 +214,7 @@ func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
 	return collaboratorFromAuthorNode(lastCommentAuthor).Login != prAuthor.Login
 }
 
-// The author's own reviews are left out: a bare inline comment on one's own diff arrives as a
-// COMMENTED review. The given reviews are the submitted ones, so bots are already out, keeping
-// a review bot's comment from handing the PR back to its author.
-func hasNonApprovingReview(submittedReviews []reviewNode, prAuthor Collaborator) bool {
+func hasNonApprovingNonOwnReview(submittedReviews []reviewNode, prAuthor Collaborator) bool {
 	return slices.ContainsFunc(submittedReviews, func(review reviewNode) bool {
 		return isNonApprovingReviewState(review.State) &&
 			collaboratorFromAuthorNode(review.Author).Login != prAuthor.Login
@@ -233,7 +226,7 @@ func isNonApprovingReviewState(state string) bool {
 }
 
 func isSubmittedUserReview(review reviewNode) bool {
-	return review.State != pendingReviewState && hasValidAuthorNode(review.Author)
+	return review.State != pendingReviewState && hasKnownNonBotAuthorNode(review.Author)
 }
 
 func isApprovingReviewNode(review reviewNode) bool {
@@ -245,7 +238,7 @@ func reviewAuthor(review reviewNode) Collaborator {
 }
 
 func hasValidCommentAuthor(comment commentNode) bool {
-	return hasValidAuthorNode(comment.Author)
+	return hasKnownNonBotAuthorNode(comment.Author)
 }
 
 func commentAuthor(comment commentNode) Collaborator {
