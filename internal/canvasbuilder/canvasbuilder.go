@@ -75,7 +75,6 @@ func renderOpenSections(content canvascontent.Content) []string {
 	})
 }
 
-// A turn section carries no empty text: it is hidden rather than rendered when it holds nothing.
 func openSection(
 	heading string, prs canvascontent.PRSection, groupedByRepository bool,
 ) section {
@@ -98,8 +97,7 @@ type section struct {
 	groupedByRepository bool
 	renderRow           func(prparser.PR) string
 	emptyText           string
-	// Renders nothing at all while the section holds no PRs, heading included, rather than
-	// falling back to emptyText.
+	// Drops the heading too, rather than showing it above emptyText.
 	hideWhenEmpty bool
 }
 
@@ -134,8 +132,7 @@ func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string
 }
 
 // An empty section shows the given line under its heading instead of rows: a missing heading
-// would read as a broken render rather than as "nothing here right now". A section set to hide
-// while empty never gets here, renderSectionBlocks having dropped it.
+// would read as a broken render rather than as "nothing here right now".
 func renderSection(
 	heading string,
 	prs []prparser.PR,

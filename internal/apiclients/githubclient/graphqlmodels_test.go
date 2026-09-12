@@ -191,8 +191,6 @@ func threadWithoutComments(isResolved bool) reviewThreadNode {
 	return reviewThreadNode{IsResolved: isResolved}
 }
 
-// The PR author reaches prWithReviewers already normalised through collaboratorFromAuthorNode,
-// which is what the bot cases below turn on.
 func prWithReviewersOfNode(author *authorNode, node pullRequestNode) PR {
 	node.Author = author
 	return prWithReviewers(pullRequestFromNode(node), models.Repository{}, node)

@@ -116,10 +116,8 @@ func isUnknownAuthorNode(author *authorNode) bool {
 	return author == nil || author.Login == ""
 }
 
-// hasValidAuthorNode turns down the unknown and the bots together, so a known author it turns
-// down is a bot.
 func isBotAuthorNode(author *authorNode) bool {
-	return !isUnknownAuthorNode(author) && !hasValidAuthorNode(author)
+	return !isUnknownAuthorNode(author) && author.Typename == botTypename
 }
 
 func timelineCommentFromNode(comment commentNode) TimelineComment {

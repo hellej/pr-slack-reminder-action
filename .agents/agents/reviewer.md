@@ -19,6 +19,11 @@ implementer's report. Check it against:
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
   docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
   `nit`
+- Every comment the change added: does it state something the code cannot? Name the ones
+  that restate the code, and say what to rename so the comment can go. A comment decoding
+  an expression means the expression is the finding, not the comment. Read the comment
+  against the code it sits on, never on its own: a well-written comment that only repeats
+  its function body still earns a `nit`
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
