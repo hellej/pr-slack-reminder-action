@@ -26,6 +26,8 @@ Ask the user what no amount of reading can supply:
 
 - The problem, and who has it
 - What is out of scope
+- Whether the work lands on `main` or on a feature branch and a PR. AGENTS.md defaults to
+  `main`, so ask whenever the request leaves it open, and record the answer in the plan
 - Constraints already settled: input names, "no new inputs", must land before another plan
 - Where the plan file goes: `.local/plans/` (gitignored) or `docs/plans/` (committed)
 

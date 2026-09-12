@@ -16,6 +16,8 @@ findings.
 - Check what of the plan is already implemented, and continue from there
 - One plan step or phase (a group of related steps) per run
 - Confirm the planned scope of the run with the user before starting
+- Work on `main` unless the plan says otherwise. If it is silent and the user has not said,
+  ask it with that same confirmation, never once the work is under way
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the step
 
