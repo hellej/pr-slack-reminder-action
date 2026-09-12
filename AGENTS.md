@@ -11,6 +11,19 @@ Improve a software team's development velocity and flow.
 - Favour signal over noise: every notification interrupts the team, so it must earn the interruption
 - When planning or implementing, weigh changes against this goal, and propose new ideas serving it
 
+## Reference Deployment
+
+One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
+
+- One team, one Slack channel, reviewers only in it
+- A monorepo the team owns, plus PRs the team has open in repos owned by others
+- 0 to 8 open PRs at a time. A weekly Dependabot batch adds ~5 at once
+- A draft PR with recent activity is a real WIP signal. A quiet one is just left open
+- Human approval gates merges: every PR needs an approving review from a human other than its author, bot-authored PRs included
+- Bot accounts post review comments on every commit, so bot activity never counts as human review and never moves a PR out of "waiting for review"
+- A daily scheduled `post` at 09:00, plus event-driven `update` runs on PR, review, comment and push events
+- The PR tracker canvas runs alongside the message as the persistent live view
+
 ## Output Style
 
 Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).

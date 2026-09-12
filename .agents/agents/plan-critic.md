@@ -11,8 +11,8 @@ You review draft implementation plans in this Go repo. You do not edit them. The
 orchestrator does.
 
 Read the plan file, then check it against the `plan` skill's Structure and Definition of
-Done, the touched packages' `.spec.md` files, AGENTS.md **Purpose** and **Code Style**,
-and the tree itself.
+Done, the touched packages' `.spec.md` files, AGENTS.md **Purpose**, **Reference
+Deployment** and **Code Style**, and the tree itself.
 
 ## How Detailed a Plan Has To Be
 
@@ -60,7 +60,9 @@ Not a checklist, and not all of it applies to any one plan.
 - **Too fine-grained.** Exhaustive file lists, every call site, every test case, or the
   edits inside a function spelled out. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
-  plan commits to before anything needs them
+  plan commits to before anything needs them. Same for anything sized for volumes
+  AGENTS.md **Reference Deployment** never reaches: pagination, caching, a feature
+  that only pays off at 40 open PRs
 - **A decision made quietly.** The plan picked one of several options and states it as if
   it were the only one. That is an `Ask`, whatever you think of the pick
 - **An open branch left standing.** "or", "optional", "if needed", "we could also". The
