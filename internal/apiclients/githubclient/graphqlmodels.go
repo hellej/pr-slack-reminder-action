@@ -26,8 +26,6 @@ const (
 
 const approvedReviewState = "APPROVED"
 
-// The review states that ask the PR author for something. DISMISSED is left out: such a review
-// has been withdrawn and no longer blocks.
 const (
 	commentedReviewState        = "COMMENTED"
 	changesRequestedReviewState = "CHANGES_REQUESTED"
