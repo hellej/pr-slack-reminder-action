@@ -366,12 +366,12 @@ func TestGetActivityText(t *testing.T) {
 			// The style threshold flips to italics here too, see TestIsRecentlyUpdated.
 			name:      "exactly at the day cutover",
 			updatedAt: now.Add(-24 * time.Hour),
-			expected:  "idle 1 days",
+			expected:  "idle 1 day",
 		},
 		{
 			name:      "just past the day cutover",
 			updatedAt: now.Add(-24*time.Hour - 30*time.Minute),
-			expected:  "idle 1 days",
+			expected:  "idle 1 day",
 		},
 		{
 			name:      "idle for days",

@@ -511,7 +511,7 @@ func TestScenarios(t *testing.T) {
 				"This is a test PR 5 minutes ago by Stitch",
 				"This PR was created 3 hours ago and contains important changes 3 hours ago by U2234567890",
 				"This PR has the same time as PR2 but a longer title 3 hours ago by U2234567890",
-				"This PR is getting old and needs attention 🚨 1 days old by U3234567890",
+				"This PR is getting old and needs attention 🚨 1 day old by U3234567890",
 				"This is a big PR that no one dares to review 🚨 2 days old by Jim",
 			},
 			expectedSummary: "5 open PRs are waiting for attention 👀",

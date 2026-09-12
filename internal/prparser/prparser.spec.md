@@ -31,6 +31,6 @@ Enriches fetched PRs with display-ready metadata.
 
 - `GetPRTurn` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
 - `GetPRTurn` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `TurnWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
-- Age and activity text are always plural and rounded to whole units, so a one-day-old PR reads "1 days" (and "idle 1 days") and a 23.6-hour-old PR reads "24 hours"
+- Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a missing/zero creation timestamp counts as old whenever a threshold is set, whatever the threshold value
 - An old-PR threshold of 0 turns the check off instead of flagging every PR as old
