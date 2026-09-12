@@ -43,8 +43,9 @@ A PR lands in the first bucket that matches:
    unresolved review thread → Waiting for author
 3. Otherwise → Waiting for review
 
-A thread counts as unresolved only when its last comment is not the PR author's: a reply hands
-it back to the reviewer, and an author's own note on their diff never blocks. See
+A thread counts as unresolved only when its last comment is neither the PR author's nor a bot's:
+a reply hands it back to the reviewer, an author's own note on their diff never blocks, and a
+review bot posting on every commit must not empty the review queue. See
 [Why the last commenter decides](#why-the-last-commenter-decides).
 
 Conflicts demote rather than promote. A conflicting PR cannot be merged, so it never reaches
@@ -66,7 +67,7 @@ New data per PR, all from the existing enrichment request:
 
 | Field | Source |
 |---|---|
-| `HasUnresolvedReviewThreads` | `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login } } } } }` |
+| `HasThreadWaitingForAuthor` | `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }` |
 | `Conflicting` | `mergeable`, `CONFLICTING` only |
 | `HasNonApprovingReview` | the already-selected `reviews.nodes[].state` |
 
@@ -117,13 +118,22 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
 
 - Add to `enrichedPullRequestSelection` and to `fullPullRequestSelection`:
   - `mergeable`
-  - `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login } } } } }`,
+  - `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }`,
     100 being the page maximum, measured as `first: 101` returning `EXCESSIVE_PAGINATION`. The
-    thread carries no author of its own, so the last comment supplies it
-- Add to `PR`: `HasUnresolvedReviewThreads`, `Conflicting`, `HasNonApprovingReview`
+    thread carries no author of its own, so the last comment supplies it. `__typename` is what
+    `collaboratorFromAuthorNode` reads to append the `[bot]` suffix GraphQL leaves off, so
+    without it no bot compares equal to itself and no bot is recognised as one
+- Add to `PR`: `HasThreadWaitingForAuthor`, `Conflicting`, `HasNonApprovingReview`
 - Derive them in `prWithReviewers`:
-  - `HasUnresolvedReviewThreads`: any node with `isResolved` false whose last comment is not
-    the PR author's. A thread with no comments, or one whose author is null, counts as blocking
+  - `HasThreadWaitingForAuthor`: any node with `isResolved` false whose last comment is neither
+    the PR author's nor a bot's. A review bot posts on every commit in the repositories running
+    this action, so counting its threads would hand each PR back to its author before a person
+    had looked. A thread with no comments, or one whose last comment's author is null or has no
+    login, counts as blocking
+  - "Is a bot" composes with `hasValidAuthorNode`, which turns down the unknown and the bots
+    together: a known author it turns down is a bot. A bot here is an account GraphQL types as
+    `Bot`, which means a GitHub App; a service account posting under a user login is a person
+    to both flags
   - `Conflicting`: `mergeable == "CONFLICTING"`
   - `HasNonApprovingReview`: any `COMMENTED` or `CHANGES_REQUESTED` review not by the PR author.
     Naming those two states leaves out `DISMISSED`, which no longer blocks
@@ -146,10 +156,15 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
 - Measured at 25 aliases, `rateLimit.cost` stays 1 with both additions, and the request stays
   an order of magnitude under the 500,000 node cap ([rate and node
   limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api))
-- Update `githubclient.spec.md`, including two oddities:
+- A JSON-decode case per new field: unit tests building `pullRequestNode` in Go cannot see a
+  struct tag, so a mistagged `mergeable`, `reviewThreads`, `isResolved` or nested
+  `comments`/`author` fails silently. The mock carries neither new key, so nothing else
+  exercises the decode path
+- Update `githubclient.spec.md`, including three oddities:
   - A PR with over 100 review threads is judged on the first 100, so an unresolved thread past
     that is missed
   - A PR left without reviewer info by a failed enrichment gets all three flags false
+  - A review a person posts through a bot integration counts for neither flag
 
 ### Step 2: add the bucketing rule
 
@@ -264,6 +279,9 @@ None.
 - A `Ready to merge` row still names its approvers in the `(✅ a)` segment, repeating the heading
 - A reviewer nit the author answered without fixing stops blocking, since the reply is what
   decides rather than the fix
+- A CI or service account posting under a user login is a person to both flags, so its per-commit
+  comments do park a PR under Waiting for author. Only accounts GraphQL types as `Bot` are
+  excluded
 - An unreviewed conflicting PR reads as ordinary in `## Waiting for review`: nothing on the row
   says a rebase is coming
 - For one run, `Ready to merge` can name a PR that cannot be merged, when `mergeable` was still
@@ -294,11 +312,20 @@ and nothing would fail.
 
 ### Why the last commenter decides
 
-Reading a thread as open-or-closed produces two false positives on a team that approves with
-nits: an author annotating their own diff, and a reviewer nit the author already replied to.
-Both park a PR under Waiting for author until someone remembers to click Resolve.
+Reading a thread as open-or-closed produces three false positives on a team that approves with
+nits: an author annotating their own diff, a reviewer nit the author already replied to, and a
+review bot's thread on a PR no person has opened yet. All three park a PR under Waiting for
+author until someone remembers to click Resolve.
 
 The last comment's author separates them, for one nested connection and one comparison.
+
+The bot case is the one that scales: the repositories running this action have bot accounts
+posting review comments on every commit, so counting those threads would empty Waiting for
+review outright. Bots are excluded from `HasNonApprovingReview` already, through
+`isSubmittedUserReview`, so excluding them here makes the two flags agree.
+
+The cost is that a review a person posts through a bot integration is invisible to both flags.
+Accepted: GraphQL types such an account as `Bot` with no way to tell it from an automated one.
 
 ### Why author comparison needs care
 
