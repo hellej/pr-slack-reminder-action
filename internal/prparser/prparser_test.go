@@ -491,3 +491,103 @@ func TestSortPRsNewestFirst(t *testing.T) {
 		t.Errorf("expected the given slice to keep its order, got %v", givenNumbers)
 	}
 }
+
+func turnPR(approverLogins []string, prFlags githubclient.PR) prparser.PR {
+	prFlags.PullRequest = &githubclient.PullRequest{
+		Author: githubclient.Collaborator{Login: "author"},
+	}
+	return prparser.PR{
+		PR: &prFlags,
+		Approvers: utilities.Map(approverLogins, func(login string) prparser.Collaborator {
+			return prparser.NewCollaborator(githubclient.Collaborator{Login: login}, "")
+		}),
+	}
+}
+
+// The checks are ordered, so each case that an earlier check claims has to stay claimed: a
+// commented-then-approved PR is ready to merge, and a conflict only ever demotes.
+func TestGetPRTurn(t *testing.T) {
+	tests := []struct {
+		name           string
+		approverLogins []string
+		prFlags        githubclient.PR
+		expected       prparser.PRTurn
+	}{
+		{
+			name:           "approved with nothing outstanding",
+			approverLogins: []string{"bob"},
+			expected:       prparser.TurnReadyToMerge,
+		},
+		{
+			name:           "approved, and the author has not answered a thread",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{HasThreadWaitingForAuthor: true},
+			expected:       prparser.TurnWaitingForAuthor,
+		},
+		{
+			// A conflict cannot be merged, so it demotes an approved PR to its author.
+			name:           "approved but conflicting",
+			approverLogins: []string{"carol"},
+			prFlags:        githubclient.PR{Conflicting: true},
+			expected:       prparser.TurnWaitingForAuthor,
+		},
+		{
+			name:           "approved twice but conflicting",
+			approverLogins: []string{"bob", "carol"},
+			prFlags:        githubclient.PR{Conflicting: true},
+			expected:       prparser.TurnWaitingForAuthor,
+		},
+		{
+			name:     "a reviewer requested changes",
+			prFlags:  githubclient.PR{HasNonApprovingReview: true},
+			expected: prparser.TurnWaitingForAuthor,
+		},
+		{
+			name:     "an unanswered thread without any review",
+			prFlags:  githubclient.PR{HasThreadWaitingForAuthor: true},
+			expected: prparser.TurnWaitingForAuthor,
+		},
+		{
+			name:     "nobody has looked at it yet",
+			expected: prparser.TurnWaitingForReview,
+		},
+		{
+			// An unreviewed conflict stays in the review queue: reviewing around a rebase is
+			// not wasted work.
+			name:     "conflicting and nothing else",
+			prFlags:  githubclient.PR{Conflicting: true},
+			expected: prparser.TurnWaitingForReview,
+		},
+		{
+			// The reviewer commented and then approved, which leaves both signals set.
+			name:           "approved by the reviewer who commented",
+			approverLogins: []string{"dave"},
+			prFlags:        githubclient.PR{HasNonApprovingReview: true},
+			expected:       prparser.TurnReadyToMerge,
+		},
+		{
+			name:           "approved, commented on, and a thread left unanswered",
+			approverLogins: []string{"erin", "bob"},
+			prFlags: githubclient.PR{
+				HasNonApprovingReview: true, HasThreadWaitingForAuthor: true,
+			},
+			expected: prparser.TurnWaitingForAuthor,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if turn := prparser.GetPRTurn(turnPR(tt.approverLogins, tt.prFlags)); turn != tt.expected {
+				t.Errorf("GetPRTurn() = %q, expected %q", turn, tt.expected)
+			}
+		})
+	}
+}
+
+// A PR without its fetched half carries no signal at all. It keeps its place in the review
+// queue rather than panicking a canvas render or claiming a merge nobody approved.
+func TestGetPRTurnOfPRWithoutFetchedData(t *testing.T) {
+	if turn := prparser.GetPRTurn(prparser.PR{}); turn != prparser.TurnWaitingForReview {
+		t.Errorf("GetPRTurn() = %q, expected %q", turn, prparser.TurnWaitingForReview)
+	}
+}

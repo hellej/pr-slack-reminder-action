@@ -39,6 +39,39 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 	}
 }
 
+// Whose turn it is to act on a PR. The values are identifiers, not headings: a renderer
+// supplies its own wording. An empty PRTurn is no turn, so the zero value claims nothing.
+type PRTurn string
+
+const (
+	TurnReadyToMerge     PRTurn = "ready to merge"
+	TurnWaitingForAuthor PRTurn = "waiting for author"
+	TurnWaitingForReview PRTurn = "waiting for review"
+)
+
+// Returns the turn of the first check that matches, so an earlier check wins every overlap: a
+// reviewer who commented and then approved leaves the PR ready to merge. A conflict only
+// demotes, never promotes: it keeps an approved PR out of TurnReadyToMerge, while an unreviewed
+// one stays in the review queue, where reviewing around a coming rebase is not wasted work.
+//
+// Approvals are read off Approvers, the same list a row's reviewer segment names, so a turn can
+// never disagree with the row beside it.
+func GetPRTurn(pr PR) PRTurn {
+	// No fetched half, so no signal to read: the review queue beats panicking a render.
+	if pr.PR == nil {
+		return TurnWaitingForReview
+	}
+
+	isApproved := len(pr.Approvers) > 0
+	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
+		return TurnReadyToMerge
+	}
+	if isApproved || pr.HasNonApprovingReview || pr.HasThreadWaitingForAuthor {
+		return TurnWaitingForAuthor
+	}
+	return TurnWaitingForReview
+}
+
 func (pr PR) GetPRAgeText() string {
 	return durationText(time.Since(pr.GetCreatedAt()))
 }
