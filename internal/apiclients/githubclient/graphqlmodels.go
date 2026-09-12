@@ -18,7 +18,6 @@ const (
 	closedPullRequestState = "closed"
 )
 
-// GraphQL states of a PR node. CLOSED and MERGED are both "closed" to the pipeline.
 const (
 	closedNodeState = "CLOSED"
 	mergedNodeState = "MERGED"
@@ -33,10 +32,8 @@ const (
 
 const conflictingMergeableState = "CONFLICTING"
 
-// A pending review is visible only to its own author, so it contributes no reviewer.
 const pendingReviewState = "PENDING"
 
-// Nullable Actor; name is selected through "... on User { name }" so it is set for users only.
 type authorNode struct {
 	Login    string `json:"login"`
 	Typename string `json:"__typename"`
@@ -137,8 +134,6 @@ func pullRequestFromNode(node pullRequestNode) *PullRequest {
 	}
 }
 
-// Only the two closed states close a PR, so an unexpected or missing state renders as open
-// rather than striking through every PR in the reminder.
 func pullRequestStateFromNodeState(nodeState string) string {
 	if nodeState == closedNodeState || nodeState == mergedNodeState {
 		return closedPullRequestState
@@ -153,7 +148,6 @@ func enrichedNode(aliasNode *pullRequestWrapperNode) (pullRequestNode, bool) {
 	return *aliasNode.PullRequest, true
 }
 
-// Reads the reviewer lists and the snooze off a PR's reviews and comments connections.
 func prWithReviewers(
 	pullRequest *PullRequest, repository models.Repository, node pullRequestNode,
 ) PR {
@@ -189,11 +183,6 @@ func hasThreadWaitingForPRAuthor(threads []reviewThreadNode, prAuthor Collaborat
 	})
 }
 
-// An unresolved thread's last comment says whose turn it is. The author replying hands it back
-// to the reviewer, and an author's own note on their own diff never waits on anyone. A bot's
-// thread waits on nobody either: with a review bot enabled, every new PR would otherwise arrive
-// already waiting on its author. A thread nobody has commented on, or one whose last commenter
-// GitHub no longer reports, is left waiting rather than assumed answered.
 func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
 	comments := thread.Comments.Nodes
 	if len(comments) == 0 {
