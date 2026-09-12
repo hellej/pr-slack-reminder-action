@@ -96,8 +96,8 @@ means. A step you can only follow because you read the whole plan is a finding.
     and say what it cuts to. Multi-bullet reasoning belongs in Justification, linked from the step
   - A choice a Justification heading settles is closed. Reopen it only by showing the reasoning
     there is wrong, never by re-asking the question
-  - Judge length against `docs/plans/`, not in the abstract. Each paragraph looks fine alone,
-    so compare the whole plan to the nearest one of similar scope
+  - Judge the whole plan, not paragraph by paragraph: each one reads fine alone. Plans already
+    in `docs/plans/` were written under older rules, so they set no bar
   - Rounds only add. From round 2, re-read what the last round touched for accreted prose
   - A line citation where a symbol name exists is a **nit**
 - **Verify**: the plan rests on a claim nobody confirmed. Name the claim and where to

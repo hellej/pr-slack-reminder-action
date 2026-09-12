@@ -38,13 +38,19 @@ Three `##` sections replace `## Open`, in descending closeness to main:
 
 A PR lands in the first bucket that matches:
 
-1. Conflicting → Waiting for author
-2. At least one approval, no unresolved review threads → Ready to merge
-3. Any non-approving review, or any unresolved review thread → Waiting for author
-4. Otherwise → Waiting for review
+1. At least one approval, no unresolved review threads, not conflicting → Ready to merge
+2. Any approval (which check 1 has already turned down), any non-approving review, or any
+   unresolved review thread → Waiting for author
+3. Otherwise → Waiting for review
 
-Conflicts outrank "nobody reviewed yet": a conflicted PR never sits in the review queue, since
-reviewing it is wasted until the author rebases.
+A thread counts as unresolved only when its last comment is not the PR author's: a reply hands
+it back to the reviewer, and an author's own note on their diff never blocks. See
+[Why the last commenter decides](#why-the-last-commenter-decides).
+
+Conflicts demote rather than promote. A conflicting PR cannot be merged, so it never reaches
+Ready to merge, but an unreviewed one falls to check 3 and stays in the review queue: a conflict
+is usually small, and reviewing around it is not wasted. See [Why conflicts only
+demote](#why-conflicts-only-demote).
 
 Rendering rules:
 
@@ -60,15 +66,18 @@ New data per PR, all from the existing enrichment request:
 
 | Field | Source |
 |---|---|
-| `HasUnresolvedReviewThreads` | `reviewThreads(first: 100){ nodes { isResolved } }` |
+| `HasUnresolvedReviewThreads` | `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login } } } } }` |
 | `Conflicting` | `mergeable`, `CONFLICTING` only |
 | `HasNonApprovingReview` | the already-selected `reviews.nodes[].state` |
 
-No `action.yml` change, and no new token permission for the action itself: `README.md` already
-documents `pull-requests: read` for listing and fetching PRs and reviews, and the REST
-equivalents of `reviews`, `comments` and `reviewThreads` all sit under Pull requests at read
+No `action.yml` change, and no new token permission: `README.md` already documents
+`pull-requests: read`, which covers both additions. The REST endpoint carrying `mergeable`
+needs Pull requests read or Contents read, either one ([REST get a pull
+request](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request)),
+and the REST equivalents of `reviewThreads` sit under Pull requests at read with no alternative
 ([permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)).
-This repository's own `pr-reminder` workflow grants less than that today, which Step 1 corrects.
+This repository's own `pr-reminder` workflow grants less than the README documents. Step 1
+closes the `pull-requests` half, leaving `issues: read` still missing.
 
 ## Breaking change
 
@@ -108,18 +117,23 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
 
 - Add to `enrichedPullRequestSelection` and to `fullPullRequestSelection`:
   - `mergeable`
-  - `reviewThreads(first: 100){ nodes { isResolved } }`, 100 being the page maximum
-    ([GraphQL pulls reference](https://docs.github.com/en/graphql/reference/pulls))
+  - `reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login } } } } }`,
+    100 being the page maximum, measured as `first: 101` returning `EXCESSIVE_PAGINATION`. The
+    thread carries no author of its own, so the last comment supplies it
 - Add to `PR`: `HasUnresolvedReviewThreads`, `Conflicting`, `HasNonApprovingReview`
 - Derive them in `prWithReviewers`:
-  - `HasUnresolvedReviewThreads`: any node with `isResolved` false
-  - `Conflicting`: `mergeable == "CONFLICTING"`. `UNKNOWN` and `MERGEABLE` both give false
-  - `HasNonApprovingReview`: any submitted review whose state is not `APPROVED`, reusing the
-    existing `submittedReviews` filter, which already drops `PENDING` and bot authors
-- `UNKNOWN` means GitHub is still computing mergeability ([MergeableState
-  enum](https://docs.github.com/en/graphql/reference/pulls)). Reading it as not conflicting
-  drops a PR into the review queue rather than parking it under its author, and the next run
-  corrects it. No polling
+  - `HasUnresolvedReviewThreads`: any node with `isResolved` false whose last comment is not
+    the PR author's. A thread with no comments, or one whose author is null, counts as blocking
+  - `Conflicting`: `mergeable == "CONFLICTING"`
+  - `HasNonApprovingReview`: any `COMMENTED` or `CHANGES_REQUESTED` review not by the PR author.
+    Naming those two states leaves out `DISMISSED`, which no longer blocks
+  - Both author comparisons run through `collaboratorFromAuthorNode` on each side, as
+    `deriveReviewers` does. See [Why author comparison needs care](#why-author-comparison-needs-care)
+- Extend `logEnrichment` to name each PR's returned thread count and `mergeable` value beside
+  the review and comment counts. It runs before `prWithReviewers`, so it logs the raw selection
+  rather than the derived flags
+- `UNKNOWN` is GitHub still computing mergeability ([MergeableState
+  enum](https://docs.github.com/en/graphql/reference/pulls)), read as not conflicting
 - `isOutdated` is not selected: an unresolved thread blocks whether or not newer commits moved it
 - `reviewDecision` is not used. It is null on an approved PR in a repository without
   required-reviewer rules, which makes it unusable as an approval signal ([community discussion
@@ -128,9 +142,9 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
   [Why both fetch fragments](#why-both-fetch-fragments)
 - Add `pull-requests: read` to the `reminder` job in `.github/workflows/pr-reminder.yml`, which
   grants only `contents: read` and `actions: read` today, below what `README.md` documents as
-  required. Step 4's run is what verifies it
-- Cost stays 1 per batch, taking a 25-PR enrichment request from 5,000 to 7,500 requested nodes
-  against a 500,000 cap ([rate and node
+  required. Done when the next workflow run is green
+- Measured at 25 aliases, `rateLimit.cost` stays 1 with both additions, and the request stays
+  an order of magnitude under the 500,000 node cap ([rate and node
   limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api))
 - Update `githubclient.spec.md`, including two oddities:
   - A PR with over 100 review threads is judged on the first 100, so an unresolved thread past
@@ -142,19 +156,19 @@ Files: `internal/apiclients/githubclient/`, `.github/workflows/pr-reminder.yml`
 Files: `internal/prparser/`
 
 - Add `PRTurn` with `TurnReadyToMerge`, `TurnWaitingForAuthor`, `TurnWaitingForReview`
-- Add `GetPRTurn(pr PR) PRTurn`, implementing the four ordered checks from the target shape
+- Add `GetPRTurn(pr PR) PRTurn`, implementing the three ordered checks from the target shape
 - Read the three new fields off the embedded `*githubclient.PR`, rather than mirroring them
   onto `prparser.PR` the way `Approvers` and `Commenters` are: those carry Slack IDs, these
   don't
 - Return a turn, not three slices: each consumer filters for itself, so `messagecontent` can
   call it later with no change here. See [Why a turn per PR](#why-a-turn-per-pr)
 - Do not compute a latest-review-per-author state. A reviewer who commented and then approved
-  lands in `Approvers`, and check 2 fires before `HasNonApprovingReview` is read
+  lands in `Approvers`, and check 1 fires before `HasNonApprovingReview` is read
 - Table-driven tests over the bucket matrix: one case per check, plus the overlaps where an
   earlier check has to win
 - Update `prparser.spec.md`, including the oddity this rule inherits: `githubclient` counts a
   user with any `APPROVED` review as an approver, so a PR approved and then changes-requested by
-  the same person, with every thread resolved, files as Ready to merge
+  the same person, with every thread resolved and no conflict, files as Ready to merge
 
 ### Step 3: bucket and render the three sections
 
@@ -188,25 +202,44 @@ In `canvasbuilder`:
 
 Tests and docs:
 
-- Re-record the golden files with `make update-test-snapshots`, adding cases for a partly
-  hidden set, a fully hidden set, and all three grouped by repository
-- The zero-state assertions in `canvascontent` and `cmd/pr-slack-reminder` encode the old
-  single section, so they change meaning rather than only being re-recorded
+- Re-record the golden files with `make update-test-snapshots`, ~3 new cases covering hidden
+  buckets and grouped mode
+- Grow the two existing whole-canvas cases, `flat open PRs and WIP PRs` and `all sections
+  grouped by repository`, past what their assertions need: ~4 Ready to merge, ~4 Waiting for
+  author, ~6 Waiting for review over three repositories. Their golden files exist to be read:
+  three `##` headings at a real day's volume, and what grouped mode's `###` count costs
+  - Vary approver and commenter counts so the `(✅ a / 💬 b)` segment renders at both widths
+  - No new helper or `prOptions` field: these cases fill the bucket fields directly, never
+    `GetPRTurn`
+  - Read both golden files before Step 4
+- `TestPostModeCanvasIsRefreshedWhenNoPRsAreFound` asserts the all-empty rendering, which this
+  change leaves identical. It must keep passing untouched
 - The snapshot target regenerates but never deletes, so drop any golden file a renamed case
   leaves behind
-- Update the canvas example in `README.md`, plus `canvascontent.spec.md` and
-  `canvasbuilder.spec.md`
+- Update the canvas example in `README.md` and the ordering paragraph under it, the only place
+  a user learns how the canvas is ordered
+- Update `canvasbuilder.spec.md`, and `canvascontent.spec.md`, whose **Doesn't Do** says
+  "Doesn't filter or re-sort the open section"
 
 ### Step 4: verify against the live canvas
 
 - No test covers this: it runs the real GraphQL selection against a real token, which no mock
   can stand in for
-- Run the `pr-reminder` workflow against this repository, with Step 1's `pull-requests: read`
-  in place
-- Done means a PR carrying an unresolved review thread renders under `## Waiting for author`,
-  and one approved with every thread resolved renders under `## Ready to merge`
-- This repository is public, so `GITHUB_TOKEN` reads its PR data whatever the `permissions:`
-  block lists. The run confirms the selection and the bucketing, not the permission
+- Leave an inline comment on your own PR first, so the run has a thread to report
+- Dispatch `pr-reminder` from the feature branch with `run-mode: post` and `build-first: true`.
+  Its other triggers run the committed `dist/` binary, which `invoke-binary.js` pins by version,
+  so they would go green without ever executing the new selection
+- Read the thread count and `mergeable` value off the log line Step 1 adds, not off a bucket: an
+  unreviewed conflicting PR renders in `## Waiting for review` whether `mergeable` said
+  `CONFLICTING` or `UNKNOWN`
+- Done means at least one PR logs a nonzero thread count alongside a `mergeable` value, and
+  every open PR renders under the bucket its state predicts
+- Your own commented PR keeping its place in `## Waiting for review` is what proves the
+  `comments(last: 1)` subselection resolved and matched the author: an empty one counts a
+  thread with no comments as blocking, which would move that PR to `## Waiting for author`
+- Only `## Waiting for review` is reachable from one account. The other two need a second
+  account to approve, since conflicts decide a bucket only once a PR is approved. Step 2's
+  tests cover both
 - Record the outcome in `docs/third-party-facts.md`, against the existing entry saying no GitHub
   page documents the permission for any GraphQL field. Closing that gap needs a private
   repository under a fine-grained PAT
@@ -215,8 +248,7 @@ Tests and docs:
 
 ### Positive
 
-- A reader picks a bucket by what they can do, instead of reading every row
-- `GetPRTurn` is the whole rule in one function, so the reminder message adopts it by filtering
+- A quiet day renders shorter: an empty bucket disappears instead of showing a fallback line
 
 ### Negative
 
@@ -230,19 +262,23 @@ None.
   the canvas is rewritten. That is a real change worth showing, but it raises write frequency
   against [004](004_reduce-PR-tracker-canvas-writes.md)
 - A `Ready to merge` row still names its approvers in the `(✅ a)` segment, repeating the heading
-- Buckets are only as good as the team resolving threads. A team that never clicks Resolve gets
-  approved PRs in `Ready to merge` with nits outstanding
+- A reviewer nit the author answered without fixing stops blocking, since the reply is what
+  decides rather than the fix
+- An unreviewed conflicting PR reads as ordinary in `## Waiting for review`: nothing on the row
+  says a rebase is coming
+- For one run, `Ready to merge` can name a PR that cannot be merged, when `mergeable` was still
+  `UNKNOWN` at fetch time
 
 ### Neutral
 
-- The fetch gains one nested connection and no rate-limit cost
+None.
 
 ## Justification
 
 ### Why a section type first
 
 Three buckets take `Content` from one flat plus one grouped field to three plus three, leaving
-15 fields of which 10 are section shapes. `PRSection` names the pairing that already exists, so
+~15 fields, most of them section shapes. `PRSection` names the pairing that already exists, so
 the feature step adds three fields instead of six, and every `Content{...}` literal in the tests
 reads as sections rather than as a field list.
 
@@ -255,6 +291,36 @@ supplying the heading, row renderer and empty text per section.
 selection keeps both fetch paths returning one enrichment shape. The alternative leaves a trap:
 adopting buckets for the message later would silently bucket every PR on zero-valued fields,
 and nothing would fail.
+
+### Why the last commenter decides
+
+Reading a thread as open-or-closed produces two false positives on a team that approves with
+nits: an author annotating their own diff, and a reviewer nit the author already replied to.
+Both park a PR under Waiting for author until someone remembers to click Resolve.
+
+The last comment's author separates them, for one nested connection and one comparison.
+
+### Why author comparison needs care
+
+Both new booleans rest on "not the PR author", and two things make that comparison easy to get
+wrong:
+
+- `submittedReviews` keeps the author. `deriveReviewers` removes them only later, so a new
+  derivation reading `submittedReviews` directly sees the author's own reviews
+- `collaboratorFromAuthorNode` appends `[bot]` to a bot login, so a raw node login never equals
+  `Author.Login` on a bot's PR. Comparing raw logins makes a bot's own reply block its own PR
+
+It matters because a bare inline diff comment arrives as a `COMMENTED` review, confirmed in this
+repo by PR #58 and workflow run 34025576473. Authors comment on their own diffs routinely.
+
+### Why conflicts only demote
+
+Treating a conflict as "waiting for author" pulls the PR out of the review queue, and most
+conflicts are a small rebase. The review can happen in parallel, so the cost of holding it back
+is a reviewer who never looks rather than a reviewer whose work is wasted.
+
+It still blocks Ready to merge, because a conflicting PR cannot be merged: the bucket would be
+claiming an action nobody can take.
 
 ### Why a turn per PR
 

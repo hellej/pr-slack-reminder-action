@@ -42,6 +42,7 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 - Don't enumerate call sites, test cases, or the edits inside a function
 - State the size instead: "rename across ~8 call sites", "new field, no behaviour change"
 - Counts convey size, so keep them approximate (use "~N" format). An exact one invites a correction round
+- Plans already in `docs/plans/` were written under older rules. Don't copy their shape
 
 ## Structure
 
