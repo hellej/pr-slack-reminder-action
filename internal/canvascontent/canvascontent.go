@@ -74,9 +74,9 @@ func GetContent(
 		return pr.GetMergedAt()
 	})
 
-	readyToMerge := prsWhoseTurnIs(sortedOpenPRs, prparser.TurnReadyToMerge)
-	waitingForAuthor := prsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForAuthor)
-	waitingForReview := prsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForReview)
+	readyToMerge := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnReadyToMerge)
+	waitingForAuthor := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForAuthor)
+	waitingForReview := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForReview)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
@@ -104,7 +104,7 @@ func GetContent(
 
 // Filtering the sorted list rather than sorting each bucket is what keeps every bucket oldest
 // first.
-func prsWhoseTurnIs(sortedOpenPRs []prparser.PR, turn prparser.PRTurn) []prparser.PR {
+func includePRsWhoseTurnIs(sortedOpenPRs []prparser.PR, turn prparser.PRTurn) []prparser.PR {
 	return utilities.Filter(sortedOpenPRs, func(pr prparser.PR) bool {
 		return prparser.GetPRTurn(pr) == turn
 	})

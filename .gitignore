@@ -30,6 +30,9 @@ go.work.sum
 .debug
 .vscode
 
+# vim swap files
+*.swp
+
 # state from "post" run-mode
 pr-slack-reminder-state.json
 pr-slack-reminder-sent-blocks.json
