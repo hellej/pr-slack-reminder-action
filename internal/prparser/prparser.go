@@ -39,37 +39,34 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 	}
 }
 
-// Whose turn it is to act on a PR. The values are identifiers, not headings: a renderer
-// supplies its own wording. An empty PRTurn is no turn, so the zero value claims nothing.
-type PRTurn string
+// What a PR needs next, and from whom. The values are identifiers, not headings: a renderer
+// supplies its own wording. An empty PRNextAction claims nothing, so the zero value is no bucket.
+type PRNextAction string
 
 const (
-	TurnReadyToMerge     PRTurn = "ready to merge"
-	TurnWaitingForAuthor PRTurn = "waiting for author"
-	TurnWaitingForReview PRTurn = "waiting for review"
+	NextActionReadyToMerge     PRNextAction = "ready to merge"
+	NextActionWaitingForAuthor PRNextAction = "waiting for author"
+	NextActionWaitingForReview PRNextAction = "waiting for review"
 )
 
-// Returns the turn of the first check that matches, so an earlier check wins every overlap: a
-// reviewer who commented and then approved leaves the PR ready to merge. A conflict only
-// demotes, never promotes: it keeps an approved PR out of TurnReadyToMerge, while an unreviewed
-// one stays in the review queue, where reviewing around a coming rebase is not wasted work.
-//
-// Approvals are read off Approvers, the same list a row's reviewer segment names, so a turn can
-// never disagree with the row beside it.
-func (pr PR) GetTurn() PRTurn {
-	// No fetched half, so no signal to read: the review queue beats panicking a render.
+// Returns the next action of the first check that matches, so an earlier check wins every
+// overlap: a reviewer who commented and then approved leaves the PR ready to merge. A conflict
+// keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while an
+// unreviewed one stays in the review queue (conflicts should not block review).
+func (pr PR) GetNextAction() PRNextAction {
+	// defensive nil check, should not happen
 	if pr.PR == nil {
-		return TurnWaitingForReview
+		return NextActionWaitingForReview
 	}
 
 	isApproved := len(pr.Approvers) > 0
 	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
-		return TurnReadyToMerge
+		return NextActionReadyToMerge
 	}
 	if isApproved || pr.HasNonApprovingReview || pr.HasThreadWaitingForAuthor {
-		return TurnWaitingForAuthor
+		return NextActionWaitingForAuthor
 	}
-	return TurnWaitingForReview
+	return NextActionWaitingForReview
 }
 
 func (pr PR) GetPRAgeText() string {

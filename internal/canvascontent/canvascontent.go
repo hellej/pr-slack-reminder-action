@@ -1,5 +1,5 @@
 // Package canvascontent structures parsed PRs into the sections a PR tracker canvas shows: the
-// open PRs bucketed by whose turn it is, work-in-progress (draft) PRs and recently merged PRs.
+// open PRs bucketed by next action, work-in-progress (draft) PRs and recently merged PRs.
 // It carries no rendering, that belongs to canvasbuilder.
 package canvascontent
 
@@ -45,7 +45,7 @@ type GetContentOptions struct {
 }
 
 // GetContent splits the given PRs into the three open sections and a work-in-progress section,
-// and takes the merged section from its own list. Open PRs are bucketed by whose turn it is,
+// and takes the merged section from its own list. Open PRs are bucketed by next action,
 // each bucket keeping the given order (oldest first); WIP PRs are ordered most recent activity
 // first, with long-inactive ones dropped and the rest of the drafts without recent activity
 // capped at MaxInactiveWIPPRs; merged PRs are ordered newest merge first. Each section is
@@ -67,9 +67,9 @@ func GetContent(
 		return pr.GetMergedAt()
 	})
 
-	readyToMerge := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnReadyToMerge)
-	waitingForAuthor := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForAuthor)
-	waitingForReview := includePRsWhoseTurnIs(sortedOpenPRs, prparser.TurnWaitingForReview)
+	readyToMerge := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionReadyToMerge)
+	waitingForAuthor := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionWaitingForAuthor)
+	waitingForReview := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionWaitingForReview)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
@@ -95,9 +95,12 @@ func GetContent(
 	}
 }
 
-func includePRsWhoseTurnIs(sortedOpenPRs []prparser.PR, turn prparser.PRTurn) []prparser.PR {
+func includePRsWhoseNextActionIs(
+	sortedOpenPRs []prparser.PR,
+	nextAction prparser.PRNextAction,
+) []prparser.PR {
 	return utilities.Filter(sortedOpenPRs, func(pr prparser.PR) bool {
-		return pr.GetTurn() == turn
+		return pr.GetNextAction() == nextAction
 	})
 }
 

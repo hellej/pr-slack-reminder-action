@@ -592,7 +592,7 @@ func TestSortPRsNewestFirst(t *testing.T) {
 	}
 }
 
-func turnPR(approverLogins []string, prFlags githubclient.PR) prparser.PR {
+func nextActionPR(approverLogins []string, prFlags githubclient.PR) prparser.PR {
 	prFlags.PullRequest = &githubclient.PullRequest{
 		Author: githubclient.Collaborator{Login: "author"},
 	}
@@ -606,64 +606,64 @@ func turnPR(approverLogins []string, prFlags githubclient.PR) prparser.PR {
 
 // The checks are ordered, so each case that an earlier check claims has to stay claimed: a
 // commented-then-approved PR is ready to merge, and a conflict only ever demotes.
-func TestGetTurn(t *testing.T) {
+func TestGetNextAction(t *testing.T) {
 	tests := []struct {
 		name           string
 		approverLogins []string
 		prFlags        githubclient.PR
-		expected       prparser.PRTurn
+		expected       prparser.PRNextAction
 	}{
 		{
 			name:           "approved with nothing outstanding",
 			approverLogins: []string{"bob"},
-			expected:       prparser.TurnReadyToMerge,
+			expected:       prparser.NextActionReadyToMerge,
 		},
 		{
 			name:           "approved, and the author has not answered a thread",
 			approverLogins: []string{"bob"},
 			prFlags:        githubclient.PR{HasThreadWaitingForAuthor: true},
-			expected:       prparser.TurnWaitingForAuthor,
+			expected:       prparser.NextActionWaitingForAuthor,
 		},
 		{
 			// A conflict cannot be merged, so it demotes an approved PR to its author.
 			name:           "approved but conflicting",
 			approverLogins: []string{"carol"},
 			prFlags:        githubclient.PR{Conflicting: true},
-			expected:       prparser.TurnWaitingForAuthor,
+			expected:       prparser.NextActionWaitingForAuthor,
 		},
 		{
 			name:           "approved twice but conflicting",
 			approverLogins: []string{"bob", "carol"},
 			prFlags:        githubclient.PR{Conflicting: true},
-			expected:       prparser.TurnWaitingForAuthor,
+			expected:       prparser.NextActionWaitingForAuthor,
 		},
 		{
 			name:     "a reviewer requested changes",
 			prFlags:  githubclient.PR{HasNonApprovingReview: true},
-			expected: prparser.TurnWaitingForAuthor,
+			expected: prparser.NextActionWaitingForAuthor,
 		},
 		{
 			name:     "an unanswered thread without any review",
 			prFlags:  githubclient.PR{HasThreadWaitingForAuthor: true},
-			expected: prparser.TurnWaitingForAuthor,
+			expected: prparser.NextActionWaitingForAuthor,
 		},
 		{
 			name:     "nobody has looked at it yet",
-			expected: prparser.TurnWaitingForReview,
+			expected: prparser.NextActionWaitingForReview,
 		},
 		{
 			// An unreviewed conflict stays in the review queue: reviewing around a rebase is
 			// not wasted work.
 			name:     "conflicting and nothing else",
 			prFlags:  githubclient.PR{Conflicting: true},
-			expected: prparser.TurnWaitingForReview,
+			expected: prparser.NextActionWaitingForReview,
 		},
 		{
 			// The reviewer commented and then approved, which leaves both signals set.
 			name:           "approved by the reviewer who commented",
 			approverLogins: []string{"dave"},
 			prFlags:        githubclient.PR{HasNonApprovingReview: true},
-			expected:       prparser.TurnReadyToMerge,
+			expected:       prparser.NextActionReadyToMerge,
 		},
 		{
 			name:           "approved, commented on, and a thread left unanswered",
@@ -671,14 +671,14 @@ func TestGetTurn(t *testing.T) {
 			prFlags: githubclient.PR{
 				HasNonApprovingReview: true, HasThreadWaitingForAuthor: true,
 			},
-			expected: prparser.TurnWaitingForAuthor,
+			expected: prparser.NextActionWaitingForAuthor,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if turn := turnPR(tt.approverLogins, tt.prFlags).GetTurn(); turn != tt.expected {
-				t.Errorf("GetTurn() = %q, expected %q", turn, tt.expected)
+			if nextAction := nextActionPR(tt.approverLogins, tt.prFlags).GetNextAction(); nextAction != tt.expected {
+				t.Errorf("GetNextAction() = %q, expected %q", nextAction, tt.expected)
 			}
 		})
 	}
@@ -686,8 +686,8 @@ func TestGetTurn(t *testing.T) {
 
 // A PR without its fetched half carries no signal at all. It keeps its place in the review
 // queue rather than panicking a canvas render or claiming a merge nobody approved.
-func TestGetTurnOfPRWithoutFetchedData(t *testing.T) {
-	if turn := (prparser.PR{}).GetTurn(); turn != prparser.TurnWaitingForReview {
-		t.Errorf("GetTurn() = %q, expected %q", turn, prparser.TurnWaitingForReview)
+func TestGetNextActionOfPRWithoutFetchedData(t *testing.T) {
+	if nextAction := (prparser.PR{}).GetNextAction(); nextAction != prparser.NextActionWaitingForReview {
+		t.Errorf("GetNextAction() = %q, expected %q", nextAction, prparser.NextActionWaitingForReview)
 	}
 }

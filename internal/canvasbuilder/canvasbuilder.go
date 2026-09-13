@@ -55,13 +55,13 @@ func BuildMarkdown(content canvascontent.Content) string {
 // All three buckets empty falls back to the single heading the canvas had before the split,
 // so it does not open at ## WIP.
 func renderOpenSections(content canvascontent.Content) []string {
-	turnSections := []section{
+	nextActionSections := []section{
 		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
 		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
 		openSection(waitingForReviewHeading, content.WaitingForReview, content.GroupedByRepository),
 	}
 
-	blocks := utilities.FlatMap(utilities.Map(turnSections, renderSectionBlocks))
+	blocks := utilities.FlatMap(utilities.Map(nextActionSections, renderSectionBlocks))
 	if len(blocks) > 0 {
 		return blocks
 	}

@@ -5,7 +5,7 @@ Structures parsed PRs into the sections of the PR tracker canvas, ready for `can
 ## Behaviour
 
 - `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `PR.IsDraft()`/`PR.IsOpen()`: drafts go to the WIP section, everything else to the open sections. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
-- The open PRs are bucketed by `PR.GetTurn()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
+- The open PRs are bucketed by `PR.GetNextAction()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
 - Bucketing filters the sorted list rather than sorting each bucket, so every bucket keeps the given order (oldest first, as `prparser.ParsePRs` left them)
 - Each section is a `PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. One `PRSection` constructor fills one shape, so both are never filled at once
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket, and nothing dedupes a repository across sections
@@ -22,7 +22,7 @@ Structures parsed PRs into the sections of the PR tracker canvas, ready for `can
 - Doesn't read the clock: `GeneratedAt` is given by the caller, keeping `canvasbuilder`'s output deterministic under test
 - Doesn't read `PRListHeading` or `NoPRsMessage`: canvas headings and fallback lines are fixed strings owned by `canvasbuilder`, so there is no `<pr_count>` substitution either
 - Doesn't have a whole-canvas "nothing to show" case: each section falls back on its own, and an empty open bucket is `canvasbuilder`'s to hide
-- Doesn't re-sort within a bucket, and filters the open PRs only by whose turn it is: no PR the fetch returned is dropped
+- Doesn't re-sort within a bucket, and filters the open PRs only by next action: no PR the fetch returned is dropped
 
 ## Oddities
 

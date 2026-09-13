@@ -26,7 +26,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Never approvers on a WIP row, and never the old-PR `🚨` marker there: nobody has been asked to review a draft yet
 - No strike-through, and no `🚀` outside the merged section: an open or WIP row can never carry a closed or merged PR
 - Doesn't escape link targets: they come from GitHub and can't contain a space or a closing parenthesis
-- Doesn't decide a PR's bucket, nor derive a heading from `prparser.PRTurn`: the heading strings are this package's, and the bucketing is `canvascontent`'s
+- Doesn't decide a PR's bucket, nor derive a heading from `prparser.PRNextAction`: the heading strings are this package's, and the bucketing is `canvascontent`'s
 - Doesn't sort, group or filter, that is `canvascontent`'s job
 - Doesn't limit the canvas size: an oversized canvas fails the write in `slackclient`
 

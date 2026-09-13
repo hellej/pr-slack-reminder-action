@@ -22,7 +22,7 @@ type testPROptions struct {
 	createdAt  time.Time
 	updatedAt  time.Time
 	mergedAt   *time.Time
-	// The signals PR.GetTurn reads, so a fixture can pick its bucket.
+	// The signals PR.GetNextAction reads.
 	approved           bool
 	conflicting        bool
 	threadWaiting      bool
@@ -106,9 +106,9 @@ func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 	assertEqual(t, "open PRs", prNumbers(content.WaitingForReview.PRs), []int{8, 7})
 }
 
-// Whose turn it is decides the section, and the fixtures name the signal rather than the bucket
+// The next action decides the section, and the fixtures name the signal rather than the bucket
 // so a wrong mapping shows up as a PR in the wrong list.
-func TestGetContentBucketsOpenPRsByWhoseTurnItIs(t *testing.T) {
+func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 	prs := []prparser.PR{
 		testPR(testPROptions{number: 1, approved: true}),
 		testPR(testPROptions{number: 2, nonApprovingReview: true}),
