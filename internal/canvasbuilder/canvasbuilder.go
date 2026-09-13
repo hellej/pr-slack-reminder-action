@@ -52,8 +52,7 @@ func BuildMarkdown(content canvascontent.Content) string {
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
-// All three buckets empty falls back to the single heading the canvas had before the split,
-// so it does not open at ## WIP.
+// All three buckets empty falls back to the single "Open" heading with "No open PRs" text.
 func renderOpenSections(content canvascontent.Content) []string {
 	nextActionSections := []section{
 		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
@@ -86,8 +85,7 @@ func openSection(
 	}
 }
 
-// One canvas section: its PRs as the flat list or as repository buckets, and how to render a row
-// of it.
+// One canvas section: its PRs as the flat list or as repository buckets.
 type section struct {
 	heading             string
 	prs                 []prview.PR
@@ -129,8 +127,7 @@ func renderRepositoryGroup(group prview.RepositoryPRs, section section) string {
 	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
 }
 
-// An empty section shows the given line under its heading instead of rows: a missing heading
-// would read as a broken render rather than as "nothing here right now".
+// An empty section shows the given line under its heading instead of rows.
 func renderSection(
 	heading string,
 	prs []prview.PR,
@@ -153,8 +150,7 @@ func renderOpenPRRow(pr prview.PR) string {
 }
 
 // A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
-// marker: nobody has been asked to review a draft yet. The activity segment is a code span while
-// the draft is moving, italics once it is idle.
+// marker. The activity segment is a code span if the PR is active, italics if it's inactive.
 func renderWIPPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters)
 
@@ -168,7 +164,6 @@ func renderWIPPRRow(pr prview.PR) string {
 	return row + " _" + activityText + "_"
 }
 
-// A failed merged fetch is not an empty week, so the section says which of the two it is.
 func emptyMergedPRsText(content canvascontent.Content) string {
 	if content.MergedPRsUnavailable {
 		return mergedPRsUnavailableText
@@ -176,8 +171,7 @@ func emptyMergedPRsText(content canvascontent.Content) string {
 	return noMergedPRsText
 }
 
-// A merged PR shows when it landed instead of its age, and never its reviewers: the section
-// answers what landed, not who reviewed it. Unknown merge time drops just that segment.
+// A merged PR shows when it landed instead of its age, and never its reviewers.
 func renderMergedPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr)
 
