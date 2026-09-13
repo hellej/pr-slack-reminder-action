@@ -15,7 +15,7 @@ Improve a software team's development velocity and flow.
 
 One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
 
-- One team, one Slack channel, reviewers only in it
+- One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
 - A monorepo the team owns, plus PRs the team has open in repos owned by others
 - 0 to 8 open PRs at a time. A weekly Dependabot batch adds ~5 at once
 - A draft PR with recent activity is a real WIP signal. A quiet one is just left open
