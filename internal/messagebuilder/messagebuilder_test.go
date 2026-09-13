@@ -11,7 +11,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
 func TestBuildSlackBlocksMessage(t *testing.T) {
@@ -42,7 +42,7 @@ func TestBuildSlackBlocksMessage(t *testing.T) {
 		testPRs := getTestPRs()
 		content := messagecontent.Content{
 			SummaryText:   "1 open PRs are waiting for attention 👀",
-			PRListHeading: "🚀 New PRs since 1 days ago",
+			PRListHeading: "🚀 New PRs since 1 day ago",
 			PRs:           testPRs.PRs,
 		}
 		_, got := messagebuilder.BuildMessage(content)
@@ -56,7 +56,7 @@ func TestBuildSlackBlocksMessage(t *testing.T) {
 
 		content := messagecontent.Content{
 			SummaryText:   "1 open PRs are waiting for attention 👀",
-			PRListHeading: "🚀 New PRs since 1 days ago",
+			PRListHeading: "🚀 New PRs since 1 day ago",
 			PRs:           testPRs.PRs,
 		}
 		got, _ := messagebuilder.BuildMessage(content)
@@ -194,17 +194,17 @@ func newRepositoryList(id int) messagecontent.PRsOfRepository {
 		HeadingPrefix:       "Open PRs in repo " + strconv.Itoa(id),
 		RepositoryLinkLabel: "owner/repo-" + strconv.Itoa(id),
 		RepositoryLink:      "https://github.com/owner/repo-" + strconv.Itoa(id),
-		PRs:                 []prparser.PR{getTestPRs().PR1},
+		PRs:                 []prview.PR{getTestPRs().PR1},
 	}
 }
 
 type TestPRs struct {
-	PR1 prparser.PR
-	PRs []prparser.PR
+	PR1 prview.PR
+	PRs []prview.PR
 }
 
 func getTestPRs() TestPRs {
-	pr1 := prparser.PR{
+	pr1 := prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				CreatedAt: time.Now().Add(-3 * time.Hour),
@@ -212,7 +212,7 @@ func getTestPRs() TestPRs {
 				Author:    githubclient.Collaborator{Login: "testuser", Name: "Test User"},
 			},
 		},
-		Author: prparser.Collaborator{
+		Author: prview.Collaborator{
 			Collaborator: &githubclient.Collaborator{
 				Login: "Test User",
 			},
@@ -221,21 +221,21 @@ func getTestPRs() TestPRs {
 	}
 	return TestPRs{
 		PR1: pr1,
-		PRs: []prparser.PR{pr1},
+		PRs: []prview.PR{pr1},
 	}
 }
 
 func TestMergedAndClosedPRFormatting(t *testing.T) {
 	testCases := []struct {
 		name                    string
-		pr                      prparser.PR
+		pr                      prview.PR
 		expectedStrikethrough   bool
 		expectedMergedIndicator bool
 		expectedReviewerSection bool
 	}{
 		{
 			name: "Open PR - no special formatting",
-			pr: prparser.PR{
+			pr: prview.PR{
 				PR: &githubclient.PR{
 					PullRequest: &githubclient.PullRequest{
 						CreatedAt: time.Now().Add(-3 * time.Hour),
@@ -245,7 +245,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 						Author:    githubclient.Collaborator{Login: "alice", Name: "Alice"},
 					},
 				},
-				Author: prparser.Collaborator{
+				Author: prview.Collaborator{
 					Collaborator: &githubclient.Collaborator{Login: "alice", Name: "Alice"},
 				},
 			},
@@ -255,7 +255,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 		},
 		{
 			name: "Merged PR with reviewers",
-			pr: prparser.PR{
+			pr: prview.PR{
 				PR: &githubclient.PR{
 					PullRequest: &githubclient.PullRequest{
 						CreatedAt: time.Now().Add(-3 * time.Hour),
@@ -265,10 +265,10 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 						Author:    githubclient.Collaborator{Login: "bob", Name: "Bob"},
 					},
 				},
-				Author: prparser.Collaborator{
+				Author: prview.Collaborator{
 					Collaborator: &githubclient.Collaborator{Login: "bob", Name: "Bob"},
 				},
-				Approvers: []prparser.Collaborator{
+				Approvers: []prview.Collaborator{
 					{Collaborator: &githubclient.Collaborator{Login: "reviewer1", Name: "Reviewer One"}},
 				},
 			},
@@ -278,7 +278,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 		},
 		{
 			name: "Closed PR without merge",
-			pr: prparser.PR{
+			pr: prview.PR{
 				PR: &githubclient.PR{
 					PullRequest: &githubclient.PullRequest{
 						CreatedAt: time.Now().Add(-3 * time.Hour),
@@ -288,7 +288,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 						Author:    githubclient.Collaborator{Login: "charlie", Name: "Charlie"},
 					},
 				},
-				Author: prparser.Collaborator{
+				Author: prview.Collaborator{
 					Collaborator: &githubclient.Collaborator{Login: "charlie", Name: "Charlie"},
 				},
 			},
@@ -298,7 +298,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 		},
 		{
 			name: "Merged PR without reviewers",
-			pr: prparser.PR{
+			pr: prview.PR{
 				PR: &githubclient.PR{
 					PullRequest: &githubclient.PullRequest{
 						CreatedAt: time.Now().Add(-3 * time.Hour),
@@ -308,7 +308,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 						Author:    githubclient.Collaborator{Login: "dave", Name: "Dave"},
 					},
 				},
-				Author: prparser.Collaborator{
+				Author: prview.Collaborator{
 					Collaborator: &githubclient.Collaborator{Login: "dave", Name: "Dave"},
 				},
 			},
@@ -323,7 +323,7 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 			content := messagecontent.Content{
 				SummaryText:   "Test",
 				PRListHeading: "Test PRs",
-				PRs:           []prparser.PR{tc.pr},
+				PRs:           []prview.PR{tc.pr},
 			}
 
 			message, _ := messagebuilder.BuildMessage(content)
@@ -373,12 +373,12 @@ func TestMergedAndClosedPRFormatting(t *testing.T) {
 	}
 }
 
-func prSectionElements(t *testing.T, pr prparser.PR) []slack.RichTextSectionElement {
+func prSectionElements(t *testing.T, pr prview.PR) []slack.RichTextSectionElement {
 	t.Helper()
 	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
 		SummaryText:   "Test",
 		PRListHeading: "Test PRs",
-		PRs:           []prparser.PR{pr},
+		PRs:           []prview.PR{pr},
 	})
 	prBlock := message.Blocks.BlockSet[1].(*slack.RichTextBlock)
 	return prBlock.Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection).Elements
@@ -410,7 +410,7 @@ func TestOldPRWarningMarker(t *testing.T) {
 
 func TestAuthorFallsBackToGitHubName(t *testing.T) {
 	pr := getTestPRs().PR1
-	pr.Author = prparser.Collaborator{
+	pr.Author = prview.Collaborator{
 		Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},
 	}
 

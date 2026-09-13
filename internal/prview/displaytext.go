@@ -1,4 +1,4 @@
-package prparser
+package prview
 
 import (
 	"fmt"
@@ -6,19 +6,26 @@ import (
 	"time"
 )
 
-// Renders a duration as days, hours or minutes depending on its magnitude, always plural and
-// rounded to whole units.
+// Renders a duration as days, hours or minutes depending on its magnitude, rounded to whole
+// units. The unit is singular for a count of 1, plural otherwise (0 included).
 func durationText(duration time.Duration) string {
 	if duration.Hours() >= 24 {
 		days := int(math.Round(duration.Hours())) / 24
-		return fmt.Sprintf("%d days", days)
+		return fmt.Sprintf("%d %s", days, pluralize(days, "day"))
 	} else if duration.Hours() >= 1 {
 		hours := int(math.Round(duration.Hours()))
-		return fmt.Sprintf("%d hours", hours)
+		return fmt.Sprintf("%d %s", hours, pluralize(hours, "hour"))
 	} else {
 		minutes := int(math.Round(duration.Minutes()))
-		return fmt.Sprintf("%d minutes", minutes)
+		return fmt.Sprintf("%d %s", minutes, pluralize(minutes, "minute"))
 	}
+}
+
+func pluralize(count int, unit string) string {
+	if count == 1 {
+		return unit
+	}
+	return unit + "s"
 }
 
 // GetActivityText renders how long ago the PR last saw activity: "updated N minutes/hours ago"

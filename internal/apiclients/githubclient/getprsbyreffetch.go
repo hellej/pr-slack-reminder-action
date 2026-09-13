@@ -15,11 +15,12 @@ const notFoundErrorType = "NOT_FOUND"
 
 // The referenced PRs may be closed or merged, so state and merged are selected alongside the
 // scalars, author and labels the open-PR listing provides in the "post" run mode.
-const fullPullRequestSelection = `  number title url isDraft createdAt updatedAt state merged mergedAt
+const fullPullRequestSelection = `  number title url isDraft createdAt updatedAt state merged mergedAt mergeable
   author { login __typename ... on User { name } }
   labels(first: 100){ nodes { name } }
   reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
-  comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }`
+  comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
+  reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }`
 
 var fullPullRequestFragment = newPullRequestFragment("fullPr", fullPullRequestSelection)
 

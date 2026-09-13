@@ -384,3 +384,45 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   plus the automatic `metadata: read`, checking the connection comes back populated
 - The failure mode is silent: an ungranted connection can return empty rather than
   `FORBIDDEN`. Same gap as the `commits` entry above
+
+## `mergeable` and `reviewThreads` both populate under `pull-requests: read` on `GITHUB_TOKEN` [2026-09-12]
+
+- Source: workflow run 34711484631, `pr-reminder` on branch `canvas-open-pr-buckets`, whose
+  `reminder` job grants `contents: read`, `actions: read`, `pull-requests: read`
+- Both fields came back populated on a public repository: PR 61 logged 1 review thread with
+  `mergeable: "MERGEABLE"`, and PR 3 logged `mergeable: "CONFLICTING"`, so neither field is
+  the silent-empty failure the entry above warns about
+- `reviewThreads`' nested `comments(last: 1){ nodes { author { login __typename } } }`
+  resolved too: PR 61's own thread, last commented by the PR author, was read as answered
+  rather than as a thread with no comments
+- This narrows the gap above rather than closing it. The job grants `contents: read` as well,
+  so it does not isolate `pull-requests: read`, and the repository is public. Closing it still
+  needs a private repository under a fine-grained PAT holding only `pull-requests: read`
+
+## `mergeable` rides on an endpoint needing Pull requests read OR Contents read, not both [2026-09-12]
+
+- Source: [REST get a pull request](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request); [permissions for fine-grained PATs](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
+- The endpoint page states the token "must have at least one of the following permission
+  sets: Pull requests repository permissions (read), Contents repository permissions (read)"
+- So a checkmark in the Contents table against this endpoint is the other arm of the OR, not a
+  second requirement. The endpoints that genuinely need Contents are the merge ones, at write
+- `pulls/{n}/reviews` and `pulls/{n}/comments` carry no such marker at all: plain Pull requests
+  at read
+- Unauthenticated `curl` against a public repository returns the `mergeable` attribute, `null`
+  on the first call and `true` on the second, which is the background compute, not permission
+- Unverified: that the GraphQL field behaves like its REST equivalent under a restricted token.
+  Confirming it needs a fine-grained PAT holding only `pull-requests: read` against a private
+  repository
+
+## GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer [2026-09-12]
+
+- Source: `curl -X POST https://api.github.com/graphql`; [workflow syntax `permissions`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions); [choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+- A tokenless GraphQL POST returns HTTP 403. The same-shaped REST read returns 200
+- REST documents per endpoint that it "can be used without authentication or the aforementioned
+  permissions if only public resources are requested". No page extends that to GraphQL
+- Specifying any permission in a workflow sets every unspecified one to `none`
+- `GITHUB_TOKEN` is an App installation token, and the implicit public-read fallback GitHub
+  documents is scoped to user access tokens, "when acting on behalf of a user". For an
+  installation token the page says success "only depends on the app's permissions"
+- So a green run in a public repository whose job grants `contents: read` proves the query
+  works, never that a permission was unnecessary

@@ -152,7 +152,8 @@ func logEnrichment(repository models.Repository, number int, node pullRequestNod
 		return
 	}
 	log.Printf(
-		"Found %d reviews and %d timeline comments for PR %v/%d",
-		len(node.Reviews.Nodes), len(node.Comments.Nodes), repository, number,
+		"Found %d reviews, %d timeline comments and %d review threads for PR %v/%d, mergeable: %q",
+		len(node.Reviews.Nodes), len(node.Comments.Nodes), len(node.ReviewThreads.Nodes),
+		repository, number, node.Mergeable,
 	)
 }

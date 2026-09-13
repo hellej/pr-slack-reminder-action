@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/slack-go/slack"
 )
@@ -58,7 +58,7 @@ func addNoPRsBlock(blocks []slack.Block, noPRsText string) []slack.Block {
 	)
 }
 
-func addPRListBLock(blocks []slack.Block, heading string, prs []prparser.PR) []slack.Block {
+func addPRListBLock(blocks []slack.Block, heading string, prs []prview.PR) []slack.Block {
 	return append(blocks,
 		slack.NewRichTextBlock("pr_list_heading",
 			slack.NewRichTextSection(
@@ -97,7 +97,7 @@ func addRepositoryPRListBlocks(
 	return blocks
 }
 
-func makePRListBlockWithID(openPRs []prparser.PR, blockID string) *slack.RichTextBlock {
+func makePRListBlockWithID(openPRs []prview.PR, blockID string) *slack.RichTextBlock {
 	var prBlocks []slack.RichTextElement
 	for _, pr := range openPRs {
 		prBlocks = append(prBlocks, buildPRBulletPointBlock(pr))
@@ -110,7 +110,7 @@ func makePRListBlockWithID(openPRs []prparser.PR, blockID string) *slack.RichTex
 	)
 }
 
-func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
+func buildPRBulletPointBlock(pr prview.PR) slack.RichTextElement {
 	var ageElements []slack.RichTextSectionElement
 
 	if pr.IsOldPR {
@@ -147,7 +147,7 @@ func buildPRBulletPointBlock(pr prparser.PR) slack.RichTextElement {
 	return slack.NewRichTextSection(prItemElements...)
 }
 
-func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
+func getUserNameElement(pr prview.PR) slack.RichTextSectionElement {
 	if pr.Author.SlackUserID != "" {
 		return slack.NewRichTextSectionUserElement(
 			pr.Author.SlackUserID, &slack.RichTextSectionTextStyle{},
@@ -158,9 +158,9 @@ func getUserNameElement(pr prparser.PR) slack.RichTextSectionElement {
 	)
 }
 
-func getReviewersElements(pr prparser.PR) []slack.RichTextSectionElement {
+func getReviewersElements(pr prview.PR) []slack.RichTextSectionElement {
 	return utilities.Map(
-		prparser.GetReviewersTextSegments(pr.Approvers, pr.Commenters),
+		prview.GetReviewersTextSegments(pr.Approvers, pr.Commenters),
 		func(segment string) slack.RichTextSectionElement {
 			return slack.NewRichTextSectionTextElement(segment, &slack.RichTextSectionTextStyle{})
 		},

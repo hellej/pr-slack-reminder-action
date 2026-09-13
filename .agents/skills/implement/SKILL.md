@@ -52,6 +52,10 @@ the implementer tests those spots, the reviewer mutates them.
 
 If the step states no criteria, say so and carry on. Do not invent them.
 
+A criterion the step cannot satisfy on its own is a briefing bug, not a finding. Check each
+is reachable within the step before passing it on: a lint target an uncalled function fails
+by construction, or a golden file a later step re-records.
+
 Check the step's claims about the tree yourself: paths, call sites, what is already
 landed, and whether wording the step quotes verbatim still matches the tree. Tell the
 implementer where the plan has gone stale.

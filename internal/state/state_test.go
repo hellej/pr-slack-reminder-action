@@ -13,7 +13,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
 func LoadFromFile(filePath string) (*State, error) {
@@ -58,8 +58,8 @@ func createTestState() State {
 	}
 }
 
-func createTestPR(number int, owner, repo string) prparser.PR {
-	return prparser.PR{
+func createTestPR(number int, owner, repo string) prview.PR {
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{Number: number},
 			Repository:  models.Repository{Owner: owner, Name: repo},
@@ -384,7 +384,7 @@ func TestNewPostStateSaveAndLoad(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := filepath.Join(tempDir, "post-state.json")
 
-	parsedPRs := []prparser.PR{
+	prViews := []prview.PR{
 		createTestPR(1, "owner1", "repo1"),
 		createTestPR(42, "owner2", "repo2"),
 	}
@@ -394,7 +394,7 @@ func TestNewPostStateSaveAndLoad(t *testing.T) {
 		Timestamp: "1729123456.123456",
 	}
 
-	if err := Save(statePath, NewPostState(parsedPRs, messageInfo)); err != nil {
+	if err := Save(statePath, NewPostState(prViews, messageInfo)); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}
 
