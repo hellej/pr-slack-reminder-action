@@ -111,22 +111,19 @@ func newPRSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
 	return PRSection{PRs: sortedPRs}
 }
 
+func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
+	return func(pr prparser.PR) bool {
+		return pr.IsActiveAsOf(generatedAt, MaxDraftPRInactivity)
+	}
+}
+
 func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
 	inactiveKept := 0
 	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
-		if pr.IsActiveAsOf(generatedAt) {
+		if pr.IsActiveAsOf(generatedAt, prparser.RecentActivityThreshold) {
 			return true
 		}
 		inactiveKept++
 		return inactiveKept <= MaxInactiveWIPPRs
 	})
-}
-
-// unknown update time returns true.
-func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
-	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
-	return func(pr prparser.PR) bool {
-		updatedAt := pr.GetUpdatedAt()
-		return updatedAt.IsZero() || !updatedAt.Before(inactiveBefore)
-	}
 }

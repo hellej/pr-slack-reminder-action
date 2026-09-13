@@ -10,9 +10,9 @@ Enriches fetched PRs with display-ready metadata.
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards
 - `GetMergedText` renders time since `MergedAt` as "merged N minutes/hours/days ago", prefixed like the activity text so a merge time cannot be misread as an age. A PR that was never merged yields no text
-- `IsRecentlyUpdated` is true when `UpdatedAt` is under 24 hours old, measured against the wall clock. The threshold is the exported `RecentActivityThreshold`, so other packages can bucket by the same boundary; it matches where `GetActivityText` flips from "updated" to "idle"
-- `IsActiveAsOf(asOf)` is the same threshold measured against a given time instead of the wall clock, for a caller that can't read the clock itself
-- Unknown activity (a zero `UpdatedAt`) yields empty activity text, counts as not recently updated, but as active for `IsActiveAsOf`
+- `IsActiveAsOf(asOf, threshold)` is true when `UpdatedAt` is within `threshold` of `asOf`, inclusive at the boundary. Callers give both, so a caller that can't read the clock passes `time.Now()` itself, and a canvas-generation timestamp stays reusable
+- `IsRecentlyUpdated` is `IsActiveAsOf(time.Now(), RecentActivityThreshold)`, for a caller that can read the wall clock directly. `RecentActivityThreshold` (24 hours) is exported so other packages bucket by the same boundary; it matches where `GetActivityText` flips from "updated" to "idle"
+- Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
 - `IsMerged` and `IsClosedButNotMerged` expose PR state for display styling

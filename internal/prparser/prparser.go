@@ -22,7 +22,7 @@ const RecentActivityThreshold = 24 * time.Hour
 type PR struct {
 	*githubclient.PR
 	Author     Collaborator
-	Approvers  []Collaborator // Users who have approved the PR at least once
+	Approvers  []Collaborator
 	Commenters []Collaborator // Users who have commented on the PR but did not approve it
 	IsOldPR    bool           // true if the PR is older than the configured threshold
 }
@@ -39,8 +39,7 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 	}
 }
 
-// What a PR needs next, and from whom. The values are identifiers, not headings: a renderer
-// supplies its own wording. An empty PRNextAction claims nothing, so the zero value is no bucket.
+// What action a PR needs next, and from whom (the values are identifiers, not headings).
 type PRNextAction string
 
 const (
@@ -77,8 +76,7 @@ func (pr PR) IsOpen() bool { return !pr.GetDraft() }
 
 func (pr PR) IsDraft() bool { return pr.GetDraft() }
 
-// Names the update time as last activity, and spells unknown activity as the nil
-// SortPRsNewestFirst documents. A zero time would otherwise sort last on its own, being year 1.
+// Names the update time as last activity and unknown activity as nil.
 func (pr PR) LastActivityAt() *time.Time {
 	updatedAt := pr.GetUpdatedAt()
 	if updatedAt.IsZero() {
@@ -87,18 +85,14 @@ func (pr PR) LastActivityAt() *time.Time {
 	return &updatedAt
 }
 
-// True when the PR saw activity less than RecentActivityThreshold ago. A PR with unknown
-// activity, a zero update time, is not recently updated.
-func (pr PR) IsRecentlyUpdated() bool {
+// True when the PR saw activity within threshold of asOf. A PR with unknown activity counts as active.
+func (pr PR) IsActiveAsOf(asOf time.Time, threshold time.Duration) bool {
 	updatedAt := pr.GetUpdatedAt()
-	return !updatedAt.IsZero() && time.Since(updatedAt) < RecentActivityThreshold
+	return updatedAt.IsZero() || !updatedAt.Before(asOf.Add(-threshold))
 }
 
-// True when the PR saw activity less than RecentActivityThreshold before asOf. A PR with
-// unknown activity, a zero update time, counts as active.
-func (pr PR) IsActiveAsOf(asOf time.Time) bool {
-	updatedAt := pr.GetUpdatedAt()
-	return updatedAt.IsZero() || updatedAt.After(asOf.Add(-RecentActivityThreshold))
+func (pr PR) IsRecentlyUpdated() bool {
+	return pr.IsActiveAsOf(time.Now(), RecentActivityThreshold)
 }
 
 func (pr PR) IsMerged() bool {

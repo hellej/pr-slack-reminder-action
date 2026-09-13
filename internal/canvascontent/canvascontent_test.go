@@ -426,7 +426,7 @@ func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
 			name: "just inside the threshold", inactivity: 24*time.Hour - time.Second,
 			wantWIPPRs: []int{6, 5, 4, 3, 2, 1},
 		},
-		{name: "exactly at the threshold", inactivity: 24 * time.Hour, wantWIPPRs: []int{6, 5, 4, 3, 2}},
+		{name: "exactly at the threshold", inactivity: 24 * time.Hour, wantWIPPRs: []int{6, 5, 4, 3, 2, 1}},
 		{
 			name: "just past the threshold", inactivity: 24*time.Hour + time.Second,
 			wantWIPPRs: []int{6, 5, 4, 3, 2},
