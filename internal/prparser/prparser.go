@@ -97,6 +97,13 @@ func (pr PR) IsRecentlyUpdated() bool {
 	return !updatedAt.IsZero() && time.Since(updatedAt) < RecentActivityThreshold
 }
 
+// True when the PR saw no activity for RecentActivityThreshold before asOf. A PR with unknown
+// activity, a zero update time, is not inactive.
+func (pr PR) IsInactiveAsOf(asOf time.Time) bool {
+	updatedAt := pr.GetUpdatedAt()
+	return !updatedAt.IsZero() && !updatedAt.After(asOf.Add(-RecentActivityThreshold))
+}
+
 func (pr PR) IsMerged() bool {
 	return pr.GetMerged()
 }

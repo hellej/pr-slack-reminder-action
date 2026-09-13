@@ -530,6 +530,41 @@ func TestLastActivityAt(t *testing.T) {
 	})
 }
 
+func TestIsInactiveAsOf(t *testing.T) {
+	asOf := time.Now()
+	tests := []struct {
+		name      string
+		updatedAt time.Time
+		expected  bool
+	}{
+		{name: "unknown activity is not inactive", updatedAt: time.Time{}, expected: false},
+		{
+			name:      "just under the 24 hour threshold",
+			updatedAt: asOf.Add(-23 * time.Hour),
+			expected:  false,
+		},
+		{
+			name:      "exactly at the 24 hour threshold",
+			updatedAt: asOf.Add(-24 * time.Hour),
+			expected:  true,
+		},
+		{
+			name:      "past the 24 hour threshold",
+			updatedAt: asOf.Add(-25 * time.Hour),
+			expected:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testPRWithUpdatedAt(1, tt.updatedAt)
+			if got := pr.IsInactiveAsOf(asOf); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
 func TestSortPRsNewestFirst(t *testing.T) {
 	now := time.Now()
 	unknownMerge := testMergedPRWithNumber(1, nil)

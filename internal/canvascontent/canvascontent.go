@@ -118,20 +118,12 @@ func newPRSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
 func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
 	inactiveKept := 0
 	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
-		if !isInactive(pr, generatedAt) {
+		if !pr.IsInactiveAsOf(generatedAt) {
 			return true
 		}
 		inactiveKept++
 		return inactiveKept <= MaxInactiveWIPPRs
 	})
-}
-
-// Inactive from prparser.RecentActivityThreshold of silence onwards, the boundary the WIP row
-// styling uses too. Unknown activity is not inactivity, so a draft without an update time is
-// never capped away.
-func isInactive(pr prparser.PR, generatedAt time.Time) bool {
-	updatedAt := pr.GetUpdatedAt()
-	return !updatedAt.IsZero() && !updatedAt.After(generatedAt.Add(-prparser.RecentActivityThreshold))
 }
 
 // A draft with unknown update time is kept
