@@ -9,14 +9,14 @@ import (
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 type Content struct {
 	SummaryText            string
 	PRListHeading          string
-	PRs                    []prparser.PR
+	PRs                    []prview.PR
 	GroupedByRepository    bool
 	PRsGroupedByRepository []PRsOfRepository
 }
@@ -29,11 +29,11 @@ type PRsOfRepository struct {
 	HeadingPrefix       string
 	RepositoryLinkLabel string
 	RepositoryLink      string
-	PRs                 []prparser.PR
+	PRs                 []prview.PR
 }
 
-func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Content {
-	sortedOpenPRs := prparser.SortPRsOldestToNewest(openPRs)
+func GetContent(openPRs []prview.PR, contentInputs config.ContentInputs) Content {
+	sortedOpenPRs := prview.SortPRsOldestToNewest(openPRs)
 
 	switch {
 	case len(sortedOpenPRs) == 0:
@@ -56,10 +56,10 @@ func GetContent(openPRs []prparser.PR, contentInputs config.ContentInputs) Conte
 	}
 }
 
-func groupPRsByRepositories(openPRs []prparser.PR) []PRsOfRepository {
+func groupPRsByRepositories(openPRs []prview.PR) []PRsOfRepository {
 	return utilities.Map(
-		prparser.GroupPRsByRepositories(openPRs),
-		func(group prparser.RepositoryPRs) PRsOfRepository {
+		prview.GroupPRsByRepositories(openPRs),
+		func(group prview.RepositoryPRs) PRsOfRepository {
 			return PRsOfRepository{
 				HeadingPrefix:       "Open PRs in ",
 				RepositoryLinkLabel: group.Repository.GetPath(),

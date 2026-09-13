@@ -1,8 +1,8 @@
-// Package prparser enriches raw GitHub PR data with additional metadata
+// Package prview enriches raw GitHub PR data with additional metadata
 // for message and canvas display. It handles Slack user ID mapping, age and
 // activity calculation, sorting, and grouping by repository. It also renders
 // the reviewer, activity and merged-time texts a PR row shows.
-package prparser
+package prview
 
 import (
 	"maps"
@@ -103,17 +103,13 @@ func (pr PR) IsClosedButNotMerged() bool {
 	return pr.GetState() == "closed" && !pr.IsMerged()
 }
 
-func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return utilities.Map(prs, getPRParser(config))
+func BuildPRViews(prs []githubclient.PR, config config.ContentInputs) []PR {
+	return utilities.Map(prs, func(pr githubclient.PR) PR {
+		return buildPRView(pr, config)
+	})
 }
 
-func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {
-	return func(pr githubclient.PR) PR {
-		return parsePR(pr, config)
-	}
-}
-
-func parsePR(pr githubclient.PR, config config.ContentInputs) PR {
+func buildPRView(pr githubclient.PR, config config.ContentInputs) PR {
 	return PR{
 		PR:         &pr,
 		Author:     NewCollaborator(pr.Author, config.SlackUserIdByGitHubUsername[pr.Author.Login]),

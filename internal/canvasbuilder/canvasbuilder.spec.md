@@ -10,7 +10,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Any section can render grouped: its PRs then get one `###` sub-heading per repository, the bare repository path linking to `models.Repository.GetPullsURL()`. The section heading above them already scopes the rows, so it is not repeated. Each section reads its own grouped slice, so all of them group together, off the one `Content.GroupedByRepository` flag. Nothing dedupes a repository across sections, so one repository can carry a `###` heading under each
 - The three open sections share one row renderer, one empty-state line and one heading level: only the heading text and the PR list differ. A PR's bucket is `canvascontent`'s to decide
 - Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers
-- WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prparser.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
+- WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prview.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
 - Merged PR row: linked title, the merge text in italics, author, then a trailing `🚀`. Never reviewers: the section answers what landed, not who reviewed it. An unknown merge time drops that segment only
 - Every section renders through one path, differing only in heading, PR lists, row renderer, empty text and whether it hides while empty, so a further section costs one call
 - An empty section that does not hide keeps its heading and shows one italic line: `_No work in progress_` or `_No merged PRs_`, and `_No open PRs_` in the all-empty open case. A merged section whose fetch failed shows `_Merged PRs could not be fetched_` instead, so a failure never reads as an empty week. Grouped mode with such a section shows that section's line and no sub-headings
@@ -26,7 +26,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Never approvers on a WIP row, and never the old-PR `🚨` marker there: nobody has been asked to review a draft yet
 - No strike-through, and no `🚀` outside the merged section: an open or WIP row can never carry a closed or merged PR
 - Doesn't escape link targets: they come from GitHub and can't contain a space or a closing parenthesis
-- Doesn't decide a PR's bucket, nor derive a heading from `prparser.PRNextAction`: the heading strings are this package's, and the bucketing is `canvascontent`'s
+- Doesn't decide a PR's bucket, nor derive a heading from `prview.PRNextAction`: the heading strings are this package's, and the bucketing is `canvascontent`'s
 - Doesn't sort, group or filter, that is `canvascontent`'s job
 - Doesn't limit the canvas size: an oversized canvas fails the write in `slackclient`
 

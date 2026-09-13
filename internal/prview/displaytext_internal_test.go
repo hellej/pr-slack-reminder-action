@@ -1,4 +1,4 @@
-package prparser
+package prview
 
 import (
 	"testing"

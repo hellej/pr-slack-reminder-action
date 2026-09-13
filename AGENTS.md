@@ -140,7 +140,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder and saves state;
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
-3. **PR Parser** (`internal/prparser/`) — enriches PRs with Slack user mappings and metadata
+3. **PR View** (`internal/prview/`) — enriches PRs with Slack user mappings and display metadata
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
 6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages

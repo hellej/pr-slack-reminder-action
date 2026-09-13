@@ -1,4 +1,4 @@
-// Package canvascontent structures parsed PRs into the sections a PR tracker canvas shows: the
+// Package canvascontent structures PR views into the sections a PR tracker canvas shows: the
 // open PRs bucketed by next action, work-in-progress (draft) PRs and recently merged PRs.
 // It carries no rendering, that belongs to canvasbuilder.
 package canvascontent
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -20,8 +20,8 @@ const MaxInactiveWIPPRs = 5
 
 // One canvas section's PRs, either as the flat list or as repository buckets.
 type PRSection struct {
-	PRs    []prparser.PR
-	Groups []prparser.RepositoryPRs
+	PRs    []prview.PR
+	Groups []prview.RepositoryPRs
 }
 
 type Content struct {
@@ -51,25 +51,25 @@ type GetContentOptions struct {
 // capped at MaxInactiveWIPPRs; merged PRs are ordered newest merge first. Each section is
 // bucketed by repository when configured, in that same order.
 func GetContent(
-	prs []prparser.PR,
-	mergedPRs []prparser.PR,
+	prs []prview.PR,
+	mergedPRs []prview.PR,
 	contentInputs config.ContentInputs,
 	options GetContentOptions,
 ) Content {
-	sortedOpenPRs := prparser.SortPRsOldestToNewest(utilities.Filter(prs, prparser.PR.IsOpen))
+	sortedOpenPRs := prview.SortPRsOldestToNewest(utilities.Filter(prs, prview.PR.IsOpen))
 	activeDrafts := utilities.Filter(
-		utilities.Filter(prs, prparser.PR.IsDraft),
+		utilities.Filter(prs, prview.PR.IsDraft),
 		isActiveEnoughForCanvas(options.GeneratedAt),
 	)
-	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, prparser.PR.LastActivityAt)
+	sortedActiveDraftPRs := prview.SortPRsNewestFirst(activeDrafts, prview.PR.LastActivityAt)
 	wipPRs := withInactiveDraftsCapped(sortedActiveDraftPRs, options.GeneratedAt)
-	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
+	sortedMergedPRs := prview.SortPRsNewestFirst(mergedPRs, func(pr prview.PR) *time.Time {
 		return pr.GetMergedAt()
 	})
 
-	readyToMerge := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionReadyToMerge)
-	waitingForAuthor := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionWaitingForAuthor)
-	waitingForReview := includePRsWhoseNextActionIs(sortedOpenPRs, prparser.NextActionWaitingForReview)
+	readyToMerge := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	waitingForAuthor := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
+	waitingForReview := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
@@ -96,31 +96,31 @@ func GetContent(
 }
 
 func includePRsWhoseNextActionIs(
-	sortedOpenPRs []prparser.PR,
-	nextAction prparser.PRNextAction,
-) []prparser.PR {
-	return utilities.Filter(sortedOpenPRs, func(pr prparser.PR) bool {
+	sortedOpenPRs []prview.PR,
+	nextAction prview.PRNextAction,
+) []prview.PR {
+	return utilities.Filter(sortedOpenPRs, func(pr prview.PR) bool {
 		return pr.GetNextAction() == nextAction
 	})
 }
 
-func newPRSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
+func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
 	if groupByRepository {
-		return PRSection{Groups: prparser.GroupPRsByRepositoriesInGivenOrder(sortedPRs)}
+		return PRSection{Groups: prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs)}
 	}
 	return PRSection{PRs: sortedPRs}
 }
 
-func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
-	return func(pr prparser.PR) bool {
+func isActiveEnoughForCanvas(generatedAt time.Time) func(prview.PR) bool {
+	return func(pr prview.PR) bool {
 		return pr.IsActiveAsOf(generatedAt, MaxDraftPRInactivity)
 	}
 }
 
-func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
+func withInactiveDraftsCapped(sortedDrafts []prview.PR, generatedAt time.Time) []prview.PR {
 	inactiveKept := 0
-	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
-		if pr.IsActiveAsOf(generatedAt, prparser.RecentActivityThreshold) {
+	return utilities.Filter(sortedDrafts, func(pr prview.PR) bool {
+		if pr.IsActiveAsOf(generatedAt, prview.RecentActivityThreshold) {
 			return true
 		}
 		inactiveKept++

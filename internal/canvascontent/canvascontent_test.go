@@ -9,7 +9,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -29,18 +29,18 @@ type testPROptions struct {
 	nonApprovingReview bool
 }
 
-func testPR(options testPROptions) prparser.PR {
+func testPR(options testPROptions) prview.PR {
 	repository := models.Repository{Owner: "test-org", Name: "test-repo"}
 	if options.repository != "" {
 		repository = models.Repository{Owner: "test-org", Name: options.repository}
 	}
-	var approvers []prparser.Collaborator
+	var approvers []prview.Collaborator
 	if options.approved {
-		approvers = []prparser.Collaborator{
-			prparser.NewCollaborator(githubclient.Collaborator{Login: "approver"}, ""),
+		approvers = []prview.Collaborator{
+			prview.NewCollaborator(githubclient.Collaborator{Login: "approver"}, ""),
 		}
 	}
-	return prparser.PR{
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				Number:    options.number,
@@ -67,8 +67,8 @@ func mergedAgo(age time.Duration) *time.Time {
 	return &timestamp
 }
 
-func prNumbers(prs []prparser.PR) []int {
-	return utilities.Map(prs, func(pr prparser.PR) int { return pr.GetNumber() })
+func prNumbers(prs []prview.PR) []int {
+	return utilities.Map(prs, func(pr prview.PR) int { return pr.GetNumber() })
 }
 
 func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
@@ -79,7 +79,7 @@ func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
 }
 
 func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 		testPR(testPROptions{number: 3}),
@@ -94,7 +94,7 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 }
 
 func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-1 * time.Hour)}),
 		testPR(testPROptions{number: 8, createdAt: generatedAt.Add(-10 * time.Hour)}),
 	}
@@ -109,7 +109,7 @@ func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 // The next action decides the section, and the fixtures name the signal rather than the bucket
 // so a wrong mapping shows up as a PR in the wrong list.
 func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, approved: true}),
 		testPR(testPROptions{number: 2, nonApprovingReview: true}),
 		testPR(testPROptions{number: 3}),
@@ -134,7 +134,7 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 	hoursAgo := func(hours int) time.Time {
 		return generatedAt.Add(-time.Duration(hours) * time.Hour)
 	}
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, approved: true, createdAt: hoursAgo(2)}),
 		testPR(testPROptions{number: 2, threadWaiting: true, createdAt: hoursAgo(3)}),
 		testPR(testPROptions{number: 3, createdAt: hoursAgo(4)}),
@@ -153,8 +153,8 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 }
 
 // The repository paths of a grouped section, so its whole group order is one expectation.
-func groupPaths(groups []prparser.RepositoryPRs) []string {
-	return utilities.Map(groups, func(group prparser.RepositoryPRs) string {
+func groupPaths(groups []prview.RepositoryPRs) []string {
+	return utilities.Map(groups, func(group prview.RepositoryPRs) string {
 		return group.Repository.GetPath()
 	})
 }
@@ -162,7 +162,7 @@ func groupPaths(groups []prparser.RepositoryPRs) []string {
 // The open PRs come in oldest first, so the oldest PR's repository leads. It is not the
 // alphabetically first one here.
 func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "repo-two"}),
 		testPR(testPROptions{number: 2, repository: "repo-one"}),
 		testPR(testPROptions{number: 3, repository: "repo-two"}),
@@ -193,7 +193,7 @@ func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.
 // both. Nothing dedupes it. The waiting-for-author groups lead with repo-two, which sorts after
 // repo-one alphabetically, so alphabetical bucketing fails this too.
 func TestGetContentGroupsEachOpenBucketOnItsOwn(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "repo-two", approved: true}),
 		testPR(testPROptions{number: 2, repository: "repo-two", threadWaiting: true}),
 		testPR(testPROptions{number: 3, repository: "repo-one", threadWaiting: true}),
@@ -227,7 +227,7 @@ func TestGetContentGroupsEachOpenBucketOnItsOwn(t *testing.T) {
 // The WIP PRs are sorted by activity first, so the most recently touched PR's repository leads.
 // repo-two sorts after repo-three alphabetically, so alphabetical bucketing fails this.
 func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "repo-two"}),
 		testPR(testPROptions{number: 2, repository: "repo-one"}),
 		testPR(testPROptions{
@@ -260,7 +260,7 @@ func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *
 }
 
 func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{
 			number: 3, repository: "repo-two", draft: true, updatedAt: activityAgo(time.Hour),
 		}),
@@ -284,7 +284,7 @@ func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
 
 func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 	// creation order and activity order disagree
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{
 			number: 1, draft: true,
 			createdAt: generatedAt.Add(-10 * time.Hour), updatedAt: activityAgo(5 * time.Hour),
@@ -310,7 +310,7 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 // rather than at the old end of them. The unknown draft leads the given order, so an
 // unsorted list would leave it first.
 func TestGetContentSortsWIPPRsWithUnknownActivityLast(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, draft: true}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(9 * time.Hour)}),
 		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(time.Hour)}),
@@ -338,7 +338,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prs := []prparser.PR{
+			prs := []prview.PR{
 				testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(tc.inactivity)}),
 			}
 
@@ -356,7 +356,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 // Inactive drafts, given oldest activity first, so keeping the first 5 given would keep the
 // wrong ones.
 func TestGetContentKeepsOnlyTheMostRecentlyActiveInactiveWIPPRs(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(9 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(8 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(7 * 24 * time.Hour)}),
@@ -374,7 +374,7 @@ func TestGetContentKeepsOnlyTheMostRecentlyActiveInactiveWIPPRs(t *testing.T) {
 }
 
 func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
@@ -391,7 +391,7 @@ func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
 
 // Recently active drafts are outside the cap, however many there are.
 func TestGetContentKeepsEveryRecentlyActiveWIPPR(t *testing.T) {
-	var prs []prparser.PR
+	var prs []prview.PR
 	for i := range 8 {
 		prs = append(prs, testPR(testPROptions{
 			number: 100 + i, draft: true, updatedAt: activityAgo(time.Duration(i+1) * time.Hour),
@@ -435,7 +435,7 @@ func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prs := []prparser.PR{
+			prs := []prview.PR{
 				testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
 				testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
 				testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(3 * 24 * time.Hour)}),
@@ -455,7 +455,7 @@ func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
 
 // Unknown activity is not inactivity, so the cap never drops such a draft.
 func TestGetContentKeepsDraftWithUnknownActivityBesidesTheCappedInactiveOnes(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(6 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(5 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(4 * 24 * time.Hour)}),
@@ -473,7 +473,7 @@ func TestGetContentKeepsDraftWithUnknownActivityBesidesTheCappedInactiveOnes(t *
 
 // Drafts past MaxDraftPRInactivity never take one of the kept slots.
 func TestGetContentKeepsNoStaleDraftAmongTheCappedInactiveOnes(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1, draft: true, updatedAt: activityAgo(70 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(65 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 3, draft: true, updatedAt: activityAgo(61 * 24 * time.Hour)}),
@@ -494,7 +494,7 @@ func TestGetContentKeepsNoStaleDraftAmongTheCappedInactiveOnes(t *testing.T) {
 // The cap is global, so three repositories with three inactive drafts each yield five rows
 // in total rather than five per repository.
 func TestGetContentCapsInactiveWIPPRsAcrossRepositories(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{
 			number: 1, repository: "repo-one", draft: true, updatedAt: activityAgo(9 * 24 * time.Hour),
 		}),
@@ -541,7 +541,7 @@ func TestGetContentCapsInactiveWIPPRsAcrossRepositories(t *testing.T) {
 }
 
 func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
-	prs := []prparser.PR{testPR(testPROptions{number: 1, draft: true})}
+	prs := []prview.PR{testPR(testPROptions{number: 1, draft: true})}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
 		GeneratedAt: generatedAt,
@@ -551,7 +551,7 @@ func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 }
 
 func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 	}
@@ -573,7 +573,7 @@ func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 }
 
 func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 1}),
 		testPR(testPROptions{number: 2, draft: true, updatedAt: activityAgo(time.Hour)}),
 	}
@@ -591,7 +591,7 @@ func TestGetContentLeavesCapFlagsUnsetWhenOptionsDont(t *testing.T) {
 
 // The merged PRs come from their own fetch, so they are never derived from the open PR list.
 func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
-	mergedPRs := []prparser.PR{
+	mergedPRs := []prview.PR{
 		testPR(testPROptions{number: 1, mergedAt: mergedAgo(3 * 24 * time.Hour)}),
 		testPR(testPROptions{number: 2, mergedAt: mergedAgo(2 * time.Hour)}),
 		testPR(testPROptions{number: 3, mergedAt: mergedAgo(24 * time.Hour)}),
@@ -609,7 +609,7 @@ func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 // The merged PRs are sorted by merge time first, so the most recently merged PR's repository
 // leads. It is not the alphabetically first one here.
 func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *testing.T) {
-	mergedPRs := []prparser.PR{
+	mergedPRs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: mergedAgo(3 * time.Hour)}),
 		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: mergedAgo(time.Hour)}),
 		testPR(testPROptions{number: 3, repository: "repo-one", mergedAt: mergedAgo(4 * time.Hour)}),
@@ -634,7 +634,7 @@ func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *tes
 }
 
 func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
-	mergedPRs := []prparser.PR{
+	mergedPRs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "repo-one", mergedAt: mergedAgo(time.Hour)}),
 		testPR(testPROptions{number: 2, repository: "repo-two", mergedAt: mergedAgo(2 * time.Hour)}),
 	}

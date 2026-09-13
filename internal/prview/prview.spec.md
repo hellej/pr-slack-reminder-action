@@ -1,10 +1,10 @@
-# prparser
+# prview
 
 Enriches fetched PRs with display-ready metadata.
 
 ## Behaviour
 
-- `ParsePRs(prs, contentInputs)` returns PRs enriched for display, sorted oldest first (by creation time, ties broken by update time)
+- `BuildPRViews(prs, contentInputs)` returns PRs enriched for display, in the given order
 - Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer

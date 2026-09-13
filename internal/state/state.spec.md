@@ -6,7 +6,7 @@ Persists and reloads the "post" run's PR set and Slack message reference, so "up
 
 - State carries a schema version, creation time, the sent Slack message's channel/timestamp, the list of PRs it covered, and the hash of the markdown last written to the PR tracker canvas
 - `Load()` fetches the most recent saved state for a repository (via a GitHub Actions artifact)
-- `NewPostState()` builds state from a "post" run's parsed PRs and Slack send result. The only place stamping the schema version and creation time, and it leaves the canvas hash empty for the caller to fill in
+- `NewPostState()` builds state from a "post" run's PR views and Slack send result. The only place stamping the schema version and creation time, and it leaves the canvas hash empty for the caller to fill in
 - `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
 - `SaveSentSlackBlocksToFile()` separately records the raw JSON actually sent to Slack, for inspection — not read back by this action
 

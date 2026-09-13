@@ -8,7 +8,7 @@ import (
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -90,10 +90,10 @@ func openSection(
 // of it.
 type section struct {
 	heading             string
-	prs                 []prparser.PR
-	groups              []prparser.RepositoryPRs
+	prs                 []prview.PR
+	groups              []prview.RepositoryPRs
 	groupedByRepository bool
-	renderRow           func(prparser.PR) string
+	renderRow           func(prview.PR) string
 	emptyText           string
 	// Drops the heading too, rather than showing it above emptyText.
 	hideWhenEmpty bool
@@ -116,13 +116,13 @@ func renderSectionBlocks(section section) []string {
 
 	return append(
 		[]string{section.heading},
-		utilities.Map(section.groups, func(group prparser.RepositoryPRs) string {
+		utilities.Map(section.groups, func(group prview.RepositoryPRs) string {
 			return renderRepositoryGroup(group, section)
 		})...,
 	)
 }
 
-func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string {
+func renderRepositoryGroup(group prview.RepositoryPRs, section section) string {
 	heading := fmt.Sprintf(
 		"### [%s](%s)", escapeMarkdown(group.Repository.GetPath()), group.Repository.GetPullsURL(),
 	)
@@ -133,18 +133,18 @@ func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string
 // would read as a broken render rather than as "nothing here right now".
 func renderSection(
 	heading string,
-	prs []prparser.PR,
-	renderRow func(prparser.PR) string,
+	prs []prview.PR,
+	renderRow func(prview.PR) string,
 	emptyText string,
 ) string {
 	if len(prs) == 0 {
 		return heading + "\n\n" + emptyText
 	}
-	rows := utilities.Map(prs, func(pr prparser.PR) string { return "- " + renderRow(pr) })
+	rows := utilities.Map(prs, func(pr prview.PR) string { return "- " + renderRow(pr) })
 	return heading + "\n\n" + strings.Join(rows, "\n")
 }
 
-func renderOpenPRRow(pr prparser.PR) string {
+func renderOpenPRRow(pr prview.PR) string {
 	ageText := "_" + pr.GetPRAgeDisplayText() + "_"
 	if pr.IsOldPR {
 		ageText = "🚨 `" + pr.GetPRAgeDisplayText() + "`"
@@ -155,7 +155,7 @@ func renderOpenPRRow(pr prparser.PR) string {
 // A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
 // marker: nobody has been asked to review a draft yet. The activity segment is a code span while
 // the draft is moving, italics once it is idle.
-func renderWIPPRRow(pr prparser.PR) string {
+func renderWIPPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters)
 
 	activityText := pr.GetActivityText()
@@ -178,7 +178,7 @@ func emptyMergedPRsText(content canvascontent.Content) string {
 
 // A merged PR shows when it landed instead of its age, and never its reviewers: the section
 // answers what landed, not who reviewed it. Unknown merge time drops just that segment.
-func renderMergedPRRow(pr prparser.PR) string {
+func renderMergedPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr)
 
 	mergedText := pr.GetMergedText()
@@ -188,17 +188,17 @@ func renderMergedPRRow(pr prparser.PR) string {
 	return row + renderAuthor(pr) + " 🚀"
 }
 
-func renderTitleLink(pr prparser.PR) string {
+func renderTitleLink(pr prview.PR) string {
 	return fmt.Sprintf("**[%s](%s)**", escapeMarkdown(pr.GetTitle()), pr.GetHTMLURL())
 }
 
-func renderAuthor(pr prparser.PR) string {
+func renderAuthor(pr prview.PR) string {
 	return " by " + escapeMarkdown(pr.Author.GetGitHubName())
 }
 
-func renderReviewers(approvers, commenters []prparser.Collaborator) string {
+func renderReviewers(approvers, commenters []prview.Collaborator) string {
 	return strings.Join(
-		utilities.Map(prparser.GetReviewersTextSegments(approvers, commenters), escapeMarkdown),
+		utilities.Map(prview.GetReviewersTextSegments(approvers, commenters), escapeMarkdown),
 		"",
 	)
 }

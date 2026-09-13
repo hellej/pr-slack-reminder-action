@@ -11,7 +11,7 @@ import (
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -40,7 +40,7 @@ type StateArtifactFetcher interface {
 	) error
 }
 
-func PRToPullRequestRef(pr prparser.PR) models.PullRequestRef {
+func PRToPullRequestRef(pr prview.PR) models.PullRequestRef {
 	return models.PullRequestRef{
 		Repository: pr.Repository,
 		Number:     pr.GetNumber(),
@@ -69,7 +69,7 @@ func Load(
 // NewPostState builds the state a "post" run leaves behind. The only place stamping
 // SchemaVersion and CreatedAt.
 func NewPostState(
-	parsedPRs []prparser.PR,
+	prViews []prview.PR,
 	messageInfo slackclient.SentMessageInfo,
 ) State {
 	return State{
@@ -79,7 +79,7 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		PullRequests: utilities.Map(parsedPRs, PRToPullRequestRef),
+		PullRequests: utilities.Map(prViews, PRToPullRequestRef),
 	}
 }
 
