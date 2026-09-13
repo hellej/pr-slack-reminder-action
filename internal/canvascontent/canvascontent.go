@@ -63,12 +63,12 @@ func GetContent(
 	contentInputs config.ContentInputs,
 	options GetContentOptions,
 ) Content {
-	sortedOpenPRs := prparser.SortPRsOldestToNewest(utilities.Filter(prs, isOpen))
+	sortedOpenPRs := prparser.SortPRsOldestToNewest(utilities.Filter(prs, prparser.PR.IsOpen))
 	activeDrafts := utilities.Filter(
-		utilities.Filter(prs, isDraft),
+		utilities.Filter(prs, prparser.PR.IsDraft),
 		isActiveEnoughForCanvas(options.GeneratedAt),
 	)
-	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, lastActivityAt)
+	sortedActiveDraftPRs := prparser.SortPRsNewestFirst(activeDrafts, prparser.PR.LastActivityAt)
 	wipPRs := withInactiveDraftsCapped(sortedActiveDraftPRs, options.GeneratedAt)
 	sortedMergedPRs := prparser.SortPRsNewestFirst(mergedPRs, func(pr prparser.PR) *time.Time {
 		return pr.GetMergedAt()
@@ -89,11 +89,11 @@ func GetContent(
 
 	groupByRepository := contentInputs.GroupByRepository
 	return Content{
-		ReadyToMerge:         prSection(readyToMerge, groupByRepository),
-		WaitingForAuthor:     prSection(waitingForAuthor, groupByRepository),
-		WaitingForReview:     prSection(waitingForReview, groupByRepository),
-		WIP:                  prSection(wipPRs, groupByRepository),
-		Merged:               prSection(sortedMergedPRs, groupByRepository),
+		ReadyToMerge:         newPRSection(readyToMerge, groupByRepository),
+		WaitingForAuthor:     newPRSection(waitingForAuthor, groupByRepository),
+		WaitingForReview:     newPRSection(waitingForReview, groupByRepository),
+		WIP:                  newPRSection(wipPRs, groupByRepository),
+		Merged:               newPRSection(sortedMergedPRs, groupByRepository),
 		GroupedByRepository:  groupByRepository,
 		OpenPRsCapped:        options.OpenPRsCapped,
 		WIPPRsCapped:         options.WIPPRsCapped,
@@ -102,27 +102,19 @@ func GetContent(
 	}
 }
 
-// Filtering the sorted list rather than sorting each bucket is what keeps every bucket oldest
-// first.
 func includePRsWhoseTurnIs(sortedOpenPRs []prparser.PR, turn prparser.PRTurn) []prparser.PR {
 	return utilities.Filter(sortedOpenPRs, func(pr prparser.PR) bool {
-		return prparser.GetPRTurn(pr) == turn
+		return pr.GetTurn() == turn
 	})
 }
 
-// Fills the one shape the canvas will read, never both. The given list is already in its
-// section's order, so bucketing it in that order puts the repository holding the section's
-// leading PR first.
-func prSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
+func newPRSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
 	if groupByRepository {
 		return PRSection{Groups: prparser.GroupPRsByRepositoriesInGivenOrder(sortedPRs)}
 	}
 	return PRSection{PRs: sortedPRs}
 }
 
-// Keeps every recently active draft and the MaxInactiveWIPPRs most recently active inactive
-// ones. The given list is sorted most recent activity first, so the drop hits the least
-// recently touched drafts.
 func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
 	inactiveKept := 0
 	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
@@ -142,7 +134,7 @@ func isInactive(pr prparser.PR, generatedAt time.Time) bool {
 	return !updatedAt.IsZero() && !updatedAt.After(generatedAt.Add(-prparser.RecentActivityThreshold))
 }
 
-// Unknown activity is not staleness, so a draft without an update time is kept.
+// A draft with unknown update time is kept
 func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
 	return func(pr prparser.PR) bool {
@@ -150,17 +142,3 @@ func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 		return updatedAt.IsZero() || !updatedAt.Before(inactiveBefore)
 	}
 }
-
-// Names the update time as the activity the WIP section sorts on, and spells the unknown case
-// as the nil SortPRsNewestFirst documents. A zero time would sort last on its own, being year 1.
-func lastActivityAt(pr prparser.PR) *time.Time {
-	updatedAt := pr.GetUpdatedAt()
-	if updatedAt.IsZero() {
-		return nil
-	}
-	return &updatedAt
-}
-
-func isOpen(pr prparser.PR) bool { return !pr.GetDraft() }
-
-func isDraft(pr prparser.PR) bool { return pr.GetDraft() }

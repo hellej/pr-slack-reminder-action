@@ -22,7 +22,7 @@ type testPROptions struct {
 	createdAt  time.Time
 	updatedAt  time.Time
 	mergedAt   *time.Time
-	// The signals prparser.GetPRTurn reads, so a fixture can pick its bucket.
+	// The signals PR.GetTurn reads, so a fixture can pick its bucket.
 	approved           bool
 	conflicting        bool
 	threadWaiting      bool

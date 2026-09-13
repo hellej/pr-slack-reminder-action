@@ -465,6 +465,71 @@ func TestIsRecentlyUpdated(t *testing.T) {
 	}
 }
 
+func TestIsOpen(t *testing.T) {
+	tests := []struct {
+		name     string
+		draft    bool
+		expected bool
+	}{
+		{name: "not a draft is open", draft: false, expected: true},
+		{name: "draft is not open", draft: true, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testDraftPR(tt.draft)
+			if got := pr.IsOpen(); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestIsDraft(t *testing.T) {
+	tests := []struct {
+		name     string
+		draft    bool
+		expected bool
+	}{
+		{name: "not a draft", draft: false, expected: false},
+		{name: "draft", draft: true, expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testDraftPR(tt.draft)
+			if got := pr.IsDraft(); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func testDraftPR(draft bool) prparser.PR {
+	pr := testPR(1, time.Time{}, time.Time{})
+	pr.Draft = draft
+	return prparser.PR{PR: &pr}
+}
+
+func TestLastActivityAt(t *testing.T) {
+	updatedAt := time.Now().Add(-3 * time.Hour)
+
+	t.Run("known activity is returned as a pointer to it", func(t *testing.T) {
+		pr := testPRWithUpdatedAt(1, updatedAt)
+		got := pr.LastActivityAt()
+		if got == nil || !got.Equal(updatedAt) {
+			t.Errorf("expected %v, got %v", updatedAt, got)
+		}
+	})
+
+	t.Run("unknown activity is nil, not the zero time", func(t *testing.T) {
+		pr := testPRWithUpdatedAt(1, time.Time{})
+		if got := pr.LastActivityAt(); got != nil {
+			t.Errorf("expected nil, got %v", got)
+		}
+	})
+}
+
 func TestSortPRsNewestFirst(t *testing.T) {
 	now := time.Now()
 	unknownMerge := testMergedPRWithNumber(1, nil)
@@ -506,7 +571,7 @@ func turnPR(approverLogins []string, prFlags githubclient.PR) prparser.PR {
 
 // The checks are ordered, so each case that an earlier check claims has to stay claimed: a
 // commented-then-approved PR is ready to merge, and a conflict only ever demotes.
-func TestGetPRTurn(t *testing.T) {
+func TestGetTurn(t *testing.T) {
 	tests := []struct {
 		name           string
 		approverLogins []string
@@ -577,8 +642,8 @@ func TestGetPRTurn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if turn := prparser.GetPRTurn(turnPR(tt.approverLogins, tt.prFlags)); turn != tt.expected {
-				t.Errorf("GetPRTurn() = %q, expected %q", turn, tt.expected)
+			if turn := turnPR(tt.approverLogins, tt.prFlags).GetTurn(); turn != tt.expected {
+				t.Errorf("GetTurn() = %q, expected %q", turn, tt.expected)
 			}
 		})
 	}
@@ -586,8 +651,8 @@ func TestGetPRTurn(t *testing.T) {
 
 // A PR without its fetched half carries no signal at all. It keeps its place in the review
 // queue rather than panicking a canvas render or claiming a merge nobody approved.
-func TestGetPRTurnOfPRWithoutFetchedData(t *testing.T) {
-	if turn := prparser.GetPRTurn(prparser.PR{}); turn != prparser.TurnWaitingForReview {
-		t.Errorf("GetPRTurn() = %q, expected %q", turn, prparser.TurnWaitingForReview)
+func TestGetTurnOfPRWithoutFetchedData(t *testing.T) {
+	if turn := (prparser.PR{}).GetTurn(); turn != prparser.TurnWaitingForReview {
+		t.Errorf("GetTurn() = %q, expected %q", turn, prparser.TurnWaitingForReview)
 	}
 }

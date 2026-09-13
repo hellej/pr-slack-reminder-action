@@ -4,12 +4,12 @@ Structures parsed PRs into the sections of the PR tracker canvas, ready for `can
 
 ## Behaviour
 
-- `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `GetDraft()`: drafts go to the WIP section, everything else to the open sections. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
-- The open PRs are bucketed by `prparser.GetPRTurn` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
+- `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `PR.IsDraft()`/`PR.IsOpen()`: drafts go to the WIP section, everything else to the open sections. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
+- The open PRs are bucketed by `PR.GetTurn()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
 - Bucketing filters the sorted list rather than sorting each bucket, so every bucket keeps the given order (oldest first, as `prparser.ParsePRs` left them)
 - Each section is a `PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prparser.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. One `PRSection` constructor fills one shape, so both are never filled at once
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket, and nothing dedupes a repository across sections
-- WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `UpdatedAt`. Unknown activity sorts last, keeping the given order among such PRs
+- WIP PRs are sorted most recent activity first via `prparser.SortPRsNewestFirst` on `PR.LastActivityAt()`. Unknown activity sorts last, keeping the given order among such PRs
 - Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out. A draft with a zero update time is kept: unknown is not stale
 - At most `MaxInactiveWIPPRs` (5) drafts without recent activity reach the WIP section, the 5 most recently touched of them. Inactive means the update time is at least `prparser.RecentActivityThreshold` (24 hours) before `GeneratedAt`, the boundary the WIP row styling uses. Recently touched drafts are never capped, nor are drafts with a zero update time. The cap runs after the staleness prune, on the whole WIP list rather than per repository
 - Merged PRs are sorted newest merge first via `prparser.SortPRsNewestFirst` on `MergedAt`. They are neither pruned nor capped here: the fetch already did both

@@ -56,7 +56,7 @@ const (
 //
 // Approvals are read off Approvers, the same list a row's reviewer segment names, so a turn can
 // never disagree with the row beside it.
-func GetPRTurn(pr PR) PRTurn {
+func (pr PR) GetTurn() PRTurn {
 	// No fetched half, so no signal to read: the review queue beats panicking a render.
 	if pr.PR == nil {
 		return TurnWaitingForReview
@@ -74,6 +74,20 @@ func GetPRTurn(pr PR) PRTurn {
 
 func (pr PR) GetPRAgeText() string {
 	return durationText(time.Since(pr.GetCreatedAt()))
+}
+
+func (pr PR) IsOpen() bool { return !pr.GetDraft() }
+
+func (pr PR) IsDraft() bool { return pr.GetDraft() }
+
+// Names the update time as last activity, and spells unknown activity as the nil
+// SortPRsNewestFirst documents. A zero time would otherwise sort last on its own, being year 1.
+func (pr PR) LastActivityAt() *time.Time {
+	updatedAt := pr.GetUpdatedAt()
+	if updatedAt.IsZero() {
+		return nil
+	}
+	return &updatedAt
 }
 
 // True when the PR saw activity less than RecentActivityThreshold ago. A PR with unknown
