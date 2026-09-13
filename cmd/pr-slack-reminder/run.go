@@ -12,7 +12,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -99,8 +99,8 @@ func runPostMode(
 	nonDraftPRs := utilities.Filter(fetched.PRs, func(pr githubclient.PR) bool {
 		return !pr.GetDraft()
 	})
-	parsedPRs := prparser.ParsePRs(nonDraftPRs, cfg.ContentInputs)
-	content := messagecontent.GetContent(parsedPRs, cfg.ContentInputs)
+	prViews := prview.BuildPRViews(nonDraftPRs, cfg.ContentInputs)
+	content := messagecontent.GetContent(prViews, cfg.ContentInputs)
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("No PRs found and no message configured for this case, exiting")
 		return &fetched, nil, nil
@@ -112,7 +112,7 @@ func runPostMode(
 		return &fetched, nil, err
 	}
 
-	postState := state.NewPostState(parsedPRs, sentMessageInfo)
+	postState := state.NewPostState(prViews, sentMessageInfo)
 	return &fetched, &postState, sentMessageHandler(sentMessageInfo)
 }
 
@@ -144,8 +144,8 @@ func runUpdateMode(
 		return loadedState, err
 	}
 
-	parsedPRs := prparser.ParsePRs(prs, cfg.ContentInputs)
-	content := messagecontent.GetContent(parsedPRs, cfg.ContentInputs)
+	prViews := prview.BuildPRViews(prs, cfg.ContentInputs)
+	content := messagecontent.GetContent(prViews, cfg.ContentInputs)
 
 	if !content.HasPRs() && content.SummaryText == "" {
 		log.Println("All PRs from state have been filtered out or closed")

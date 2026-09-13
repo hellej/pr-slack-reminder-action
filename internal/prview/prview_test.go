@@ -1,4 +1,4 @@
-package prparser_test
+package prview_test
 
 import (
 	"slices"
@@ -8,7 +8,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -23,8 +23,8 @@ func testPR(number int, createdAt, updatedAt time.Time) githubclient.PR {
 	}
 }
 
-func parsedPR(number int, createdAt, updatedAt time.Time) prparser.PR {
-	return prparser.PR{
+func testPRView(number int, createdAt, updatedAt time.Time) prview.PR {
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				Number:    number,
@@ -36,53 +36,53 @@ func parsedPR(number int, createdAt, updatedAt time.Time) prparser.PR {
 	}
 }
 
-func TestParsePRsReturnsGivenOrder(t *testing.T) {
+func TestBuildPRViewsReturnsGivenOrder(t *testing.T) {
 	now := time.Now()
 	pr1 := testPR(1, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
 	pr3 := testPR(2, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
 	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
 
-	parsed := prparser.ParsePRs([]githubclient.PR{pr1, pr3, pr2}, config.ContentInputs{})
+	prViews := prview.BuildPRViews([]githubclient.PR{pr1, pr3, pr2}, config.ContentInputs{})
 
 	want := []int{1, 2, 3}
-	got := utilities.Map(parsed, func(pr prparser.PR) int { return pr.GetNumber() })
+	got := utilities.Map(prViews, func(pr prview.PR) int { return pr.GetNumber() })
 
 	if !slices.Equal(got, want) {
-		t.Errorf("expected parsed PRs to be in order %v, got %v", want, got)
+		t.Errorf("expected PR views to be in order %v, got %v", want, got)
 	}
 }
 
-func TestParsePRsIsOldPRFlagSetCorrectly(t *testing.T) {
+func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	now := time.Now()
 	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
 	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
 	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
 
-	parsed := prparser.ParsePRs(
+	prViews := prview.BuildPRViews(
 		[]githubclient.PR{pr1, pr3, pr2},
 		config.ContentInputs{OldPRThresholdHours: 35},
 	)
 
-	isOld := func(pr prparser.PR) bool {
+	isOld := func(pr prview.PR) bool {
 		return pr.IsOldPR
 	}
 
 	want := []bool{false, false, true}
-	got := utilities.Map(parsed, isOld)
+	got := utilities.Map(prViews, isOld)
 
 	if !slices.Equal(got, want) {
-		t.Errorf("expected parsed PRs to have IsOldPR flags %v, got %v", want, got)
+		t.Errorf("expected PR views to have IsOldPR flags %v, got %v", want, got)
 	}
 
 }
 
 func TestSortPRsOldestToNewest(t *testing.T) {
 	now := time.Now()
-	oldest := parsedPR(1, now.Add(-48*time.Hour), now.Add(-48*time.Hour))
-	middle := parsedPR(2, now.Add(-24*time.Hour), now.Add(-24*time.Hour))
-	newest := parsedPR(3, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+	oldest := testPRView(1, now.Add(-48*time.Hour), now.Add(-48*time.Hour))
+	middle := testPRView(2, now.Add(-24*time.Hour), now.Add(-24*time.Hour))
+	newest := testPRView(3, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
 
-	result := prparser.SortPRsOldestToNewest([]prparser.PR{newest, oldest, middle})
+	result := prview.SortPRsOldestToNewest([]prview.PR{newest, oldest, middle})
 
 	want := []int{1, 2, 3}
 	for i, number := range want {
@@ -95,11 +95,11 @@ func TestSortPRsOldestToNewest(t *testing.T) {
 func TestSortPRsOldestToNewestBreaksCreatedAtTiesByUpdatedAt(t *testing.T) {
 	now := time.Now()
 	sameCreatedAt := now.Add(-24 * time.Hour)
-	updatedLater := parsedPR(1, sameCreatedAt, now.Add(-1*time.Hour))
-	updatedEarlier := parsedPR(2, sameCreatedAt, now.Add(-2*time.Hour))
+	updatedLater := testPRView(1, sameCreatedAt, now.Add(-1*time.Hour))
+	updatedEarlier := testPRView(2, sameCreatedAt, now.Add(-2*time.Hour))
 
-	result := prparser.SortPRsOldestToNewest(
-		[]prparser.PR{updatedLater, updatedEarlier},
+	result := prview.SortPRsOldestToNewest(
+		[]prview.PR{updatedLater, updatedEarlier},
 	)
 
 	if result[0].GetNumber() != 2 || result[1].GetNumber() != 1 {
@@ -110,10 +110,10 @@ func TestSortPRsOldestToNewestBreaksCreatedAtTiesByUpdatedAt(t *testing.T) {
 	}
 }
 
-func testPRInRepository(number int, repository models.Repository) prparser.PR {
+func testPRInRepository(number int, repository models.Repository) prview.PR {
 	pr := testPR(number, time.Time{}, time.Time{})
 	pr.Repository = repository
-	return prparser.PR{PR: &pr}
+	return prview.PR{PR: &pr}
 }
 
 func TestGroupPRsByRepositories(t *testing.T) {
@@ -123,19 +123,19 @@ func TestGroupPRsByRepositories(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		prs                 []prparser.PR
+		prs                 []prview.PR
 		expectedRepos       []models.Repository
 		expectedPRNumbersBy map[string][]int
 	}{
 		{
 			name:                "no PRs",
-			prs:                 []prparser.PR{},
+			prs:                 []prview.PR{},
 			expectedRepos:       []models.Repository{},
 			expectedPRNumbersBy: map[string][]int{},
 		},
 		{
 			name: "single repository keeps every PR in one group",
-			prs: []prparser.PR{
+			prs: []prview.PR{
 				testPRInRepository(1, repoA),
 				testPRInRepository(2, repoA),
 			},
@@ -144,7 +144,7 @@ func TestGroupPRsByRepositories(t *testing.T) {
 		},
 		{
 			name: "multiple repositories are ordered alphabetically by path, PRs keep input order",
-			prs: []prparser.PR{
+			prs: []prview.PR{
 				testPRInRepository(4, repoB),
 				testPRInRepository(2, repoC),
 				testPRInRepository(3, repoA),
@@ -163,7 +163,7 @@ func TestGroupPRsByRepositories(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			groups := prparser.GroupPRsByRepositories(tt.prs)
+			groups := prview.GroupPRsByRepositories(tt.prs)
 
 			if len(groups) != len(tt.expectedRepos) {
 				t.Fatalf("expected %d groups, got %d", len(tt.expectedRepos), len(groups))
@@ -173,7 +173,7 @@ func TestGroupPRsByRepositories(t *testing.T) {
 					t.Errorf("expected group %d to be %v, got %v", i, expectedRepo, groups[i].Repository)
 				}
 				expectedNumbers := tt.expectedPRNumbersBy[expectedRepo.GetPath()]
-				numbers := utilities.Map(groups[i].PRs, func(pr prparser.PR) int { return pr.GetNumber() })
+				numbers := utilities.Map(groups[i].PRs, func(pr prview.PR) int { return pr.GetNumber() })
 				if !slices.Equal(numbers, expectedNumbers) {
 					t.Errorf(
 						"expected PR numbers %v for %s, got %v",
@@ -192,19 +192,19 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		prs                 []prparser.PR
+		prs                 []prview.PR
 		expectedRepos       []models.Repository
 		expectedPRNumbersBy map[string][]int
 	}{
 		{
 			name:                "no PRs",
-			prs:                 []prparser.PR{},
+			prs:                 []prview.PR{},
 			expectedRepos:       []models.Repository{},
 			expectedPRNumbersBy: map[string][]int{},
 		},
 		{
 			name: "single repository keeps every PR in one group",
-			prs: []prparser.PR{
+			prs: []prview.PR{
 				testPRInRepository(1, repoA),
 				testPRInRepository(2, repoA),
 			},
@@ -215,7 +215,7 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 			// Alphabetical order would be another-org/gamma, org/alpha, org/beta, so this case
 			// fails against alphabetical bucket ordering.
 			name: "multiple repositories are ordered by their first PR in the given list",
-			prs: []prparser.PR{
+			prs: []prview.PR{
 				testPRInRepository(4, repoB),
 				testPRInRepository(2, repoC),
 				testPRInRepository(3, repoA),
@@ -234,7 +234,7 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			groups := prparser.GroupPRsByRepositoriesInGivenOrder(tt.prs)
+			groups := prview.GroupPRsByRepositoriesInGivenOrder(tt.prs)
 
 			if len(groups) != len(tt.expectedRepos) {
 				t.Fatalf("expected %d groups, got %d", len(tt.expectedRepos), len(groups))
@@ -244,7 +244,7 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 					t.Errorf("expected group %d to be %v, got %v", i, expectedRepo, groups[i].Repository)
 				}
 				expectedNumbers := tt.expectedPRNumbersBy[expectedRepo.GetPath()]
-				numbers := utilities.Map(groups[i].PRs, func(pr prparser.PR) int { return pr.GetNumber() })
+				numbers := utilities.Map(groups[i].PRs, func(pr prview.PR) int { return pr.GetNumber() })
 				if !slices.Equal(numbers, expectedNumbers) {
 					t.Errorf(
 						"expected PR numbers %v for %s, got %v",
@@ -256,8 +256,8 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 	}
 }
 
-func testCollaborator(name string) prparser.Collaborator {
-	return prparser.Collaborator{Collaborator: &githubclient.Collaborator{Login: name, Name: name}}
+func testCollaborator(name string) prview.Collaborator {
+	return prview.Collaborator{Collaborator: &githubclient.Collaborator{Login: name, Name: name}}
 }
 
 func TestGetReviewersTextSegments(t *testing.T) {
@@ -267,8 +267,8 @@ func TestGetReviewersTextSegments(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		approvers  []prparser.Collaborator
-		commenters []prparser.Collaborator
+		approvers  []prview.Collaborator
+		commenters []prview.Collaborator
 		expected   []string
 	}{
 		{
@@ -277,25 +277,25 @@ func TestGetReviewersTextSegments(t *testing.T) {
 		},
 		{
 			name:      "approvers only",
-			approvers: []prparser.Collaborator{alice, bob},
+			approvers: []prview.Collaborator{alice, bob},
 			expected:  []string{" (✅ ", "Alice", ", ", "Bob", ")"},
 		},
 		{
 			name:       "commenters only",
-			commenters: []prparser.Collaborator{carol},
+			commenters: []prview.Collaborator{carol},
 			expected:   []string{" (💬 ", "Carol", ")"},
 		},
 		{
 			name:       "approvers and commenters",
-			approvers:  []prparser.Collaborator{alice},
-			commenters: []prparser.Collaborator{bob, carol},
+			approvers:  []prview.Collaborator{alice},
+			commenters: []prview.Collaborator{bob, carol},
 			expected:   []string{" (✅ ", "Alice", " / 💬 ", "Bob", ", ", "Carol", ")"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segments := prparser.GetReviewersTextSegments(tt.approvers, tt.commenters)
+			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters)
 			if !slices.Equal(segments, tt.expected) {
 				t.Errorf("expected segments %q, got %q", tt.expected, segments)
 			}
@@ -316,18 +316,18 @@ func TestGetPRAgeDisplayText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := testPR(1, time.Now().Add(-72*time.Hour), time.Time{})
-			parsed := prparser.PR{PR: &pr, IsOldPR: tt.isOldPR}
+			prView := prview.PR{PR: &pr, IsOldPR: tt.isOldPR}
 
-			if parsed.GetPRAgeDisplayText() != tt.expected {
-				t.Errorf("expected '%s', got '%s'", tt.expected, parsed.GetPRAgeDisplayText())
+			if prView.GetPRAgeDisplayText() != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, prView.GetPRAgeDisplayText())
 			}
 		})
 	}
 }
 
-func testPRWithUpdatedAt(number int, updatedAt time.Time) prparser.PR {
+func testPRWithUpdatedAt(number int, updatedAt time.Time) prview.PR {
 	pr := testPR(number, time.Time{}, updatedAt)
-	return prparser.PR{PR: &pr}
+	return prview.PR{PR: &pr}
 }
 
 func timePointer(t time.Time) *time.Time {
@@ -363,15 +363,14 @@ func TestGetActivityText(t *testing.T) {
 			expected:  "updated 23 hours ago",
 		},
 		{
-			// The style threshold flips to italics here too, see TestIsRecentlyUpdated.
 			name:      "exactly at the day cutover",
 			updatedAt: now.Add(-24 * time.Hour),
-			expected:  "idle 1 days",
+			expected:  "idle 1 day",
 		},
 		{
 			name:      "just past the day cutover",
 			updatedAt: now.Add(-24*time.Hour - 30*time.Minute),
-			expected:  "idle 1 days",
+			expected:  "idle 1 day",
 		},
 		{
 			name:      "idle for days",
@@ -390,10 +389,10 @@ func TestGetActivityText(t *testing.T) {
 	}
 }
 
-func testMergedPRWithNumber(number int, mergedAt *time.Time) prparser.PR {
+func testMergedPRWithNumber(number int, mergedAt *time.Time) prview.PR {
 	pr := testPR(number, time.Time{}, time.Time{})
 	pr.MergedAt = mergedAt
-	return prparser.PR{PR: &pr}
+	return prview.PR{PR: &pr}
 }
 
 func TestGetMergedText(t *testing.T) {
@@ -430,29 +429,49 @@ func TestGetMergedText(t *testing.T) {
 	}
 }
 
-func TestIsRecentlyUpdated(t *testing.T) {
-	now := time.Now()
+func TestIsActiveAsOf(t *testing.T) {
+	asOf := time.Now()
 	tests := []struct {
 		name      string
 		updatedAt time.Time
 		expected  bool
 	}{
-		{name: "unknown activity is not recent", updatedAt: time.Time{}, expected: false},
+		{name: "unknown activity is active", updatedAt: time.Time{}, expected: true},
 		{
-			name:      "just under the 24 hour threshold",
-			updatedAt: now.Add(-23 * time.Hour),
+			name:      "just under the threshold",
+			updatedAt: asOf.Add(-23 * time.Hour),
 			expected:  true,
 		},
 		{
-			name:      "exactly at the 24 hour threshold",
-			updatedAt: now.Add(-24 * time.Hour),
-			expected:  false,
+			name:      "exactly at the threshold",
+			updatedAt: asOf.Add(-24 * time.Hour),
+			expected:  true,
 		},
 		{
-			name:      "past the 24 hour threshold",
-			updatedAt: now.Add(-25 * time.Hour),
+			name:      "past the threshold",
+			updatedAt: asOf.Add(-25 * time.Hour),
 			expected:  false,
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testPRWithUpdatedAt(1, tt.updatedAt)
+			if got := pr.IsActiveAsOf(asOf, prview.RecentActivityThreshold); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestIsRecentlyUpdated(t *testing.T) {
+	tests := []struct {
+		name      string
+		updatedAt time.Time
+		expected  bool
+	}{
+		{name: "recent activity", updatedAt: time.Now().Add(-23 * time.Hour), expected: true},
+		{name: "stale activity", updatedAt: time.Now().Add(-25 * time.Hour), expected: false},
 	}
 
 	for _, tt := range tests {
@@ -465,6 +484,71 @@ func TestIsRecentlyUpdated(t *testing.T) {
 	}
 }
 
+func TestIsOpen(t *testing.T) {
+	tests := []struct {
+		name     string
+		draft    bool
+		expected bool
+	}{
+		{name: "not a draft is open", draft: false, expected: true},
+		{name: "draft is not open", draft: true, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testDraftPR(tt.draft)
+			if got := pr.IsOpen(); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestIsDraft(t *testing.T) {
+	tests := []struct {
+		name     string
+		draft    bool
+		expected bool
+	}{
+		{name: "not a draft", draft: false, expected: false},
+		{name: "draft", draft: true, expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := testDraftPR(tt.draft)
+			if got := pr.IsDraft(); got != tt.expected {
+				t.Errorf("expected %t, got %t", tt.expected, got)
+			}
+		})
+	}
+}
+
+func testDraftPR(draft bool) prview.PR {
+	pr := testPR(1, time.Time{}, time.Time{})
+	pr.Draft = draft
+	return prview.PR{PR: &pr}
+}
+
+func TestLastActivityAt(t *testing.T) {
+	updatedAt := time.Now().Add(-3 * time.Hour)
+
+	t.Run("known activity is returned as a pointer to it", func(t *testing.T) {
+		pr := testPRWithUpdatedAt(1, updatedAt)
+		got := pr.LastActivityAt()
+		if got == nil || !got.Equal(updatedAt) {
+			t.Errorf("expected %v, got %v", updatedAt, got)
+		}
+	})
+
+	t.Run("unknown activity is nil, not the zero time", func(t *testing.T) {
+		pr := testPRWithUpdatedAt(1, time.Time{})
+		if got := pr.LastActivityAt(); got != nil {
+			t.Errorf("expected nil, got %v", got)
+		}
+	})
+}
+
 func TestSortPRsNewestFirst(t *testing.T) {
 	now := time.Now()
 	unknownMerge := testMergedPRWithNumber(1, nil)
@@ -473,9 +557,9 @@ func TestSortPRsNewestFirst(t *testing.T) {
 	alsoUnknownMerge := testMergedPRWithNumber(4, nil)
 	middleMerge := testMergedPRWithNumber(5, timePointer(now.Add(-24*time.Hour)))
 
-	given := []prparser.PR{unknownMerge, oldestMerge, newestMerge, alsoUnknownMerge, middleMerge}
+	given := []prview.PR{unknownMerge, oldestMerge, newestMerge, alsoUnknownMerge, middleMerge}
 
-	sorted := prparser.SortPRsNewestFirst(given, func(pr prparser.PR) *time.Time {
+	sorted := prview.SortPRsNewestFirst(given, func(pr prview.PR) *time.Time {
 		return pr.MergedAt
 	})
 
@@ -486,8 +570,108 @@ func TestSortPRsNewestFirst(t *testing.T) {
 		}
 	}
 
-	givenNumbers := utilities.Map(given, func(pr prparser.PR) int { return pr.GetNumber() })
+	givenNumbers := utilities.Map(given, func(pr prview.PR) int { return pr.GetNumber() })
 	if !slices.Equal(givenNumbers, []int{1, 2, 3, 4, 5}) {
 		t.Errorf("expected the given slice to keep its order, got %v", givenNumbers)
+	}
+}
+
+func nextActionPR(approverLogins []string, prFlags githubclient.PR) prview.PR {
+	prFlags.PullRequest = &githubclient.PullRequest{
+		Author: githubclient.Collaborator{Login: "author"},
+	}
+	return prview.PR{
+		PR: &prFlags,
+		Approvers: utilities.Map(approverLogins, func(login string) prview.Collaborator {
+			return prview.NewCollaborator(githubclient.Collaborator{Login: login}, "")
+		}),
+	}
+}
+
+// The checks are ordered, so each case that an earlier check claims has to stay claimed: a
+// commented-then-approved PR is ready to merge, and a conflict only ever demotes.
+func TestGetNextAction(t *testing.T) {
+	tests := []struct {
+		name           string
+		approverLogins []string
+		prFlags        githubclient.PR
+		expected       prview.PRNextAction
+	}{
+		{
+			name:           "approved with nothing outstanding",
+			approverLogins: []string{"bob"},
+			expected:       prview.NextActionReadyToMerge,
+		},
+		{
+			name:           "approved, and the author has not answered a thread",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{HasThreadWaitingForAuthor: true},
+			expected:       prview.NextActionWaitingForAuthor,
+		},
+		{
+			// A conflict cannot be merged, so it demotes an approved PR to its author.
+			name:           "approved but conflicting",
+			approverLogins: []string{"carol"},
+			prFlags:        githubclient.PR{Conflicting: true},
+			expected:       prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:           "approved twice but conflicting",
+			approverLogins: []string{"bob", "carol"},
+			prFlags:        githubclient.PR{Conflicting: true},
+			expected:       prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:     "a reviewer requested changes",
+			prFlags:  githubclient.PR{HasNonApprovingReview: true},
+			expected: prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:     "an unanswered thread without any review",
+			prFlags:  githubclient.PR{HasThreadWaitingForAuthor: true},
+			expected: prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:     "nobody has looked at it yet",
+			expected: prview.NextActionWaitingForReview,
+		},
+		{
+			// An unreviewed conflict stays in the review queue: reviewing around a rebase is
+			// not wasted work.
+			name:     "conflicting and nothing else",
+			prFlags:  githubclient.PR{Conflicting: true},
+			expected: prview.NextActionWaitingForReview,
+		},
+		{
+			// The reviewer commented and then approved, which leaves both signals set.
+			name:           "approved by the reviewer who commented",
+			approverLogins: []string{"dave"},
+			prFlags:        githubclient.PR{HasNonApprovingReview: true},
+			expected:       prview.NextActionReadyToMerge,
+		},
+		{
+			name:           "approved, commented on, and a thread left unanswered",
+			approverLogins: []string{"erin", "bob"},
+			prFlags: githubclient.PR{
+				HasNonApprovingReview: true, HasThreadWaitingForAuthor: true,
+			},
+			expected: prview.NextActionWaitingForAuthor,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if nextAction := nextActionPR(tt.approverLogins, tt.prFlags).GetNextAction(); nextAction != tt.expected {
+				t.Errorf("GetNextAction() = %q, expected %q", nextAction, tt.expected)
+			}
+		})
+	}
+}
+
+// A PR without its fetched half carries no signal at all. It keeps its place in the review
+// queue rather than panicking a canvas render or claiming a merge nobody approved.
+func TestGetNextActionOfPRWithoutFetchedData(t *testing.T) {
+	if nextAction := (prview.PR{}).GetNextAction(); nextAction != prview.NextActionWaitingForReview {
+		t.Errorf("GetNextAction() = %q, expected %q", nextAction, prview.NextActionWaitingForReview)
 	}
 }

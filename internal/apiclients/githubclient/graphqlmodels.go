@@ -1,6 +1,7 @@
 package githubclient
 
 import (
+	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -17,7 +18,6 @@ const (
 	closedPullRequestState = "closed"
 )
 
-// GraphQL states of a PR node. CLOSED and MERGED are both "closed" to the pipeline.
 const (
 	closedNodeState = "CLOSED"
 	mergedNodeState = "MERGED"
@@ -25,10 +25,15 @@ const (
 
 const approvedReviewState = "APPROVED"
 
-// A pending review is visible only to its own author, so it contributes no reviewer.
+const (
+	commentedReviewState        = "COMMENTED"
+	changesRequestedReviewState = "CHANGES_REQUESTED"
+)
+
+const conflictingMergeableState = "CONFLICTING"
+
 const pendingReviewState = "PENDING"
 
-// Nullable Actor; name is selected through "... on User { name }" so it is set for users only.
 type authorNode struct {
 	Login    string `json:"login"`
 	Typename string `json:"__typename"`
@@ -50,6 +55,13 @@ type commentNode struct {
 	Author    *authorNode `json:"author"`
 }
 
+// A review thread carries no author of its own, so its last comment supplies the one that
+// decides whose turn the thread is.
+type reviewThreadNode struct {
+	IsResolved bool                    `json:"isResolved"`
+	Comments   connection[commentNode] `json:"comments"`
+}
+
 type connection[T any] struct {
 	Nodes []T `json:"nodes"`
 }
@@ -68,6 +80,9 @@ type pullRequestNode struct {
 	Labels    connection[labelNode]   `json:"labels"`
 	Reviews   connection[reviewNode]  `json:"reviews"`
 	Comments  connection[commentNode] `json:"comments"`
+
+	Mergeable     string                       `json:"mergeable"`
+	ReviewThreads connection[reviewThreadNode] `json:"reviewThreads"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -84,8 +99,16 @@ func collaboratorFromAuthorNode(author *authorNode) Collaborator {
 	}
 }
 
-func hasValidAuthorNode(author *authorNode) bool {
-	return author != nil && author.Login != "" && author.Typename != botTypename
+func hasKnownNonBotAuthorNode(author *authorNode) bool {
+	return !isUnknownAuthorNode(author) && author.Typename != botTypename
+}
+
+func isUnknownAuthorNode(author *authorNode) bool {
+	return author == nil || author.Login == ""
+}
+
+func isBotAuthorNode(author *authorNode) bool {
+	return !isUnknownAuthorNode(author) && author.Typename == botTypename
 }
 
 func timelineCommentFromNode(comment commentNode) TimelineComment {
@@ -111,8 +134,6 @@ func pullRequestFromNode(node pullRequestNode) *PullRequest {
 	}
 }
 
-// Only the two closed states close a PR, so an unexpected or missing state renders as open
-// rather than striking through every PR in the reminder.
 func pullRequestStateFromNodeState(nodeState string) string {
 	if nodeState == closedNodeState || nodeState == mergedNodeState {
 		return closedPullRequestState
@@ -127,7 +148,6 @@ func enrichedNode(aliasNode *pullRequestWrapperNode) (pullRequestNode, bool) {
 	return *aliasNode.PullRequest, true
 }
 
-// Reads the reviewer lists and the snooze off a PR's reviews and comments connections.
 func prWithReviewers(
 	pullRequest *PullRequest, repository models.Repository, node pullRequestNode,
 ) PR {
@@ -149,11 +169,51 @@ func prWithReviewers(
 		ApprovedByUsers:  approvedByUsers,
 		CommentedByUsers: commentedByUsers,
 		SnoozedUntil:     findActiveSnooze(timelineComments),
+		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
+			node.ReviewThreads.Nodes, pullRequest.Author,
+		),
+		Conflicting:           node.Mergeable == conflictingMergeableState,
+		HasNonApprovingReview: hasNonApprovingNonOwnReview(submittedReviews, pullRequest.Author),
 	}
 }
 
+func hasThreadWaitingForPRAuthor(threads []reviewThreadNode, prAuthor Collaborator) bool {
+	return slices.ContainsFunc(threads, func(thread reviewThreadNode) bool {
+		return !thread.IsResolved && isWaitingForPRAuthor(thread, prAuthor)
+	})
+}
+
+func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
+	comments := thread.Comments.Nodes
+	if len(comments) == 0 {
+		return true
+	}
+
+	lastCommentAuthor := comments[len(comments)-1].Author
+	if isUnknownAuthorNode(lastCommentAuthor) {
+		return true
+	}
+	if isBotAuthorNode(lastCommentAuthor) {
+		return false
+	}
+	// The PR author's login came through collaboratorFromAuthorNode as well, so both sides
+	// spell the same account the same way.
+	return collaboratorFromAuthorNode(lastCommentAuthor).Login != prAuthor.Login
+}
+
+func hasNonApprovingNonOwnReview(submittedReviews []reviewNode, prAuthor Collaborator) bool {
+	return slices.ContainsFunc(submittedReviews, func(review reviewNode) bool {
+		return isNonApprovingReviewState(review.State) &&
+			collaboratorFromAuthorNode(review.Author).Login != prAuthor.Login
+	})
+}
+
+func isNonApprovingReviewState(state string) bool {
+	return state == commentedReviewState || state == changesRequestedReviewState
+}
+
 func isSubmittedUserReview(review reviewNode) bool {
-	return review.State != pendingReviewState && hasValidAuthorNode(review.Author)
+	return review.State != pendingReviewState && hasKnownNonBotAuthorNode(review.Author)
 }
 
 func isApprovingReviewNode(review reviewNode) bool {
@@ -165,7 +225,7 @@ func reviewAuthor(review reviewNode) Collaborator {
 }
 
 func hasValidCommentAuthor(comment commentNode) bool {
-	return hasValidAuthorNode(comment.Author)
+	return hasKnownNonBotAuthorNode(comment.Author)
 }
 
 func commentAuthor(comment commentNode) Collaborator {

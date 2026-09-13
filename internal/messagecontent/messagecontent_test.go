@@ -8,7 +8,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
@@ -22,12 +22,12 @@ type testPROptions struct {
 	mergedAt   *time.Time
 }
 
-func testPR(options testPROptions) prparser.PR {
+func testPR(options testPROptions) prview.PR {
 	repository := models.Repository{Owner: "test-org", Name: "test-repo"}
 	if options.repository != "" {
 		repository = models.Repository{Owner: "test-org", Name: options.repository}
 	}
-	return prparser.PR{
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				Number:    options.number,
@@ -47,12 +47,12 @@ func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
 	}
 }
 
-func prNumbers(prs []prparser.PR) []int {
-	return utilities.Map(prs, func(pr prparser.PR) int { return pr.GetNumber() })
+func prNumbers(prs []prview.PR) []int {
+	return utilities.Map(prs, func(pr prview.PR) int { return pr.GetNumber() })
 }
 
 func TestGetContentSortsPRsOldestToNewest(t *testing.T) {
-	prs := []prparser.PR{
+	prs := []prview.PR{
 		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-1 * time.Hour)}),
 		testPR(testPROptions{number: 8, createdAt: generatedAt.Add(-10 * time.Hour)}),
 	}

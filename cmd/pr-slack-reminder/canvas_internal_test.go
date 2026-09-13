@@ -9,12 +9,12 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/canvasbuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
-func hashTestPR(number int, title string) prparser.PR {
+func hashTestPR(number int, title string) prview.PR {
 	repository := models.Repository{Owner: "test-org", Name: "test-repo"}
-	return prparser.PR{
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				Number:    number,
@@ -24,21 +24,21 @@ func hashTestPR(number int, title string) prparser.PR {
 			},
 			Repository: repository,
 		},
-		Author: prparser.NewCollaborator(
+		Author: prview.NewCollaborator(
 			githubclient.Collaborator{Login: "alice", Name: "Alice Anderson"}, "",
 		),
 	}
 }
 
-func hashTestContent(openPRs []prparser.PR, generatedAt time.Time) canvascontent.Content {
+func hashTestContent(openPRs []prview.PR, generatedAt time.Time) canvascontent.Content {
 	return canvascontent.Content{
-		OpenPRs:     openPRs,
-		GeneratedAt: generatedAt,
+		WaitingForReview: canvascontent.PRSection{PRs: openPRs},
+		GeneratedAt:      generatedAt,
 	}
 }
 
 func TestCanvasContentHashIgnoresTheGeneratedAtTimestamp(t *testing.T) {
-	prs := []prparser.PR{hashTestPR(1, "Add pagination to the PR listing")}
+	prs := []prview.PR{hashTestPR(1, "Add pagination to the PR listing")}
 
 	earlier := canvasContentHash(hashTestContent(prs, time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)))
 	later := canvasContentHash(hashTestContent(prs, time.Date(2026, 8, 9, 11, 45, 0, 0, time.UTC)))
@@ -52,10 +52,10 @@ func TestCanvasContentHashChangesWithAPRRow(t *testing.T) {
 	generatedAt := time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 	original := canvasContentHash(
-		hashTestContent([]prparser.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt),
+		hashTestContent([]prview.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt),
 	)
 	retitled := canvasContentHash(
-		hashTestContent([]prparser.PR{hashTestPR(1, "Add pagination to the PR list")}, generatedAt),
+		hashTestContent([]prview.PR{hashTestPR(1, "Add pagination to the PR list")}, generatedAt),
 	)
 
 	if original == retitled {
@@ -67,7 +67,7 @@ func TestCanvasContentHashChangesWithAPRRow(t *testing.T) {
 // cases must not be taken for the same canvas.
 func TestCanvasContentHashChangesWithUnavailableMergedPRs(t *testing.T) {
 	generatedAt := time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
-	content := hashTestContent([]prparser.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt)
+	content := hashTestContent([]prview.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt)
 
 	withMergedPRs := canvasContentHash(content)
 	content.MergedPRsUnavailable = true
@@ -82,7 +82,7 @@ func TestCanvasContentHashChangesWithUnavailableMergedPRs(t *testing.T) {
 // a year-1 timestamp on the canvas.
 func TestCanvasContentHashLeavesTheContentUnmutated(t *testing.T) {
 	generatedAt := time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
-	content := hashTestContent([]prparser.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt)
+	content := hashTestContent([]prview.PR{hashTestPR(1, "Add pagination to the PR listing")}, generatedAt)
 
 	canvasContentHash(content)
 

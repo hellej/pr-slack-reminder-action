@@ -107,7 +107,7 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			}
 			markdown := mockSlackAPI.ReplacedCanvas.Markdown
 			assertCanvasContains(t, markdown,
-				"## Open\n", "## WIP\n", "## Merged\n",
+				"## Waiting for review\n", "## WIP\n", "## Merged\n",
 				"Open PR one", "Open PR two", "Draft PR one",
 				"**[Merged PR two]", "_merged 2 hours ago_ by Bob 🚀",
 			)

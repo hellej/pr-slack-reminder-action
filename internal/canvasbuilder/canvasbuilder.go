@@ -8,11 +8,14 @@ import (
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 const (
+	readyToMergeHeading      = "## Ready to merge"
+	waitingForAuthorHeading  = "## Waiting for author"
+	waitingForReviewHeading  = "## Waiting for review"
 	openPRsHeading           = "## Open"
 	wipPRsHeading            = "## WIP"
 	mergedPRsHeading         = "## Merged"
@@ -25,26 +28,19 @@ const (
 // The canvas has no top-level heading: Slack renders the canvas title as its own H1 at the top
 // of the document, so a body H1 would show as a second title.
 func BuildMarkdown(content canvascontent.Content) string {
-	blocks := renderSectionBlocks(section{
-		heading:             openPRsHeading,
-		prs:                 content.OpenPRs,
-		groups:              content.OpenPRsGroupedByRepository,
-		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderOpenPRRow,
-		emptyText:           noOpenPRsText,
-	})
+	blocks := renderOpenSections(content)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             wipPRsHeading,
-		prs:                 content.WIPPRs,
-		groups:              content.WIPPRsGroupedByRepository,
+		prs:                 content.WIP.PRs,
+		groups:              content.WIP.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderWIPPRRow,
 		emptyText:           noWIPPRsText,
 	})...)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             mergedPRsHeading,
-		prs:                 content.MergedPRs,
-		groups:              content.MergedPRsGroupedByRepository,
+		prs:                 content.Merged.PRs,
+		groups:              content.Merged.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),
@@ -56,55 +52,96 @@ func BuildMarkdown(content canvascontent.Content) string {
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
-// One canvas section: its PRs as the flat list or as repository buckets, and how to render a row
-// of it.
+// All three buckets empty falls back to the single "Open" heading with "No open PRs" text.
+func renderOpenSections(content canvascontent.Content) []string {
+	nextActionSections := []section{
+		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
+		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
+		openSection(waitingForReviewHeading, content.WaitingForReview, content.GroupedByRepository),
+	}
+
+	blocks := utilities.FlatMap(utilities.Map(nextActionSections, renderSectionBlocks))
+	if len(blocks) > 0 {
+		return blocks
+	}
+	return renderSectionBlocks(section{
+		heading:             openPRsHeading,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderOpenPRRow,
+		emptyText:           noOpenPRsText,
+	})
+}
+
+func openSection(
+	heading string, prs canvascontent.PRSection, groupedByRepository bool,
+) section {
+	return section{
+		heading:             heading,
+		prs:                 prs.PRs,
+		groups:              prs.Groups,
+		groupedByRepository: groupedByRepository,
+		renderRow:           renderOpenPRRow,
+		hideWhenEmpty:       true,
+	}
+}
+
+// One canvas section: its PRs as the flat list or as repository buckets.
 type section struct {
 	heading             string
-	prs                 []prparser.PR
-	groups              []prparser.RepositoryPRs
+	prs                 []prview.PR
+	groups              []prview.RepositoryPRs
 	groupedByRepository bool
-	renderRow           func(prparser.PR) string
+	renderRow           func(prview.PR) string
 	emptyText           string
+	// Drops the heading too, rather than showing it above emptyText.
+	hideWhenEmpty bool
+}
+
+func (section section) isEmpty() bool {
+	return len(section.prs) == 0 && len(section.groups) == 0
 }
 
 // Grouped PRs get one sub-heading block per repository, with no repeated section heading.
 // Grouping with nothing to show falls back to the same single line the flat section uses.
 func renderSectionBlocks(section section) []string {
+	// Nil rather than a blank block: strings.Join would keep an empty string as a gap.
+	if section.hideWhenEmpty && section.isEmpty() {
+		return nil
+	}
 	if !section.groupedByRepository || len(section.groups) == 0 {
 		return []string{renderSection(section.heading, section.prs, section.renderRow, section.emptyText)}
 	}
 
 	return append(
 		[]string{section.heading},
-		utilities.Map(section.groups, func(group prparser.RepositoryPRs) string {
+		utilities.Map(section.groups, func(group prview.RepositoryPRs) string {
 			return renderRepositoryGroup(group, section)
 		})...,
 	)
 }
 
-func renderRepositoryGroup(group prparser.RepositoryPRs, section section) string {
+func renderRepositoryGroup(group prview.RepositoryPRs, section section) string {
 	heading := fmt.Sprintf(
 		"### [%s](%s)", escapeMarkdown(group.Repository.GetPath()), group.Repository.GetPullsURL(),
 	)
 	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
 }
 
-// An empty section keeps its heading and shows the given line instead of rows: a missing
-// heading would read as a broken render rather than as "nothing here right now".
+// An empty section shows the given line under its heading instead of rows.
 func renderSection(
 	heading string,
-	prs []prparser.PR,
-	renderRow func(prparser.PR) string,
+	prs []prview.PR,
+	renderRow func(prview.PR) string,
 	emptyText string,
 ) string {
 	if len(prs) == 0 {
 		return heading + "\n\n" + emptyText
 	}
-	rows := utilities.Map(prs, func(pr prparser.PR) string { return "- " + renderRow(pr) })
+	rows := utilities.Map(prs, func(pr prview.PR) string { return "- " + renderRow(pr) })
 	return heading + "\n\n" + strings.Join(rows, "\n")
 }
 
-func renderOpenPRRow(pr prparser.PR) string {
+func renderOpenPRRow(pr prview.PR) string {
 	ageText := "_" + pr.GetPRAgeDisplayText() + "_"
 	if pr.IsOldPR {
 		ageText = "🚨 `" + pr.GetPRAgeDisplayText() + "`"
@@ -113,9 +150,8 @@ func renderOpenPRRow(pr prparser.PR) string {
 }
 
 // A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
-// marker: nobody has been asked to review a draft yet. The activity segment is a code span while
-// the draft is moving, italics once it is idle.
-func renderWIPPRRow(pr prparser.PR) string {
+// marker. The activity segment is a code span if the PR is active, italics if it's inactive.
+func renderWIPPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters)
 
 	activityText := pr.GetActivityText()
@@ -128,7 +164,6 @@ func renderWIPPRRow(pr prparser.PR) string {
 	return row + " _" + activityText + "_"
 }
 
-// A failed merged fetch is not an empty week, so the section says which of the two it is.
 func emptyMergedPRsText(content canvascontent.Content) string {
 	if content.MergedPRsUnavailable {
 		return mergedPRsUnavailableText
@@ -136,9 +171,8 @@ func emptyMergedPRsText(content canvascontent.Content) string {
 	return noMergedPRsText
 }
 
-// A merged PR shows when it landed instead of its age, and never its reviewers: the section
-// answers what landed, not who reviewed it. Unknown merge time drops just that segment.
-func renderMergedPRRow(pr prparser.PR) string {
+// A merged PR shows when it landed instead of its age, and never its reviewers.
+func renderMergedPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr)
 
 	mergedText := pr.GetMergedText()
@@ -148,17 +182,17 @@ func renderMergedPRRow(pr prparser.PR) string {
 	return row + renderAuthor(pr) + " 🚀"
 }
 
-func renderTitleLink(pr prparser.PR) string {
+func renderTitleLink(pr prview.PR) string {
 	return fmt.Sprintf("**[%s](%s)**", escapeMarkdown(pr.GetTitle()), pr.GetHTMLURL())
 }
 
-func renderAuthor(pr prparser.PR) string {
+func renderAuthor(pr prview.PR) string {
 	return " by " + escapeMarkdown(pr.Author.GetGitHubName())
 }
 
-func renderReviewers(approvers, commenters []prparser.Collaborator) string {
+func renderReviewers(approvers, commenters []prview.Collaborator) string {
 	return strings.Join(
-		utilities.Map(prparser.GetReviewersTextSegments(approvers, commenters), escapeMarkdown),
+		utilities.Map(prview.GetReviewersTextSegments(approvers, commenters), escapeMarkdown),
 		"",
 	)
 }

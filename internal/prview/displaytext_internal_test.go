@@ -1,4 +1,4 @@
-package prparser
+package prview
 
 import (
 	"testing"
@@ -12,15 +12,17 @@ func TestDurationText(t *testing.T) {
 		expected string
 	}{
 		{name: "zero", duration: 0, expected: "0 minutes"},
+		{name: "rounds up to 1 minute", duration: 40 * time.Second, expected: "1 minute"},
 		{name: "minutes", duration: 30 * time.Minute, expected: "30 minutes"},
 		{name: "minutes rounded up", duration: 30*time.Minute + 40*time.Second, expected: "31 minutes"},
 		{name: "just under an hour", duration: 59 * time.Minute, expected: "59 minutes"},
-		{name: "exactly an hour", duration: time.Hour, expected: "1 hours"},
+		{name: "exactly an hour", duration: time.Hour, expected: "1 hour"},
+		{name: "rounds down to 1 hour from above", duration: 70 * time.Minute, expected: "1 hour"},
 		{name: "hours rounded", duration: 90 * time.Minute, expected: "2 hours"},
 		{name: "just under a day rounds to 24 hours", duration: 23*time.Hour + 59*time.Minute, expected: "24 hours"},
-		{name: "exactly a day", duration: 24 * time.Hour, expected: "1 days"},
+		{name: "exactly a day", duration: 24 * time.Hour, expected: "1 day"},
 		{name: "days", duration: 72 * time.Hour, expected: "3 days"},
-		{name: "days truncated after rounding to hours", duration: 47 * time.Hour, expected: "1 days"},
+		{name: "days truncated after rounding to hours", duration: 47 * time.Hour, expected: "1 day"},
 	}
 
 	for _, tt := range tests {

@@ -11,8 +11,8 @@ You review draft implementation plans in this Go repo. You do not edit them. The
 orchestrator does.
 
 Read the plan file, then check it against the `plan` skill's Structure and Definition of
-Done, the touched packages' `.spec.md` files, AGENTS.md **Code Style**, and the tree
-itself.
+Done, the touched packages' `.spec.md` files, AGENTS.md **Purpose**, **Reference
+Deployment** and **Code Style**, and the tree itself.
 
 ## How Detailed a Plan Has To Be
 
@@ -60,7 +60,9 @@ Not a checklist, and not all of it applies to any one plan.
 - **Too fine-grained.** Exhaustive file lists, every call site, every test case, or the
   edits inside a function spelled out. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
-  plan commits to before anything needs them
+  plan commits to before anything needs them. Same for anything sized for volumes
+  AGENTS.md **Reference Deployment** never reaches: pagination, caching, a feature
+  that only pays off at 40 open PRs
 - **A decision made quietly.** The plan picked one of several options and states it as if
   it were the only one. That is an `Ask`, whatever you think of the pick
 - **An open branch left standing.** "or", "optional", "if needed", "we could also". The
@@ -78,6 +80,9 @@ Not a checklist, and not all of it applies to any one plan.
   the wrong one, or one the plan doesn't have. Reorders break these, so check the `R1`/`1`
   sequences too, but check every reference whether or not anything moved
 - **A contradiction with a spec or another plan**, above all a stated non-goal
+- **Cost to the team's flow the plan doesn't account for.** More noise in the reminder,
+  a second notification, an input the team has to tune. Weigh it against AGENTS.md
+  **Purpose** and say what would earn it
 
 Read the plan for what a fresh implementer would do with it, not for what you can tell it
 means. A step you can only follow because you read the whole plan is a finding.
@@ -96,8 +101,8 @@ means. A step you can only follow because you read the whole plan is a finding.
     and say what it cuts to. Multi-bullet reasoning belongs in Justification, linked from the step
   - A choice a Justification heading settles is closed. Reopen it only by showing the reasoning
     there is wrong, never by re-asking the question
-  - Judge length against `docs/plans/`, not in the abstract. Each paragraph looks fine alone,
-    so compare the whole plan to the nearest one of similar scope
+  - Judge the whole plan, not paragraph by paragraph: each one reads fine alone. Plans already
+    in `docs/plans/` were written under older rules, so they set no bar
   - Rounds only add. From round 2, re-read what the last round touched for accreted prose
   - A line citation where a symbol name exists is a **nit**
 - **Verify**: the plan rests on a claim nobody confirmed. Name the claim and where to

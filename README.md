@@ -25,7 +25,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 
 - Monitor up to 30 repositories
 - Option to ["refresh" the latest PR reminder](#3-update-mode-enabled) when PRs get reviewed or merged (with run-mode: `update`)
-- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open, draft and recently merged PRs
+- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open PRs bucketed by whose turn it is, plus draft and recently merged PRs
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
@@ -198,9 +198,16 @@ Both `filters` and `repository-filters` support:
 Optional: keep a Slack canvas updated with a live view of open, draft and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
 
 ```markdown
-## Open
+## Ready to merge
 
 - **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+
+## Waiting for author
+
+- **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/4)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
+
+## Waiting for review
+
 - **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _30 minutes ago_ by Bob Brown
 
 ## WIP
@@ -217,7 +224,9 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 _Updated 2026-08-08 06:15 UTC_
 ```
 
-Open PRs are listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days, and names no reviewers.
+Open PRs are split by whose turn it is: an approved PR with nothing outstanding is ready to merge (1); a PR carrying a review comment or a review thread its author hasn't answered, and an approved one that now conflicts, are waiting for the author (2); everything else is waiting for review (3).
+
+Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
 ### Setup
 

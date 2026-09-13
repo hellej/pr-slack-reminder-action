@@ -11,6 +11,19 @@ Improve a software team's development velocity and flow.
 - Favour signal over noise: every notification interrupts the team, so it must earn the interruption
 - When planning or implementing, weigh changes against this goal, and propose new ideas serving it
 
+## Reference Deployment
+
+One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
+
+- One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
+- A monorepo the team owns, plus PRs the team has open in repos owned by others
+- 0 to 8 open PRs at a time. A weekly Dependabot batch adds ~5 at once
+- A draft PR with recent activity is a real WIP signal. A quiet one is just left open
+- Human approval gates merges: every PR needs an approving review from a human other than its author, bot-authored PRs included
+- Bot accounts post review comments on every commit, so bot activity never counts as human review and never moves a PR out of "waiting for review"
+- A daily scheduled `post` at 09:00, plus event-driven `update` runs on PR, review, comment and push events
+- The PR tracker canvas runs alongside the message as the persistent live view
+
 ## Output Style
 
 Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
@@ -88,7 +101,8 @@ Don't stack hedges:
 
 - **Readability > Speed:** Data sets are tiny; never trade clarity for execution speed or micro-optimizations.
 - **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
-- **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead.
+- **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
+- **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
 - **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
@@ -111,12 +125,14 @@ Don't stack hedges:
 - `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
+- `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` — try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
 - `make check-fmt` — fail if any file needs `gofmt`
 - `make check-vet` — run `go vet ./...`
-- `make check-dead-code` — fail if `deadcode` finds an unreachable function under `./cmd/...`. Expected to fail until plan 001 Step 1 lands
+- `make check-dead-code` — fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities` — run `govulncheck ./...`
 - `make install-hooks` — point git at `githooks/`, a pre-commit hook running `check-fmt` and `check-vet`. One-time opt-in per clone
 - `go run .github/scripts/check_inputs.go` — validate action.yml and config.go constants are in sync
+- Go LSP (gopls) is available via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
 
 ## Architecture
 
@@ -124,7 +140,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder and saves state;
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
-3. **PR Parser** (`internal/prparser/`) — enriches PRs with Slack user mappings and metadata
+3. **PR View** (`internal/prview/`) — enriches PRs with Slack user mappings and display metadata
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
 6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages

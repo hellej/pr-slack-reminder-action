@@ -13,7 +13,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/canvasbuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/prparser"
+	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
 // Refreshes the canvas, and fetches the merged PRs itself, so that both run modes share one code
@@ -50,10 +50,10 @@ func refreshPRTrackerCanvas(
 		log.Printf("Failed to fetch recently merged PRs: %v", mergedPRsErr)
 	}
 
-	parsedPRs := prparser.ParsePRs(openPRs.PRs, cfg.ContentInputs)
+	prViews := prview.BuildPRViews(openPRs.PRs, cfg.ContentInputs)
 	content := canvascontent.GetContent(
-		parsedPRs,
-		prparser.ParsePRs(mergedPRs, cfg.ContentInputs),
+		prViews,
+		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		cfg.ContentInputs,
 		canvascontent.GetContentOptions{
 			OpenPRsCapped:        openPRs.OpenPRsCapped,

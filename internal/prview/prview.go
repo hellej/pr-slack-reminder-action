@@ -1,8 +1,8 @@
-// Package prparser enriches raw GitHub PR data with additional metadata
+// Package prview enriches raw GitHub PR data with additional metadata
 // for message and canvas display. It handles Slack user ID mapping, age and
 // activity calculation, sorting, and grouping by repository. It also renders
 // the reviewer, activity and merged-time texts a PR row shows.
-package prparser
+package prview
 
 import (
 	"maps"
@@ -22,7 +22,7 @@ const RecentActivityThreshold = 24 * time.Hour
 type PR struct {
 	*githubclient.PR
 	Author     Collaborator
-	Approvers  []Collaborator // Users who have approved the PR at least once
+	Approvers  []Collaborator
 	Commenters []Collaborator // Users who have commented on the PR but did not approve it
 	IsOldPR    bool           // true if the PR is older than the configured threshold
 }
@@ -39,15 +39,60 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 	}
 }
 
+// What action a PR needs next, and from whom (the values are identifiers, not headings).
+type PRNextAction string
+
+const (
+	NextActionReadyToMerge     PRNextAction = "ready to merge"
+	NextActionWaitingForAuthor PRNextAction = "waiting for author"
+	NextActionWaitingForReview PRNextAction = "waiting for review"
+)
+
+// Returns the next action of the first check that matches, so an earlier check wins every
+// overlap: a reviewer who commented and then approved leaves the PR ready to merge. A conflict
+// keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while an
+// unreviewed one stays in the review queue (conflicts should not block review).
+func (pr PR) GetNextAction() PRNextAction {
+	// defensive nil check, should not happen
+	if pr.PR == nil {
+		return NextActionWaitingForReview
+	}
+
+	isApproved := len(pr.Approvers) > 0
+	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
+		return NextActionReadyToMerge
+	}
+	if isApproved || pr.HasNonApprovingReview || pr.HasThreadWaitingForAuthor {
+		return NextActionWaitingForAuthor
+	}
+	return NextActionWaitingForReview
+}
+
 func (pr PR) GetPRAgeText() string {
 	return durationText(time.Since(pr.GetCreatedAt()))
 }
 
-// True when the PR saw activity less than RecentActivityThreshold ago. A PR with unknown
-// activity, a zero update time, is not recently updated.
-func (pr PR) IsRecentlyUpdated() bool {
+func (pr PR) IsOpen() bool { return !pr.GetDraft() }
+
+func (pr PR) IsDraft() bool { return pr.GetDraft() }
+
+// Names the update time as last activity and unknown activity as nil.
+func (pr PR) LastActivityAt() *time.Time {
 	updatedAt := pr.GetUpdatedAt()
-	return !updatedAt.IsZero() && time.Since(updatedAt) < RecentActivityThreshold
+	if updatedAt.IsZero() {
+		return nil
+	}
+	return &updatedAt
+}
+
+// True when the PR saw activity within threshold of asOf. A PR with unknown activity counts as active.
+func (pr PR) IsActiveAsOf(asOf time.Time, threshold time.Duration) bool {
+	updatedAt := pr.GetUpdatedAt()
+	return updatedAt.IsZero() || !updatedAt.Before(asOf.Add(-threshold))
+}
+
+func (pr PR) IsRecentlyUpdated() bool {
+	return pr.IsActiveAsOf(time.Now(), RecentActivityThreshold)
 }
 
 func (pr PR) IsMerged() bool {
@@ -58,17 +103,13 @@ func (pr PR) IsClosedButNotMerged() bool {
 	return pr.GetState() == "closed" && !pr.IsMerged()
 }
 
-func ParsePRs(prs []githubclient.PR, config config.ContentInputs) []PR {
-	return utilities.Map(prs, getPRParser(config))
+func BuildPRViews(prs []githubclient.PR, config config.ContentInputs) []PR {
+	return utilities.Map(prs, func(pr githubclient.PR) PR {
+		return buildPRView(pr, config)
+	})
 }
 
-func getPRParser(config config.ContentInputs) func(pr githubclient.PR) PR {
-	return func(pr githubclient.PR) PR {
-		return parsePR(pr, config)
-	}
-}
-
-func parsePR(pr githubclient.PR, config config.ContentInputs) PR {
+func buildPRView(pr githubclient.PR, config config.ContentInputs) PR {
 	return PR{
 		PR:         &pr,
 		Author:     NewCollaborator(pr.Author, config.SlackUserIdByGitHubUsername[pr.Author.Login]),

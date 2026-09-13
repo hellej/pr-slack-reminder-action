@@ -93,6 +93,11 @@ type PR struct {
 	ApprovedByUsers  []Collaborator
 	CommentedByUsers []Collaborator // reviewers who commented the PR but did not approve it
 	SnoozedUntil     *time.Time
+	// An unresolved review thread whose last comment is neither the author's nor a bot's. A
+	// thread with no comments, or one whose last commenter GitHub no longer reports, counts too.
+	HasThreadWaitingForAuthor bool
+	Conflicting               bool // cannot be merged as it stands
+	HasNonApprovingReview     bool // a reviewer commented or requested changes
 }
 
 type PRResult struct {
