@@ -132,6 +132,7 @@ Don't stack hedges:
 - `make check-vulnerabilities` — run `govulncheck ./...`
 - `make install-hooks` — point git at `githooks/`, a pre-commit hook running `check-fmt` and `check-vet`. One-time opt-in per clone
 - `go run .github/scripts/check_inputs.go` — validate action.yml and config.go constants are in sync
+- Go LSP (gopls) is available via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
 
 ## Architecture
 
