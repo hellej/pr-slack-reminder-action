@@ -12,13 +12,13 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// Drafts inactive longer than this are left off the canvas
+// Drafts inactive longer than this are left off the canvas.
 const MaxDraftPRInactivity = 60 * 24 * time.Hour
 
-// How many drafts without recent activity the WIP section shows
+// How many drafts without recent activity the WIP section shows.
 const MaxInactiveWIPPRs = 5
 
-// One canvas section's PRs, either as the flat list or as repository buckets
+// One canvas section's PRs, either as the flat list or as repository buckets.
 type PRSection struct {
 	PRs    []prparser.PR
 	Groups []prparser.RepositoryPRs
@@ -119,7 +119,7 @@ func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time)
 	})
 }
 
-// unknown update time returns true
+// unknown update time returns true.
 func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
 	return func(pr prparser.PR) bool {
