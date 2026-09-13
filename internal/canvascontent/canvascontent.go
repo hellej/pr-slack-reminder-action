@@ -12,15 +12,13 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// Drafts untouched for longer than this are left off the canvas.
+// Drafts inactive longer than this are left off the canvas
 const MaxDraftPRInactivity = 60 * 24 * time.Hour
 
-// How many drafts without recent activity the WIP section shows. Recently touched drafts are
-// the point of the section, older ones only need a sample.
+// How many drafts without recent activity the WIP section shows
 const MaxInactiveWIPPRs = 5
 
-// One canvas section's PRs, either as the flat list or as repository buckets. Filling both
-// loses one of them: canvasbuilder renders the shape Content.GroupedByRepository names.
+// One canvas section's PRs, either as the flat list or as repository buckets
 type PRSection struct {
 	PRs    []prparser.PR
 	Groups []prparser.RepositoryPRs
@@ -40,15 +38,10 @@ type Content struct {
 }
 
 type GetContentOptions struct {
-	// Reported by the fetch, never derived from how many PRs reach the canvas.
-	OpenPRsCapped bool
-	WIPPRsCapped  bool
-	// Set when the merged PR fetch failed, so the section can say so instead of claiming
-	// that nothing was merged.
+	OpenPRsCapped        bool
+	WIPPRsCapped         bool
 	MergedPRsUnavailable bool
-	// The moment the canvas is generated: shown in the footer and used as "now" when
-	// pruning inactive drafts.
-	GeneratedAt time.Time
+	GeneratedAt          time.Time
 }
 
 // GetContent splits the given PRs into the three open sections and a work-in-progress section,
@@ -118,7 +111,7 @@ func newPRSection(sortedPRs []prparser.PR, groupByRepository bool) PRSection {
 func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time) []prparser.PR {
 	inactiveKept := 0
 	return utilities.Filter(sortedDrafts, func(pr prparser.PR) bool {
-		if !pr.IsInactiveAsOf(generatedAt) {
+		if pr.IsActiveAsOf(generatedAt) {
 			return true
 		}
 		inactiveKept++
@@ -126,7 +119,7 @@ func withInactiveDraftsCapped(sortedDrafts []prparser.PR, generatedAt time.Time)
 	})
 }
 
-// A draft with unknown update time is kept
+// unknown update time returns true
 func isActiveEnoughForCanvas(generatedAt time.Time) func(prparser.PR) bool {
 	inactiveBefore := generatedAt.Add(-MaxDraftPRInactivity)
 	return func(pr prparser.PR) bool {
