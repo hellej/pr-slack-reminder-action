@@ -107,9 +107,9 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			}
 			markdown := mockSlackAPI.ReplacedCanvas.Markdown
 			assertCanvasContains(t, markdown,
-				"## Waiting for review\n", "## WIP\n", "## Merged\n",
+				"## 👀 Waiting for review\n", "## 🔧 WIP\n", "## 🚀 Merged\n",
 				"Open PR one", "Open PR two", "Draft PR one",
-				"**[Merged PR two]", "_merged 2 hours ago_ by Bob 🚀",
+				"**[Merged PR two]", "_merged 2 hours ago_ by Bob\n",
 			)
 			if strings.Index(markdown, "Merged PR two") > strings.Index(markdown, "Merged PR one") {
 				t.Errorf("Expected the newest merge first on the canvas, got:\n%s", markdown)

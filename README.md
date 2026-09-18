@@ -198,26 +198,26 @@ Both `filters` and `repository-filters` support:
 Optional: keep a Slack canvas updated with a live view of open, draft and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
 
 ```markdown
-## Ready to merge
+## ✅ Ready to merge
 
 - **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 
-## Waiting for author
+## 💬 Waiting for author
 
 - **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/4)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
 
-## Waiting for review
+## 👀 Waiting for review
 
 - **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _30 minutes ago_ by Bob Brown
 
-## WIP
+## 🔧 WIP
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
-## Merged
+## 🚀 Merged
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown 🚀
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson 🚀
+- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson
 
 ---
 

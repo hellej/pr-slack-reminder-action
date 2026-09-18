@@ -475,84 +475,80 @@ func assertMarkdownMatchesSnapshot(t *testing.T, markdown string) {
 	}
 }
 
-// A snapshot would accept a heading appearing or vanishing on a re-record, so the presence of
-// each open heading is asserted on its own.
-func TestBuildMarkdownHidesEmptyOpenSections(t *testing.T) {
-	pr := testPR(prOptions{
+// A snapshot would accept a heading appearing, vanishing or losing its emoji on a re-record, so
+// every heading line the render emits is pinned here, in order.
+func TestBuildMarkdownSectionHeadings(t *testing.T) {
+	filled := canvascontent.PRSection{PRs: []prview.PR{testPR(prOptions{
 		number: 1, title: "Add pagination to the PR listing", authorName: "Alice Anderson",
 		age: hoursAge,
-	})
-	filled := canvascontent.PRSection{PRs: []prview.PR{pr}}
+	})}}
+	alwaysRenderedHeadings := []string{"## 🔧 WIP", "## 🚀 Merged"}
 
 	testCases := []struct {
-		name             string
-		content          canvascontent.Content
-		expectedHeadings []string
+		name                 string
+		content              canvascontent.Content
+		expectedOpenHeadings []string
 	}{
 		{
-			name:             "only ready to merge",
-			content:          canvascontent.Content{ReadyToMerge: filled},
-			expectedHeadings: []string{"## Ready to merge"},
+			name:                 "only ready to merge",
+			content:              canvascontent.Content{ReadyToMerge: filled},
+			expectedOpenHeadings: []string{"## ✅ Ready to merge"},
 		},
 		{
-			name:             "only waiting for author",
-			content:          canvascontent.Content{WaitingForAuthor: filled},
-			expectedHeadings: []string{"## Waiting for author"},
+			name:                 "only waiting for author",
+			content:              canvascontent.Content{WaitingForAuthor: filled},
+			expectedOpenHeadings: []string{"## 💬 Waiting for author"},
 		},
 		{
-			name:             "only waiting for review",
-			content:          canvascontent.Content{WaitingForReview: filled},
-			expectedHeadings: []string{"## Waiting for review"},
+			name:                 "only waiting for review",
+			content:              canvascontent.Content{WaitingForReview: filled},
+			expectedOpenHeadings: []string{"## 👀 Waiting for review"},
 		},
 		{
 			name: "ready to merge and waiting for review",
 			content: canvascontent.Content{
 				ReadyToMerge: filled, WaitingForReview: filled,
 			},
-			expectedHeadings: []string{"## Ready to merge", "## Waiting for review"},
+			expectedOpenHeadings: []string{"## ✅ Ready to merge", "## 👀 Waiting for review"},
 		},
 		{
-			name: "all three",
+			name: "every section filled",
 			content: canvascontent.Content{
 				ReadyToMerge: filled, WaitingForAuthor: filled, WaitingForReview: filled,
+				WIP: filled, Merged: filled,
 			},
-			expectedHeadings: []string{
-				"## Ready to merge", "## Waiting for author", "## Waiting for review",
+			expectedOpenHeadings: []string{
+				"## ✅ Ready to merge", "## 💬 Waiting for author", "## 👀 Waiting for review",
 			},
 		},
 		{
-			// Nothing open at all keeps one heading, so the canvas does not open at ## WIP.
-			name:             "nothing open",
-			content:          canvascontent.Content{},
-			expectedHeadings: []string{"## Open"},
+			// Nothing open at all keeps one heading, so the canvas does not open at ## 🔧 WIP.
+			name:                 "nothing open",
+			content:              canvascontent.Content{},
+			expectedOpenHeadings: []string{"## Open"},
 		},
 		{
 			name: "nothing open while grouping by repository",
 			content: canvascontent.Content{
 				GroupedByRepository: true,
 			},
-			expectedHeadings: []string{"## Open"},
+			expectedOpenHeadings: []string{"## Open"},
 		},
 	}
 
-	allHeadings := []string{
-		"## Ready to merge", "## Waiting for author", "## Waiting for review", "## Open",
-	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			markdown := canvasbuilder.BuildMarkdown(tc.content)
 
-			for _, heading := range allHeadings {
-				wantHeading := slices.Contains(tc.expectedHeadings, heading)
-				if gotHeading := strings.Contains(markdown, heading+"\n"); gotHeading != wantHeading {
-					t.Errorf(
-						"heading %q present: %t, expected present: %t, in:\n%s",
-						heading, gotHeading, wantHeading, markdown,
-					)
-				}
+			expectedHeadings := append(slices.Clone(tc.expectedOpenHeadings), alwaysRenderedHeadings...)
+			headings := utilities.Filter(strings.Split(markdown, "\n"), func(line string) bool {
+				return strings.HasPrefix(line, "## ")
+			})
+			if !slices.Equal(headings, expectedHeadings) {
+				t.Errorf("Expected headings %q, got %q", expectedHeadings, headings)
 			}
-			if strings.Contains(markdown, noOpenPRsTextInRender) != (len(tc.expectedHeadings) == 1 &&
-				tc.expectedHeadings[0] == "## Open") {
+			if strings.Contains(markdown, noOpenPRsTextInRender) !=
+				slices.Contains(tc.expectedOpenHeadings, "## Open") {
 				t.Errorf("unexpected open-PR fallback line in:\n%s", markdown)
 			}
 			// A hidden section must drop out entirely: an empty block instead would leave a
