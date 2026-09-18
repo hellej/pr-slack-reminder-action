@@ -1,4 +1,4 @@
-## Ready to merge
+## ✅ Ready to merge
 
 ### [test-org/repo-three](https://github.com/test-org/repo-three/pulls)
 
@@ -13,7 +13,7 @@
 
 - **[Retry the artifact download](https://github.com/test-org/repo-two/pull/22)** _30 minutes ago_ by Bob Brown (✅ Dana Davis, Erin Evans)
 
-## Waiting for author
+## 💬 Waiting for author
 
 ### [test-org/test-repo](https://github.com/test-org/test-repo/pulls)
 
@@ -28,7 +28,7 @@
 
 - **[Handle the 404 on missing repositories](https://github.com/test-org/repo-three/pull/33)** _5 hours ago_ by Dana Davis (✅ Alice Anderson / 💬 Bob Brown)
 
-## Waiting for review
+## 👀 Waiting for review
 
 ### [test-org/test-repo](https://github.com/test-org/test-repo/pulls)
 
@@ -45,7 +45,7 @@
 - **[Bump golangci-lint](https://github.com/test-org/repo-two/pull/45)** _5 hours ago_ by Erin Evans
 - **[Document the canvas scopes](https://github.com/test-org/repo-two/pull/42)** _30 minutes ago_ by Bob Brown
 
-## WIP
+## 🔧 WIP
 
 ### [test-org/repo-two](https://github.com/test-org/repo-two/pulls)
 
@@ -55,15 +55,15 @@
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
-## Merged
+## 🚀 Merged
 
 ### [test-org/repo-two](https://github.com/test-org/repo-two/pulls)
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown 🚀
+- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown
 
 ### [test-org/test-repo](https://github.com/test-org/test-repo/pulls)
 
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson 🚀
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson
 
 ​
 

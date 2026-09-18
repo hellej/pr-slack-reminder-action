@@ -2,12 +2,12 @@
 
 _No open PRs_
 
-## WIP
+## 🔧 WIP
 
 - **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 - **[Refactor state store](https://github.com/test-org/test-repo/pull/5)** by Carol Clark (💬 Erin Evans) _idle 3 days_
 
-## Merged
+## 🚀 Merged
 
 _No merged PRs_
 

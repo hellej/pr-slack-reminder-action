@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	readyToMergeHeading      = "## Ready to merge"
-	waitingForAuthorHeading  = "## Waiting for author"
-	waitingForReviewHeading  = "## Waiting for review"
+	readyToMergeHeading      = "## ✅ Ready to merge"
+	waitingForAuthorHeading  = "## 💬 Waiting for author"
+	waitingForReviewHeading  = "## 👀 Waiting for review"
 	openPRsHeading           = "## Open"
-	wipPRsHeading            = "## WIP"
-	mergedPRsHeading         = "## Merged"
+	wipPRsHeading            = "## 🔧 WIP"
+	mergedPRsHeading         = "## 🚀 Merged"
 	noOpenPRsText            = "_No open PRs_"
 	noWIPPRsText             = "_No work in progress_"
 	noMergedPRsText          = "_No merged PRs_"
@@ -179,7 +179,7 @@ func renderMergedPRRow(pr prview.PR) string {
 	if mergedText != "" {
 		row += " _" + mergedText + "_"
 	}
-	return row + renderAuthor(pr) + " 🚀"
+	return row + renderAuthor(pr)
 }
 
 func renderTitleLink(pr prview.PR) string {
