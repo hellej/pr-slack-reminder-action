@@ -72,6 +72,16 @@ Don't stack hedges:
 - ✗ `This should probably work in most cases, though it may be worth verifying.`
 - ✓ `Unverified: whether Slack rejects payloads over the 50-block limit.`
 
+Don't open a sentence with a modifier that describes something other than its subject:
+
+- ✗ `Grouped by repository, each section carries a sub-heading.`
+- ✓ `When grouped by repository, each section carries a sub-heading.`
+
+Don't use a pronoun when an earlier noun in the same sentence could equally be its antecedent:
+
+- ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
+- ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
