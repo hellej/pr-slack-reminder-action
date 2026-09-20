@@ -54,7 +54,7 @@ inputs: {
     required: false,
   },
   no-prs-message: {
-    description: 'Message to send when there are no open PRs',
+    description: 'Line to show above the message sections when there are no open PRs',
     required: false,
   },
   old-pr-threshold-hours: {

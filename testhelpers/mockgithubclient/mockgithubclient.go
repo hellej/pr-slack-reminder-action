@@ -39,8 +39,8 @@ type MockGitHubClientOptions struct {
 	Recording                  *FetchRecording
 }
 
-// With the canvas off, the open PRs and the merged PRs reach neither the message nor the canvas,
-// so the request itself is all a test can assert on.
+// Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
+// once whatever the run renders from it.
 type FetchRecording struct {
 	OpenPRFetches   int
 	MergedPRFetches int

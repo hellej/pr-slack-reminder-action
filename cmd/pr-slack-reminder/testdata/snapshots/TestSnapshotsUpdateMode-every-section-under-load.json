@@ -263,6 +263,36 @@
               "elements": [
                 {
                   "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/69",
+                  "text": "Opened after the message was posted",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 3 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Grace Green",
+                  "style": {}
+                }
+              ]
+            },
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
                   "url": "https://github.com/test-org/test-repo/pull/63",
                   "text": "Nobody has looked at this yet",
                   "style": {
@@ -363,6 +393,36 @@
                 {
                   "type": "text",
                   "text": ")",
+                  "style": {}
+                }
+              ]
+            },
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/70",
+                  "text": "Merged without ever being listed",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " merged 4 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Heidi Hill",
                   "style": {}
                 }
               ]

@@ -146,7 +146,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Architecture
 
-Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** loads state, re-fetches those PRs, and edits or deletes the existing message.
+Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering

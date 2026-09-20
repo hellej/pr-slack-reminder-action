@@ -973,13 +973,33 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 	}
 }
 
+// The PRs the open-PR fetch returns in update mode: the named state PRs, rendered from the same
+// fixtures the tracked-PR fetch renders, plus the PRs opened since the message was posted.
+func openPRsOfFetch(
+	prByNumber map[int]*github.PullRequest,
+	openPRNumbers []int,
+	openPRsNotInState []*github.PullRequest,
+) []*github.PullRequest {
+	openPRs := make([]*github.PullRequest, 0, len(openPRNumbers)+len(openPRsNotInState))
+	for _, number := range openPRNumbers {
+		openPRs = append(openPRs, prByNumber[number])
+	}
+	return append(openPRs, openPRsNotInState...)
+}
+
 func TestScenariosUpdateMode(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		config                 testhelpers.TestConfig
-		configOverrides        *map[string]any
-		mockState              *state.State
-		prByNumber             map[int]*github.PullRequest
+		name            string
+		config          testhelpers.TestConfig
+		configOverrides *map[string]any
+		mockState       *state.State
+		prByNumber      map[int]*github.PullRequest
+		// The open-PR fetch is live, so it returns the state PRs that are still open, by number,
+		// and any PR opened since the message was posted.
+		openPRNumbers          []int
+		openPRsNotInState      []*github.PullRequest
+		mergedPRsFromSearch    []*github.PullRequest
+		mergedPRsSearchError   error
 		fetchPRErrorByPRNumber map[int]error
 		reviewsByPRNumber      map[int][]*github.PullRequestReview
 		listArtifactsError     error
@@ -999,12 +1019,17 @@ func TestScenariosUpdateMode(t *testing.T) {
 			expectedErrorMsg: "configuration error: required input slack-bot-token is not set",
 		},
 		{
-			name:   "update mode with empty state exits gracefully",
+			// A message posted with no PRs still has the live ones to show.
+			name:   "update mode with an empty state lists the PRs open now",
 			config: testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{
 				config.InputRunMode: config.RunModeUpdate,
 			},
 			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{}})),
+			openPRsNotInState: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Opened since the post", AuthorLogin: "alice"}),
+			},
+			expectedPRItemTexts: []string{"Opened since the post 5 hours ago by Alice"},
 		},
 		{
 			name:   "update mode with all PRs filtered out deletes message",
@@ -1018,6 +1043,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "alice"}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Second PR", AuthorLogin: "bob"}),
 			},
+			openPRNumbers:        []int{1, 2},
 			expectMessageDeleted: true,
 		},
 		{
@@ -1045,6 +1071,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "Draft PR 1", AuthorLogin: "alice", Draft: github.Ptr(true)}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Draft PR 2", AuthorLogin: "bob", Draft: github.Ptr(true)}),
 			},
+			openPRNumbers:        []int{1, 2},
 			expectMessageDeleted: true,
 		},
 		{
@@ -1086,6 +1113,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "alice"}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Second PR", AuthorLogin: "bob"}),
 			},
+			openPRNumbers: []int{1, 2},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
 					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
@@ -1112,6 +1140,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 					getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "nameless-author"}),
 				),
 			},
+			openPRNumbers:       []int{1},
 			expectedPRItemTexts: []string{"First PR 5 hours ago by nameless-author"},
 		},
 		{
@@ -1169,6 +1198,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "alice"}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Second PR", AuthorLogin: "bob"}),
 			},
+			openPRNumbers:      []int{1, 2},
 			updateMessageError: errors.New("slack update failed"),
 			expectedErrorMsg:   "failed to update Slack message: slack update failed",
 		},
@@ -1234,6 +1264,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 					MergedHoursAgo: 2,
 				}),
 			},
+			openPRNumbers: []int{1},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				1: {
 					mockgithubclient.NewReview("reviewer1", "Reviewer One", "APPROVED"),
@@ -1249,6 +1280,78 @@ func TestScenariosUpdateMode(t *testing.T) {
 				"Merged PR with reviewer merged 6 hours ago by Bob (✅ Reviewer Two)",
 			},
 		},
+		{
+			name:   "update mode lists the PRs open right now, not the ones in state",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})),
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Still open PR", AuthorLogin: "alice"}),
+				2: getTestPR(GetTestPROptions{
+					Number: 2, Title: "Closed since the post", AuthorLogin: "bob", State: "closed",
+				}),
+			},
+			openPRNumbers: []int{1},
+			openPRsNotInState: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 3, Title: "Opened since the post", AuthorLogin: "carol"}),
+			},
+			expectedPRItemTexts: []string{
+				"Still open PR 5 hours ago by Alice",
+				"Opened since the post 5 hours ago by Carol",
+			},
+		},
+		{
+			// 7 days is githubclient.RecentlyMergedWindow, so the merged fetch drops this PR even
+			// though the search returns it. Only the state artifact can still name it.
+			name:   "update mode keeps a state PR merged before the recently merged window",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1}})),
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{
+					Number: 1, Title: "Merged last week", AuthorLogin: "alice",
+					State: "closed", Merged: true, MergedHoursAgo: 7*24 + 1,
+				}),
+			},
+			mergedPRsFromSearch: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 1, Title: "Merged last week", AuthorLogin: "alice",
+					State: "closed", Merged: true, MergedHoursAgo: 7*24 + 1,
+				}),
+			},
+			expectedPRItemTexts: []string{"Merged last week merged 7 days ago by Alice"},
+		},
+		{
+			// A post made with no open PRs and a no-prs-message saves a state with no PRs, so an
+			// update run can find one. With the input gone by then, nothing is left to show.
+			name:   "update mode with an empty state and nothing open deletes the message",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState:            testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{}})),
+			expectMessageDeleted: true,
+		},
+		{
+			// A failed merged search leaves the run unable to tell an empty day from an outage,
+			// and only one of the two should remove a message this run cannot rebuild.
+			name:   "update mode keeps the message when the merged PR search failed",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1}})),
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{
+					Number: 1, Title: "Closed without merging", AuthorLogin: "alice", State: "closed",
+				}),
+			},
+			mergedPRsSearchError: errors.New("merged PR search failed"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1257,6 +1360,9 @@ func TestScenariosUpdateMode(t *testing.T) {
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 				PRsByNumber:            tc.prByNumber,
+				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:              tc.mergedPRsFromSearch,
+				MergedPRsSearchError:   tc.mergedPRsSearchError,
 				ErrByPRNumber:          tc.fetchPRErrorByPRNumber,
 				ReviewsByPRNumber:      tc.reviewsByPRNumber,
 				MockStateForUpdateMode: tc.mockState,
@@ -1338,8 +1444,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 }
 
 // Both fetches are made before the run-mode switch, so an update run makes them with the canvas
-// off too. Nothing renders the open PRs yet, which is what makes the request the only thing to
-// assert on.
+// off too, and its message is built from them.
 func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
 		config.InputRunMode: config.RunModeUpdate,
@@ -1376,10 +1481,10 @@ func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 	if !updatedMessage.SomePRItemContainsText("Tracked PR") {
 		t.Error("Expected the state-tracked PR in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Open PR not in state") {
-		t.Error("Expected the message to still list the state PRs only")
+	if !updatedMessage.SomePRItemContainsText("Open PR not in state") {
+		t.Error("Expected a PR opened since the post in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Merged PR") {
-		t.Error("Expected the searched merged PR to stay out of the message")
+	if !updatedMessage.SomePRItemContainsText("Merged PR") {
+		t.Error("Expected the searched merged PR in the updated message")
 	}
 }

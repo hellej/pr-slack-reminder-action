@@ -334,23 +334,44 @@ Touches `internal/messagebuilder`, `cmd/pr-slack-reminder`, `testhelpers/mocksla
 Touches `cmd/pr-slack-reminder/run.go`, `action.yml`, `README.md`, `docs/examples/`.
 
 - Post mode passes R1's open PRs with drafts filtered out, no tracked PRs, and R1's merged PRs to
-  `messagecontent.GetContent`
+  `messagecontent.GetContent`. The draft filter and the view building move into
+  `buildNonDraftPRViews`, which both modes call
 - Both modes pass R1's `generatedAt` to it, so a post stamps the footer with the time it posted and
   an update with the time it edited
 - Update mode keeps its `GetPRs` call on `loadedState.PullRequests`, now for one purpose: those are
-  the tracked PRs the Merged section reads. Its open sections come from R1's fetch, draft-filtered
-  by the same predicate post mode uses
+  the tracked PRs the Merged section reads. It moves behind `getTrackedPRs`, and its open sections
+  come from R1's fetch, draft-filtered by the same predicate post mode uses
   - Drop the `len(loadedState.PullRequests) == 0` early return. A message posted with no PRs still
-    has live ones to show. The `GetPRs` call is skipped in that case rather than made with an
-    empty ref slice
+    has live ones to show. `getTrackedPRs` skips the call on an empty ref slice rather than making
+    it: `getPRsByRef` chunks the refs, so such a call sends no request but still logs a fetch
+  - An empty-state run with nothing open and no `no-prs-message` therefore deletes the message,
+    where it used to exit without touching it
 - Both modes send or edit whenever `content.HasPRs() || content.NoOpenPRsText != ""`. `SummaryText`
   is no longer part of that test: step 2 always sets it. **Landed in step 3**, which is where
   `SummaryText` stopped being empty and the old test stopped firing
 - Update mode deletes the message only when that test fails: no open PR, no merged PR, and no
   `no-prs-message`. Today the same test is over the re-fetched state PRs alone, merged and closed
   ones included, so the delete fires when that fetch comes back empty after filters and snooze
-- Cover in `main_test.go`: an update run whose live open PRs are not the state's, and an update run
-  with a state PR merged longer than `githubclient.RecentlyMergedWindow` ago, which no fetch reaches
+  - `runUpdateMode` takes `mergedPRsErr` alongside the merged PRs, as `refreshPRTrackerCanvas`
+    already does, and skips the delete while it is non-nil. Otherwise a failed merged search would
+    read as "nothing merged" and remove a message the run cannot rebuild, which
+    [§ Why a failed tracked-PR fetch degrades the message instead of failing the run](#why-a-failed-tracked-pr-fetch-degrades-the-message-instead-of-failing-the-run)
+    rules out. Such a run still edits the message whenever the send/keep test passes
+  - Rewrite the comment above the merged fetch in `Run`: the merged PRs no longer cost the canvas
+    alone, and the error now has a second reader
+- Cover in `main_test.go`, one update run each:
+  - Live open PRs that are not the state's
+  - An empty state with a PR open
+  - An empty state with nothing open, which deletes
+  - A state PR merged an hour past `githubclient.RecentlyMergedWindow`. The merged fetch returns
+    it and then drops it as out of window, so only the state path can surface it
+  - A failed merged search with nothing else to show, which keeps the message
+- The update-mode fixtures gain the live open fetch and the merged search
+  - `TestUpdateModeCanvasShowsCurrentlyOpenPRs` and
+    `TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled` already carry both, and both pin
+    the state-only message this step replaces, so their message assertions turn around
+  - The two delete cases get the live fetch too. Without it they delete because nothing was
+    fetched, not because the filter or the draft rule dropped anything
 - `no-prs-message` is documented as the whole message in two places, and is now a line above the
   sections: rewrite its `action.yml` description ("Message to send when there are no open PRs")
   and its README input-table row ("Message when no PRs are found (if not set, no empty message

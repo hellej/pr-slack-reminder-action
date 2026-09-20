@@ -324,8 +324,8 @@ func TestCanvasIsNotRefreshedWhenLinkIsUnset(t *testing.T) {
 	}
 }
 
-// Update mode's message is state-tracked while its canvas shows what is open right now,
-// so the two fetches carry deliberately different PRs here.
+// Both surfaces read the open fetch, and only the canvas shows drafts, so the two carry
+// deliberately different PRs here.
 func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
 		config.InputRunMode:             config.RunModeUpdate,
@@ -370,11 +370,14 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	if !updatedMessage.SomePRItemContainsText("Tracked merged PR") {
 		t.Error("Expected the state-tracked merged PR in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Untracked open PR") {
-		t.Error("Expected an open PR that is not in state to stay out of the updated message")
+	if !updatedMessage.SomePRItemContainsText("Untracked open PR") {
+		t.Error("Expected an open PR that is not in state in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Merged PR one") {
-		t.Error("Expected a searched merged PR to stay out of the updated message")
+	if !updatedMessage.SomePRItemContainsText("Merged PR one") {
+		t.Error("Expected a searched merged PR in the updated message")
+	}
+	if updatedMessage.SomePRItemContainsText("Untracked draft PR") {
+		t.Error("Expected a draft PR to stay out of the updated message")
 	}
 }
 
