@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
@@ -161,9 +162,11 @@ func runUpdateMode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to load state: %w", err)
 	}
-	trackedPRs, err := getTrackedPRs(githubClient, cfg, loadedState.PullRequests)
-	if err != nil {
-		return loadedState, err
+	trackedPRs, trackedPRsErr := resolveTrackedPRs(
+		githubClient, cfg, loadedState.PullRequests, openPRs.PRs, mergedPRs,
+	)
+	if trackedPRsErr != nil {
+		log.Printf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr)
 	}
 
 	content := messagecontent.GetContent(
@@ -175,10 +178,10 @@ func runUpdateMode(
 	)
 
 	if !content.HasPRs() && content.NoOpenPRsText == "" {
-		// Deleting takes proof that nothing is left to show, and a failed merged fetch is not
-		// proof: the message stands until a run that can rebuild it says otherwise.
-		if mergedPRsErr != nil {
-			log.Println("Keeping the Slack message: nothing to show, but the merged PR fetch failed")
+		// Deleting takes proof that nothing is left to show, and a failed fetch is not proof:
+		// the message stands until a run that can rebuild it says otherwise.
+		if mergedPRsErr != nil || trackedPRsErr != nil {
+			log.Println("Keeping the Slack message: nothing to show, but a PR fetch failed")
 			return loadedState, nil
 		}
 		log.Println("Nothing left to show: no open PRs and no merged ones")
@@ -210,8 +213,36 @@ func runUpdateMode(
 }
 
 // The PRs the message was posted with, in whatever state they are now: the Merged section reads
-// the merged ones. A post made with no PRs leaves nothing to resolve, and an empty ref slice
-// makes GetPRs log a fetch it never sends, so that case skips the call.
+// the merged ones. The run's own fetches answer for most of them, so only the rest are fetched.
+// A ref the open fetch returned is open right now and reaches no section, and a ref the merged
+// fetch returned arrives with the reviewers GetPRs would give it. Absence from a fetch means
+// unresolved, never gone: the residue is every other ref, merged outside the fetch's window or
+// past its cap, closed, filtered out, turned into a draft, or past the open fetch's cap.
+//
+// A tracked PR resolved off the merged fetch is returned as tracked, so the merged section's cap
+// on untracked PRs cannot drop it.
+func resolveTrackedPRs(
+	githubClient githubclient.Client,
+	cfg config.Config,
+	references []models.PullRequestRef,
+	openPRs []githubclient.PR,
+	mergedPRs []githubclient.PR,
+) ([]githubclient.PR, error) {
+	trackedMergedPRs := utilities.Filter(mergedPRs, func(pr githubclient.PR) bool {
+		return slices.Contains(references, refOf(pr))
+	})
+	resolvedReferences := utilities.Map(slices.Concat(openPRs, mergedPRs), refOf)
+	unresolvedReferences := utilities.Filter(references, func(ref models.PullRequestRef) bool {
+		return !slices.Contains(resolvedReferences, ref)
+	})
+	fetchedPRs, err := getTrackedPRs(githubClient, cfg, unresolvedReferences)
+	if err != nil {
+		return trackedMergedPRs, err
+	}
+	return slices.Concat(trackedMergedPRs, fetchedPRs), nil
+}
+
+// An empty ref slice makes GetPRs log a fetch it never sends, so that case skips the call.
 func getTrackedPRs(
 	githubClient githubclient.Client,
 	cfg config.Config,
@@ -223,6 +254,10 @@ func getTrackedPRs(
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
 	return githubClient.GetPRs(ctx, references, cfg.GetFiltersForRepository)
+}
+
+func refOf(pr githubclient.PR) models.PullRequestRef {
+	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
 }
 
 func findOpenPRs(

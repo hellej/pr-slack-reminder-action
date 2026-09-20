@@ -464,13 +464,21 @@ Touches `cmd/pr-slack-reminder/run.go`, `testhelpers/mockgithubclient`.
   - The state save is unchanged: update mode never rewrites the tracked PR list
 - Cover in `main_test.go`: an update run whose state PRs are all still open and one where a state
   PR merged inside the window, both asserting no `GetPRs` request goes out; one where a state PR
-  merged outside it, asserting the residue carries it into the Merged section with its reviewers;
-  one whose residue fetch fails, asserting the message is edited and not deleted
-  - `mockgithubclient` gains a recording of the refs each `GetPRs` request asked for, so a test
-    can assert the call was skipped or narrowed. It already parses them off the query as
-    `postedPullRequestRefs`, but `MakeMockGitHubClientGetter` builds the transport inside the
-    closure and hands the test only a `githubclient.Client`, so the recording hangs off
-    `MockGitHubClientOptions` as a pointer. `ErrByPRNumber` already fails the call, since a
+  merged outside it, asserting the request carries that ref alone and the PR reaches the Merged
+  section with its reviewers; one where the merged fetch resolves a state PR behind four newer
+  untracked merges, asserting the cap of 3 keeps it; one whose residue fetch fails, asserting the
+  message is edited and not deleted, and one where such a run has nothing else to show, asserting
+  the message is kept
+  - `TestScenariosUpdateMode`'s "update mode fails when fetching individual PR fails" case pins
+    the behaviour this step reverses, so it goes, together with the table's now unused
+    `fetchPRErrorByPRNumber` field
+  - `mockgithubclient` gains `FetchRecording.GetPRsRequests`, the refs of every `GetPRs` request,
+    so a test can assert the call was skipped or narrowed. It already parses them off the query as
+    `postedPullRequestRefs`, which gains the owner beside the repository name, but
+    `MakeMockGitHubClientGetter` builds the transport inside the closure and hands the test only a
+    `githubclient.Client`, so the recording hangs off `MockGitHubClientOptions` as a pointer. Both
+    `GetPRs` and the enrichment phase select a PR by number, so the two are told apart by the
+    `fullPr` fragment only `GetPRs` spreads. `ErrByPRNumber` already fails the call, since a
     PR-level error fails the whole `GetPRs` query
 
 ## 7. Delete what the change left unreachable

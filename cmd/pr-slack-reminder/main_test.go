@@ -3,6 +3,7 @@ package main_test
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"os"
@@ -204,16 +205,7 @@ type GetTestStateOptions struct {
 }
 
 func getTestState(options GetTestStateOptions) state.State {
-	prRefs := make([]models.PullRequestRef, 0, len(options.PRNumbers))
-	for _, prNumber := range options.PRNumbers {
-		prRefs = append(prRefs, models.PullRequestRef{
-			Repository: models.Repository{
-				Owner: "test-org",
-				Name:  "test-repo",
-			},
-			Number: prNumber,
-		})
-	}
+	prRefs := utilities.Map(options.PRNumbers, stateRef)
 
 	return state.State{
 		SchemaVersion: 1,
@@ -996,19 +988,18 @@ func TestScenariosUpdateMode(t *testing.T) {
 		prByNumber      map[int]*github.PullRequest
 		// The open-PR fetch is live, so it returns the state PRs that are still open, by number,
 		// and any PR opened since the message was posted.
-		openPRNumbers          []int
-		openPRsNotInState      []*github.PullRequest
-		mergedPRsFromSearch    []*github.PullRequest
-		mergedPRsSearchError   error
-		fetchPRErrorByPRNumber map[int]error
-		reviewsByPRNumber      map[int][]*github.PullRequestReview
-		listArtifactsError     error
-		downloadArtifactError  error
-		updateMessageError     error
-		deleteMessageError     error
-		expectedErrorMsg       string
-		expectedPRItemTexts    []string
-		expectMessageDeleted   bool
+		openPRNumbers         []int
+		openPRsNotInState     []*github.PullRequest
+		mergedPRsFromSearch   []*github.PullRequest
+		mergedPRsSearchError  error
+		reviewsByPRNumber     map[int][]*github.PullRequestReview
+		listArtifactsError    error
+		downloadArtifactError error
+		updateMessageError    error
+		deleteMessageError    error
+		expectedErrorMsg      string
+		expectedPRItemTexts   []string
+		expectMessageDeleted  bool
 	}{
 		{
 			name:   "unset required inputs",
@@ -1142,21 +1133,6 @@ func TestScenariosUpdateMode(t *testing.T) {
 			},
 			openPRNumbers:       []int{1},
 			expectedPRItemTexts: []string{"First PR 5 hours ago by nameless-author"},
-		},
-		{
-			name:   "update mode fails when fetching individual PR fails",
-			config: testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{
-				config.InputRunMode: config.RunModeUpdate,
-			},
-			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})),
-			prByNumber: map[int]*github.PullRequest{
-				1: getTestPR(GetTestPROptions{Number: 1, Title: "First PR", AuthorLogin: "alice"}),
-			},
-			fetchPRErrorByPRNumber: map[int]error{
-				2: errors.New("failed to fetch PR"),
-			},
-			expectedErrorMsg: "failed to fetch PR",
 		},
 		{
 			name:   "update mode fails when artifact listing fails",
@@ -1363,7 +1339,6 @@ func TestScenariosUpdateMode(t *testing.T) {
 				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
 				MergedPRs:              tc.mergedPRsFromSearch,
 				MergedPRsSearchError:   tc.mergedPRsSearchError,
-				ErrByPRNumber:          tc.fetchPRErrorByPRNumber,
 				ReviewsByPRNumber:      tc.reviewsByPRNumber,
 				MockStateForUpdateMode: tc.mockState,
 				ListArtifactsError:     tc.listArtifactsError,
@@ -1486,5 +1461,220 @@ func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 	}
 	if !updatedMessage.SomePRItemContainsText("Merged PR") {
 		t.Error("Expected the searched merged PR in the updated message")
+	}
+}
+
+func stateRef(number int) models.PullRequestRef {
+	return models.PullRequestRef{
+		Repository: models.Repository{Owner: "test-org", Name: "test-repo"},
+		Number:     number,
+	}
+}
+
+func setUpdateModeEnvironment(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode: config.RunModeUpdate,
+	})
+}
+
+func TestUpdateModeSkipsTheTrackedPRFetchWhenTheStatePRsAreStillOpen(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	openPR1 := getTestPR(GetTestPROptions{Number: 1, Title: "Still open PR", AuthorLogin: "alice"})
+	openPR2 := getTestPR(GetTestPROptions{Number: 2, Title: "Also still open PR", AuthorLogin: "bob"})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                    []*github.PullRequest{openPR1, openPR2},
+			MockStateForUpdateMode: &loadedState,
+			Recording:              &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if len(recording.GetPRsRequests) != 0 {
+		t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Still open PR") {
+		t.Error("Expected the state PR in the updated message, rendered from the open PR fetch")
+	}
+}
+
+func TestUpdateModeSkipsTheTrackedPRFetchWhenAStatePRMergedInsideTheWindow(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	mergedStatePR := getTestPR(GetTestPROptions{
+		Number: 1, Title: "Merged state PR", AuthorLogin: "alice",
+		State: "closed", Merged: true, MergedHoursAgo: 2,
+	})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                    []*github.PullRequest{getTestPR(GetTestPROptions{Number: 9, Title: "Open PR"})},
+			MergedPRs:              []*github.PullRequest{mergedStatePR},
+			MockStateForUpdateMode: &loadedState,
+			Recording:              &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if len(recording.GetPRsRequests) != 0 {
+		t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Merged state PR") {
+		t.Error("Expected the merged state PR in the updated message, taken from the merged PR fetch")
+	}
+}
+
+// A state PR merged before the merged fetch's window reaches neither fetch, so the run asks for
+// that one ref alone, and the answer carries its reviewers.
+func TestUpdateModeFetchesOnlyTheStatePRsNeitherFetchResolved(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	openStatePR := getTestPR(GetTestPROptions{Number: 1, Title: "Still open PR", AuthorLogin: "alice"})
+	longAgoMergedStatePR := getTestPR(GetTestPROptions{
+		Number: 2, Title: "Merged nine days ago", AuthorLogin: "bob",
+		State: "closed", Merged: true, MergedHoursAgo: 9 * 24,
+	})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:         []*github.PullRequest{openStatePR},
+			MergedPRs:   []*github.PullRequest{longAgoMergedStatePR},
+			PRsByNumber: map[int]*github.PullRequest{2: longAgoMergedStatePR},
+			ReviewsByPRNumber: map[int][]*github.PullRequestReview{
+				2: {mockgithubclient.NewReview("dana", "Dana", "APPROVED")},
+			},
+			MockStateForUpdateMode: &loadedState,
+			Recording:              &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	expectedRequests := [][]models.PullRequestRef{{stateRef(2)}}
+	if !slices.EqualFunc(recording.GetPRsRequests, expectedRequests, slices.Equal) {
+		t.Errorf("Expected GetPRs requests %v, got %v", expectedRequests, recording.GetPRsRequests)
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Merged nine days ago") {
+		t.Error("Expected the long ago merged state PR in the updated message")
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("✅ Dana") {
+		t.Errorf(
+			"Expected the fetched merged PR to name its approver, got items %v",
+			mockSlackAPI.UpdatedMessage.Blocks.GetAllPRItemTexts(),
+		)
+	}
+}
+
+// The cap of 3 applies to the untracked merges alone, so a state PR the merged fetch resolved
+// has to arrive as tracked: counted as untracked it would fall behind the three newest merges.
+func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	mergedStatePR := getTestPR(GetTestPROptions{
+		Number: 1, Title: "Merged state PR", AuthorLogin: "alice",
+		State: "closed", Merged: true, MergedHoursAgo: 30,
+	})
+	newerMerges := []*github.PullRequest{}
+	for hoursAgo := 1; hoursAgo <= 4; hoursAgo++ {
+		newerMerges = append(newerMerges, getTestPR(GetTestPROptions{
+			Number: 10 + hoursAgo, Title: fmt.Sprintf("Merged %dh ago", hoursAgo),
+			AuthorLogin: "bob", State: "closed", Merged: true, MergedHoursAgo: float32(hoursAgo),
+		}))
+	}
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRs:              append([]*github.PullRequest{mergedStatePR}, newerMerges...),
+			MockStateForUpdateMode: &loadedState,
+			Recording:              &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if len(recording.GetPRsRequests) != 0 {
+		t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+	}
+	updatedMessage := mockSlackAPI.UpdatedMessage.Blocks
+	if !updatedMessage.SomePRItemContainsText("Merged state PR") {
+		t.Errorf(
+			"Expected the tracked merge to survive the untracked cap, got items %v",
+			updatedMessage.GetAllPRItemTexts(),
+		)
+	}
+	if updatedMessage.SomePRItemContainsText("Merged 4h ago") {
+		t.Error("Expected the 4th newest untracked merge to be dropped by the cap")
+	}
+	if updatedMessage.GetPRCount() != 4 {
+		t.Errorf("Expected 4 merged PRs in the message, got %d", updatedMessage.GetPRCount())
+	}
+}
+
+func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{2}})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR not in state", AuthorLogin: "alice"}),
+			},
+			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockStateForUpdateMode: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed despite the tracked PR fetch failure, got error: %v", err)
+	}
+	if mockSlackAPI.DeletedMessage.ChannelID != "" {
+		t.Error("Expected the message to be kept, but DeleteMessage was called")
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Open PR not in state") {
+		t.Error("Expected the message to be edited with the open PRs the run did fetch")
+	}
+}
+
+// Without the residue, an empty message is a fetch outage as much as an empty day.
+func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{2}})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockStateForUpdateMode: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed despite the tracked PR fetch failure, got error: %v", err)
+	}
+	if mockSlackAPI.DeletedMessage.ChannelID != "" {
+		t.Error("Expected the message to be kept, but DeleteMessage was called")
 	}
 }
