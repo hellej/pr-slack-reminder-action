@@ -2,126 +2,36 @@
   [
     {
       "type": "rich_text",
-      "block_id": "pr_list_heading_test-org/repo-one",
+      "block_id": "section_waiting_for_review",
       "elements": [
         {
           "type": "rich_text_section",
           "elements": [
             {
               "type": "text",
-              "text": "Open PRs in ",
-              "style": {
-                "bold": true
-              }
-            },
-            {
-              "type": "link",
-              "url": "https://github.com/test-org/repo-one/pulls",
-              "text": "test-org/repo-one",
-              "style": {
-                "bold": true
-              }
-            },
-            {
-              "type": "text",
-              "text": ":",
+              "text": "👀 Waiting for review",
               "style": {
                 "bold": true
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "rich_text",
-      "block_id": "open_prs_test-org/repo-one",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/repo-one/pull/11",
-                  "text": "Add pagination to the PR listing",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 2 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Alice Anderson",
-                  "style": {}
-                }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": " "
-      }
-    },
-    {
-      "type": "rich_text",
-      "block_id": "pr_list_heading_test-org/repo-two",
-      "elements": [
+        },
         {
           "type": "rich_text_section",
           "elements": [
-            {
-              "type": "text",
-              "text": "Open PRs in ",
-              "style": {
-                "bold": true
-              }
-            },
             {
               "type": "link",
               "url": "https://github.com/test-org/repo-two/pulls",
               "text": "test-org/repo-two",
-              "style": {
-                "bold": true
-              }
+              "style": {}
             },
             {
               "type": "text",
               "text": ":",
-              "style": {
-                "bold": true
-              }
+              "style": {}
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "rich_text",
-      "block_id": "open_prs_test-org/repo-two",
-      "elements": [
+        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -190,6 +100,70 @@
           "indent": 0,
           "border": 0,
           "offset": 0
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "link",
+              "url": "https://github.com/test-org/repo-one/pulls",
+              "text": "test-org/repo-one",
+              "style": {}
+            },
+            {
+              "type": "text",
+              "text": ":",
+              "style": {}
+            }
+          ]
+        },
+        {
+          "type": "rich_text_list",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/repo-one/pull/11",
+                  "text": "Add pagination to the PR listing",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 2 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Alice Anderson",
+                  "style": {}
+                }
+              ]
+            }
+          ],
+          "style": "bullet",
+          "indent": 0,
+          "border": 0,
+          "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
         }
       ]
     }

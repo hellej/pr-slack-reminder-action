@@ -36,6 +36,14 @@ type MockGitHubClientOptions struct {
 	MockStateForUpdateMode     *state.State
 	ListArtifactsError         error
 	DownloadArtifactError      error
+	Recording                  *FetchRecording
+}
+
+// With the canvas off, the open PRs and the merged PRs reach neither the message nor the canvas,
+// so the request itself is all a test can assert on.
+type FetchRecording struct {
+	OpenPRFetches   int
+	MergedPRFetches int
 }
 
 func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenForState string) githubclient.Client {
@@ -144,6 +152,9 @@ const notFoundStatus = 404
 // A 404 renders NOT_FOUND on the aliases of the repositories that have no PRs fixture; any other
 // non-200 status fails the whole request at the transport level.
 func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.Recording != nil {
+		t.opts.Recording.OpenPRFetches++
+	}
 	status := cmp.Or(t.opts.ListPRsResponseStatus, http.StatusOK)
 	if status != http.StatusOK && status != notFoundStatus {
 		body, err := json.Marshal(map[string]string{"message": errorMessage(t.opts.PRServiceError)})
@@ -209,6 +220,9 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 // The merged PR search has its own failure knob: a canvas refresh fetches merged PRs and open
 // PRs separately, and only one of the two failing is the interesting case.
 func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.Recording != nil {
+		t.opts.Recording.MergedPRFetches++
+	}
 	if t.opts.MergedPRsSearchError != nil {
 		body, err := json.Marshal(
 			map[string]string{"message": t.opts.MergedPRsSearchError.Error()},
@@ -268,6 +282,7 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["number"] = number
 	node["state"] = pullRequestNodeState(pr)
 	node["merged"] = pr.GetMerged()
+	node["mergedAt"] = mergedAtJSON(pr)
 	node["labels"] = labelsJSON(pr)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)

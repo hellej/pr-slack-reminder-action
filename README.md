@@ -94,7 +94,6 @@ jobs:
             alice: U1234567890
             kronk: U2345678901
             charlie: U3456789012
-          pr-list-heading: "We have <pr_count> PRs waiting for review! 👀"
           no-prs-message: "🎉 All caught up! No PRs waiting for review."
           old-pr-threshold-hours: 48
           filters: |
@@ -175,10 +174,9 @@ jobs:
 | `filters`                           | ❌       | Global filters (JSON)<br>Example:<br>`{"authors": ["alice"], "ignored-labels": ["wip"]}`                                                                                                   |
 | `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"ignored-authors": ["bot"]}`                                                                           |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`                                                                                      |
-| `pr-list-heading`                   | ❌       | Message heading (`<pr_count>` gets replaced)<br>Default: `There are <pr_count> open PRs 👀`                                                                                                |
 | `no-prs-message`                    | ❌       | Message when no PRs are found (if not set, no empty message gets sent)<br>Example: `All caught up! 🎉`                                                                                     |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
-| `group-by-repository`               | ❌       | Group PRs by repository with repository headings (defaults to `false`). When enabled, `pr-list-heading` is ignored.                                                                        |
+| `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
@@ -246,7 +244,7 @@ to be in the same channel as the canvas to have write access.
 
 - ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `pr-list-heading`, `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
+- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
 - The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
 - A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not lost data. Reload the canvas to see its real content.
@@ -256,7 +254,7 @@ to be in the same channel as the canvas to have write access.
 - **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
 - **Snooze a PR**: Comment `/snooze for 3 days` (or `/snooze PR reminder for 3 days`) on a PR to temporarily hide it from reminders. To unsnooze, delete the comment or post `/snooze for 0 days`.
 - **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
-- **Customize messages**: Make the reminders fit your team's culture
+- **Customize the empty-day message**: Set `no-prs-message` to fit your team's culture
 
 ## 💬 Slack Bot Token Scopes
 

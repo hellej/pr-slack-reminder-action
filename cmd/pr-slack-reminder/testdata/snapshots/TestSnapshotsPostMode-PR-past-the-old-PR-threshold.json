@@ -2,26 +2,20 @@
   [
     {
       "type": "rich_text",
-      "block_id": "pr_list_heading",
+      "block_id": "section_waiting_for_review",
       "elements": [
         {
           "type": "rich_text_section",
           "elements": [
             {
               "type": "text",
-              "text": "There are 2 open PRs 🚀",
+              "text": "👀 Waiting for review",
               "style": {
                 "bold": true
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "rich_text",
-      "block_id": "open_prs",
-      "elements": [
+        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -96,6 +90,15 @@
           "indent": 0,
           "border": 0,
           "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
         }
       ]
     }

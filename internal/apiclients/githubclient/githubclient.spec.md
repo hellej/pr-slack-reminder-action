@@ -41,7 +41,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 
 - `search` reports a nonexistent repository, one the token cannot read and an empty window identically, as an empty result with no error, so a misspelled repository is silent on the merged path. Not silent overall: every canvas refresh lists open PRs through `repository(owner:,name:)` first, and that fails the run on an unreadable repository
 - The merged search selects fewer fields than the other two paths, so a merged PR carries a zero `UpdatedAt` and `Draft: false` on the shared `PullRequest` struct. Nothing reads them: the merged list is ordered on `MergedAt`
-- `MergedAt` is filled on the `GetPRs` path too, where nothing reads it yet. The reminder message's merged marker comes from `Merged`
+- `MergedAt` is filled on the `GetPRs` path too, which is what dates a merged row in the reminder message. `Merged` is what puts the PR in that section
 - GitHub's PR search index lags a merge by seconds, so a merge from the last moments before the run can be missing from the list
 - `GetAuthenticatedClient` accepts a second, optional GitHub token used only for artifact list/download calls, needed because the "update" run mode may require `actions: read` on a token/scope different from the main PR-fetching token
 - `GetPRs` truncates its input to the first `MaxPRsToFetch` refs if more are passed, before fetching anything
@@ -55,7 +55,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - GraphQL returns bot logins without the `[bot]` suffix, so the client appends it; an author GitHub reports as null, such as a deleted account, yields a collaborator with no login at all
 - A user with any `APPROVED` review counts as an approver, so a later `CHANGES_REQUESTED` review from the same user doesn't cancel it
 - `PENDING` reviews contribute no reviewer or commenter, since such a review is visible only to its own author's token
-- `GetPRs` renders any state other than `CLOSED` or `MERGED` as open, so an unexpected or missing state doesn't strike the PR through in the reminder
+- `GetPRs` renders any state other than `CLOSED` or `MERGED` as open, so an unexpected or missing state leaves the PR in the reminder's open sections
 - A PR's first 100 labels are read (GitHub's maximum page size), so a PR with more labels can slip past `ignored-labels` or fail a `labels` allow-list
 - Snooze detection reads raw timeline comments, not the bot-filtered set used for reviewer/commenter extraction, so a bot-authored comment can still trigger a snooze
 - A snooze comment must be exactly the command, matched against the untrimmed body, so surrounding text, a second line, a trailing space or a trailing newline all stop the match

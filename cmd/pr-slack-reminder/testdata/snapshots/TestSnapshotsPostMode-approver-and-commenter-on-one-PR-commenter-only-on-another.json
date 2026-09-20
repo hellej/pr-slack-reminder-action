@@ -2,74 +2,23 @@
   [
     {
       "type": "rich_text",
-      "block_id": "pr_list_heading",
+      "block_id": "section_ready_to_merge",
       "elements": [
         {
           "type": "rich_text_section",
           "elements": [
             {
               "type": "text",
-              "text": "There are 2 open PRs 🚀",
+              "text": "✅ Ready to merge",
               "style": {
                 "bold": true
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "rich_text",
-      "block_id": "open_prs",
-      "elements": [
+        },
         {
           "type": "rich_text_list",
           "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/32",
-                  "text": "PR whose only reviewer input is a timeline comment",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 6 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Frank Foster",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
-                }
-              ]
-            },
             {
               "type": "rich_text_section",
               "elements": [
@@ -130,6 +79,94 @@
           "indent": 0,
           "border": 0,
           "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": " "
+      }
+    },
+    {
+      "type": "rich_text",
+      "block_id": "section_waiting_for_review",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "👀 Waiting for review",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        },
+        {
+          "type": "rich_text_list",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/32",
+                  "text": "PR whose only reviewer input is a timeline comment",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " 6 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Bob Brown",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " (💬 ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Frank Foster",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": ")",
+                  "style": {}
+                }
+              ]
+            }
+          ],
+          "style": "bullet",
+          "indent": 0,
+          "border": 0,
+          "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
         }
       ]
     }

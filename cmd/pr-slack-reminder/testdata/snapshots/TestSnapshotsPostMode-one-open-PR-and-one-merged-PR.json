@@ -2,26 +2,20 @@
   [
     {
       "type": "rich_text",
-      "block_id": "pr_list_heading",
+      "block_id": "section_waiting_for_review",
       "elements": [
         {
           "type": "rich_text_section",
           "elements": [
             {
               "type": "text",
-              "text": "There are 3 open PRs 🚀",
+              "text": "👀 Waiting for review",
               "style": {
                 "bold": true
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "rich_text",
-      "block_id": "open_prs",
-      "elements": [
+        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -30,74 +24,8 @@
               "elements": [
                 {
                   "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/63",
-                  "text": "Closed PR without merge",
-                  "style": {
-                    "bold": true,
-                    "strike": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 10 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Carol Clark",
-                  "style": {}
-                }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/62",
-                  "text": "Merged PR",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 7 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " 🚀",
-                  "style": {}
-                }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/61",
-                  "text": "Still open PR",
+                  "url": "https://github.com/test-org/test-repo/pull/91",
+                  "text": "The only open PR",
                   "style": {
                     "bold": true
                   }
@@ -126,6 +54,79 @@
           "indent": 0,
           "border": 0,
           "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": " "
+      }
+    },
+    {
+      "type": "rich_text",
+      "block_id": "section_merged",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "🚀 Recently merged",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        },
+        {
+          "type": "rich_text_list",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://github.com/test-org/test-repo/pull/92",
+                  "text": "The only merged PR",
+                  "style": {
+                    "bold": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " merged 5 hours ago",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " by ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Bob Brown",
+                  "style": {}
+                }
+              ]
+            }
+          ],
+          "style": "bullet",
+          "indent": 0,
+          "border": 0,
+          "offset": 0
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
         }
       ]
     }

@@ -294,7 +294,7 @@ func TestScenarios(t *testing.T) {
 			name:            "no PRs found with message",
 			config:          testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{config.InputNoPRsMessage: "No PRs found, happy coding! 🎉"},
-			expectedSummary: "No PRs found, happy coding! 🎉",
+			expectedSummary: "Nothing waiting for review 🎉",
 		},
 		{
 			name:             "invalid global filters input 1",
@@ -616,7 +616,7 @@ func TestScenarios(t *testing.T) {
 			},
 			expectedPRNumbers: []int{1, 2},
 			expectedSummary:   "2 open PRs are waiting for attention 👀",
-			expectedHeadings:  []string{"Open PRs in test-org/test-repo:"},
+			expectedHeadings:  []string{"test-org/test-repo:"},
 		},
 		{
 			name:   "group by repository with multiple repos",
@@ -636,29 +636,7 @@ func TestScenarios(t *testing.T) {
 			},
 			expectedPRNumbers: []int{1, 2, 3},
 			expectedSummary:   "3 open PRs are waiting for attention 👀",
-			expectedHeadings:  []string{"Open PRs in org/repo1:", "Open PRs in org/repo2:"},
-		},
-		{
-			name:   "group by repository disabled with PR list heading required",
-			config: testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{
-				config.InputGroupByRepository: false,
-				config.InputPRListHeading:     "", // Empty heading when grouping is disabled should cause error
-			},
-			expectedErrorMsg: "configuration error: pr-list-heading is required when group-by-repository is false",
-		},
-		{
-			name:   "group by repository enabled ignores PR list heading",
-			config: testhelpers.GetDefaultConfigMinimal(),
-			configOverrides: &map[string]any{
-				config.InputGroupByRepository: true,
-				config.InputPRListHeading:     "", // Empty heading should be ignored when grouping is enabled
-			},
-			prs: []*github.PullRequest{
-				getTestPR(GetTestPROptions{Number: 1, Title: "Test PR", AuthorLogin: "alice"}),
-			},
-			expectedPRNumbers: []int{1},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedHeadings:  []string{"org/repo1:", "org/repo2:"},
 		},
 		{
 			name:   "reviews by bots and author are excluded from review status",
@@ -770,27 +748,6 @@ func TestScenarios(t *testing.T) {
 				t.Errorf(
 					"Expected %v PRs to be included in the message (was %v)",
 					len(expectedPRs), mockSlackAPI.SentMessage.Blocks.GetPRCount(),
-				)
-			}
-			expectedHeading := ""
-			// Check if grouping is enabled in overrides
-			groupByRepository := tc.config.ContentInputs.GroupByRepository
-			if tc.configOverrides != nil {
-				if override, exists := (*tc.configOverrides)[config.InputGroupByRepository]; exists {
-					if groupBool, ok := override.(bool); ok {
-						groupByRepository = groupBool
-					}
-				}
-			}
-			// Only expect PR list heading when not grouping by repository
-			if len(expectedPRs) > 0 && !groupByRepository {
-				expectedHeading = strings.ReplaceAll(
-					tc.config.ContentInputs.PRListHeading, "<pr_count>", strconv.Itoa(len(expectedPRs)),
-				)
-			}
-			if expectedHeading != "" && !mockSlackAPI.SentMessage.Blocks.ContainsHeading(expectedHeading) {
-				t.Errorf(
-					"Expected PR list heading '%s' to be included in the Slack message", expectedHeading,
 				)
 			}
 			// Check for expected repository headings (used in group-by-repository mode)
@@ -1216,7 +1173,31 @@ func TestScenariosUpdateMode(t *testing.T) {
 			expectedErrorMsg:   "failed to update Slack message: slack update failed",
 		},
 		{
-			name:   "update mode with merged and closed PRs shows appropriate status indicators",
+			// The message the reminder exists to show is the one it would otherwise delete here:
+			// every PR it was posted with has landed, and no no-prs-message is configured.
+			name:   "update mode keeps a message whose only rows are merged PRs",
+			config: testhelpers.GetDefaultConfigMinimal(),
+			configOverrides: &map[string]any{
+				config.InputRunMode: config.RunModeUpdate,
+			},
+			mockState: testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})),
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{
+					Number: 1, Title: "First PR", AuthorLogin: "alice",
+					State: "closed", Merged: true, MergedHoursAgo: 3,
+				}),
+				2: getTestPR(GetTestPROptions{
+					Number: 2, Title: "Second PR", AuthorLogin: "bob",
+					State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+			},
+			expectedPRItemTexts: []string{
+				"Second PR merged 1 hour ago by Bob",
+				"First PR merged 3 hours ago by Alice",
+			},
+		},
+		{
+			name:   "update mode lists merged PRs in their own section and drops closed ones",
 			config: testhelpers.GetDefaultConfigMinimal(),
 			configOverrides: &map[string]any{
 				config.InputRunMode: config.RunModeUpdate,
@@ -1230,11 +1211,12 @@ func TestScenariosUpdateMode(t *testing.T) {
 					State:       "open",
 				}),
 				2: getTestPR(GetTestPROptions{
-					Number:      2,
-					Title:       "Merged PR with reviewer",
-					AuthorLogin: "bob",
-					State:       "closed",
-					Merged:      true,
+					Number:         2,
+					Title:          "Merged PR with reviewer",
+					AuthorLogin:    "bob",
+					State:          "closed",
+					Merged:         true,
+					MergedHoursAgo: 6,
 				}),
 				3: getTestPR(GetTestPROptions{
 					Number:      3,
@@ -1244,11 +1226,12 @@ func TestScenariosUpdateMode(t *testing.T) {
 					Merged:      false,
 				}),
 				4: getTestPR(GetTestPROptions{
-					Number:      4,
-					Title:       "Merged PR without reviewers",
-					AuthorLogin: "dave",
-					State:       "closed",
-					Merged:      true,
+					Number:         4,
+					Title:          "Merged PR without reviewers",
+					AuthorLogin:    "dave",
+					State:          "closed",
+					Merged:         true,
+					MergedHoursAgo: 2,
 				}),
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
@@ -1259,11 +1242,11 @@ func TestScenariosUpdateMode(t *testing.T) {
 					mockgithubclient.NewReview("reviewer2", "Reviewer Two", "APPROVED"),
 				},
 			},
+			// The closed-but-not-merged PR reaches no section.
 			expectedPRItemTexts: []string{
 				"Open PR with approvals 5 hours ago by Alice (✅ Reviewer One)",
-				"Merged PR with reviewer 5 hours ago by Bob (✅ Reviewer Two) 🚀",
-				"~Closed PR without merge~ 5 hours ago by Charlie",
-				"Merged PR without reviewers 5 hours ago by Dave 🚀",
+				"Merged PR without reviewers merged 2 hours ago by Dave",
+				"Merged PR with reviewer merged 6 hours ago by Bob (✅ Reviewer Two)",
 			},
 		},
 	}
@@ -1323,6 +1306,9 @@ func TestScenariosUpdateMode(t *testing.T) {
 				return
 			}
 
+			if mockSlackAPI.DeletedMessage.ChannelID != "" {
+				t.Error("Expected the message to be kept, but DeleteMessage was called")
+			}
 			if len(tc.expectedPRItemTexts) != mockSlackAPI.UpdatedMessage.Blocks.GetPRCount() {
 				t.Errorf(
 					"Expected %v PRs to be included in the message (was %v)",
@@ -1348,5 +1334,52 @@ func TestScenariosUpdateMode(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Both fetches are made before the run-mode switch, so an update run makes them with the canvas
+// off too. Nothing renders the open PRs yet, which is what makes the request the only thing to
+// assert on.
+func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode: config.RunModeUpdate,
+	})
+	trackedPR := getTestPR(GetTestPROptions{Number: 1, Title: "Tracked PR", AuthorLogin: "alice"})
+	openPRNotInState := getTestPR(GetTestPROptions{Number: 2, Title: "Open PR not in state", AuthorLogin: "bob"})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRsByNumber: map[int]*github.PullRequest{1: trackedPR},
+			PRs:         []*github.PullRequest{trackedPR, openPRNotInState},
+			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+				Number: 3, Title: "Merged PR", AuthorLogin: "carol", MergedHoursAgo: 2,
+			})},
+			MockStateForUpdateMode: &loadedState,
+			Recording:              &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if recording.OpenPRFetches != 1 {
+		t.Errorf("Expected 1 open PR fetch, got %d", recording.OpenPRFetches)
+	}
+	if recording.MergedPRFetches != 1 {
+		t.Errorf("Expected 1 merged PR fetch, got %d", recording.MergedPRFetches)
+	}
+	updatedMessage := mockSlackAPI.UpdatedMessage.Blocks
+	if !updatedMessage.SomePRItemContainsText("Tracked PR") {
+		t.Error("Expected the state-tracked PR in the updated message")
+	}
+	if updatedMessage.SomePRItemContainsText("Open PR not in state") {
+		t.Error("Expected the message to still list the state PRs only")
+	}
+	if updatedMessage.SomePRItemContainsText("Merged PR") {
+		t.Error("Expected the searched merged PR to stay out of the message")
 	}
 }

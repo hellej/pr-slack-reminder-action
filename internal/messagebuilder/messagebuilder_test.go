@@ -1,8 +1,6 @@
 package messagebuilder_test
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,413 +12,340 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
-func TestBuildSlackBlocksMessage(t *testing.T) {
-	t.Run("No PRs", func(t *testing.T) {
-		content := messagecontent.Content{
-			SummaryText: "No open PRs, happy coding! 🎉",
-		}
+var generatedAt = time.Date(2026, 9, 19, 12, 12, 0, 0, time.UTC)
 
-		message, _ := messagebuilder.BuildMessage(content)
-
-		blockLen := len(message.Blocks.BlockSet)
-		if blockLen != 1 {
-			t.Errorf("Expected there to be exactly one block, got %d", blockLen)
-		}
-
-		firstBlock := message.Blocks.BlockSet[0]
-		if firstBlock.BlockType() != "rich_text" {
-			t.Errorf("Expected first block to be of type 'rich_text', was '%s'", firstBlock.BlockType())
-		}
-
-		richTextElement := firstBlock.(*slack.RichTextBlock).Elements[0].(*slack.RichTextSection).Elements[0].(*slack.RichTextSectionTextElement)
-		if richTextElement.Text != content.SummaryText {
-			t.Errorf("Expected text to be '%s', got '%s'", content.SummaryText, richTextElement.Text)
-		}
-	})
-
-	t.Run("Message summary", func(t *testing.T) {
-		testPRs := getTestPRs()
-		content := messagecontent.Content{
-			SummaryText:   "1 open PRs are waiting for attention 👀",
-			PRListHeading: "🚀 New PRs since 1 day ago",
-			PRs:           testPRs.PRs,
-		}
-		_, got := messagebuilder.BuildMessage(content)
-		if got != content.SummaryText {
-			t.Errorf("Expected summary to be '%s', got '%s'", content.SummaryText, got)
-		}
-	})
-
-	t.Run("One new PR", func(t *testing.T) {
-		testPRs := getTestPRs()
-
-		content := messagecontent.Content{
-			SummaryText:   "1 open PRs are waiting for attention 👀",
-			PRListHeading: "🚀 New PRs since 1 day ago",
-			PRs:           testPRs.PRs,
-		}
-		got, _ := messagebuilder.BuildMessage(content)
-
-		if len(got.Blocks.BlockSet) < 2 {
-			t.Errorf("Expected non-empty blocks, got nil or empty")
-		}
-		firstBlock := got.Blocks.BlockSet[0]
-		header := firstBlock.(*slack.RichTextBlock).Elements[0].(*slack.RichTextSection).Elements[0].(*slack.RichTextSectionTextElement)
-		if header.Text != content.PRListHeading {
-			t.Errorf("Expected '%s', got '%s'", content.PRListHeading, header.Text)
-		}
-		prBulletPointTextElements := got.Msg.Blocks.BlockSet[1].(*slack.RichTextBlock).Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection).Elements
-		prLinkElement := prBulletPointTextElements[0].(*slack.RichTextSectionLinkElement)
-		prAgeElement := prBulletPointTextElements[1].(*slack.RichTextSectionTextElement)
-		prBeforeUserElement := prBulletPointTextElements[2].(*slack.RichTextSectionTextElement)
-		prUserElement := prBulletPointTextElements[3].(*slack.RichTextSectionUserElement)
-		if prLinkElement.Text != testPRs.PR1.Title {
-			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1.Title, prLinkElement.Text)
-		}
-		expectedAgeText := " 3 hours ago"
-		if prAgeElement.Text != expectedAgeText {
-			t.Errorf("Expected text to be '%s', got '%s'", expectedAgeText, prAgeElement.Text)
-		}
-		expectedBeforeUserText := " by "
-		if prBeforeUserElement.Text != expectedBeforeUserText {
-			t.Errorf("Expected text to be '%s', got '%s'", expectedBeforeUserText, prAgeElement.Text)
-		}
-		if prUserElement.UserID != testPRs.PR1.Author.SlackUserID {
-			t.Errorf("Expected text to be '%s', got '%s'", testPRs.PR1.Author.SlackUserID, prUserElement.UserID)
-		}
-	})
-
-	t.Run("Grouped by repository", func(t *testing.T) {
-		content := messagecontent.Content{
-			SummaryText:         "2 open PRs are waiting for attention 👀",
-			GroupedByRepository: true,
-			PRsGroupedByRepository: []messagecontent.PRsOfRepository{
-				{
-					HeadingPrefix:       "Open PRs in ",
-					RepositoryLinkLabel: "owner/repo-name",
-					RepositoryLink:      "https://github.com/owner/repo-name",
-					PRs:                 getTestPRs().PRs,
-				},
-				{
-					HeadingPrefix:       "Open PRs in ",
-					RepositoryLinkLabel: "another-org/special-chars_repo",
-					RepositoryLink:      "https://github.com/another-org/special-chars_repo",
-					PRs:                 getTestPRs().PRs,
-				},
-			},
-		}
-
-		message, summaryText := messagebuilder.BuildMessage(content)
-
-		if summaryText != content.SummaryText {
-			t.Errorf("Expected summary to be '%s', got '%s'", content.SummaryText, summaryText)
-		}
-
-		if len(message.Blocks.BlockSet) != 5 {
-			t.Errorf("Expected 5 blocks, got %d", len(message.Blocks.BlockSet))
-		}
-
-		firstHeadingBlock := message.Blocks.BlockSet[0].(*slack.RichTextBlock)
-
-		firstSection := firstHeadingBlock.Elements[0].(*slack.RichTextSection)
-		if len(firstSection.Elements) != 3 { // prefix + link + colon
-			t.Errorf("Expected 3 elements in first section, got %d", len(firstSection.Elements))
-		}
-
-		prefixElement := firstSection.Elements[0].(*slack.RichTextSectionTextElement)
-		if prefixElement.Text != "Open PRs in " {
-			t.Errorf("Expected prefix 'Open PRs in ', got '%s'", prefixElement.Text)
-		}
-
-		linkElement := firstSection.Elements[1].(*slack.RichTextSectionLinkElement)
-		if linkElement.Text != "owner/repo-name" {
-			t.Errorf("Expected link text 'owner/repo-name', got '%s'", linkElement.Text)
-		}
-		if linkElement.URL != "https://github.com/owner/repo-name" {
-			t.Errorf("Expected link URL 'https://github.com/owner/repo-name', got '%s'", linkElement.URL)
-		}
-	})
+type testPROptions struct {
+	title       string
+	slackUserID string
+	mergedAt    *time.Time
+	isOldPR     bool
+	approvers   []string
 }
 
-func TestLimitMessageSizeByMaxBlocks(t *testing.T) {
-	testCases := []struct {
-		name            string
-		numRepositories int
-		expectedBlocks  int
-	}{
-		{
-			name:            "Within block limit",
-			numRepositories: 5,
-			expectedBlocks:  14, // 3 blocks per PR (except the last one has only 2)
-		},
-		{
-			name:            "Exceeding block limit",
-			numRepositories: 20, // -> 59 blocks
-			expectedBlocks:  50,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			repoLists := []messagecontent.PRsOfRepository{}
-			repoId := 1
-			for repoId <= tc.numRepositories {
-				repoLists = append(repoLists, newRepositoryList(repoId))
-				repoId += 1
-			}
-
-			message, _ := messagebuilder.BuildMessage(
-				messagecontent.Content{
-					SummaryText:            "2 open PRs are waiting for attention 👀",
-					GroupedByRepository:    true,
-					PRsGroupedByRepository: repoLists,
-				},
-			)
-
-			blocks := message.Blocks.BlockSet
-			if len(blocks) != tc.expectedBlocks {
-				t.Fatalf("Expected %d blocks, got %d", tc.expectedBlocks, len(blocks))
-			}
-			lastBlock, isRichText := blocks[len(blocks)-1].(*slack.RichTextBlock)
-			if isRichText && strings.HasPrefix(lastBlock.BlockID, "pr_list_heading") {
-				t.Errorf("Expected the message not to end on a repository heading with no PR list under it, got '%s'", lastBlock.BlockID)
-			}
-		})
-	}
-}
-
-func newRepositoryList(id int) messagecontent.PRsOfRepository {
-	return messagecontent.PRsOfRepository{
-		HeadingPrefix:       "Open PRs in repo " + strconv.Itoa(id),
-		RepositoryLinkLabel: "owner/repo-" + strconv.Itoa(id),
-		RepositoryLink:      "https://github.com/owner/repo-" + strconv.Itoa(id),
-		PRs:                 []prview.PR{getTestPRs().PR1},
-	}
-}
-
-type TestPRs struct {
-	PR1 prview.PR
-	PRs []prview.PR
-}
-
-func getTestPRs() TestPRs {
-	pr1 := prview.PR{
+func testPR(options testPROptions) prview.PR {
+	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
+				Title:     options.title,
+				HTMLURL:   "https://github.com/test-org/test-repo/pull/1",
 				CreatedAt: time.Now().Add(-3 * time.Hour),
-				Title:     "This is a test PR",
-				Author:    githubclient.Collaborator{Login: "testuser", Name: "Test User"},
+				MergedAt:  options.mergedAt,
+				Merged:    options.mergedAt != nil,
 			},
 		},
 		Author: prview.Collaborator{
-			Collaborator: &githubclient.Collaborator{
-				Login: "Test User",
-			},
-			SlackUserID: "U12345678",
+			Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},
+			SlackUserID:  options.slackUserID,
 		},
-	}
-	return TestPRs{
-		PR1: pr1,
-		PRs: []prview.PR{pr1},
+		Approvers: approvers(options.approvers),
+		IsOldPR:   options.isOldPR,
 	}
 }
 
-func TestMergedAndClosedPRFormatting(t *testing.T) {
-	testCases := []struct {
-		name                    string
-		pr                      prview.PR
-		expectedStrikethrough   bool
-		expectedMergedIndicator bool
-		expectedReviewerSection bool
-	}{
-		{
-			name: "Open PR - no special formatting",
-			pr: prview.PR{
-				PR: &githubclient.PR{
-					PullRequest: &githubclient.PullRequest{
-						CreatedAt: time.Now().Add(-3 * time.Hour),
-						Title:     "Open PR",
-						State:     "open",
-						Merged:    false,
-						Author:    githubclient.Collaborator{Login: "alice", Name: "Alice"},
-					},
-				},
-				Author: prview.Collaborator{
-					Collaborator: &githubclient.Collaborator{Login: "alice", Name: "Alice"},
-				},
-			},
-			expectedStrikethrough:   false,
-			expectedMergedIndicator: false,
-			expectedReviewerSection: false,
-		},
-		{
-			name: "Merged PR with reviewers",
-			pr: prview.PR{
-				PR: &githubclient.PR{
-					PullRequest: &githubclient.PullRequest{
-						CreatedAt: time.Now().Add(-3 * time.Hour),
-						Title:     "Merged PR",
-						State:     "closed",
-						Merged:    true,
-						Author:    githubclient.Collaborator{Login: "bob", Name: "Bob"},
-					},
-				},
-				Author: prview.Collaborator{
-					Collaborator: &githubclient.Collaborator{Login: "bob", Name: "Bob"},
-				},
-				Approvers: []prview.Collaborator{
-					{Collaborator: &githubclient.Collaborator{Login: "reviewer1", Name: "Reviewer One"}},
-				},
-			},
-			expectedStrikethrough:   false, // Merged PRs should NOT have strikethrough
-			expectedMergedIndicator: true,
-			expectedReviewerSection: true,
-		},
-		{
-			name: "Closed PR without merge",
-			pr: prview.PR{
-				PR: &githubclient.PR{
-					PullRequest: &githubclient.PullRequest{
-						CreatedAt: time.Now().Add(-3 * time.Hour),
-						Title:     "Closed PR",
-						State:     "closed",
-						Merged:    false,
-						Author:    githubclient.Collaborator{Login: "charlie", Name: "Charlie"},
-					},
-				},
-				Author: prview.Collaborator{
-					Collaborator: &githubclient.Collaborator{Login: "charlie", Name: "Charlie"},
-				},
-			},
-			expectedStrikethrough:   true,
-			expectedMergedIndicator: false,
-			expectedReviewerSection: false,
-		},
-		{
-			name: "Merged PR without reviewers",
-			pr: prview.PR{
-				PR: &githubclient.PR{
-					PullRequest: &githubclient.PullRequest{
-						CreatedAt: time.Now().Add(-3 * time.Hour),
-						Title:     "Merged PR no reviewers",
-						State:     "closed",
-						Merged:    true,
-						Author:    githubclient.Collaborator{Login: "dave", Name: "Dave"},
-					},
-				},
-				Author: prview.Collaborator{
-					Collaborator: &githubclient.Collaborator{Login: "dave", Name: "Dave"},
-				},
-			},
-			expectedStrikethrough:   false, // Merged PRs should NOT have strikethrough
-			expectedMergedIndicator: true,
-			expectedReviewerSection: false, // No reviewers, so no reviewer section
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			content := messagecontent.Content{
-				SummaryText:   "Test",
-				PRListHeading: "Test PRs",
-				PRs:           []prview.PR{tc.pr},
-			}
-
-			message, _ := messagebuilder.BuildMessage(content)
-
-			prBlock := message.Blocks.BlockSet[1].(*slack.RichTextBlock)
-			prSection := prBlock.Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection)
-
-			linkElement := prSection.Elements[0].(*slack.RichTextSectionLinkElement)
-
-			if tc.expectedStrikethrough {
-				if linkElement.Style == nil || !linkElement.Style.Strike {
-					t.Error("Expected strikethrough formatting on PR title but it was not applied")
-				}
-			} else {
-				if linkElement.Style != nil && linkElement.Style.Strike {
-					t.Error("Did not expect strikethrough formatting on PR title but it was applied")
-				}
-			}
-
-			hasReviewerSection := false
-			hasMergedIndicator := false
-
-			for _, element := range prSection.Elements {
-				if textElement, ok := element.(*slack.RichTextSectionTextElement); ok {
-					if textElement.Text == " 🚀" {
-						hasMergedIndicator = true
-					}
-					if textElement.Text == " (✅ " || textElement.Text == " (💬 " || textElement.Text == " (" {
-						hasReviewerSection = true
-					}
-				}
-			}
-
-			if tc.expectedReviewerSection && !hasReviewerSection {
-				t.Error("Expected reviewer section but it was not found")
-			}
-			if !tc.expectedReviewerSection && hasReviewerSection {
-				t.Error("Did not expect reviewer section but it was found")
-			}
-			if tc.expectedMergedIndicator && !hasMergedIndicator {
-				t.Error("Expected merged indicator (🚀) but it was not found")
-			}
-			if !tc.expectedMergedIndicator && hasMergedIndicator {
-				t.Error("Did not expect merged indicator (🚀) but it was found")
-			}
+func approvers(names []string) []prview.Collaborator {
+	var collaborators []prview.Collaborator
+	for _, name := range names {
+		collaborators = append(collaborators, prview.Collaborator{
+			Collaborator: &githubclient.Collaborator{Login: name, Name: name},
 		})
 	}
+	return collaborators
 }
 
-func prSectionElements(t *testing.T, pr prview.PR) []slack.RichTextSectionElement {
+func blockIDs(blocks []slack.Block) []string {
+	ids := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		switch typedBlock := block.(type) {
+		case *slack.RichTextBlock:
+			ids = append(ids, typedBlock.BlockID)
+		case *slack.SectionBlock:
+			ids = append(ids, "spacing")
+		case *slack.ContextBlock:
+			ids = append(ids, "context")
+		default:
+			ids = append(ids, "unknown:"+string(block.BlockType()))
+		}
+	}
+	return ids
+}
+
+func assertBlockIDs(t *testing.T, message slack.Message, expected []string) {
 	t.Helper()
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
-		SummaryText:   "Test",
-		PRListHeading: "Test PRs",
-		PRs:           []prview.PR{pr},
+	got := blockIDs(message.Blocks.BlockSet)
+	if len(got) != len(expected) {
+		t.Fatalf("expected blocks %v, got %v", expected, got)
+	}
+	for index, id := range got {
+		if id != expected[index] {
+			t.Fatalf("expected blocks %v, got %v", expected, got)
+		}
+	}
+}
+
+func sectionElements(t *testing.T, block slack.Block) []slack.RichTextElement {
+	t.Helper()
+	richTextBlock, isRichText := block.(*slack.RichTextBlock)
+	if !isRichText {
+		t.Fatalf("expected a rich_text block, got %T", block)
+	}
+	return richTextBlock.Elements
+}
+
+func headingText(t *testing.T, element slack.RichTextElement) string {
+	t.Helper()
+	section, isSection := element.(*slack.RichTextSection)
+	if !isSection {
+		t.Fatalf("expected a rich_text_section, got %T", element)
+	}
+	return section.Elements[0].(*slack.RichTextSectionTextElement).Text
+}
+
+func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack.RichTextSectionElement {
+	t.Helper()
+	list, isList := element.(*slack.RichTextList)
+	if !isList {
+		t.Fatalf("expected a rich_text_list, got %T", element)
+	}
+	return list.Elements[index].(*slack.RichTextSection).Elements
+}
+
+func TestEachNonEmptySectionIsOneBlockWithASpacingBlockBetween(t *testing.T) {
+	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+		SummaryText:      "2 open PRs are waiting for attention 👀",
+		WaitingForReview: messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})}},
+		Merged: messagecontent.PRSection{
+			PRs: []prview.PR{testPR(testPROptions{title: "Merged PR", mergedAt: &generatedAt})},
+		},
+		GeneratedAt: generatedAt,
 	})
-	prBlock := message.Blocks.BlockSet[1].(*slack.RichTextBlock)
-	return prBlock.Elements[0].(*slack.RichTextList).Elements[0].(*slack.RichTextSection).Elements
+
+	assertBlockIDs(t, message, []string{
+		"section_waiting_for_review", "spacing", "section_merged", "context",
+	})
+	if summaryText != "2 open PRs are waiting for attention 👀" {
+		t.Errorf("expected the summary text as the fallback, got %q", summaryText)
+	}
+}
+
+func TestSectionHeadings(t *testing.T) {
+	onePR := messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "PR"})}}
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		ReadyToMerge:     onePR,
+		WaitingForAuthor: onePR,
+		WaitingForReview: onePR,
+		Merged:           onePR,
+		GeneratedAt:      generatedAt,
+	})
+
+	expectedHeadings := []string{
+		"✅ Ready to merge", "💬 Waiting for author", "👀 Waiting for review", "🚀 Recently merged",
+	}
+	sectionBlocks := []slack.Block{
+		message.Blocks.BlockSet[0], message.Blocks.BlockSet[2],
+		message.Blocks.BlockSet[4], message.Blocks.BlockSet[6],
+	}
+	for index, block := range sectionBlocks {
+		got := headingText(t, sectionElements(t, block)[0])
+		if got != expectedHeadings[index] {
+			t.Errorf("expected heading %q, got %q", expectedHeadings[index], got)
+		}
+	}
+}
+
+func TestGroupedSectionHoldsEveryRepositoryInOneBlock(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview: messagecontent.PRSection{
+			Groups: []messagecontent.PRsOfRepository{
+				{
+					RepositoryLinkLabel: "owner/repo-one",
+					RepositoryLink:      "https://github.com/owner/repo-one/pulls",
+					PRs:                 []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
+				},
+				{
+					RepositoryLinkLabel: "owner/repo-two",
+					RepositoryLink:      "https://github.com/owner/repo-two/pulls",
+					PRs:                 []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
+				},
+			},
+		},
+		GeneratedAt: generatedAt,
+	})
+
+	assertBlockIDs(t, message, []string{"section_waiting_for_review", "context"})
+	elements := sectionElements(t, message.Blocks.BlockSet[0])
+	if len(elements) != 5 {
+		t.Fatalf("expected a heading, two sub-headings and two lists, got %d elements", len(elements))
+	}
+
+	subHeading := elements[1].(*slack.RichTextSection)
+	linkElement := subHeading.Elements[0].(*slack.RichTextSectionLinkElement)
+	if linkElement.Text != "owner/repo-one" {
+		t.Errorf("expected sub-heading link text 'owner/repo-one', got %q", linkElement.Text)
+	}
+	if linkElement.URL != "https://github.com/owner/repo-one/pulls" {
+		t.Errorf("expected the repository pulls URL, got %q", linkElement.URL)
+	}
+	if linkElement.Style != nil && linkElement.Style.Bold {
+		t.Error("expected the repository sub-heading not to be bold")
+	}
+}
+
+func TestOpenPRRow(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		WaitingForReview: messagecontent.PRSection{
+			PRs: []prview.PR{testPR(testPROptions{title: "Open PR", slackUserID: "U12345678"})},
+		},
+		GeneratedAt: generatedAt,
+	})
+
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	if len(elements) != 4 {
+		t.Fatalf("expected title, age, ' by ' and author elements, got %d", len(elements))
+	}
+	if title := elements[0].(*slack.RichTextSectionLinkElement); title.Text != "Open PR" {
+		t.Errorf("expected the PR title as the link text, got %q", title.Text)
+	} else if title.Style != nil && title.Style.Strike {
+		t.Error("expected no strike-through on an open PR title")
+	}
+	if age := elements[1].(*slack.RichTextSectionTextElement); age.Text != " 3 hours ago" {
+		t.Errorf("expected age ' 3 hours ago', got %q", age.Text)
+	}
+	if user := elements[3].(*slack.RichTextSectionUserElement); user.UserID != "U12345678" {
+		t.Errorf("expected the mapped Slack user, got %q", user.UserID)
+	}
 }
 
 func TestOldPRWarningMarker(t *testing.T) {
-	pr := getTestPRs().PR1
-	pr.PullRequest.CreatedAt = time.Now().Add(-72 * time.Hour)
-	pr.IsOldPR = true
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		WaitingForReview: messagecontent.PRSection{
+			PRs: []prview.PR{testPR(testPROptions{title: "Old PR", isOldPR: true})},
+		},
+		GeneratedAt: generatedAt,
+	})
 
-	elements := prSectionElements(t, pr)
-
-	warningElement := elements[1].(*slack.RichTextSectionTextElement)
-	if warningElement.Text != " 🚨 " {
-		t.Errorf("expected warning marker ' 🚨 ', got '%s'", warningElement.Text)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	warning := elements[1].(*slack.RichTextSectionTextElement)
+	if warning.Text != " 🚨 " {
+		t.Errorf("expected warning marker ' 🚨 ', got %q", warning.Text)
 	}
-	if warningElement.Style != nil && (warningElement.Style.Bold || warningElement.Style.Code) {
-		t.Error("expected the warning marker to sit outside the styled age element")
+	age := elements[2].(*slack.RichTextSectionTextElement)
+	if age.Text != "3 hours old" {
+		t.Errorf("expected age text '3 hours old', got %q", age.Text)
 	}
-
-	ageElement := elements[2].(*slack.RichTextSectionTextElement)
-	if ageElement.Text != "3 days old" {
-		t.Errorf("expected age text '3 days old', got '%s'", ageElement.Text)
-	}
-	if ageElement.Style == nil || !ageElement.Style.Bold || !ageElement.Style.Code {
-		t.Errorf("expected bold+code style on the age text, got %+v", ageElement.Style)
+	if age.Style == nil || !age.Style.Bold || !age.Style.Code {
+		t.Errorf("expected bold+code style on the age text, got %+v", age.Style)
 	}
 }
 
 func TestAuthorFallsBackToGitHubName(t *testing.T) {
-	pr := getTestPRs().PR1
-	pr.Author = prview.Collaborator{
-		Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},
-	}
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		WaitingForReview: messagecontent.PRSection{
+			PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})},
+		},
+		GeneratedAt: generatedAt,
+	})
 
-	elements := prSectionElements(t, pr)
-
-	authorElement, ok := elements[3].(*slack.RichTextSectionTextElement)
-	if !ok {
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	author, isText := elements[3].(*slack.RichTextSectionTextElement)
+	if !isText {
 		t.Fatalf("expected a text element for the author, got %T", elements[3])
 	}
-	if authorElement.Text != "Test User" {
-		t.Errorf("expected author name 'Test User', got '%s'", authorElement.Text)
+	if author.Text != "Test User" {
+		t.Errorf("expected author name 'Test User', got %q", author.Text)
+	}
+}
+
+func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
+	mergedAt := time.Now().Add(-2 * time.Hour)
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		Merged: messagecontent.PRSection{
+			PRs: []prview.PR{testPR(testPROptions{
+				title: "Merged PR", mergedAt: &mergedAt, isOldPR: true, approvers: []string{"Dana Davis"},
+			})},
+		},
+		GeneratedAt: generatedAt,
+	})
+
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	texts := make([]string, 0, len(elements))
+	for _, element := range elements {
+		switch typed := element.(type) {
+		case *slack.RichTextSectionLinkElement:
+			texts = append(texts, typed.Text)
+		case *slack.RichTextSectionTextElement:
+			texts = append(texts, typed.Text)
+		}
+	}
+	expected := []string{"Merged PR", " merged 2 hours ago", " by ", "Test User", " (✅ ", "Dana Davis", ")"}
+	if len(texts) != len(expected) {
+		t.Fatalf("expected row segments %v, got %v", expected, texts)
+	}
+	for index, text := range texts {
+		if text != expected[index] {
+			t.Fatalf("expected row segments %v, got %v", expected, texts)
+		}
+	}
+	mergeTime := elements[1].(*slack.RichTextSectionTextElement)
+	if mergeTime.Style == nil || !mergeTime.Style.Italic {
+		t.Errorf("expected the merge time in italics, got %+v", mergeTime.Style)
+	}
+}
+
+func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		Merged:      messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
+		GeneratedAt: generatedAt,
+	})
+
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	if len(elements) != 3 {
+		t.Fatalf("expected title, ' by ' and author elements, got %d", len(elements))
+	}
+}
+
+func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
+	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+		SummaryText:   "Nothing waiting for review 🎉",
+		NoOpenPRsText: "All caught up! 🎉",
+		Merged:        messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
+		GeneratedAt:   generatedAt,
+	})
+
+	assertBlockIDs(t, message, []string{"no_open_prs", "section_merged", "context"})
+	line := sectionElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
+	if text := line.Elements[0].(*slack.RichTextSectionTextElement).Text; text != "All caught up! 🎉" {
+		t.Errorf("expected the configured no-PRs message, got %q", text)
+	}
+	if summaryText != "Nothing waiting for review 🎉" {
+		t.Errorf("expected the summary text as the fallback, got %q", summaryText)
+	}
+}
+
+func TestMessageWithNothingToListIsTheNoOpenPRsLineAndTheFooter(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		SummaryText:   "Nothing waiting for review 🎉",
+		NoOpenPRsText: "All caught up! 🎉",
+		GeneratedAt:   generatedAt,
+	})
+
+	assertBlockIDs(t, message, []string{"no_open_prs", "context"})
+}
+
+func TestFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		SummaryText: "Nothing waiting for review 🎉",
+		GeneratedAt: generatedAt,
+	})
+
+	assertBlockIDs(t, message, []string{"context"})
+	footer := message.Blocks.BlockSet[0].(*slack.ContextBlock)
+	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject)
+	expected := "_Live, updated <!date^1789819920^{time}|12:12 UTC>_"
+	if text.Text != expected {
+		t.Errorf("expected footer text %q, got %q", expected, text.Text)
+	}
+	if text.Type != "mrkdwn" {
+		t.Errorf("expected an mrkdwn footer element, got %q", text.Type)
 	}
 }

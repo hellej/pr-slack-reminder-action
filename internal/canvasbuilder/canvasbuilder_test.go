@@ -218,7 +218,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			name: "open PRs grouped by repository",
 			content: canvascontent.Content{
 				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositories([]prview.PR{openPR, otherOpenPR}),
+					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{openPR, otherOpenPR}),
 				},
 				GroupedByRepository: true,
 				WIP:                 canvascontent.PRSection{PRs: []prview.PR{wipPR}},
@@ -409,7 +409,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			name: "markdown characters in titles and names",
 			content: canvascontent.Content{
 				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositories([]prview.PR{
+					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{
 						testPR(prOptions{
 							number:     7,
 							title:      "Fix [ABC-123] crash in `make test` & **WIP** _debug_ ~legacy~ C:\\path <b>",
@@ -598,7 +598,7 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 			name: "grouped by repository",
 			content: canvascontent.Content{
 				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositories([]prview.PR{openPR}),
+					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{openPR}),
 				},
 				GroupedByRepository: true,
 				WIP:                 canvascontent.PRSection{PRs: []prview.PR{wipPR}},

@@ -33,7 +33,6 @@ const (
 	InputGlobalFilters               string = "filters"
 	InputRepositoryFilters           string = "repository-filters"
 	InputSlackUserIdByGitHubUsername string = "github-user-slack-user-id-mapping"
-	InputPRListHeading               string = "pr-list-heading"
 	InputNoPRsMessage                string = "no-prs-message"
 	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
 	InputGroupByRepository           string = "group-by-repository"
@@ -75,7 +74,6 @@ func (c Config) CanvasEnabled() bool {
 
 type ContentInputs struct {
 	SlackUserIdByGitHubUsername map[string]string
-	PRListHeading               string
 	NoPRsMessage                string
 	OldPRThresholdHours         int
 	GroupByRepository           bool
@@ -117,7 +115,6 @@ func GetConfig() (Config, error) {
 	globalFilters, err6 := GetGlobalFiltersFromInput(InputGlobalFilters)
 	repositoryFilters, err7 := GetRepositoryFiltersFromInput(InputRepositoryFilters)
 	slackUserIdByGitHubUsername, err8 := inputhelpers.GetInputMapping(InputSlackUserIdByGitHubUsername)
-	prListHeading := inputhelpers.GetInput(InputPRListHeading)
 	noPRsMessage := inputhelpers.GetInput(InputNoPRsMessage)
 	oldPRsThresholdHours, err9 := inputhelpers.GetInputInt(InputOldPRThresholdHours)
 	groupByRepository, err10 := inputhelpers.GetInputBool(InputGroupByRepository)
@@ -157,7 +154,6 @@ func GetConfig() (Config, error) {
 		RepositoryFilters:       repositoryFilters,
 		ContentInputs: ContentInputs{
 			SlackUserIdByGitHubUsername: slackUserIdByGitHubUsername,
-			PRListHeading:               prListHeading,
 			NoPRsMessage:                noPRsMessage,
 			OldPRThresholdHours:         oldPRsThresholdHours,
 			GroupByRepository:           groupByRepository,
@@ -191,9 +187,6 @@ func (c Config) validate() error {
 		return fmt.Errorf("too many repositories: maximum of %d repositories allowed, got %d", MaxRepositories, len(c.Repositories))
 	}
 	if err := c.validateRepositoryNames(); err != nil {
-		return err
-	}
-	if err := c.validateHeadingOptions(); err != nil {
 		return err
 	}
 	if err := c.validateStateArtifactName(); err != nil {
@@ -255,13 +248,6 @@ func validateRepositoryReferences[V any](
 				repoNameOrPath,
 			)
 		}
-	}
-	return nil
-}
-
-func (c Config) validateHeadingOptions() error {
-	if !c.ContentInputs.GroupByRepository && c.ContentInputs.PRListHeading == "" {
-		return fmt.Errorf("%s is required when group-by-repository is false", InputPRListHeading)
 	}
 	return nil
 }

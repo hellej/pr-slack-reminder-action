@@ -123,7 +123,7 @@ README screenshots run off that branch.
 
 ## R1. Hoist both PR fetches and the run timestamp into `Run`
 
-Touches `cmd/pr-slack-reminder` (`run.go`, `canvas.go`).
+Touches `cmd/pr-slack-reminder` (`run.go`, `canvas.go`), `testhelpers/mockgithubclient`.
 
 - `Run` performs, before the run-mode switch:
   - `generatedAt := time.Now().UTC()`, today the first line of `refreshPRTrackerCanvas`
@@ -134,6 +134,8 @@ Touches `cmd/pr-slack-reminder` (`run.go`, `canvas.go`).
   parameters instead of producing any of them. Its `openPRs == nil` fetch branch goes away: no
   caller leaves them unfetched any more. It keeps returning `mergedPRsErr`, so a failed merged
   fetch still fails the run only when the canvas is enabled
+- Neither function fetches any more, so both drop their `githubClient` parameter, and
+  `findRecentlyMergedPRs` moves to `run.go` beside `findOpenPRs`
 - Rewrite `refreshPRTrackerCanvas`'s doc comment: it no longer fetches the merged PRs, owns the
   run's "now", or has a nil-`openPRs` contract
 - Rewrite `Run`'s block comment too. "Their errors are collected instead of short-circuited"
@@ -154,7 +156,15 @@ Touches `cmd/pr-slack-reminder` (`run.go`, `canvas.go`).
   message that update mode cannot rebuild
 - Update mode passes the open PRs straight to the canvas here, and step 4 is what makes its
   message read them
-- No message output changes. `canvas_test.go` and the snapshot tests are the regression net
+- No message output changes. `canvas_test.go` and the snapshot tests are the regression net,
+  except for three of its tests that pin behaviour this step reverses: the post-mode fetch
+  failure no longer reports a second, canvas-scoped failure; the update-mode fetch failure no
+  longer updates the message, which turns that test into the failed-fetch case over both canvas
+  settings; and the seeded-hash test loses its fetch-failure row, since such a run now saves no
+  state at all
+- `mockgithubclient` gains a `FetchRecording`, counting the open and merged fetches a run made.
+  With the canvas off, those fetches reach no output yet, so the request is all a test can assert
+  on
 
 ## 1. Remove the `pr-list-heading` input
 
@@ -241,7 +251,8 @@ Touches `internal/messagecontent`.
 
 ## 3. `messagebuilder` renders the four sections and the live footer
 
-Touches `internal/messagebuilder`, `cmd/pr-slack-reminder`.
+Touches `internal/messagebuilder`, `cmd/pr-slack-reminder`, `testhelpers/mockslackclient`,
+`testhelpers/mockgithubclient`.
 
 - The message renders no heading block. Its first block is its first non-empty section
 - Each non-empty section renders as one `slack.NewRichTextBlock` holding, in order: a bold heading
@@ -261,22 +272,29 @@ Touches `internal/messagebuilder`, `cmd/pr-slack-reminder`.
   are derived from `PRNextAction`: it is an identifier, not display text
 - `HeadingPrefix` ("Open PRs in ") is dropped from the repository sub-heading: the section heading
   above already says what the rows are
-- `buildPRBulletPointBlock` loses its two state branches: the trailing `🚀` for `pr.IsMerged()`
-  and `Strike: pr.IsClosedButNotMerged()` on the title link. Its rows are always open now, so
-  neither can fire, and `make check-dead-code` checks function reachability under `./cmd/...`,
-  not branches
+- The row renderer loses its two state branches: the trailing `🚀` for `pr.IsMerged()` and
+  `Strike: pr.IsClosedButNotMerged()` on the title link. Its rows are always open now, so neither
+  can fire, and `make check-dead-code` checks function reachability under `./cmd/...`, not
+  branches. With a second renderer beside it, it is renamed `buildOpenPRBulletPoint`
   - That leaves `prview.PR.IsClosedButNotMerged` with no caller, for step 7
   - `messagebuilder.spec.md`'s row line loses "struck through if closed-but-not-merged" and
     "a rocket marker if merged" with them
-- Merged rows get their own row renderer beside `buildPRBulletPointBlock`: linked title, then
+- Merged rows get their own renderer, `buildMergedPRBulletPoint`: linked title, then
   `prview.PR.GetMergedText()` in italics, then the author, then the reviewer segments
   `GetReviewersTextSegments` returns. No age text, no `🚨` old-PR marker and no trailing `🚀`: the
   section heading carries the rocket. An unknown merge time only drops that segment
   - Readers need the reviewer segments to see who got the PR landed, and the row already carries
     them today. A PR with no reviewers renders none
-- `Content.NoOpenPRsText` renders as a plain rich-text line above the sections, when set.
-  `addNoPRsBlock` and `BuildMessage`'s `!content.HasPRs()` early return go away: a message with no
-  section renders that line and the footer
+- `Content.NoOpenPRsText` renders as a plain rich-text line above the sections, when set, with no
+  spacing block under it. `addNoPRsBlock` and `BuildMessage`'s `!content.HasPRs()` early return go
+  away: a message with no section renders that line and the footer
+- Both run modes' send/keep/delete test moves off `content.SummaryText` onto
+  `content.NoOpenPRsText` here rather than in step 4, since step 2 makes `SummaryText` never
+  empty and the old test would stop firing the moment it lands
+- `mockslackclient`'s block reader is rewritten with the layout: a section block now holds its
+  heading and its lists together, where it used to read a heading block and a list block
+- `mockgithubclient` selects `mergedAt` on the `GetPRs` path, which the real query already
+  selects and no rendering read before this step
 - One spacing block between rendered sections. That replaces today's between-repository spacing
   block
 - The footer is the message's last block, always rendered: a `context` block holding one `mrkdwn`
@@ -294,7 +312,8 @@ Touches `internal/messagebuilder`, `cmd/pr-slack-reminder`.
     with no divider above it
   - The no-PRs message carries it too
 - `BuildMessage` returns `content.SummaryText` as the fallback text, unchanged
-- The 50-block cap and its log line stay as a safety net. Rewrite
+- The 50-block cap and its log line stay as a safety net, now over the content blocks alone: the
+  footer is appended after the cap, so it keeps the last slot whatever was dropped. Rewrite
   `maximumBlocksInSlackMessage`'s comment: its 16-repositories × 3-blocks derivation describes a
   layout this step removes
 - `assertSentBlocksMatchSnapshot` replaces the footer's unix seconds and UTC fallback with fixed
@@ -325,7 +344,8 @@ Touches `cmd/pr-slack-reminder/run.go`, `action.yml`, `README.md`, `docs/example
     has live ones to show. The `GetPRs` call is skipped in that case rather than made with an
     empty ref slice
 - Both modes send or edit whenever `content.HasPRs() || content.NoOpenPRsText != ""`. `SummaryText`
-  is no longer part of that test: step 2 always sets it
+  is no longer part of that test: step 2 always sets it. **Landed in step 3**, which is where
+  `SummaryText` stopped being empty and the old test stopped firing
 - Update mode deletes the message only when that test fails: no open PR, no merged PR, and no
   `no-prs-message`. Today the same test is over the re-fetched state PRs alone, merged and closed
   ones included, so the delete fires when that fetch comes back empty after filters and snooze
