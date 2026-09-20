@@ -404,6 +404,31 @@
                   "type": "text",
                   "text": "Carol Clark",
                   "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " (✅ ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Dana Davis",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": " / 💬 ",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Erin Evans",
+                  "style": {}
+                },
+                {
+                  "type": "text",
+                  "text": ")",
+                  "style": {}
                 }
               ]
             },

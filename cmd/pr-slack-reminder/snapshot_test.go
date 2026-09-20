@@ -291,6 +291,12 @@ func TestSnapshotsPostMode(t *testing.T) {
 				},
 				73: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
 				74: {mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED")},
+				// Only one of the merged PRs was reviewed, so the snapshot keeps a merged row
+				// with reviewers apart from one without.
+				83: {
+					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
+					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
+				},
 			},
 		},
 		{

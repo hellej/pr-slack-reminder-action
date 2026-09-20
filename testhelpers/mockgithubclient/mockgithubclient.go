@@ -263,14 +263,17 @@ func (t GraphQLTransport) hasOpenPRsFixture(repoName string) bool {
 	return len(t.opts.PRs) > 0
 }
 
-// PR scalars come from PRsByNumber when it is set, and from the listing fixtures otherwise.
+// PR scalars come from PRsByNumber when it is set, and from the listing fixtures otherwise. The
+// merged fixtures are searched too, since the merged fetch enriches what its search returned.
 func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullRequest {
 	if pr, isSet := t.opts.PRsByNumber[ref.number]; isSet {
 		return pr
 	}
-	pr, _ := utilities.Find(t.openPRs(ref.repoName), func(pr *github.PullRequest) bool {
-		return pr.GetNumber() == ref.number
-	})
+	hasNumber := func(pr *github.PullRequest) bool { return pr.GetNumber() == ref.number }
+	if pr, isFound := utilities.Find(t.openPRs(ref.repoName), hasNumber); isFound {
+		return pr
+	}
+	pr, _ := utilities.Find(t.mergedPRs(ref.repoName), hasNumber)
 	return pr
 }
 

@@ -395,18 +395,20 @@ Touches `cmd/pr-slack-reminder/run.go`, `action.yml`, `README.md`, `docs/example
 
 ## 5. Merged PRs carry their reviewers, on both surfaces
 
-Touches `internal/apiclients/githubclient`, `internal/canvasbuilder`, `README.md`.
+Touches `internal/apiclients/githubclient`, `internal/canvasbuilder`, `testhelpers/mockgithubclient`,
+`README.md`.
 
 - `FindRecentlyMergedPRs` runs its capped results through `enrichPRsWithReviewInfo`, so a merged
   row names its approvers and commenters like every other row. `mergedPR` stays as the unenriched
-  mapping
+  mapping, renamed `prWithoutReviewers`: the fallback is now its only role, and the absence of
+  reviewers is what distinguishes it, not that the PR is merged
   - The search already produces the `[]PRResult` enrichment takes, so this reuses the second
     phase `FindOpenPRs` already runs, just on a second set of PRs
   - `MaxMergedPRsToFetch` (6) is far under `enrichBatchSize` (25), so this is one more GraphQL
     request on a run that fetches merged PRs, never more
-- A failed enrichment falls back to `mergedPR` over the search results and logs it, rather than
-  failing the fetch. That is today's merged row, and failing instead would let a reviewer query
-  take down a canvas-enabled run. Per-PR failures already degrade on their own
+- A failed enrichment falls back to `prWithoutReviewers` over the search results and logs it,
+  rather than failing the fetch. That is today's merged row, and failing instead would let a
+  reviewer query take down a canvas-enabled run. Per-PR failures already degrade on their own
   (`failsOnlyOnePullRequest`), so only repository-, query- or transport-scoped errors reach it
 - Merged PRs are not snooze-excluded: a snooze suppresses a request for attention, and a merged row
   asks for nothing. `excludeSnoozedPRs` comes off the `GetPRs` path with them, so the same PR
@@ -427,6 +429,10 @@ Touches `internal/apiclients/githubclient`, `internal/canvasbuilder`, `README.md
     `internal/canvasbuilder/testdata/` file holding a merged row with reviewers changes
   - README § **PR Tracker Canvas** shows a rendered canvas whose merged rows come from the same
     fixtures. Add the reviewer segment there so the sample keeps matching what the code renders
+- `mockgithubclient.findPullRequest` resolves an enrichment ref against the merged fixtures as
+  well as the open ones. Without it the mock answers `NOT_FOUND` for every merged PR, where real
+  GitHub resolves it, and the integration snapshots would record the degraded row as the expected
+  shape. One merged fixture gets reviews and one stays without, so its snapshot tells the two apart
 
 ## 6. Update mode re-fetches only the state PRs the two fetches leave unresolved
 

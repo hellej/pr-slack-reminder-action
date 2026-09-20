@@ -12,7 +12,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - The three open sections share one row renderer, one empty-state line and one heading level: only the heading text and the PR list differ. A PR's bucket is `canvascontent`'s to decide
 - Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers
 - WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prview.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
-- Merged PR row: linked title, the merge text in italics, then the author. Never reviewers: the section answers what landed, not who reviewed it. An unknown merge time drops that segment only
+- Merged PR row: linked title, the merge text in italics, the author, then the reviewers, named as an open row names them. An unknown merge time drops that segment only
 - Every section renders through one path, differing only in heading, PR lists, row renderer, empty text and whether it hides while empty, so a further section costs one call
 - An empty section that does not hide keeps its heading and shows one italic line: `_No work in progress_` or `_No merged PRs_`, and `_No open PRs_` in the all-empty open case. A merged section whose fetch failed shows `_Merged PRs could not be fetched_` instead, so a failure never reads as an empty week. Grouped mode with such a section shows that section's line and no sub-headings
 - Footer: a blank line, a line holding a lone non-breaking space, another blank line, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 )
@@ -94,5 +95,31 @@ func TestGetPRsByRefFailsOnNullPullRequestWithoutError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), expectedMessage) {
 		t.Errorf("error = %q, expected it to contain %q", err.Error(), expectedMessage)
+	}
+}
+
+// A snooze suppresses a request for attention, and the merged row this path serves asks for
+// nothing, so the same PR cannot show or hide depending on which fetch resolved it.
+func TestGetPRsKeepsASnoozedPR(t *testing.T) {
+	transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{
+		1: {comments: []map[string]any{
+			commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),
+		}},
+	}}
+	testClient := &client{graphql: graphqlClient{transport: transport}}
+
+	prs, err := testClient.GetPRs(
+		context.Background(),
+		[]models.PullRequestRef{{Repository: testRepositories[0], Number: 1}},
+		noTestFilters,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 1 {
+		t.Fatalf("got %d PRs, expected the snoozed one to be kept", len(prs))
+	}
+	if prs[0].SnoozedUntil == nil {
+		t.Error("SnoozedUntil = nil, expected the snooze to be parsed off the comments")
 	}
 }

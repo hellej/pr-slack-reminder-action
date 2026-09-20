@@ -171,7 +171,7 @@ func emptyMergedPRsText(content canvascontent.Content) string {
 	return noMergedPRsText
 }
 
-// A merged PR shows when it landed instead of its age, and never its reviewers.
+// A merged PR shows when it landed instead of its age.
 func renderMergedPRRow(pr prview.PR) string {
 	row := renderTitleLink(pr)
 
@@ -179,7 +179,7 @@ func renderMergedPRRow(pr prview.PR) string {
 	if mergedText != "" {
 		row += " _" + mergedText + "_"
 	}
-	return row + renderAuthor(pr)
+	return row + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.Commenters)
 }
 
 func renderTitleLink(pr prview.PR) string {

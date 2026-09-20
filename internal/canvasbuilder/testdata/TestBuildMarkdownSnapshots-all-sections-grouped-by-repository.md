@@ -63,7 +63,7 @@
 
 ### [test-org/test-repo](https://github.com/test-org/test-repo/pulls)
 
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 
 ​
 
