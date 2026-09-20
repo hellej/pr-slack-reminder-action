@@ -5,7 +5,6 @@
 package prview
 
 import (
-	"maps"
 	"slices"
 	"time"
 
@@ -99,10 +98,6 @@ func (pr PR) IsMerged() bool {
 	return pr.GetMerged()
 }
 
-func (pr PR) IsClosedButNotMerged() bool {
-	return pr.GetState() == "closed" && !pr.IsMerged()
-}
-
 func BuildPRViews(prs []githubclient.PR, config config.ContentInputs) []PR {
 	return utilities.Map(prs, func(pr githubclient.PR) PR {
 		return buildPRView(pr, config)
@@ -131,13 +126,6 @@ func withSlackUserIds(
 type RepositoryPRs struct {
 	Repository models.Repository
 	PRs        []PR
-}
-
-// Buckets PRs by repository, ordered alphabetically by repository path. PRs keep their given
-// order within a bucket.
-func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
-	buckets := bucketPRsByRepository(prs)
-	return buckets.groupsForPaths(slices.Sorted(maps.Keys(buckets.repositoryByPath)))
 }
 
 // Buckets PRs by repository, ordered by each repository's first PR in the given list. PRs keep
