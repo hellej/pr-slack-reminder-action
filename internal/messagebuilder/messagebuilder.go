@@ -25,7 +25,8 @@ const (
 )
 
 // Slack rejects a message of more than 50 blocks. Grouped by repository, a section spends
-// 1 + 2 × repositories of them.
+// 2 × repositories of them: one block per repository, one spacing block between each pair, and
+// the section heading.
 const maximumBlocksInSlackMessage = 50
 
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
@@ -76,8 +77,8 @@ func buildSectionHeadingBlock(section section) slack.Block {
 	)
 }
 
-// A repository's heading takes a block of its own because a header block cannot sit inside a
-// rich_text block.
+// A spacing block cannot sit inside a rich_text block, so each repository takes a block of its
+// own and the spacing blocks go between them.
 func buildSectionContentBlocks(section section) []slack.Block {
 	if len(section.prs.Groups) == 0 {
 		return []slack.Block{
@@ -86,25 +87,36 @@ func buildSectionContentBlocks(section section) []slack.Block {
 	}
 	var blocks []slack.Block
 	for repositoryPosition, group := range section.prs.Groups {
+		if repositoryPosition > 0 {
+			blocks = append(blocks, buildSpacingBlock())
+		}
 		// The repository's position identifies it, not its path: whether a block_id may hold
 		// the path's "/" is not documented.
-		blockID := fmt.Sprintf("%s_repository_%d", section.blockID, repositoryPosition+1)
-		blocks = append(blocks,
-			buildRepositoryHeadingBlock(group, "heading_"+blockID),
-			buildPRListBlock("section_"+blockID, group.PRs, section.renderRow),
-		)
+		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockID, repositoryPosition+1)
+		blocks = append(blocks, buildRepositoryBlock(blockID, group, section.renderRow))
 	}
 	return blocks
 }
 
-// A header block's text is a plain_text object, so the repository name carries no link here.
-// Each row links to its own PR, and the repository's pulls page is a click rarely wanted.
-func buildRepositoryHeadingBlock(group messagecontent.PRsOfRepository, blockID string) slack.Block {
-	return slack.NewHeaderBlock(
-		slack.NewTextBlockObject("plain_text", group.RepositoryPath, true, false),
-		slack.HeaderBlockOptionBlockID(blockID),
-		slack.HeaderBlockOptionLevel(3),
+// The repository name carries no link: each row links to its own PR, and the repository's pulls
+// page is a click rarely wanted.
+func buildRepositoryBlock(
+	blockID string, group messagecontent.PRsOfRepository,
+	renderRow func(prview.PR) slack.RichTextElement,
+) slack.Block {
+	subHeading := slack.NewRichTextSection(
+		slack.NewRichTextSectionTextElement(
+			group.RepositoryPath, &slack.RichTextSectionTextStyle{Bold: true},
+		),
+		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
 	)
+	return slack.NewRichTextBlock(blockID, subHeading, slack.NewRichTextList(
+		slack.RichTextListElementType("bullet"), 0, utilities.Map(group.PRs, renderRow)...,
+	))
+}
+
+func buildSpacingBlock() slack.Block {
+	return slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil)
 }
 
 func buildPRListBlock(

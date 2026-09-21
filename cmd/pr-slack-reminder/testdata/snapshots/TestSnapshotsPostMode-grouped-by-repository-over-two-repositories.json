@@ -11,19 +11,28 @@
       "level": 2
     },
     {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "test-org/repo-two",
-        "emoji": true
-      },
-      "block_id": "heading_waiting_for_review_repository_1",
-      "level": 3
-    },
-    {
       "type": "rich_text",
       "block_id": "section_waiting_for_review_repository_1",
       "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "test-org/repo-two",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": ":",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -96,19 +105,35 @@
       ]
     },
     {
-      "type": "header",
+      "type": "section",
       "text": {
-        "type": "plain_text",
-        "text": "test-org/repo-one",
-        "emoji": true
-      },
-      "block_id": "heading_waiting_for_review_repository_2",
-      "level": 3
+        "type": "mrkdwn",
+        "text": " "
+      }
     },
     {
       "type": "rich_text",
       "block_id": "section_waiting_for_review_repository_2",
       "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "test-org/repo-one",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": ":",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        },
         {
           "type": "rich_text_list",
           "elements": [

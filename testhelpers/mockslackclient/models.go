@@ -19,8 +19,9 @@ type PRList struct {
 	PRListItems []string
 }
 
-// Each bullet list becomes one PRList under the heading of the header block above it: the
-// repository's heading when grouped by repository, the section's heading when not.
+// Each bullet list becomes one PRList under the heading above it: the repository's sub-heading
+// when grouped by repository, the section's header block when not. A sub-heading keeps its
+// trailing ":".
 func (b BlocksWrapper) GetPRLists() []PRList {
 	prLists := []PRList{}
 	currentHeading := ""
@@ -33,6 +34,10 @@ func (b BlocksWrapper) GetPRLists() []PRList {
 			continue
 		}
 		for _, element := range block.sectionElements() {
+			if element.Type == "rich_text_section" {
+				currentHeading = concatenatedText(element.textRuns())
+				continue
+			}
 			prLists = append(prLists, PRList{
 				Heading:     currentHeading,
 				PRListItems: utilities.Map(element.listItems(), listItemText),
@@ -115,6 +120,7 @@ func (b Block) sectionElements() []RichTextElement {
 // Both a rich_text_section and a rich_text_list carry an "elements" array, holding text runs
 // for the section and list item sections for the list.
 type RichTextElement struct {
+	Type     string          `json:"type"`
 	Elements json.RawMessage `json:"elements"`
 }
 
