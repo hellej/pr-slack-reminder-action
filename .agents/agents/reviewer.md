@@ -14,7 +14,8 @@ work in the same tree, so review only the files this change touched, per the tas
 implementer's report. Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
-  touched package's `.spec.md` updated if behaviour changed?
+  touched package's `.spec.md` updated if behaviour changed? The tree holds one end
+  state, so whether the test came first is unverifiable: skip it.
 - AGENTS.md **Code Style**
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
   docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
