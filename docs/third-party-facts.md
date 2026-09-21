@@ -515,3 +515,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   (`free_team_canvas_tab_already_exists`). A probe has to edit the existing canvas
 - `conversations.info` gives the canvas's file ID under `channel.properties.tabs[]`, where a
   `type: "canvas"` tab carries `data.file_id`. `properties.canvas` was absent
+
+## Two adjacent Slack `header` blocks stack their padding, and Block Kit exposes no spacing control [2026-09-21]
+
+- Source: live `post` runs of this action against the dev channel off
+  `message-sections-by-next-action`, read in the Slack client
+- A `header` block carries its own vertical padding. An H2 header immediately followed by an H3
+  header leaves a gap wider than either alone, with nothing between them in the payload
+- No block or element field sets spacing. The only lever is an extra block, a `section` block
+  holding a single space
+- A spacing block cannot sit inside a `rich_text` block, whose elements are section, list, quote
+  and preformatted only. So rows that need a spacing block between them have to be split across
+  blocks
+- Where a heading precedes a list with no gap wanted, a bold text run at the head of the list's
+  own `rich_text` block renders tighter than a `header` block does
