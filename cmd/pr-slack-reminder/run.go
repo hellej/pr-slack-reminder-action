@@ -235,7 +235,7 @@ func resolveTrackedPRs(
 	unresolvedReferences := utilities.Filter(references, func(ref models.PullRequestRef) bool {
 		return !slices.Contains(resolvedReferences, ref)
 	})
-	fetchedPRs, err := getTrackedPRs(githubClient, cfg, unresolvedReferences)
+	fetchedPRs, err := fetchUnresolvedPRs(githubClient, cfg, unresolvedReferences)
 	if err != nil {
 		return trackedMergedPRs, err
 	}
@@ -243,7 +243,7 @@ func resolveTrackedPRs(
 }
 
 // An empty ref slice makes GetPRs log a fetch it never sends, so that case skips the call.
-func getTrackedPRs(
+func fetchUnresolvedPRs(
 	githubClient githubclient.Client,
 	cfg config.Config,
 	references []models.PullRequestRef,

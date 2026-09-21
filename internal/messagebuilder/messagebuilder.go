@@ -41,10 +41,10 @@ func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 }
 
 type section struct {
-	blockID   string
-	heading   string
-	prs       messagecontent.PRSection
-	renderRow func(prview.PR) slack.RichTextElement
+	blockIDFragment string
+	heading         string
+	prs             messagecontent.PRSection
+	renderRow       func(prview.PR) slack.RichTextElement
 }
 
 func buildSectionBlocks(content messagecontent.Content) []slack.Block {
@@ -72,7 +72,7 @@ func sectionHasPRs(section section) bool {
 func buildSectionHeadingBlock(section section) slack.Block {
 	return slack.NewHeaderBlock(
 		slack.NewTextBlockObject("plain_text", section.heading, true, false),
-		slack.HeaderBlockOptionBlockID("heading_"+section.blockID),
+		slack.HeaderBlockOptionBlockID("heading_"+section.blockIDFragment),
 		slack.HeaderBlockOptionLevel(2),
 	)
 }
@@ -82,7 +82,7 @@ func buildSectionHeadingBlock(section section) slack.Block {
 func buildSectionContentBlocks(section section) []slack.Block {
 	if len(section.prs.Groups) == 0 {
 		return []slack.Block{
-			buildPRListBlock("section_"+section.blockID, section.prs.PRs, section.renderRow),
+			buildPRListBlock("section_"+section.blockIDFragment, section.prs.PRs, section.renderRow),
 		}
 	}
 	var blocks []slack.Block
@@ -92,7 +92,7 @@ func buildSectionContentBlocks(section section) []slack.Block {
 		}
 		// The repository's position identifies it, not its path: whether a block_id may hold
 		// the path's "/" is not documented.
-		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockID, repositoryPosition+1)
+		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockIDFragment, repositoryPosition+1)
 		blocks = append(blocks, buildRepositoryBlock(blockID, group, section.renderRow))
 	}
 	return blocks

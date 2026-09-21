@@ -30,10 +30,10 @@ func (b BlocksWrapper) GetPRLists() []PRList {
 			currentHeading = block.Text.Text
 			continue
 		}
-		if !block.IsSection() {
+		if !block.holdsPRRows() {
 			continue
 		}
-		for _, element := range block.sectionElements() {
+		for _, element := range block.richTextElements() {
 			if element.Type == "rich_text_section" {
 				currentHeading = concatenatedText(element.textRuns())
 				continue
@@ -105,11 +105,11 @@ type Block struct {
 	Elements json.RawMessage `json:"elements,omitempty"` // We'll unmarshal this based on Type
 }
 
-func (b Block) IsSection() bool {
+func (b Block) holdsPRRows() bool {
 	return b.Type == "rich_text" && strings.HasPrefix(b.BlockID, "section_")
 }
 
-func (b Block) sectionElements() []RichTextElement {
+func (b Block) richTextElements() []RichTextElement {
 	var elements []RichTextElement
 	if err := json.Unmarshal(b.Elements, &elements); err != nil {
 		panic(fmt.Sprintf("Unexpected rich_text element array type: %v", err))

@@ -68,10 +68,10 @@ func GetContent(
 	contentInputs config.ContentInputs,
 ) Content {
 	sortedOpenPRs := prview.SortPRsOldestToNewest(openPRs)
-	readyToMerge := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
-	waitingForAuthor := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
-	waitingForReview := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
-	mergedPRs := mergedPRsToList(trackedPRs, recentlyMergedPRs)
+	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
+	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
+	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests "+
@@ -98,7 +98,7 @@ func GetContent(
 // The tracked merges are kept whole, however long ago they landed, and the cap applies to the
 // fetch's half alone. Sorting the fetch before capping keeps the 3 newest of it from resting on
 // another package's ordering.
-func mergedPRsToList(trackedPRs []prview.PR, recentlyMergedPRs []prview.PR) []prview.PR {
+func selectMergedPRsToShow(trackedPRs []prview.PR, recentlyMergedPRs []prview.PR) []prview.PR {
 	trackedMergedPRs := utilities.Filter(trackedPRs, prview.PR.IsMerged)
 	isTracked := trackedRefs(trackedMergedPRs)
 	untrackedMergedPRs := utilities.Filter(
@@ -127,7 +127,7 @@ func refOf(pr prview.PR) models.PullRequestRef {
 	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
 }
 
-func includePRsWhoseNextActionIs(
+func prsWhoseNextActionIs(
 	sortedOpenPRs []prview.PR,
 	nextAction prview.PRNextAction,
 ) []prview.PR {

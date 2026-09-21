@@ -84,7 +84,7 @@ func assertBlockIDs(t *testing.T, message slack.Message, expected []string) {
 	}
 }
 
-func sectionElements(t *testing.T, block slack.Block) []slack.RichTextElement {
+func richTextElements(t *testing.T, block slack.Block) []slack.RichTextElement {
 	t.Helper()
 	richTextBlock, isRichText := block.(*slack.RichTextBlock)
 	if !isRichText {
@@ -126,7 +126,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 		"heading_merged", "section_merged", "context",
 	})
 	for _, blockIndex := range []int{1, 3} {
-		if elements := sectionElements(t, message.Blocks.BlockSet[blockIndex]); len(elements) != 1 {
+		if elements := richTextElements(t, message.Blocks.BlockSet[blockIndex]); len(elements) != 1 {
 			t.Errorf("expected one list in an ungrouped section block, got %d elements", len(elements))
 		}
 	}
@@ -177,7 +177,7 @@ func TestSectionHeadings(t *testing.T) {
 
 func assertRepositorySubHeading(t *testing.T, block slack.Block, expectedPath string) {
 	t.Helper()
-	elements := sectionElements(t, block)
+	elements := richTextElements(t, block)
 	if len(elements) != 2 {
 		t.Fatalf("expected a sub-heading and a list in %q's block, got %d elements", expectedPath, len(elements))
 	}
@@ -225,7 +225,7 @@ func assertSpacingBlock(t *testing.T, block slack.Block) {
 // which repository's rows landed in it.
 func firstRowTitle(t *testing.T, block slack.Block) string {
 	t.Helper()
-	elements := sectionElements(t, block)
+	elements := richTextElements(t, block)
 	if len(elements) != 2 {
 		t.Fatalf("expected a sub-heading and a list in the block, got %d elements", len(elements))
 	}
@@ -391,7 +391,7 @@ func TestOpenPRRow(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
+	elements := rowElements(t, richTextElements(t, message.Blocks.BlockSet[1])[0], 0)
 	if len(elements) != 4 {
 		t.Fatalf("expected title, age, ' by ' and author elements, got %d", len(elements))
 	}
@@ -416,7 +416,7 @@ func TestOldPRWarningMarker(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
+	elements := rowElements(t, richTextElements(t, message.Blocks.BlockSet[1])[0], 0)
 	warning := elements[1].(*slack.RichTextSectionTextElement)
 	if warning.Text != " 🚨 " {
 		t.Errorf("expected warning marker ' 🚨 ', got %q", warning.Text)
@@ -438,7 +438,7 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
+	elements := rowElements(t, richTextElements(t, message.Blocks.BlockSet[1])[0], 0)
 	author, isText := elements[3].(*slack.RichTextSectionTextElement)
 	if !isText {
 		t.Fatalf("expected a text element for the author, got %T", elements[3])
@@ -459,7 +459,7 @@ func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
+	elements := rowElements(t, richTextElements(t, message.Blocks.BlockSet[1])[0], 0)
 	texts := make([]string, 0, len(elements))
 	for _, element := range elements {
 		switch typed := element.(type) {
@@ -490,7 +490,7 @@ func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
+	elements := rowElements(t, richTextElements(t, message.Blocks.BlockSet[1])[0], 0)
 	if len(elements) != 3 {
 		t.Fatalf("expected title, ' by ' and author elements, got %d", len(elements))
 	}
@@ -507,7 +507,7 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	assertBlockIDs(t, message, []string{
 		"no_open_prs", "heading_merged", "section_merged", "context",
 	})
-	line := sectionElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
+	line := richTextElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
 	if text := line.Elements[0].(*slack.RichTextSectionTextElement).Text; text != "All caught up! 🎉" {
 		t.Errorf("expected the configured no-PRs message, got %q", text)
 	}
