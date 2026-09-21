@@ -1,21 +1,19 @@
 [
   [
     {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "✅ Ready to merge",
+        "emoji": true
+      },
+      "block_id": "heading_ready_to_merge",
+      "level": 2
+    },
+    {
       "type": "rich_text",
       "block_id": "section_ready_to_merge",
       "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            {
-              "type": "text",
-              "text": "✅ Ready to merge",
-              "style": {
-                "bold": true
-              }
-            }
-          ]
-        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -128,28 +126,19 @@
       ]
     },
     {
-      "type": "section",
+      "type": "header",
       "text": {
-        "type": "mrkdwn",
-        "text": " "
-      }
+        "type": "plain_text",
+        "text": "💬 Waiting for author",
+        "emoji": true
+      },
+      "block_id": "heading_waiting_for_author",
+      "level": 2
     },
     {
       "type": "rich_text",
       "block_id": "section_waiting_for_author",
       "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            {
-              "type": "text",
-              "text": "💬 Waiting for author",
-              "style": {
-                "bold": true
-              }
-            }
-          ]
-        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -252,28 +241,19 @@
       ]
     },
     {
-      "type": "section",
+      "type": "header",
       "text": {
-        "type": "mrkdwn",
-        "text": " "
-      }
+        "type": "plain_text",
+        "text": "👀 Waiting for review",
+        "emoji": true
+      },
+      "block_id": "heading_waiting_for_review",
+      "level": 2
     },
     {
       "type": "rich_text",
       "block_id": "section_waiting_for_review",
       "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            {
-              "type": "text",
-              "text": "👀 Waiting for review",
-              "style": {
-                "bold": true
-              }
-            }
-          ]
-        },
         {
           "type": "rich_text_list",
           "elements": [
@@ -352,28 +332,19 @@
       ]
     },
     {
-      "type": "section",
+      "type": "header",
       "text": {
-        "type": "mrkdwn",
-        "text": " "
-      }
+        "type": "plain_text",
+        "text": "🚀 Recently merged",
+        "emoji": true
+      },
+      "block_id": "heading_merged",
+      "level": 2
     },
     {
       "type": "rich_text",
       "block_id": "section_merged",
       "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            {
-              "type": "text",
-              "text": "🚀 Recently merged",
-              "style": {
-                "bold": true
-              }
-            }
-          ]
-        },
         {
           "type": "rich_text_list",
           "elements": [

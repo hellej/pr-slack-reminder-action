@@ -58,8 +58,8 @@ func blockIDs(blocks []slack.Block) []string {
 		switch typedBlock := block.(type) {
 		case *slack.RichTextBlock:
 			ids = append(ids, typedBlock.BlockID)
-		case *slack.SectionBlock:
-			ids = append(ids, "spacing")
+		case *slack.HeaderBlock:
+			ids = append(ids, typedBlock.BlockID)
 		case *slack.ContextBlock:
 			ids = append(ids, "context")
 		default:
@@ -91,13 +91,13 @@ func sectionElements(t *testing.T, block slack.Block) []slack.RichTextElement {
 	return richTextBlock.Elements
 }
 
-func headingText(t *testing.T, element slack.RichTextElement) string {
+func headerBlock(t *testing.T, block slack.Block) *slack.HeaderBlock {
 	t.Helper()
-	section, isSection := element.(*slack.RichTextSection)
-	if !isSection {
-		t.Fatalf("expected a rich_text_section, got %T", element)
+	header, isHeader := block.(*slack.HeaderBlock)
+	if !isHeader {
+		t.Fatalf("expected a header block, got %T", block)
 	}
-	return section.Elements[0].(*slack.RichTextSectionTextElement).Text
+	return header
 }
 
 func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack.RichTextSectionElement {
@@ -109,7 +109,7 @@ func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack
 	return list.Elements[index].(*slack.RichTextSection).Elements
 }
 
-func TestEachNonEmptySectionIsOneBlockWithASpacingBlockBetween(t *testing.T) {
+func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
 		SummaryText:      "2 open PRs are waiting for attention 👀",
 		WaitingForReview: messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})}},
@@ -120,7 +120,8 @@ func TestEachNonEmptySectionIsOneBlockWithASpacingBlockBetween(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"section_waiting_for_review", "spacing", "section_merged", "context",
+		"heading_waiting_for_review", "section_waiting_for_review",
+		"heading_merged", "section_merged", "context",
 	})
 	if summaryText != "2 open PRs are waiting for attention 👀" {
 		t.Errorf("expected the summary text as the fallback, got %q", summaryText)
@@ -137,17 +138,32 @@ func TestSectionHeadings(t *testing.T) {
 		GeneratedAt:      generatedAt,
 	})
 
+	assertBlockIDs(t, message, []string{
+		"heading_ready_to_merge", "section_ready_to_merge",
+		"heading_waiting_for_author", "section_waiting_for_author",
+		"heading_waiting_for_review", "section_waiting_for_review",
+		"heading_merged", "section_merged", "context",
+	})
 	expectedHeadings := []string{
 		"✅ Ready to merge", "💬 Waiting for author", "👀 Waiting for review", "🚀 Recently merged",
 	}
-	sectionBlocks := []slack.Block{
+	headingBlocks := []slack.Block{
 		message.Blocks.BlockSet[0], message.Blocks.BlockSet[2],
 		message.Blocks.BlockSet[4], message.Blocks.BlockSet[6],
 	}
-	for index, block := range sectionBlocks {
-		got := headingText(t, sectionElements(t, block)[0])
-		if got != expectedHeadings[index] {
-			t.Errorf("expected heading %q, got %q", expectedHeadings[index], got)
+	for index, block := range headingBlocks {
+		header := headerBlock(t, block)
+		if header.Text.Text != expectedHeadings[index] {
+			t.Errorf("expected heading %q, got %q", expectedHeadings[index], header.Text.Text)
+		}
+		if header.Level != 2 {
+			t.Errorf("expected heading %q at level 2, got level %d", expectedHeadings[index], header.Level)
+		}
+		if header.Text.Type != "plain_text" {
+			t.Errorf("expected a plain_text heading object, got %q", header.Text.Type)
+		}
+		if header.Text.Emoji == nil || !*header.Text.Emoji {
+			t.Errorf("expected emoji rendering enabled on heading %q", expectedHeadings[index])
 		}
 	}
 }
@@ -172,13 +188,15 @@ func TestGroupedSectionHoldsEveryRepositoryInOneBlock(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"section_waiting_for_review", "context"})
-	elements := sectionElements(t, message.Blocks.BlockSet[0])
-	if len(elements) != 5 {
-		t.Fatalf("expected a heading, two sub-headings and two lists, got %d elements", len(elements))
+	assertBlockIDs(t, message, []string{
+		"heading_waiting_for_review", "section_waiting_for_review", "context",
+	})
+	elements := sectionElements(t, message.Blocks.BlockSet[1])
+	if len(elements) != 4 {
+		t.Fatalf("expected two sub-headings and two lists, got %d elements", len(elements))
 	}
 
-	subHeading := elements[1].(*slack.RichTextSection)
+	subHeading := elements[0].(*slack.RichTextSection)
 	linkElement := subHeading.Elements[0].(*slack.RichTextSectionLinkElement)
 	if linkElement.Text != "owner/repo-one" {
 		t.Errorf("expected sub-heading link text 'owner/repo-one', got %q", linkElement.Text)
@@ -199,7 +217,7 @@ func TestOpenPRRow(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
 	if len(elements) != 4 {
 		t.Fatalf("expected title, age, ' by ' and author elements, got %d", len(elements))
 	}
@@ -224,7 +242,7 @@ func TestOldPRWarningMarker(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
 	warning := elements[1].(*slack.RichTextSectionTextElement)
 	if warning.Text != " 🚨 " {
 		t.Errorf("expected warning marker ' 🚨 ', got %q", warning.Text)
@@ -246,7 +264,7 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
 	author, isText := elements[3].(*slack.RichTextSectionTextElement)
 	if !isText {
 		t.Fatalf("expected a text element for the author, got %T", elements[3])
@@ -267,7 +285,7 @@ func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
 	texts := make([]string, 0, len(elements))
 	for _, element := range elements {
 		switch typed := element.(type) {
@@ -298,7 +316,7 @@ func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[0])[1], 0)
+	elements := rowElements(t, sectionElements(t, message.Blocks.BlockSet[1])[0], 0)
 	if len(elements) != 3 {
 		t.Fatalf("expected title, ' by ' and author elements, got %d", len(elements))
 	}
@@ -312,7 +330,9 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 		GeneratedAt:   generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"no_open_prs", "section_merged", "context"})
+	assertBlockIDs(t, message, []string{
+		"no_open_prs", "heading_merged", "section_merged", "context",
+	})
 	line := sectionElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
 	if text := line.Elements[0].(*slack.RichTextSectionTextElement).Text; text != "All caught up! 🎉" {
 		t.Errorf("expected the configured no-PRs message, got %q", text)

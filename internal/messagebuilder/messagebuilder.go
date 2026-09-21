@@ -24,9 +24,10 @@ const (
 	mergedPRsHeading        = "🚀 Recently merged"
 )
 
-// Slack rejects a message of more than 50 blocks. The layout spends at most 9 of them: the
-// no-open-PRs line, four section blocks with a spacing block between them, and the footer. So
-// this is a safety net against an unforeseen layout, not a bound the content can reach.
+// Slack rejects a message of more than 50 blocks. The layout spends at most 10 of them: the
+// no-open-PRs line, a header and a rich_text block per section for four sections, and the
+// footer. So this is a safety net against an unforeseen layout, not a bound the content can
+// reach.
 const maximumBlocksInSlackMessage = 50
 
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
@@ -47,8 +48,6 @@ type section struct {
 	renderRow func(prview.PR) slack.RichTextElement
 }
 
-// An empty section renders nothing at all, its heading included, so the spacing blocks fall
-// between the sections that did render.
 func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 	sections := []section{
 		{"ready_to_merge", readyToMergeHeading, content.ReadyToMerge, buildOpenPRBulletPoint},
@@ -59,10 +58,7 @@ func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 
 	var blocks []slack.Block
 	for _, section := range utilities.Filter(sections, sectionHasPRs) {
-		if len(blocks) > 0 {
-			blocks = append(blocks, buildSpacingBlock())
-		}
-		blocks = append(blocks, buildSectionBlock(section))
+		blocks = append(blocks, buildSectionHeadingBlock(section), buildSectionBlock(section))
 	}
 	return blocks
 }
@@ -71,14 +67,20 @@ func sectionHasPRs(section section) bool {
 	return section.prs.HasPRs()
 }
 
-// A whole section goes in one block, so the block count stays independent of how many
+// A header block is the only message text larger than bold, and it carries its own vertical
+// padding, so nothing else separates the sections.
+func buildSectionHeadingBlock(section section) slack.Block {
+	return slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", section.heading, true, false),
+		slack.HeaderBlockOptionBlockID("heading_"+section.blockID),
+		slack.HeaderBlockOptionLevel(2),
+	)
+}
+
+// A whole section's rows go in one block, so the block count stays independent of how many
 // repositories the section spans.
 func buildSectionBlock(section section) slack.Block {
-	elements := []slack.RichTextElement{
-		slack.NewRichTextSection(
-			slack.NewRichTextSectionTextElement(section.heading, &slack.RichTextSectionTextStyle{Bold: true}),
-		),
-	}
+	var elements []slack.RichTextElement
 	if len(section.prs.Groups) == 0 {
 		elements = append(elements, buildPRList(section.prs.PRs, section.renderRow))
 	}
@@ -116,10 +118,6 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 			slack.NewRichTextSectionTextElement(noOpenPRsText, &slack.RichTextSectionTextStyle{}),
 		),
 	)
-}
-
-func buildSpacingBlock() slack.Block {
-	return slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil)
 }
 
 // <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a

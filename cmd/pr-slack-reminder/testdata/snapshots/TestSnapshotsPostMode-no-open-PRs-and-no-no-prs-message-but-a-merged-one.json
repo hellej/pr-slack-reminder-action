@@ -1,21 +1,19 @@
 [
   [
     {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "🚀 Recently merged",
+        "emoji": true
+      },
+      "block_id": "heading_merged",
+      "level": 2
+    },
+    {
       "type": "rich_text",
       "block_id": "section_merged",
       "elements": [
-        {
-          "type": "rich_text_section",
-          "elements": [
-            {
-              "type": "text",
-              "text": "🚀 Recently merged",
-              "style": {
-                "bold": true
-              }
-            }
-          ]
-        },
         {
           "type": "rich_text_list",
           "elements": [
