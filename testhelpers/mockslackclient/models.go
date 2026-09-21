@@ -19,21 +19,20 @@ type PRList struct {
 	PRListItems []string
 }
 
-// A message section is one rich_text block holding its heading section, then either one bullet
-// list or a repository sub-heading section and a bullet list per repository. Each list becomes
-// one PRList under the heading that precedes it.
+// Each bullet list becomes one PRList under the heading of the header block above it: the
+// repository's heading when grouped by repository, the section's heading when not.
 func (b BlocksWrapper) GetPRLists() []PRList {
 	prLists := []PRList{}
+	currentHeading := ""
 	for _, block := range b.Blocks {
+		if block.Type == "header" && block.Text != nil {
+			currentHeading = block.Text.Text
+			continue
+		}
 		if !block.IsSection() {
 			continue
 		}
-		currentHeading := ""
 		for _, element := range block.sectionElements() {
-			if element.Type == "rich_text_section" {
-				currentHeading = concatenatedText(element.textRuns())
-				continue
-			}
 			prLists = append(prLists, PRList{
 				Heading:     currentHeading,
 				PRListItems: utilities.Map(element.listItems(), listItemText),
@@ -97,6 +96,7 @@ func (b BlocksWrapper) GetPRCount() int {
 type Block struct {
 	Type     string          `json:"type"`
 	BlockID  string          `json:"block_id,omitempty"`
+	Text     *Element        `json:"text,omitempty"`     // Set on a header block only
 	Elements json.RawMessage `json:"elements,omitempty"` // We'll unmarshal this based on Type
 }
 
@@ -115,7 +115,6 @@ func (b Block) sectionElements() []RichTextElement {
 // Both a rich_text_section and a rich_text_list carry an "elements" array, holding text runs
 // for the section and list item sections for the list.
 type RichTextElement struct {
-	Type     string          `json:"type"`
 	Elements json.RawMessage `json:"elements"`
 }
 

@@ -123,6 +123,11 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 		"heading_waiting_for_review", "section_waiting_for_review",
 		"heading_merged", "section_merged", "context",
 	})
+	for _, blockIndex := range []int{1, 3} {
+		if elements := sectionElements(t, message.Blocks.BlockSet[blockIndex]); len(elements) != 1 {
+			t.Errorf("expected one list in an ungrouped section block, got %d elements", len(elements))
+		}
+	}
 	if summaryText != "2 open PRs are waiting for attention 👀" {
 		t.Errorf("expected the summary text as the fallback, got %q", summaryText)
 	}
@@ -168,51 +173,148 @@ func TestSectionHeadings(t *testing.T) {
 	}
 }
 
-func TestGroupedSectionHoldsEveryRepositoryInOneBlock(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
-		GroupedByRepository: true,
-		WaitingForReview: messagecontent.PRSection{
-			Groups: []messagecontent.PRsOfRepository{
-				{
-					RepositoryLinkLabel: "owner/repo-one",
-					RepositoryLink:      "https://github.com/owner/repo-one/pulls",
-					PRs:                 []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
-				},
-				{
-					RepositoryLinkLabel: "owner/repo-two",
-					RepositoryLink:      "https://github.com/owner/repo-two/pulls",
-					PRs:                 []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
-				},
+func assertRepositoryHeadingBlock(t *testing.T, block slack.Block, expectedPath string) {
+	t.Helper()
+	header := headerBlock(t, block)
+	if header.Text.Text != expectedPath {
+		t.Errorf("expected repository heading %q, got %q", expectedPath, header.Text.Text)
+	}
+	if header.Level != 3 {
+		t.Errorf("expected repository heading %q at level 3, got level %d", expectedPath, header.Level)
+	}
+	if header.Text.Type != "plain_text" {
+		t.Errorf("expected a plain_text repository heading object, got %q", header.Text.Type)
+	}
+	if header.Text.Emoji == nil || !*header.Text.Emoji {
+		t.Errorf("expected emoji rendering enabled on repository heading %q", expectedPath)
+	}
+}
+
+// A grouped repository block holds its rows alone, so the title of its single row identifies
+// which repository's rows landed in it.
+func onlyRowTitle(t *testing.T, block slack.Block) string {
+	t.Helper()
+	elements := sectionElements(t, block)
+	if len(elements) != 1 {
+		t.Fatalf("expected the block to hold one list, got %d elements", len(elements))
+	}
+	return rowElements(t, elements[0], 0)[0].(*slack.RichTextSectionLinkElement).Text
+}
+
+func linkURLs(blocks []slack.Block) []string {
+	var urls []string
+	for _, block := range blocks {
+		richTextBlock, isRichText := block.(*slack.RichTextBlock)
+		if !isRichText {
+			continue
+		}
+		for _, element := range richTextBlock.Elements {
+			list, isList := element.(*slack.RichTextList)
+			if !isList {
+				urls = append(urls, "non-list element: "+string(element.RichTextElementType()))
+				continue
+			}
+			for _, row := range list.Elements {
+				for _, rowElement := range row.(*slack.RichTextSection).Elements {
+					if link, isLink := rowElement.(*slack.RichTextSectionLinkElement); isLink {
+						urls = append(urls, link.URL)
+					}
+				}
+			}
+		}
+	}
+	return urls
+}
+
+func groupedOverTwoRepositories() messagecontent.PRSection {
+	return messagecontent.PRSection{
+		Groups: []messagecontent.PRsOfRepository{
+			{
+				RepositoryPath: "owner/repo-one",
+				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
+			},
+			{
+				RepositoryPath: "owner/repo-two",
+				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
 			},
 		},
-		GeneratedAt: generatedAt,
+	}
+}
+
+func TestGroupedSectionIsAHeadingBlockAndARichTextBlockPerRepository(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverTwoRepositories(),
+		GeneratedAt:         generatedAt,
 	})
 
 	assertBlockIDs(t, message, []string{
-		"heading_waiting_for_review", "section_waiting_for_review", "context",
+		"heading_waiting_for_review",
+		"heading_waiting_for_review_repository_1", "section_waiting_for_review_repository_1",
+		"heading_waiting_for_review_repository_2", "section_waiting_for_review_repository_2",
+		"context",
 	})
-	elements := sectionElements(t, message.Blocks.BlockSet[1])
-	if len(elements) != 4 {
-		t.Fatalf("expected two sub-headings and two lists, got %d elements", len(elements))
+	sectionHeading := headerBlock(t, message.Blocks.BlockSet[0])
+	if sectionHeading.Text.Text != "👀 Waiting for review" {
+		t.Errorf("expected the section heading text, got %q", sectionHeading.Text.Text)
 	}
+	if sectionHeading.Level != 2 {
+		t.Errorf("expected the section heading at level 2, got level %d", sectionHeading.Level)
+	}
+	assertRepositoryHeadingBlock(t, message.Blocks.BlockSet[1], "owner/repo-one")
+	assertRepositoryHeadingBlock(t, message.Blocks.BlockSet[3], "owner/repo-two")
+	if title := onlyRowTitle(t, message.Blocks.BlockSet[2]); title != "PR in repo one" {
+		t.Errorf("expected the first repository's row under its own heading, got %q", title)
+	}
+	if title := onlyRowTitle(t, message.Blocks.BlockSet[4]); title != "PR in repo two" {
+		t.Errorf("expected the second repository's row under its own heading, got %q", title)
+	}
+}
 
-	subHeading := elements[0].(*slack.RichTextSection)
-	linkElement := subHeading.Elements[0].(*slack.RichTextSectionLinkElement)
-	if linkElement.Text != "owner/repo-one" {
-		t.Errorf("expected sub-heading link text 'owner/repo-one', got %q", linkElement.Text)
+// testPR gives every PR the same URL, so the only link a grouped message can carry is that one.
+func TestGroupedSectionRendersNoRepositoryLink(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverTwoRepositories(),
+		GeneratedAt:         generatedAt,
+	})
+
+	for _, url := range linkURLs(message.Blocks.BlockSet) {
+		if url != "https://github.com/test-org/test-repo/pull/1" {
+			t.Errorf("expected PR links only in a grouped message, got %q", url)
+		}
 	}
-	if linkElement.URL != "https://github.com/owner/repo-one/pulls" {
-		t.Errorf("expected the repository pulls URL, got %q", linkElement.URL)
-	}
-	if linkElement.Style == nil || !linkElement.Style.Bold {
-		t.Error("expected the repository sub-heading link to be bold")
-	}
-	colonElement := subHeading.Elements[1].(*slack.RichTextSectionTextElement)
-	if colonElement.Text != ":" {
-		t.Errorf("expected ':' after the repository link, got %q", colonElement.Text)
-	}
-	if colonElement.Style == nil || !colonElement.Style.Bold {
-		t.Error("expected the ':' after the repository link to be bold")
+}
+
+func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		ReadyToMerge: messagecontent.PRSection{
+			Groups: []messagecontent.PRsOfRepository{{
+				RepositoryPath: "owner/ready-repo",
+				PRs:            []prview.PR{testPR(testPROptions{title: "Ready PR"})},
+			}},
+		},
+		WaitingForReview: groupedOverTwoRepositories(),
+		GeneratedAt:      generatedAt,
+	})
+
+	assertBlockIDs(t, message, []string{
+		"heading_ready_to_merge",
+		"heading_ready_to_merge_repository_1", "section_ready_to_merge_repository_1",
+		"heading_waiting_for_review",
+		"heading_waiting_for_review_repository_1", "section_waiting_for_review_repository_1",
+		"heading_waiting_for_review_repository_2", "section_waiting_for_review_repository_2",
+		"context",
+	})
+	assertRepositoryHeadingBlock(t, message.Blocks.BlockSet[1], "owner/ready-repo")
+	assertRepositoryHeadingBlock(t, message.Blocks.BlockSet[4], "owner/repo-one")
+	assertRepositoryHeadingBlock(t, message.Blocks.BlockSet[6], "owner/repo-two")
+	expectedRowTitles := map[int]string{2: "Ready PR", 5: "PR in repo one", 7: "PR in repo two"}
+	for blockIndex, expectedTitle := range expectedRowTitles {
+		if title := onlyRowTitle(t, message.Blocks.BlockSet[blockIndex]); title != expectedTitle {
+			t.Errorf("expected row %q in block %d, got %q", expectedTitle, blockIndex, title)
+		}
 	}
 }
 

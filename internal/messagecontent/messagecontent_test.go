@@ -109,14 +109,11 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 	assertEqual(
 		t, "grouped repositories",
 		utilities.Map(waitingForReview.Groups, func(group PRsOfRepository) string {
-			return group.RepositoryLinkLabel
+			return group.RepositoryPath
 		}),
 		[]string{"test-org/zebra", "test-org/alpha"},
 	)
 	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].PRs), []int{1, 3})
-	if waitingForReview.Groups[0].RepositoryLink != "https://github.com/test-org/zebra/pulls" {
-		t.Errorf("unexpected repository link %q", waitingForReview.Groups[0].RepositoryLink)
-	}
 }
 
 // The tracked PR merged longest ago is the one the cap would drop if it were counted as

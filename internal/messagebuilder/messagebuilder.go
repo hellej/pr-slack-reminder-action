@@ -24,10 +24,8 @@ const (
 	mergedPRsHeading        = "🚀 Recently merged"
 )
 
-// Slack rejects a message of more than 50 blocks. The layout spends at most 10 of them: the
-// no-open-PRs line, a header and a rich_text block per section for four sections, and the
-// footer. So this is a safety net against an unforeseen layout, not a bound the content can
-// reach.
+// Slack rejects a message of more than 50 blocks. Grouped by repository, a section spends
+// 1 + 2 × repositories of them.
 const maximumBlocksInSlackMessage = 50
 
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
@@ -58,7 +56,8 @@ func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 
 	var blocks []slack.Block
 	for _, section := range utilities.Filter(sections, sectionHasPRs) {
-		blocks = append(blocks, buildSectionHeadingBlock(section), buildSectionBlock(section))
+		blocks = append(blocks, buildSectionHeadingBlock(section))
+		blocks = append(blocks, buildSectionContentBlocks(section)...)
 	}
 	return blocks
 }
@@ -77,38 +76,43 @@ func buildSectionHeadingBlock(section section) slack.Block {
 	)
 }
 
-// A whole section's rows go in one block, so the block count stays independent of how many
-// repositories the section spans.
-func buildSectionBlock(section section) slack.Block {
-	var elements []slack.RichTextElement
+// A repository's heading takes a block of its own because a header block cannot sit inside a
+// rich_text block.
+func buildSectionContentBlocks(section section) []slack.Block {
 	if len(section.prs.Groups) == 0 {
-		elements = append(elements, buildPRList(section.prs.PRs, section.renderRow))
+		return []slack.Block{
+			buildPRListBlock("section_"+section.blockID, section.prs.PRs, section.renderRow),
+		}
 	}
-	for _, group := range section.prs.Groups {
-		elements = append(elements,
-			buildRepositorySubHeading(group),
-			buildPRList(group.PRs, section.renderRow),
+	var blocks []slack.Block
+	for repositoryPosition, group := range section.prs.Groups {
+		// The repository's position identifies it, not its path: whether a block_id may hold
+		// the path's "/" is not documented.
+		blockID := fmt.Sprintf("%s_repository_%d", section.blockID, repositoryPosition+1)
+		blocks = append(blocks,
+			buildRepositoryHeadingBlock(group, "heading_"+blockID),
+			buildPRListBlock("section_"+blockID, group.PRs, section.renderRow),
 		)
 	}
-	return slack.NewRichTextBlock("section_"+section.blockID, elements...)
+	return blocks
 }
 
-func buildRepositorySubHeading(group messagecontent.PRsOfRepository) slack.RichTextElement {
-	return slack.NewRichTextSection(
-		slack.NewRichTextSectionLinkElement(
-			group.RepositoryLink, group.RepositoryLinkLabel,
-			&slack.RichTextSectionTextStyle{Bold: true},
-		),
-		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
+// A header block's text is a plain_text object, so the repository name carries no link here.
+// Each row links to its own PR, and the repository's pulls page is a click rarely wanted.
+func buildRepositoryHeadingBlock(group messagecontent.PRsOfRepository, blockID string) slack.Block {
+	return slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", group.RepositoryPath, true, false),
+		slack.HeaderBlockOptionBlockID(blockID),
+		slack.HeaderBlockOptionLevel(3),
 	)
 }
 
-func buildPRList(
-	prs []prview.PR, renderRow func(prview.PR) slack.RichTextElement,
-) slack.RichTextElement {
-	return slack.NewRichTextList(
+func buildPRListBlock(
+	blockID string, prs []prview.PR, renderRow func(prview.PR) slack.RichTextElement,
+) slack.Block {
+	return slack.NewRichTextBlock(blockID, slack.NewRichTextList(
 		slack.RichTextListElementType("bullet"), 0, utilities.Map(prs, renderRow)...,
-	)
+	))
 }
 
 func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {

@@ -32,9 +32,8 @@ func (section PRSection) HasPRs() bool {
 }
 
 type PRsOfRepository struct {
-	RepositoryLinkLabel string
-	RepositoryLink      string
-	PRs                 []prview.PR
+	RepositoryPath string
+	PRs            []prview.PR
 }
 
 type Content struct {
@@ -146,9 +145,8 @@ func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
 			prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs),
 			func(group prview.RepositoryPRs) PRsOfRepository {
 				return PRsOfRepository{
-					RepositoryLinkLabel: group.Repository.GetPath(),
-					RepositoryLink:      group.Repository.GetPullsURL(),
-					PRs:                 group.PRs,
+					RepositoryPath: group.Repository.GetPath(),
+					PRs:            group.PRs,
 				}
 			},
 		),
