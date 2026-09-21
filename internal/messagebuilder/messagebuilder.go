@@ -93,14 +93,13 @@ func buildSectionBlock(section section) slack.Block {
 	return slack.NewRichTextBlock("section_"+section.blockID, elements...)
 }
 
-// The section heading above already says what the rows are, so the sub-heading is the
-// repository link alone, unbolded to sit under that heading.
 func buildRepositorySubHeading(group messagecontent.PRsOfRepository) slack.RichTextElement {
 	return slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(
-			group.RepositoryLink, group.RepositoryLinkLabel, &slack.RichTextSectionTextStyle{},
+			group.RepositoryLink, group.RepositoryLinkLabel,
+			&slack.RichTextSectionTextStyle{Bold: true},
 		),
-		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{}),
+		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
 	)
 }
 

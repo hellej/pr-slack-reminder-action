@@ -21,12 +21,16 @@
               "type": "link",
               "url": "https://github.com/test-org/repo-two/pulls",
               "text": "test-org/repo-two",
-              "style": {}
+              "style": {
+                "bold": true
+              }
             },
             {
               "type": "text",
               "text": ":",
-              "style": {}
+              "style": {
+                "bold": true
+              }
             }
           ]
         },
@@ -106,12 +110,16 @@
               "type": "link",
               "url": "https://github.com/test-org/repo-one/pulls",
               "text": "test-org/repo-one",
-              "style": {}
+              "style": {
+                "bold": true
+              }
             },
             {
               "type": "text",
               "text": ":",
-              "style": {}
+              "style": {
+                "bold": true
+              }
             }
           ]
         },

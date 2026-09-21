@@ -8,7 +8,7 @@ Turns `messagecontent.Content` into a Slack message.
 - The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
 - Each non-empty section is two blocks: a `header` block at level 2 holding the heading, then one `rich_text` block holding its rows. An empty section renders neither block
 - The headings are this package's own display text: `✅ Ready to merge`, `💬 Waiting for author`, `👀 Waiting for review`, `🚀 Recently merged`
-- Grouped-by-repository case: inside that same rich_text block, an unbolded repository sub-heading carrying the repository link from [internal/messagecontent](../messagecontent/messagecontent.spec.md) and a bulleted list, per repository
+- Grouped-by-repository case: inside that same rich_text block, a bold repository sub-heading carrying the repository link from [internal/messagecontent](../messagecontent/messagecontent.spec.md) and a bulleted list, per repository
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
 - An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist)
 - A merged PR row shows: title (linked), when it merged in italics, author, approvers/commenters. No age, no old-PR marker: the section heading says it landed

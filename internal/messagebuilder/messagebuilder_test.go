@@ -204,8 +204,15 @@ func TestGroupedSectionHoldsEveryRepositoryInOneBlock(t *testing.T) {
 	if linkElement.URL != "https://github.com/owner/repo-one/pulls" {
 		t.Errorf("expected the repository pulls URL, got %q", linkElement.URL)
 	}
-	if linkElement.Style != nil && linkElement.Style.Bold {
-		t.Error("expected the repository sub-heading not to be bold")
+	if linkElement.Style == nil || !linkElement.Style.Bold {
+		t.Error("expected the repository sub-heading link to be bold")
+	}
+	colonElement := subHeading.Elements[1].(*slack.RichTextSectionTextElement)
+	if colonElement.Text != ":" {
+		t.Errorf("expected ':' after the repository link, got %q", colonElement.Text)
+	}
+	if colonElement.Style == nil || !colonElement.Style.Bold {
+		t.Error("expected the ':' after the repository link to be bold")
 	}
 }
 
