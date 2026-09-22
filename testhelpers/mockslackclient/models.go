@@ -20,8 +20,7 @@ type PRList struct {
 }
 
 // Each bullet list becomes one PRList under the heading above it: the repository's sub-heading
-// when grouped by repository, the section's header block when not. A sub-heading keeps its
-// trailing ":".
+// when grouped by repository, the section's header block when not.
 func (b BlocksWrapper) GetPRLists() []PRList {
 	prLists := []PRList{}
 	currentHeading := ""

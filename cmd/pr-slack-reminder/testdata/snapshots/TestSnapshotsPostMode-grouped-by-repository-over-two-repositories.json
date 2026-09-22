@@ -18,15 +18,9 @@
           "type": "rich_text_section",
           "elements": [
             {
-              "type": "text",
+              "type": "link",
+              "url": "https://github.com/test-org/repo-two/pulls",
               "text": "repo-two",
-              "style": {
-                "bold": true
-              }
-            },
-            {
-              "type": "text",
-              "text": ":",
               "style": {
                 "bold": true
               }
@@ -119,15 +113,9 @@
           "type": "rich_text_section",
           "elements": [
             {
-              "type": "text",
+              "type": "link",
+              "url": "https://github.com/test-org/repo-one/pulls",
               "text": "repo-one",
-              "style": {
-                "bold": true
-              }
-            },
-            {
-              "type": "text",
-              "text": ":",
               "style": {
                 "bold": true
               }

@@ -98,17 +98,14 @@ func buildSectionContentBlocks(section section) []slack.Block {
 	return blocks
 }
 
-// The repository name carries no link: each row links to its own PR, and the repository's pulls
-// page is a click rarely wanted.
 func buildRepositoryBlock(
 	blockID string, group messagecontent.PRsOfRepository,
 	renderRow func(prview.PR) slack.RichTextElement,
 ) slack.Block {
 	subHeading := slack.NewRichTextSection(
-		slack.NewRichTextSectionTextElement(
-			group.RepositoryName, &slack.RichTextSectionTextStyle{Bold: true},
+		slack.NewRichTextSectionLinkElement(
+			group.RepositoryPullsURL, group.RepositoryName, &slack.RichTextSectionTextStyle{Bold: true},
 		),
-		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
 	)
 	return slack.NewRichTextBlock(blockID, subHeading, slack.NewRichTextList(
 		slack.RichTextListElementType("bullet"), 0, utilities.Map(group.PRs, renderRow)...,

@@ -175,38 +175,31 @@ func TestSectionHeadings(t *testing.T) {
 	}
 }
 
-func assertRepositorySubHeading(t *testing.T, block slack.Block, expectedPath string) {
+func assertRepositorySubHeading(t *testing.T, block slack.Block, expectedName string, expectedURL string) {
 	t.Helper()
 	elements := richTextElements(t, block)
 	if len(elements) != 2 {
-		t.Fatalf("expected a sub-heading and a list in %q's block, got %d elements", expectedPath, len(elements))
+		t.Fatalf("expected a sub-heading and a list in %q's block, got %d elements", expectedName, len(elements))
 	}
 	subHeading, isSection := elements[0].(*slack.RichTextSection)
 	if !isSection {
 		t.Fatalf("expected a rich_text_section sub-heading, got %T", elements[0])
 	}
-	if len(subHeading.Elements) != 2 {
-		t.Fatalf("expected the path and its colon in the sub-heading, got %d elements", len(subHeading.Elements))
+	if len(subHeading.Elements) != 1 {
+		t.Fatalf("expected the linked name alone in the sub-heading, got %d elements", len(subHeading.Elements))
 	}
-	pathElement, isText := subHeading.Elements[0].(*slack.RichTextSectionTextElement)
-	if !isText {
-		t.Fatalf("expected an unlinked text sub-heading, got %T", subHeading.Elements[0])
+	link, isLink := subHeading.Elements[0].(*slack.RichTextSectionLinkElement)
+	if !isLink {
+		t.Fatalf("expected a link sub-heading, got %T", subHeading.Elements[0])
 	}
-	if pathElement.Style == nil || !pathElement.Style.Bold {
-		t.Errorf("expected sub-heading %q bold", expectedPath)
+	if link.Text != expectedName {
+		t.Errorf("expected the sub-heading to read %q, got %q", expectedName, link.Text)
 	}
-	colonElement, isText := subHeading.Elements[1].(*slack.RichTextSectionTextElement)
-	if !isText {
-		t.Fatalf("expected a text colon after the sub-heading, got %T", subHeading.Elements[1])
+	if link.URL != expectedURL {
+		t.Errorf("expected sub-heading %q to link to %q, got %q", expectedName, expectedURL, link.URL)
 	}
-	if colonElement.Style == nil || !colonElement.Style.Bold {
-		t.Errorf("expected the colon after %q bold", expectedPath)
-	}
-	// The path and the colon are separate elements, so only their concatenation shows whether
-	// either one carries a stray space.
-	subHeadingText := pathElement.Text + colonElement.Text
-	if subHeadingText != expectedPath+":" {
-		t.Errorf("expected the sub-heading to read %q, got %q", expectedPath+":", subHeadingText)
+	if link.Style == nil || !link.Style.Bold {
+		t.Errorf("expected sub-heading %q bold", expectedName)
 	}
 }
 
@@ -232,55 +225,18 @@ func firstRowTitle(t *testing.T, block slack.Block) string {
 	return rowElements(t, elements[1], 0)[0].(*slack.RichTextSectionLinkElement).Text
 }
 
-func linkURLs(blocks []slack.Block) []string {
-	var urls []string
-	for _, block := range blocks {
-		richTextBlock, isRichText := block.(*slack.RichTextBlock)
-		if !isRichText {
-			continue
-		}
-		for _, element := range richTextBlock.Elements {
-			urls = append(urls, linkURLsOfElement(element)...)
-		}
-	}
-	return urls
-}
-
-func linkURLsOfElement(element slack.RichTextElement) []string {
-	if section, isSection := element.(*slack.RichTextSection); isSection {
-		return linkURLsOfSection(section)
-	}
-	list, isList := element.(*slack.RichTextList)
-	if !isList {
-		return []string{"unexpected element: " + string(element.RichTextElementType())}
-	}
-	var urls []string
-	for _, row := range list.Elements {
-		urls = append(urls, linkURLsOfSection(row.(*slack.RichTextSection))...)
-	}
-	return urls
-}
-
-func linkURLsOfSection(section *slack.RichTextSection) []string {
-	var urls []string
-	for _, element := range section.Elements {
-		if link, isLink := element.(*slack.RichTextSectionLinkElement); isLink {
-			urls = append(urls, link.URL)
-		}
-	}
-	return urls
-}
-
 func groupedOverTwoRepositories() messagecontent.PRSection {
 	return messagecontent.PRSection{
 		Groups: []messagecontent.PRsOfRepository{
 			{
-				RepositoryName: "repo-one",
-				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
+				RepositoryName:     "repo-one",
+				RepositoryPullsURL: "https://github.com/owner-one/repo-one/pulls",
+				PRs:                []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
 			},
 			{
-				RepositoryName: "repo-two",
-				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
+				RepositoryName:     "repo-two",
+				RepositoryPullsURL: "https://github.com/owner-two/repo-two/pulls",
+				PRs:                []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
 			},
 		},
 	}
@@ -307,9 +263,9 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 	if sectionHeading.Level != 2 {
 		t.Errorf("expected the section heading at level 2, got level %d", sectionHeading.Level)
 	}
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one", "https://github.com/owner-one/repo-one/pulls")
 	assertSpacingBlock(t, message.Blocks.BlockSet[2])
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two", "https://github.com/owner-two/repo-two/pulls")
 	if title := firstRowTitle(t, message.Blocks.BlockSet[1]); title != "PR in repo one" {
 		t.Errorf("expected the first repository's row under its own sub-heading, got %q", title)
 	}
@@ -335,28 +291,14 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 	})
 }
 
-// testPR gives every PR the same URL, so the only link a grouped message can carry is that one.
-func TestGroupedSectionRendersNoRepositoryLink(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
-		GroupedByRepository: true,
-		WaitingForReview:    groupedOverTwoRepositories(),
-		GeneratedAt:         generatedAt,
-	})
-
-	for _, url := range linkURLs(message.Blocks.BlockSet) {
-		if url != "https://github.com/test-org/test-repo/pull/1" {
-			t.Errorf("expected PR links only in a grouped message, got %q", url)
-		}
-	}
-}
-
 func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
 		GroupedByRepository: true,
 		ReadyToMerge: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
-				RepositoryName: "ready-repo",
-				PRs:            []prview.PR{testPR(testPROptions{title: "Ready PR"})},
+				RepositoryName:     "ready-repo",
+				RepositoryPullsURL: "https://github.com/ready-owner/ready-repo/pulls",
+				PRs:                []prview.PR{testPR(testPROptions{title: "Ready PR"})},
 			}},
 		},
 		WaitingForReview: groupedOverTwoRepositories(),
@@ -372,9 +314,9 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		"section_waiting_for_review_repository_2",
 		"context",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "repo-two")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one", "https://github.com/owner-one/repo-one/pulls")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "repo-two", "https://github.com/owner-two/repo-two/pulls")
 	expectedRowTitles := map[int]string{1: "Ready PR", 3: "PR in repo one", 5: "PR in repo two"}
 	for blockIndex, expectedTitle := range expectedRowTitles {
 		if title := firstRowTitle(t, message.Blocks.BlockSet[blockIndex]); title != expectedTitle {

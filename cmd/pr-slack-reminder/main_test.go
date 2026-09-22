@@ -614,7 +614,7 @@ func TestScenarios(t *testing.T) {
 			},
 			expectedPRNumbers: []int{1, 2},
 			expectedSummary:   "2 open PRs are waiting for attention 👀",
-			expectedHeadings:  []string{"test-repo:"},
+			expectedHeadings:  []string{"test-repo"},
 		},
 		{
 			name:   "group by repository with multiple repos",
@@ -634,7 +634,7 @@ func TestScenarios(t *testing.T) {
 			},
 			expectedPRNumbers: []int{1, 2, 3},
 			expectedSummary:   "3 open PRs are waiting for attention 👀",
-			expectedHeadings:  []string{"repo1:", "repo2:"},
+			expectedHeadings:  []string{"repo1", "repo2"},
 		},
 		{
 			name:   "reviews by bots and author are excluded from review status",
