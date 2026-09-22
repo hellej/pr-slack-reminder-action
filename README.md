@@ -177,7 +177,7 @@ jobs:
 | `filters`                           | ❌       | Global filters (JSON)<br>Example:<br>`{"authors": ["alice"], "ignored-labels": ["wip"]}`                                                                                                   |
 | `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"ignored-authors": ["bot"]}`                                                                           |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`                                                                                      |
-| `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found. Without it, a run with no open PRs still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
+| `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line: a run with no open PRs then still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
@@ -232,7 +232,7 @@ to be in the same channel as the canvas to have write access.
 - **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs (consider weekends too)
 - **Snooze a PR**: Comment `/snooze for 3 days` (or `/snooze PR reminder for 3 days`) on a PR to temporarily hide it from reminders. To unsnooze, delete the comment or post `/snooze for 0 days`.
 - **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
-- **Customize the empty-day message**: Set `no-prs-message` to fit your team's culture
+- **Customize the empty-day message**: Set `no-prs-message` to fit your team's culture, or to `""` for no message on days with nothing to show
 
 ## 💬 Slack Bot Token Scopes
 

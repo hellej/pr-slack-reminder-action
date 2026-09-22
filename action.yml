@@ -56,6 +56,7 @@ inputs: {
   no-prs-message: {
     description: 'Text to show in the message when there are no open PRs',
     required: false,
+    default: 'No open PRs - happy coding! 🎉',
   },
   old-pr-threshold-hours: {
     description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text)',

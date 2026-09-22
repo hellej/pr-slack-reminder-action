@@ -119,7 +119,7 @@ func runPostMode(
 		cfg.ContentInputs,
 	)
 	if !content.HasPRs() && content.NoOpenPRsText == "" {
-		log.Println("No PRs found and no message configured for this case, exiting")
+		log.Println("No PRs found and no-prs-message is set to empty, exiting")
 		return nil, nil
 	}
 	message, summaryText := messagebuilder.BuildMessage(content)
@@ -185,7 +185,7 @@ func runUpdateMode(
 			return loadedState, nil
 		}
 		log.Println("Nothing left to show: no open PRs and no merged ones")
-		log.Println("Deleting Slack message as no-prs-message input is not set")
+		log.Println("Deleting Slack message as no-prs-message is set to empty")
 		if err := slackClient.DeleteMessage(
 			loadedState.SlackMessage.ChannelID,
 			loadedState.SlackMessage.MessageTS,

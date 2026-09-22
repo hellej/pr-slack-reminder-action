@@ -529,3 +529,14 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   blocks
 - Where a heading precedes a list with no gap wanted, a bold text run at the head of the list's
   own `rich_text` block renders tighter than a `header` block does
+
+## An action input's `default:` applies only when `with:` omits the key, so an explicit `""` stays empty [2026-09-22]
+
+- Source: `actions/runner`, `src/Runner.Worker/ActionRunner.cs` on `main`, line 214:
+  `if (!inputs.ContainsKey(key)) { inputs[key] = manifestManager.EvaluateDefaultInput(...) }`
+- The runner decides on whether the caller's `with:` block contains the key at all, never on the
+  value. A workflow that sets an input to `""` keeps `""`; only omitting the key entirely gets the
+  `action.yml` default
+- This holds for a string-typed input the same as `old-pr-threshold-hours` (int-shaped) or
+  `group-by-repository` (bool-shaped): every action input is a string to the runner regardless of
+  how its value reads
