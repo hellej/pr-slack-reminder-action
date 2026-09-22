@@ -15,13 +15,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
-// A failed merged fetch costs the merged section only: the canvas is written without it, and
-// mergedPRsErr is returned so that it still reaches the run's exit code.
-//
-// previousHash is the hash of what the last run put on the canvas. Matching it skips the write:
-// Slack's canvas client mis-merges a replace that lands while somebody has the canvas open.
-// Returns the hash that is on the canvas afterwards, which is the previous one on every path
-// that wrote nothing, a failed write included.
+// See run.spec.md for this function's full behaviour.
 func refreshPRTrackerCanvas(
 	slackClient slackclient.Client,
 	cfg config.Config,
@@ -59,8 +53,6 @@ func refreshPRTrackerCanvas(
 	return contentHash, mergedPRsErr
 }
 
-// Hashes the markdown the canvas would get, with the footer timestamp left out so that a run
-// rendering the same rows recognizes its own canvas.
 func canvasContentHash(content canvascontent.Content) string {
 	contentWithoutTimestamp := content
 	contentWithoutTimestamp.GeneratedAt = time.Time{}

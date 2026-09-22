@@ -89,9 +89,10 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 ## Package Specs
 
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities — read it before reading the package's source
+- `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go` and `canvas.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
-- A `git commit` with staged `internal/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
+- A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
 
 ## Third-party Facts
 

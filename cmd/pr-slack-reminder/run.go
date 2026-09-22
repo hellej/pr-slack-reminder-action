@@ -21,6 +21,7 @@ import (
 
 const prFetchTimeout = 60 * time.Second
 
+// See run.spec.md for this function's full behaviour.
 func Run(
 	getGitHubClient func(token, tokenForState string) githubclient.Client,
 	getSlackClient func(token string) slackclient.Client,
@@ -44,26 +45,18 @@ func Run(
 
 	sentMessageHandler := getSentMessageHandler(cfg)
 
-	// One "now" for the merged PR window and the canvas footer.
 	generatedAt := time.Now().UTC()
-	// A message edited or deleted over a fetch outage is one no later run can rebuild.
 	openPRs, err := findOpenPRs(githubClient, cfg, githubclient.PRFetchOptions{
 		IncludeDrafts: cfg.CanvasEnabled(),
 	})
 	if err != nil {
 		return err
 	}
-	// A failed merged fetch costs the message and the canvas their merged rows, so the run
-	// carries on without them. It also leaves update mode unable to tell an empty day from an
-	// outage, which is why it takes the error along.
 	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(githubClient, cfg, generatedAt)
 	if mergedPRsErr != nil {
 		log.Printf("Failed to fetch recently merged PRs: %v", mergedPRsErr)
 	}
 
-	// The message path and the canvas refresh are independent attempts: a failing reminder
-	// says nothing about whether the canvas can be written, and a stale canvas is what this
-	// feature exists to prevent. Their errors are collected instead of short-circuited.
 	var messageErr, canvasErr, stateErr error
 	var stateToSave *state.State
 
@@ -100,8 +93,7 @@ func Run(
 	return errors.Join(messageErr, canvasErr, stateErr)
 }
 
-// Returns the state to save, which is nil on every path that leaves no message to track, so
-// that nothing is written.
+// Returns a nil state when there is nothing to send, so callers write nothing.
 func runPostMode(
 	slackClient slackclient.Client,
 	cfg config.Config,
@@ -133,8 +125,6 @@ func runPostMode(
 	return &postState, sentMessageHandler(sentMessageInfo)
 }
 
-// Drafts are dropped by the same predicate that keeps them out of the fetch when the canvas is
-// off, and before anything else sees the PRs.
 func buildNonDraftPRViews(openPRs githubclient.OpenPRsResult, cfg config.Config) []prview.PR {
 	nonDraftPRs := utilities.Filter(openPRs.PRs, func(pr githubclient.PR) bool {
 		return !pr.GetDraft()
@@ -178,8 +168,6 @@ func runUpdateMode(
 	)
 
 	if !content.HasPRs() && content.NoOpenPRsText == "" {
-		// Deleting takes proof that nothing is left to show, and a failed fetch is not proof:
-		// the message stands until a run that can rebuild it says otherwise.
 		if mergedPRsErr != nil || trackedPRsErr != nil {
 			log.Println("Keeping the Slack message: nothing to show, but a PR fetch failed")
 			return loadedState, nil
@@ -212,15 +200,9 @@ func runUpdateMode(
 	return loadedState, sentMessageHandler(sentMessageInfo)
 }
 
-// The PRs the message was posted with, in whatever state they are now: the Merged section reads
-// the merged ones. The run's own fetches answer for most of them, so only the rest are fetched.
-// A ref the open fetch returned is open right now and reaches no section, and a ref the merged
-// fetch returned arrives with the reviewers GetPRs would give it. Absence from a fetch means
-// unresolved, never gone: the residue is every other ref, merged outside the fetch's window or
-// past its cap, closed, filtered out, turned into a draft, or past the open fetch's cap.
-//
-// A tracked PR resolved off the merged fetch is returned as tracked, so the merged section's cap
-// on untracked PRs cannot drop it.
+// Resolves each tracked PR ref the run's own open and merged fetches didn't already answer for.
+// See run.spec.md for what counts as resolved and why an already-resolved merged PR still
+// counts as tracked.
 func resolveTrackedPRs(
 	githubClient githubclient.Client,
 	cfg config.Config,
