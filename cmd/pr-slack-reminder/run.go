@@ -115,6 +115,7 @@ func runPostMode(
 		prViews,
 		nil,
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
+		time.Time{},
 		generatedAt,
 		cfg.ContentInputs,
 	)
@@ -173,6 +174,7 @@ func runUpdateMode(
 		buildNonDraftPRViews(openPRs, cfg),
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
+		loadedState.CreatedAt,
 		generatedAt,
 		cfg.ContentInputs,
 	)
