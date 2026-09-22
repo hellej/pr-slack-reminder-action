@@ -466,7 +466,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 ## `chat.update` and `chat.delete` take a channel ID only, where `chat.postMessage` also takes a name [2026-09-19]
 
-- Source: live posts to the dev channel with `.agents/skills/blockkit-probe/send.sh`;
+- Source: live posts to the dev channel with `.agents/skills/slack-message-probe/send.sh`;
   [chat.update](https://docs.slack.dev/reference/methods/chat.update)
 - `chat.postMessage` with `"channel": "pr-reminders-test"` returns `ok` and the channel ID
 - The same name on `chat.update` returns `ok: false`, `error: "channel_not_found"`

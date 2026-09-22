@@ -2,9 +2,9 @@
 # Post, edit or delete a hand-written Block Kit payload in the dev Slack channel.
 #
 # Usage:
-#   .agents/skills/blockkit-probe/send.sh .local/<name>_payload.json          # post
-#   .agents/skills/blockkit-probe/send.sh .local/<name>_payload.json edit     # edit the last post
-#   .agents/skills/blockkit-probe/send.sh .local/<name>_payload.json delete   # delete it
+#   .agents/skills/slack-message-probe/send.sh .local/message-payloads/<NNN>_<name>_payload.json          # post
+#   .agents/skills/slack-message-probe/send.sh .local/message-payloads/<NNN>_<name>_payload.json edit     # edit the last post
+#   .agents/skills/slack-message-probe/send.sh .local/message-payloads/<NNN>_<name>_payload.json delete   # delete it
 #
 # The payload is the chat.postMessage body: channel, text, blocks. A post records the channel ID
 # and ts in <payload>.sent, which edit and delete read: chat.update rejects a channel name.

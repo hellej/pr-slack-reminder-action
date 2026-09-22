@@ -15,7 +15,7 @@ Enriches fetched PRs with display-ready metadata.
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
-- `IsMerged` reports whether a PR was merged, how `messagecontent` picks the tracked PRs that have since landed into the message's Merged section
+- `IsMerged` reports whether a PR was merged
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`
 - `LastActivityAt` returns `UpdatedAt` as a pointer, nil when it's zero, the nil convention `SortPRsNewestFirst` expects for unknown activity
 - `GetNextAction()` says what a PR needs next, as the first of three ordered checks that matches: approved with nothing outstanding is `NextActionReadyToMerge`; an approval, a non-approving review or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording

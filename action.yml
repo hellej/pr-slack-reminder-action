@@ -63,7 +63,7 @@ inputs: {
     default: '96',
   },
   group-by-repository: {
-    description: 'Group PRs by repository with repository sub-headings in each section.',
+    description: 'Group PRs by repository with repository sub-headings.',
     required: false,
     default: 'false',
   },
