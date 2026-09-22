@@ -194,28 +194,28 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 ```markdown
 ## ✅ Ready to merge
 
-- **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+- **[Add wrong-lever trapdoor escape room booking](https://github.com/kuzcotopia/kuzcotopia-ios/pull/41)** _4 hours ago_ by Kuzco (✅ Pacha / 💬 Kronk)
 
 ## 💬 Waiting for author
 
-- **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/4)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
+- **[Fix potion inventory going negative](https://github.com/kuzcotopia/kuzcotopia-api/pull/18)** 🚨 `9 days old` by Yzma (💬 Pacha)
 
 ## 👀 Waiting for review
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _30 minutes ago_ by Bob Brown
+- **[Bump SwiftLint to 0.55](https://github.com/kuzcotopia/kuzcotopia-ios/pull/44)** _20 minutes ago_ by Bucky
 
 ## 🔧 WIP
 
-- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
+- **[Spike: llama-safe zip line queue](https://github.com/kuzcotopia/kuzcotopia-ios/pull/40)** by Kronk `updated 2 hours ago`
 
 ## 🚀 Merged
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown (✅ Frank Foster)
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+- **[Add village relocation compensation tracker](https://github.com/kuzcotopia/kuzcotopia-api/pull/33)** _merged 6 hours ago_ by Chicha (✅ Kuzco)
+- **[Ship imperial llama meet-and-greet scheduler](https://github.com/kuzcotopia/kuzcotopia-ios/pull/38)** _merged 2 days ago_ by Pacha (✅ Kuzco / 💬 Yzma)
 
 ---
 
-_Updated 2026-08-08 06:15 UTC_
+_Updated 2026-09-22 21:40 UTC_
 ```
 
 Open PRs are split by whose turn it is: an approved PR with nothing outstanding is ready to merge (1); a PR carrying a review comment or a review thread its author hasn't answered, and an approved one that now conflicts, are waiting for the author (2); everything else is waiting for review (3).
