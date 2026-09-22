@@ -35,12 +35,11 @@ type PRsOfRepository struct {
 }
 
 type Content struct {
-	SummaryText      string
-	ReadyToMerge     PRSection
-	WaitingForAuthor PRSection
-	WaitingForReview PRSection
-	Merged           PRSection
-	// The configured no-PRs message, set only when no open PR is listed.
+	SummaryText         string
+	ReadyToMerge        PRSection
+	WaitingForAuthor    PRSection
+	WaitingForReview    PRSection
+	Merged              PRSection
 	NoOpenPRsText       string
 	GeneratedAt         time.Time
 	GroupedByRepository bool
