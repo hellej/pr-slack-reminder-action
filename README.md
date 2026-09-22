@@ -216,7 +216,7 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 ## 🚀 Merged
 
-- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown
+- **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _merged 5 hours ago_ by Bob Brown (✅ Frank Foster)
 - **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 
 ---
