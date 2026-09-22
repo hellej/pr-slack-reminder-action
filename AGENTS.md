@@ -72,6 +72,16 @@ Don't stack hedges:
 - ✗ `This should probably work in most cases, though it may be worth verifying.`
 - ✓ `Unverified: whether Slack rejects payloads over the 50-block limit.`
 
+Don't open a sentence with a modifier that describes something other than its subject:
+
+- ✗ `Grouped by repository, each section carries a sub-heading.`
+- ✓ `When grouped by repository, each section carries a sub-heading.`
+
+Don't use a pronoun when an earlier noun in the same sentence could equally be its antecedent:
+
+- ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
+- ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
@@ -79,9 +89,10 @@ Don't stack hedges:
 ## Package Specs
 
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities — read it before reading the package's source
+- `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go` and `canvas.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
-- A `git commit` with staged `internal/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
+- A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
 
 ## Third-party Facts
 
@@ -107,6 +118,7 @@ Don't stack hedges:
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
 - **Keep exported type names exported:** Don't unexport a type just to shrink a package's API surface. Unexporting renames it, and lowercase type names read worse here. Funcs and consts are fine to unexport.
+- **Name a map `<value>By<key>`:** e.g. `isTrackedByPRRef` for a `map[PullRequestRef]bool`.
 
 ## Testing
 
@@ -136,7 +148,7 @@ Don't stack hedges:
 
 ## Architecture
 
-Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** loads state, re-fetches those PRs, and edits or deletes the existing message.
+Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering

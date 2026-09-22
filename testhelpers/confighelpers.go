@@ -45,7 +45,6 @@ func GetDefaultConfigFull() TestConfig {
 			SlackChannelName:        "some-channel-name",
 			ContentInputs: config.ContentInputs{
 				NoPRsMessage:                "No open PRs found.",
-				PRListHeading:               "There are <pr_count> open PRs 🚀",
 				SlackUserIdByGitHubUsername: slackUserIdByGithubUsername,
 				OldPRThresholdHours:         oldPRsThresholdHours,
 			},
@@ -68,9 +67,6 @@ func GetDefaultConfigMinimal() TestConfig {
 			StateFilePath:           "/tmp/pr-slack-reminder-state.json",
 			SentSlackBlocksFilePath: "/tmp/sent-slack-blocks.json",
 			SlackChannelName:        "some-channel-name",
-			ContentInputs: config.ContentInputs{
-				PRListHeading: "There are <pr_count> open PRs 🚀",
-			},
 		},
 	}
 }
@@ -89,7 +85,6 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputSlackChannelID, c.SlackChannelID)
 	setInputEnv(t, overrides, config.InputSlackUserIdByGitHubUsername, c.ContentInputs.SlackUserIdByGitHubUsername)
 	setInputEnv(t, overrides, config.InputNoPRsMessage, c.ContentInputs.NoPRsMessage)
-	setInputEnv(t, overrides, config.InputPRListHeading, c.ContentInputs.PRListHeading)
 	setInputEnv(t, overrides, config.InputOldPRThresholdHours, c.ContentInputs.OldPRThresholdHours)
 	setInputEnv(t, overrides, config.InputGlobalFilters, c.GlobalFiltersRaw)
 	setInputEnv(t, overrides, config.InputRepositoryFilters, c.RepositoryFiltersRaw)

@@ -1,18 +1,34 @@
 [
   [
     {
+      "type": "rich_text",
+      "block_id": "no_open_prs",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "No open PRs, happy coding! 🎉",
+              "style": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "👀 Waiting for review",
+        "text": "🚀 Recently merged",
         "emoji": true
       },
-      "block_id": "heading_waiting_for_review",
+      "block_id": "heading_merged",
       "level": 2
     },
     {
       "type": "rich_text",
-      "block_id": "section_waiting_for_review",
+      "block_id": "section_merged",
       "elements": [
         {
           "type": "rich_text_list",
@@ -22,15 +38,15 @@
               "elements": [
                 {
                   "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/52",
-                  "text": "PR by an unmapped author",
+                  "url": "https://github.com/test-org/test-repo/pull/81",
+                  "text": "Merged since the message was posted",
                   "style": {
                     "bold": true
                   }
                 },
                 {
                   "type": "text",
-                  "text": " 9 hours ago",
+                  "text": " merged 2 hours ago",
                   "style": {
                     "italic": true
                   }
@@ -42,37 +58,7 @@
                 },
                 {
                   "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
-                }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/51",
-                  "text": "PR by a mapped author",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 6 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "user",
-                  "user_id": "U2234567890",
+                  "text": "Alice Anderson",
                   "style": {}
                 }
               ]

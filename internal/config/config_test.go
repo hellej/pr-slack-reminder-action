@@ -18,7 +18,6 @@ const (
 	TestDefaultRunMode      = "post"
 	TestSlackChannelName    = "test-channel"
 	TestSlackChannelID      = "C1234567890"
-	TestPRListHeading       = "PRs needing attention"
 	TestNoPRsMessage        = "No PRs found!"
 	TestOldPRThresholdHours = 24
 	TestDefaultRepository   = "test-org/test-repo"
@@ -109,7 +108,6 @@ type MinimalConfigOptions struct {
 	SkipGithubToken      bool // Skip setting github-token
 	SkipSlackBotToken    bool // Skip setting slack-bot-token
 	SkipSlackChannelName bool // Skip setting slack-channel-name
-	SkipPRListHeading    bool // Skip setting pr-list-heading
 }
 
 func (h *ConfigTestHelpers) setupMinimalValidConfig(opts ...MinimalConfigOptions) {
@@ -139,9 +137,6 @@ func (h *ConfigTestHelpers) setupMinimalValidConfig(opts ...MinimalConfigOptions
 	}
 	if !options.SkipSlackChannelName {
 		h.setInput(config.InputSlackChannelName, TestSlackChannelName)
-	}
-	if !options.SkipPRListHeading {
-		h.setInput(config.InputPRListHeading, TestPRListHeading)
 	}
 }
 
@@ -181,10 +176,6 @@ func TestGetConfig_MinimalValid(t *testing.T) {
 	if cfg.SlackChannelName != TestSlackChannelName {
 		t.Errorf("Expected SlackChannelName '%s', got '%s'", TestSlackChannelName, cfg.SlackChannelName)
 	}
-	if cfg.ContentInputs.PRListHeading != TestPRListHeading {
-		t.Errorf("Expected PRListHeading '%s', got '%s'", TestPRListHeading, cfg.ContentInputs.PRListHeading)
-	}
-
 	if len(cfg.Repositories) != 1 {
 		t.Fatalf("Expected 1 repository, got %d", len(cfg.Repositories))
 	}
@@ -293,13 +284,6 @@ func TestGetConfig_MissingRequiredInputs(t *testing.T) {
 				SkipSlackBotToken: true,
 			},
 			expectedErrMsg: "required input slack-bot-token is not set",
-		},
-		{
-			name: "missing PR list heading",
-			setupOptions: MinimalConfigOptions{
-				SkipPRListHeading: true,
-			},
-			expectedErrMsg: "pr-list-heading is required when group-by-repository is false",
 		},
 		{
 			name: "missing slack channel",

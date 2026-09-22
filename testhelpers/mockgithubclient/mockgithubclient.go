@@ -12,10 +12,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -36,6 +38,36 @@ type MockGitHubClientOptions struct {
 	MockStateForUpdateMode     *state.State
 	ListArtifactsError         error
 	DownloadArtifactError      error
+	Recording                  *FetchRecording
+}
+
+// Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
+// once whatever the run renders from it. GetPRsRequests gets one entry per request, so a skipped
+// call shows up as no entry at all. GetPRs fetches in batches of 25 refs over its own goroutines,
+// so every write takes the lock.
+type FetchRecording struct {
+	mutex           sync.Mutex
+	OpenPRFetches   int
+	MergedPRFetches int
+	GetPRsRequests  [][]models.PullRequestRef
+}
+
+func (r *FetchRecording) recordGetPRsRequest(references []models.PullRequestRef) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.GetPRsRequests = append(r.GetPRsRequests, references)
+}
+
+func (r *FetchRecording) recordOpenPRFetch() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.OpenPRFetches++
+}
+
+func (r *FetchRecording) recordMergedPRFetch() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.MergedPRFetches++
 }
 
 func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenForState string) githubclient.Client {
@@ -120,6 +152,9 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 		return t.openPRsResponse(request.Variables)
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
+		if t.opts.Recording != nil && isGetPRsQuery(request.Query) {
+			t.opts.Recording.recordGetPRsRequest(pullRequestReferences(request.Variables))
+		}
 		return t.enrichedPRsResponse(request.Variables)
 	}
 	if strings.Contains(request.Query, "search(") {
@@ -144,6 +179,9 @@ const notFoundStatus = 404
 // A 404 renders NOT_FOUND on the aliases of the repositories that have no PRs fixture; any other
 // non-200 status fails the whole request at the transport level.
 func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.Recording != nil {
+		t.opts.Recording.recordOpenPRFetch()
+	}
 	status := cmp.Or(t.opts.ListPRsResponseStatus, http.StatusOK)
 	if status != http.StatusOK && status != notFoundStatus {
 		body, err := json.Marshal(map[string]string{"message": errorMessage(t.opts.PRServiceError)})
@@ -209,6 +247,9 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 // The merged PR search has its own failure knob: a canvas refresh fetches merged PRs and open
 // PRs separately, and only one of the two failing is the interesting case.
 func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.Recording != nil {
+		t.opts.Recording.recordMergedPRFetch()
+	}
 	if t.opts.MergedPRsSearchError != nil {
 		body, err := json.Marshal(
 			map[string]string{"message": t.opts.MergedPRsSearchError.Error()},
@@ -249,14 +290,17 @@ func (t GraphQLTransport) hasOpenPRsFixture(repoName string) bool {
 	return len(t.opts.PRs) > 0
 }
 
-// PR scalars come from PRsByNumber when it is set, and from the listing fixtures otherwise.
+// PR scalars come from PRsByNumber when it is set, and from the listing fixtures otherwise. The
+// merged fixtures are searched too, since the merged fetch enriches what its search returned.
 func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullRequest {
 	if pr, isSet := t.opts.PRsByNumber[ref.number]; isSet {
 		return pr
 	}
-	pr, _ := utilities.Find(t.openPRs(ref.repoName), func(pr *github.PullRequest) bool {
-		return pr.GetNumber() == ref.number
-	})
+	hasNumber := func(pr *github.PullRequest) bool { return pr.GetNumber() == ref.number }
+	if pr, isFound := utilities.Find(t.openPRs(ref.repoName), hasNumber); isFound {
+		return pr
+	}
+	pr, _ := utilities.Find(t.mergedPRs(ref.repoName), hasNumber)
 	return pr
 }
 
@@ -268,6 +312,7 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["number"] = number
 	node["state"] = pullRequestNodeState(pr)
 	node["merged"] = pr.GetMerged()
+	node["mergedAt"] = mergedAtJSON(pr)
 	node["labels"] = labelsJSON(pr)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)
@@ -390,8 +435,24 @@ func errorMessage(err error) string {
 }
 
 type pullRequestRef struct {
-	repoName string
-	number   int
+	repoOwner string
+	repoName  string
+	number    int
+}
+
+// Both GetPRs and the enrichment phase select a PR by number; only GetPRs spreads the fullPr
+// fragment the githubclient names.
+func isGetPRsQuery(query string) bool {
+	return strings.Contains(query, "fullPr")
+}
+
+func pullRequestReferences(variables map[string]any) []models.PullRequestRef {
+	return utilities.Map(postedPullRequestRefs(variables), func(ref pullRequestRef) models.PullRequestRef {
+		return models.PullRequestRef{
+			Repository: models.Repository{Owner: ref.repoOwner, Name: ref.repoName},
+			Number:     ref.number,
+		}
+	})
 }
 
 func postedRepositoryNames(variables map[string]any) []string {
@@ -437,7 +498,8 @@ func postedPullRequestRefs(variables map[string]any) []pullRequestRef {
 		if !isSet {
 			return refs
 		}
-		refs = append(refs, pullRequestRef{repoName: repoName, number: int(number)})
+		owner, _ := variables[fmt.Sprintf("owner%d", index)].(string)
+		refs = append(refs, pullRequestRef{repoOwner: owner, repoName: repoName, number: int(number)})
 	}
 	return refs
 }

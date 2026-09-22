@@ -4,7 +4,9 @@
 package messagebuilder
 
 import (
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
@@ -12,139 +14,199 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// Slack API has limit of 50 blocks for PostMessage
-// If the content is grouped by repository, each repository section uses 3 blocks (heading,
-// PR list, spacing). To ensure that the last PR list is not cut off to only title, we set
-// the limit to 50 blocks (16 repositories * 3 blocks each + 2 blocks for the last PR list
-// which doesn't need spacing block after it).
+// The section headings are this package's display text, not prview.PRNextAction values: those
+// are identifiers. The merged heading says "recently" because the section shows the newest
+// untracked merges only.
+const (
+	readyToMergeHeading     = "✅ Ready to merge"
+	waitingForAuthorHeading = "💬 Waiting for author"
+	waitingForReviewHeading = "👀 Waiting for review"
+	mergedPRsHeading        = "🚀 Recently merged"
+)
+
+// Slack rejects a message of more than 50 blocks. Grouped by repository, a section spends
+// 2 × repositories of them: one block per repository, one spacing block between each pair, and
+// the section heading.
 const maximumBlocksInSlackMessage = 50
 
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	var blocks []slack.Block
-
-	if !content.HasPRs() {
-		blocks = addNoPRsBlock(blocks, content.SummaryText)
-		return slack.NewBlockMessage(blocks...), content.SummaryText
+	if content.NoOpenPRsText != "" {
+		blocks = append(blocks, buildNoOpenPRsBlock(content.NoOpenPRsText))
 	}
-
-	if !content.GroupedByRepository {
-		blocks = addPRListBLock(blocks, content.PRListHeading, content.PRs)
-	} else {
-		blocks = addRepositoryPRListBlocks(blocks, content.PRsGroupedByRepository)
-	}
-
+	blocks = append(blocks, buildSectionBlocks(content)...)
 	blocks = limitMaximumMessageSize(blocks)
+	blocks = append(blocks, buildFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
 
-func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
-	if len(blocks) > maximumBlocksInSlackMessage {
-		log.Printf(
-			"Message content is too large (too many blocks: %v, dropping: %v)",
-			len(blocks), len(blocks)-maximumBlocksInSlackMessage,
-		)
-		blocks = blocks[:maximumBlocksInSlackMessage]
+type section struct {
+	blockIDFragment string
+	heading         string
+	prs             messagecontent.PRSection
+	renderRow       func(prview.PR) slack.RichTextElement
+}
+
+func buildSectionBlocks(content messagecontent.Content) []slack.Block {
+	sections := []section{
+		{"ready_to_merge", readyToMergeHeading, content.ReadyToMerge, buildOpenPRBulletPoint},
+		{"waiting_for_author", waitingForAuthorHeading, content.WaitingForAuthor, buildOpenPRBulletPoint},
+		{"waiting_for_review", waitingForReviewHeading, content.WaitingForReview, buildOpenPRBulletPoint},
+		{"merged", mergedPRsHeading, content.Merged, buildMergedPRBulletPoint},
+	}
+
+	var blocks []slack.Block
+	for _, section := range utilities.Filter(sections, sectionHasPRs) {
+		blocks = append(blocks, buildSectionHeadingBlock(section))
+		blocks = append(blocks, buildSectionContentBlocks(section)...)
 	}
 	return blocks
 }
 
-func addNoPRsBlock(blocks []slack.Block, noPRsText string) []slack.Block {
-	return append(blocks,
-		slack.NewRichTextBlock("no_prs_block",
-			slack.NewRichTextSection(
-				slack.NewRichTextSectionTextElement(noPRsText, &slack.RichTextSectionTextStyle{}),
-			),
-		),
+func sectionHasPRs(section section) bool {
+	return section.prs.HasPRs()
+}
+
+// A header block is the only message text larger than bold, and it carries its own vertical
+// padding, so nothing else separates the sections.
+func buildSectionHeadingBlock(section section) slack.Block {
+	return slack.NewHeaderBlock(
+		slack.NewTextBlockObject("plain_text", section.heading, true, false),
+		slack.HeaderBlockOptionBlockID("heading_"+section.blockIDFragment),
+		slack.HeaderBlockOptionLevel(2),
 	)
 }
 
-func addPRListBLock(blocks []slack.Block, heading string, prs []prview.PR) []slack.Block {
-	return append(blocks,
-		slack.NewRichTextBlock("pr_list_heading",
-			slack.NewRichTextSection(
-				slack.NewRichTextSectionTextElement(heading, &slack.RichTextSectionTextStyle{Bold: true}),
-			),
-		),
-		makePRListBlockWithID(prs, "open_prs"),
-	)
-}
-
-func addRepositoryPRListBlocks(
-	blocks []slack.Block,
-	prsGroupedByRepository []messagecontent.PRsOfRepository,
-) []slack.Block {
-	for idx, group := range prsGroupedByRepository {
-		blocks = append(blocks,
-			slack.NewRichTextBlock("pr_list_heading_"+group.RepositoryLinkLabel,
-				slack.NewRichTextSection(
-					slack.NewRichTextSectionTextElement(group.HeadingPrefix, &slack.RichTextSectionTextStyle{Bold: true}),
-					slack.NewRichTextSectionLinkElement(
-						group.RepositoryLink, group.RepositoryLinkLabel, &slack.RichTextSectionTextStyle{Bold: true},
-					),
-					slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
-				),
-			),
-		)
-		blocks = append(blocks, makePRListBlockWithID(group.PRs, "open_prs_"+group.RepositoryLinkLabel))
-
-		if idx < len(prsGroupedByRepository)-1 {
-			// adding spacing block between repositories
-			blocks = append(blocks,
-				slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil),
-			)
+// A spacing block cannot sit inside a rich_text block, so each repository takes a block of its
+// own and the spacing blocks go between them.
+func buildSectionContentBlocks(section section) []slack.Block {
+	if len(section.prs.Groups) == 0 {
+		return []slack.Block{
+			buildPRListBlock("section_"+section.blockIDFragment, section.prs.PRs, section.renderRow),
 		}
 	}
+	var blocks []slack.Block
+	for repositoryPosition, group := range section.prs.Groups {
+		if repositoryPosition > 0 {
+			blocks = append(blocks, buildSpacingBlock())
+		}
+		// The repository's position identifies it, not its path: whether a block_id may hold
+		// the path's "/" is not documented.
+		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockIDFragment, repositoryPosition+1)
+		blocks = append(blocks, buildRepositoryBlock(blockID, group, section.renderRow))
+	}
 	return blocks
 }
 
-func makePRListBlockWithID(openPRs []prview.PR, blockID string) *slack.RichTextBlock {
-	var prBlocks []slack.RichTextElement
-	for _, pr := range openPRs {
-		prBlocks = append(prBlocks, buildPRBulletPointBlock(pr))
-	}
-	return slack.NewRichTextBlock(
-		blockID,
-		slack.NewRichTextList(slack.RichTextListElementType("bullet"), 0,
-			prBlocks...,
+// The repository name carries no link: each row links to its own PR, and the repository's pulls
+// page is a click rarely wanted.
+func buildRepositoryBlock(
+	blockID string, group messagecontent.PRsOfRepository,
+	renderRow func(prview.PR) slack.RichTextElement,
+) slack.Block {
+	subHeading := slack.NewRichTextSection(
+		slack.NewRichTextSectionTextElement(
+			group.RepositoryName, &slack.RichTextSectionTextStyle{Bold: true},
+		),
+		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
+	)
+	return slack.NewRichTextBlock(blockID, subHeading, slack.NewRichTextList(
+		slack.RichTextListElementType("bullet"), 0, utilities.Map(group.PRs, renderRow)...,
+	))
+}
+
+func buildSpacingBlock() slack.Block {
+	return slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil)
+}
+
+func buildPRListBlock(
+	blockID string, prs []prview.PR, renderRow func(prview.PR) slack.RichTextElement,
+) slack.Block {
+	return slack.NewRichTextBlock(blockID, slack.NewRichTextList(
+		slack.RichTextListElementType("bullet"), 0, utilities.Map(prs, renderRow)...,
+	))
+}
+
+func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
+	return slack.NewRichTextBlock("no_open_prs",
+		slack.NewRichTextSection(
+			slack.NewRichTextSectionTextElement(noOpenPRsText, &slack.RichTextSectionTextStyle{}),
 		),
 	)
 }
 
-func buildPRBulletPointBlock(pr prview.PR) slack.RichTextElement {
-	var ageElements []slack.RichTextSectionElement
-
-	if pr.IsOldPR {
-		ageElements = append(ageElements,
-			slack.NewRichTextSectionTextElement(" 🚨 ", &slack.RichTextSectionTextStyle{}),
-			slack.NewRichTextSectionTextElement(pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Bold: true, Code: true}),
-		)
-	} else {
-		ageElements = append(ageElements,
-			slack.NewRichTextSectionTextElement(" "+pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Italic: true}),
-		)
-	}
-
-	prItemElements := []slack.RichTextSectionElement{}
-
-	linkStyle := &slack.RichTextSectionTextStyle{Bold: true, Strike: pr.IsClosedButNotMerged()}
-	prItemElements = append(prItemElements,
-		slack.NewRichTextSectionLinkElement(pr.GetHTMLURL(), pr.GetTitle(), linkStyle),
+// <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a
+// client that cannot process it shows instead. A context block renders smaller and greyer than
+// a rich_text line, so the footer doesn't read as a fifth section.
+func buildFooterBlock(generatedAt time.Time) slack.Block {
+	footerText := fmt.Sprintf(
+		"_Live, updated <!date^%d^{time}|%s UTC>_",
+		generatedAt.Unix(), generatedAt.UTC().Format("15:04"),
 	)
-	prItemElements = append(prItemElements, ageElements...)
-	prItemElements = append(prItemElements,
+	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
+}
+
+// The footer is appended after this, so it gets the last slot.
+func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
+	maximumContentBlocks := maximumBlocksInSlackMessage - 1
+	if len(blocks) <= maximumContentBlocks {
+		return blocks
+	}
+	log.Printf(
+		"Message content is too large (too many blocks: %v, dropping: %v)",
+		len(blocks), len(blocks)-maximumContentBlocks,
+	)
+	return blocks[:maximumContentBlocks]
+}
+
+func buildOpenPRBulletPoint(pr prview.PR) slack.RichTextElement {
+	elements := []slack.RichTextSectionElement{
+		slack.NewRichTextSectionLinkElement(
+			pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true},
+		),
+	}
+	elements = append(elements, buildAgeElements(pr)...)
+	elements = append(elements,
 		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
 	)
+	return slack.NewRichTextSection(append(elements, getReviewersElements(pr)...)...)
+}
 
-	prItemElements = append(prItemElements, getReviewersElements(pr)...)
-
-	if pr.IsMerged() {
-		prItemElements = append(prItemElements,
-			slack.NewRichTextSectionTextElement(" 🚀", &slack.RichTextSectionTextStyle{}),
-		)
+// A merged row shows when it landed instead of its age, so it carries neither the old-PR marker
+// nor the rocket the section heading already has. An unknown merge time drops that segment.
+func buildMergedPRBulletPoint(pr prview.PR) slack.RichTextElement {
+	elements := []slack.RichTextSectionElement{
+		slack.NewRichTextSectionLinkElement(
+			pr.GetHTMLURL(), pr.GetTitle(), &slack.RichTextSectionTextStyle{Bold: true},
+		),
 	}
+	if mergedText := pr.GetMergedText(); mergedText != "" {
+		elements = append(elements, slack.NewRichTextSectionTextElement(
+			" "+mergedText, &slack.RichTextSectionTextStyle{Italic: true},
+		))
+	}
+	elements = append(elements,
+		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
+		getUserNameElement(pr),
+	)
+	return slack.NewRichTextSection(append(elements, getReviewersElements(pr)...)...)
+}
 
-	return slack.NewRichTextSection(prItemElements...)
+func buildAgeElements(pr prview.PR) []slack.RichTextSectionElement {
+	if !pr.IsOldPR {
+		return []slack.RichTextSectionElement{
+			slack.NewRichTextSectionTextElement(
+				" "+pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Italic: true},
+			),
+		}
+	}
+	return []slack.RichTextSectionElement{
+		slack.NewRichTextSectionTextElement(" 🚨 ", &slack.RichTextSectionTextStyle{}),
+		slack.NewRichTextSectionTextElement(
+			pr.GetPRAgeDisplayText(), &slack.RichTextSectionTextStyle{Bold: true, Code: true},
+		),
+	}
 }
 
 func getUserNameElement(pr prview.PR) slack.RichTextSectionElement {

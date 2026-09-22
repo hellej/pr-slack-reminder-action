@@ -15,15 +15,15 @@ Enriches fetched PRs with display-ready metadata.
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
-- `IsMerged` and `IsClosedButNotMerged` expose PR state for display styling
+- `IsMerged` reports whether a PR was merged
+- `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`
 - `LastActivityAt` returns `UpdatedAt` as a pointer, nil when it's zero, the nil convention `SortPRsNewestFirst` expects for unknown activity
 - `GetNextAction()` says what a PR needs next, as the first of three ordered checks that matches: approved with nothing outstanding is `NextActionReadyToMerge`; an approval, a non-approving review or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording
 - The checks being ordered is what settles the overlaps: a reviewer who commented and then approved leaves the PR ready to merge, since the approval is read before the comment
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
 - `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor` and `HasNonApprovingReview` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
-- `GroupPRsByRepositories(prs)` buckets PRs into `[]RepositoryPRs`, ordered alphabetically by repository path; PRs keep their given order within a bucket. It carries no display text, so each renderer supplies its own headings and links
-- `GroupPRsByRepositoriesInGivenOrder(prs)` buckets the same way, but orders the buckets by each repository's first PR in the given list. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was
+- `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
 
 ## Doesn't Do
 

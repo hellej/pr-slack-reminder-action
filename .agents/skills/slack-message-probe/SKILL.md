@@ -1,5 +1,5 @@
 ---
-name: blockkit-probe
+name: slack-message-probe
 description: "Post a hand-written Slack Block Kit payload to the dev channel to see how a planned message renders, before any Go code exists. Use when: probing a message layout, checking block spacing or a heading level live, trying out a planned message shape, or iterating on Block Kit JSON."
 argument-hint: "Optional: what layout to probe, e.g. 'plan 007 four sections'"
 ---
@@ -24,13 +24,16 @@ that would build it is written.
 2. Copy the row formats from `cmd/pr-slack-reminder/testdata/snapshots/*.json`. Those are real
    payloads, so link, age, reviewer and author runs come out right without re-deriving them from
    `internal/messagebuilder`.
-3. Write the whole `chat.postMessage` body to `.local/<name>_payload.json`: `channel`, `text`,
-   `blocks`. `.local` is gitignored and survives the session, so the next round edits the file
-   instead of rebuilding it.
+3. Write the whole `chat.postMessage` body to
+   `.local/message-payloads/<NNN>_<name>_payload.json`: `channel`, `text`, `blocks`. `NNN` is the
+   next unused 3-digit number in the folder, so files keep sorting in creation order. `.local` is
+   gitignored and survives the session, so the next round edits the file instead of rebuilding it.
+   `.local/message-payloads/` keeps these apart from
+   [slack-canvas-probe](../slack-canvas-probe/SKILL.md)'s canvas markdown.
 4. Post it:
 
    ```
-   .agents/skills/blockkit-probe/send.sh .local/<name>_payload.json
+   .agents/skills/slack-message-probe/send.sh .local/message-payloads/<NNN>_<name>_payload.json
    ```
 
    The script reads `INPUT_SLACK_BOT_TOKEN` from `.envrc`, prints `ok` and `ts`, and records the
@@ -40,7 +43,7 @@ that would build it is written.
 6. Iterate: edit the payload, then edit the same message in place:
 
    ```
-   .agents/skills/blockkit-probe/send.sh .local/<name>_payload.json edit
+   .agents/skills/slack-message-probe/send.sh .local/message-payloads/<NNN>_<name>_payload.json edit
    ```
 
    `delete` removes it. Both read `<payload>.sent`, so the payload's `channel` can stay a name:
@@ -71,4 +74,4 @@ nothing.
 
 - Record what the probe settled in [docs/third-party-facts.md](../../../docs/third-party-facts.md),
   citing the probe: what rendered, what Slack rejected, what it silently dropped
-- Leave the payload in `.local/` for the next round
+- Leave the payload in `.local/message-payloads/` for the next round

@@ -60,6 +60,7 @@ Omit a heading's body and the heading itself if it has no genuine content — ne
 - Describe current state only — never proposed changes, TODOs, or "should" statements
 - Business logic over implementation: describe what the package's public interface does for a caller, not internal data flow, private helper names, or which library/pattern it's built with. Implementation detail is fair game only in Oddities, and only when it's needed to explain a surprising externally-visible effect
 - Don't restate what's already in the root `AGENTS.md` (pipeline order, architecture) — link there (`[AGENTS.md](../../AGENTS.md)`) instead
+- Describe what the package offers, not how other packages call it
 - Don't restate a concern owned by another package's spec — reference that package by path instead of duplicating
 - Any link to `AGENTS.md` or another spec file must be a relative path (e.g. `[internal/state](../../state/state.spec.md)`) — not absolute or bare — so it stays clickable when the file is viewed on GitHub
 - Base every bullet on the actual source in the directory, not on the package name or prior assumptions

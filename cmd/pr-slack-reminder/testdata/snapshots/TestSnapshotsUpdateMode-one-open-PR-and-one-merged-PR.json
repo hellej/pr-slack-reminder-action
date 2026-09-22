@@ -4,15 +4,15 @@
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "✅ Ready to merge",
+        "text": "👀 Waiting for review",
         "emoji": true
       },
-      "block_id": "heading_ready_to_merge",
+      "block_id": "heading_waiting_for_review",
       "level": 2
     },
     {
       "type": "rich_text",
-      "block_id": "section_ready_to_merge",
+      "block_id": "section_waiting_for_review",
       "elements": [
         {
           "type": "rich_text_list",
@@ -22,8 +22,8 @@
               "elements": [
                 {
                   "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/31",
-                  "text": "Refactor the review fetching",
+                  "url": "https://github.com/test-org/test-repo/pull/71",
+                  "text": "The only open PR",
                   "style": {
                     "bold": true
                   }
@@ -44,31 +44,6 @@
                   "type": "text",
                   "text": "Alice Anderson",
                   "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (✅ ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " / 💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Erin Evans",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
                 }
               ]
             }
@@ -84,15 +59,15 @@
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "👀 Waiting for review",
+        "text": "🚀 Recently merged",
         "emoji": true
       },
-      "block_id": "heading_waiting_for_review",
+      "block_id": "heading_merged",
       "level": 2
     },
     {
       "type": "rich_text",
-      "block_id": "section_waiting_for_review",
+      "block_id": "section_merged",
       "elements": [
         {
           "type": "rich_text_list",
@@ -102,15 +77,15 @@
               "elements": [
                 {
                   "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/32",
-                  "text": "PR whose only reviewer input is a timeline comment",
+                  "url": "https://github.com/test-org/test-repo/pull/72",
+                  "text": "The only merged PR",
                   "style": {
                     "bold": true
                   }
                 },
                 {
                   "type": "text",
-                  "text": " 6 hours ago",
+                  "text": " merged 5 hours ago",
                   "style": {
                     "italic": true
                   }
@@ -123,21 +98,6 @@
                 {
                   "type": "text",
                   "text": "Bob Brown",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Frank Foster",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
                   "style": {}
                 }
               ]

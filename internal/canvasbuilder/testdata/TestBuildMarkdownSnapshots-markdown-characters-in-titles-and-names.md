@@ -1,6 +1,6 @@
 ## 👀 Waiting for review
 
-### [test-org/repo\_two](https://github.com/test-org/repo_two/pulls)
+### [repo\_two](https://github.com/test-org/repo_two/pulls)
 
 - **[Fix \[ABC-123\] crash in \`make test\` \& \*\*WIP\*\* \_debug\_ \~legacy\~ C:\\path \<b\>](https://github.com/test-org/repo_two/pull/7)** _5 hours ago_ by Al\*ice\_And\[erson\] (💬 E\~rin \<Evans\>)
 

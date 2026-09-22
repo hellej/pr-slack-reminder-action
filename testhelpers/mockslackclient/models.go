@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 // A data model for Blocks that were sent to Slack API.
@@ -17,62 +19,44 @@ type PRList struct {
 	PRListItems []string
 }
 
+// Each bullet list becomes one PRList under the heading above it: the repository's sub-heading
+// when grouped by repository, the section's header block when not. A sub-heading keeps its
+// trailing ":".
 func (b BlocksWrapper) GetPRLists() []PRList {
 	prLists := []PRList{}
-
 	currentHeading := ""
 	for _, block := range b.Blocks {
-		if block.IsHeading() {
-			var richTextSections []RichTextSection
-			err := json.Unmarshal(block.Elements, &richTextSections)
-			if err != nil {
-				panic(fmt.Sprintf("Unexpected rich_text section array type: %v", err))
-			}
-			if len(richTextSections) > 0 {
-				headingText := ""
-				for _, element := range richTextSections[0].Elements {
-					if element.Text != "" {
-						headingText += element.Text
-					}
-				}
-				currentHeading = headingText
-			}
+		if block.Type == "header" && block.Text != nil {
+			currentHeading = block.Text.Text
+			continue
 		}
-		var prList PRList
-		if currentHeading != "" && block.IsPRItem() {
-			prList.Heading = currentHeading
-			var richTextLists []RichTextList // we're expecting an array of one
-			err := json.Unmarshal(block.Elements, &richTextLists)
-			if err != nil {
-				panic(fmt.Sprintf("Unexpected rich_text list array type: %v", err))
-			}
-			if len(richTextLists) != 1 {
-				panic(fmt.Sprintf("Expected exactly one rich_text list, got %d", len(richTextLists)))
-			}
-			listItemsElements := richTextLists[0].Elements
-			for _, section := range listItemsElements {
-				prText := ""
-				for _, element := range section.Elements {
-					if element.Text != "" {
-						text := element.Text
-						if element.Style != nil && element.Style.Strike {
-							text = "~" + text + "~"
-						}
-						prText += text
-					}
-					if element.UserID != "" {
-						prText += element.UserID
-					}
-				}
-				prList.PRListItems = append(prList.PRListItems, prText)
-			}
-
+		if !block.holdsPRRows() {
+			continue
 		}
-		if prList.Heading != "" || len(prList.PRListItems) > 0 {
-			prLists = append(prLists, prList)
+		for _, element := range block.richTextElements() {
+			if element.Type == "rich_text_section" {
+				currentHeading = concatenatedText(element.textRuns())
+				continue
+			}
+			prLists = append(prLists, PRList{
+				Heading:     currentHeading,
+				PRListItems: utilities.Map(element.listItems(), listItemText),
+			})
 		}
 	}
 	return prLists
+}
+
+func listItemText(listItem RichTextElement) string {
+	return concatenatedText(listItem.textRuns())
+}
+
+func concatenatedText(elements []Element) string {
+	text := ""
+	for _, element := range elements {
+		text += element.Text + element.UserID
+	}
+	return text
 }
 
 func (b BlocksWrapper) GetAllPRItemTexts() []string {
@@ -117,33 +101,48 @@ func (b BlocksWrapper) GetPRCount() int {
 type Block struct {
 	Type     string          `json:"type"`
 	BlockID  string          `json:"block_id,omitempty"`
+	Text     *Element        `json:"text,omitempty"`     // Set on a header block only
 	Elements json.RawMessage `json:"elements,omitempty"` // We'll unmarshal this based on Type
 }
 
-func (b Block) IsHeading() bool {
-	return b.Type == "rich_text" && (strings.HasPrefix(b.BlockID, "pr_list_heading"))
+func (b Block) holdsPRRows() bool {
+	return b.Type == "rich_text" && strings.HasPrefix(b.BlockID, "section_")
 }
 
-func (b Block) IsPRItem() bool {
-	return strings.HasPrefix(b.BlockID, "open_prs")
+func (b Block) richTextElements() []RichTextElement {
+	var elements []RichTextElement
+	if err := json.Unmarshal(b.Elements, &elements); err != nil {
+		panic(fmt.Sprintf("Unexpected rich_text element array type: %v", err))
+	}
+	return elements
 }
 
-type RichTextList struct {
-	Elements []RichTextSection `json:"elements"`
+// Both a rich_text_section and a rich_text_list carry an "elements" array, holding text runs
+// for the section and list item sections for the list.
+type RichTextElement struct {
+	Type     string          `json:"type"`
+	Elements json.RawMessage `json:"elements"`
 }
 
-type RichTextSection struct {
-	Elements []Element `json:"elements"`
+func (e RichTextElement) textRuns() []Element {
+	var runs []Element
+	if err := json.Unmarshal(e.Elements, &runs); err != nil {
+		panic(fmt.Sprintf("Unexpected rich_text_section element array type: %v", err))
+	}
+	return runs
+}
+
+func (e RichTextElement) listItems() []RichTextElement {
+	var items []RichTextElement
+	if err := json.Unmarshal(e.Elements, &items); err != nil {
+		panic(fmt.Sprintf("Unexpected rich_text_list element array type: %v", err))
+	}
+	return items
 }
 
 type Element struct {
-	Text   string        `json:"text,omitempty"`
-	UserID string        `json:"user_id,omitempty"`
-	Style  *ElementStyle `json:"style,omitempty"`
-}
-
-type ElementStyle struct {
-	Strike bool `json:"strike,omitempty"`
+	Text   string `json:"text,omitempty"`
+	UserID string `json:"user_id,omitempty"`
 }
 
 func parseBlocks(data []byte) (BlocksWrapper, error) {

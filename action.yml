@@ -53,14 +53,10 @@ inputs: {
     description: 'Mapping of GitHub usernames to Slack user IDs (e.g., "alice: U08RWPGNCUX\\nbob: U08RWPGNWER")',
     required: false,
   },
-  pr-list-heading: {
-    description: 'Main heading of the message to send (`<pr_count>` gets replaced)',
-    required: false,
-    default: 'There are <pr_count> open PRs 👀',
-  },
   no-prs-message: {
-    description: 'Message to send when there are no open PRs',
+    description: 'Text to show in the message when there are no open PRs',
     required: false,
+    default: 'No open PRs - happy coding! 🎉',
   },
   old-pr-threshold-hours: {
     description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text)',
@@ -68,7 +64,7 @@ inputs: {
     default: '96',
   },
   group-by-repository: {
-    description: 'Group PRs by repository with repository headings. When enabled, pr-list-heading is ignored.',
+    description: 'Group PRs by repository with repository sub-headings.',
     required: false,
     default: 'false',
   },

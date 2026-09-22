@@ -170,8 +170,8 @@ func (c *client) FindOpenPRs(
 }
 
 // Returns the PRs merged since the given moment, newest merge first. The window is a parameter
-// rather than a clock read, so the canvas footer and the merged list share one "now". The PRs
-// carry no reviewers and no snooze: a merged row names neither.
+// rather than a clock read, so the canvas footer and the merged list share one "now". The capped
+// PRs are enriched with their reviewers; a failed enrichment is logged and leaves them without.
 func (c *client) FindRecentlyMergedPRs(
 	ctx context.Context,
 	repositories []models.Repository,
@@ -193,7 +193,12 @@ func (c *client) FindRecentlyMergedPRs(
 	mergedPRs = capMergedPRResultsToLimit(sortByMergeTimeNewestFirst(mergedPRs))
 	logFoundMergedPRs(mergedPRs)
 
-	return utilities.Map(mergedPRs, mergedPR), nil
+	enrichedPRs, err := c.enrichPRsWithReviewInfo(ctx, mergedPRs)
+	if err != nil {
+		log.Printf("Unable to fetch reviewers for the merged pull requests: %v", err)
+		return utilities.Map(mergedPRs, prWithoutReviewers), nil
+	}
+	return enrichedPRs, nil
 }
 
 func isMergedSince(mergedSince time.Time) func(result PRResult) bool {
@@ -230,7 +235,7 @@ func logFoundMergedPRs(mergedPRs []PRResult) {
 	}
 }
 
-func mergedPR(result PRResult) PR {
+func prWithoutReviewers(result PRResult) PR {
 	return PR{PullRequest: result.pr, Repository: result.repository}
 }
 
@@ -258,7 +263,7 @@ func (c *client) GetPRs(
 	prs = capPRsToLimit(prs)
 	logFoundPRs(prs, false)
 
-	return excludeSnoozedPRs(prs), nil
+	return prs, nil
 }
 
 func getPRFilterFunc[T repositoryPullRequest](

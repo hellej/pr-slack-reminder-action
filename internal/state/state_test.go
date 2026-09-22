@@ -161,8 +161,8 @@ func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
 	filePath := filepath.Join(tempDir, "sent-blocks.json")
 
 	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"pr_list_heading","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"There are 2 open PRs 🚀","style":{"bold":true}}]}]}`,
-		`{"type":"rich_text","block_id":"open_prs","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
+		`{"type":"rich_text","block_id":"no_open_prs","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"No open PRs, happy coding! 🎉"}]}]}`,
+		`{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
 	}
 
 	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
@@ -195,8 +195,8 @@ func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
 		if savedBlocks[0]["type"] != "rich_text" {
 			t.Errorf("Expected first block type to be 'rich_text', got %v", savedBlocks[0]["type"])
 		}
-		if savedBlocks[0]["block_id"] != "pr_list_heading" {
-			t.Errorf("Expected first block_id to be 'pr_list_heading', got %v", savedBlocks[0]["block_id"])
+		if savedBlocks[0]["block_id"] != "no_open_prs" {
+			t.Errorf("Expected first block_id to be 'no_open_prs', got %v", savedBlocks[0]["block_id"])
 		}
 	}
 }

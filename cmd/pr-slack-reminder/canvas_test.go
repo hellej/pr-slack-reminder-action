@@ -117,19 +117,19 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			if !canvasFooterLine.MatchString(markdown) {
 				t.Errorf("Expected an updated-at footer line on the canvas, got:\n%s", markdown)
 			}
-			if tc.groupByRepository && !strings.Contains(markdown, "### [test-org/test-repo]") {
+			if tc.groupByRepository && !strings.Contains(markdown, "### [test-repo](https://github.com/test-org/test-repo/pulls)") {
 				t.Errorf("Expected a repository sub-heading on the canvas, got:\n%s", markdown)
 			}
 
 			if mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Draft PR one") {
 				t.Error("Expected the draft PR to be left out of the reminder message")
 			}
-			if mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Merged PR two") {
-				t.Error("Expected a merged PR to be left out of the reminder message")
+			if !mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Merged PR two") {
+				t.Error("Expected the merged PR in the reminder message too")
 			}
-			if mockSlackAPI.SentMessage.Blocks.GetPRCount() != 2 {
+			if mockSlackAPI.SentMessage.Blocks.GetPRCount() != 4 {
 				t.Errorf(
-					"Expected 2 PRs in the reminder message, got %d",
+					"Expected 2 open and 2 merged PRs in the reminder message, got %d",
 					mockSlackAPI.SentMessage.Blocks.GetPRCount(),
 				)
 			}
@@ -215,47 +215,66 @@ func TestPostModeCanvasIsNotRefreshedWhenFetchFails(t *testing.T) {
 	if !strings.Contains(err.Error(), "error fetching pull requests") {
 		t.Errorf("Expected the fetch error to be reported, got: %v", err)
 	}
-	// The canvas refresh retries the fetch and fails on it too, so it reports its own failure.
-	if !strings.Contains(err.Error(), "PR tracker canvas refresh failed") {
-		t.Errorf("Expected the canvas failure to be reported, got: %v", err)
+	if mockSlackAPI.SentMessage.ChannelID != "" {
+		t.Error("Expected no message to be sent when the PR fetch failed")
 	}
 }
 
-// Update mode's canvas fetch is its own attempt: it can fail while the state-tracked message
-// update succeeds, and a failed fetch must never wipe the canvas.
-func TestUpdateModeCanvasIsNotRefreshedWhenFetchFails(t *testing.T) {
-	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
-		config.InputRunMode:             config.RunModeUpdate,
-		config.InputPRTrackerCanvasLink: testCanvasLink,
-	})
-
-	trackedPR := getTestPR(GetTestPROptions{Number: 1, Title: "Tracked open PR", AuthorLogin: "alice"})
-	mockState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
-
-	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
-	err := main.Run(
-		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRsByNumber:            map[int]*github.PullRequest{1: trackedPR},
-			PRs:                    []*github.PullRequest{trackedPR},
-			MockStateForUpdateMode: &mockState,
-			// Only the open PR listing fails, so the message update still goes through.
-			ListPRsResponseStatus: 500,
-			PRServiceError:        errors.New("unable to fetch PRs"),
-		}),
-		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
-	)
-
-	if err == nil {
-		t.Fatal("Expected Run to fail when the canvas PR fetch fails")
+// Both surfaces are rendered off the one open PR fetch, so a failed fetch ends the run before
+// either is touched. Editing or deleting a message the run cannot rebuild is worse than leaving
+// yesterday's standing.
+func TestUpdateModeOpenPRFetchFailureStopsTheRun(t *testing.T) {
+	testCases := []struct {
+		name       string
+		canvasLink string
+	}{
+		{name: "canvas enabled", canvasLink: testCanvasLink},
+		{name: "canvas disabled"},
 	}
-	if !strings.Contains(err.Error(), "canvas") {
-		t.Errorf("Expected the error to name the canvas, got: %v", err)
-	}
-	if mockSlackAPI.ReplacedCanvas.Called {
-		t.Error("Expected the canvas not to be refreshed when the canvas PR fetch failed")
-	}
-	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Tracked open PR") {
-		t.Error("Expected the reminder message to be updated anyway")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+				config.InputRunMode:             config.RunModeUpdate,
+				config.InputPRTrackerCanvasLink: tc.canvasLink,
+				config.EnvStateFilePath:         stateFilePath,
+			})
+
+			trackedPR := getTestPR(GetTestPROptions{Number: 1, Title: "Tracked open PR", AuthorLogin: "alice"})
+			mockState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRsByNumber:            map[int]*github.PullRequest{1: trackedPR},
+					PRs:                    []*github.PullRequest{trackedPR},
+					MockStateForUpdateMode: &mockState,
+					ListPRsResponseStatus:  500,
+					PRServiceError:         errors.New("unable to fetch PRs"),
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			)
+
+			if err == nil {
+				t.Fatal("Expected Run to fail when the open PR fetch fails")
+			}
+			if !strings.Contains(err.Error(), "error fetching pull requests") {
+				t.Errorf("Expected the fetch error to be reported, got: %v", err)
+			}
+			if mockSlackAPI.ReplacedCanvas.Called {
+				t.Error("Expected no canvas write when the open PR fetch failed")
+			}
+			if mockSlackAPI.UpdatedMessage.ChannelID != "" {
+				t.Error("Expected the Slack message not to be updated when the open PR fetch failed")
+			}
+			if mockSlackAPI.DeletedMessage.ChannelID != "" {
+				t.Error("Expected the Slack message not to be deleted when the open PR fetch failed")
+			}
+			if _, statErr := os.Stat(stateFilePath); !os.IsNotExist(statErr) {
+				t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+			}
+		})
 	}
 }
 
@@ -305,8 +324,8 @@ func TestCanvasIsNotRefreshedWhenLinkIsUnset(t *testing.T) {
 	}
 }
 
-// Update mode's message is state-tracked while its canvas shows what is open right now,
-// so the two fetches carry deliberately different PRs here.
+// Both surfaces read the open fetch, and only the canvas shows drafts, so the two carry
+// deliberately different PRs here.
 func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
 		config.InputRunMode:             config.RunModeUpdate,
@@ -351,11 +370,14 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	if !updatedMessage.SomePRItemContainsText("Tracked merged PR") {
 		t.Error("Expected the state-tracked merged PR in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Untracked open PR") {
-		t.Error("Expected an open PR that is not in state to stay out of the updated message")
+	if !updatedMessage.SomePRItemContainsText("Untracked open PR") {
+		t.Error("Expected an open PR that is not in state in the updated message")
 	}
-	if updatedMessage.SomePRItemContainsText("Merged PR one") {
-		t.Error("Expected a searched merged PR to stay out of the updated message")
+	if !updatedMessage.SomePRItemContainsText("Merged PR one") {
+		t.Error("Expected a searched merged PR in the updated message")
+	}
+	if updatedMessage.SomePRItemContainsText("Untracked draft PR") {
+		t.Error("Expected a draft PR to stay out of the updated message")
 	}
 }
 
@@ -742,63 +764,46 @@ func TestUpdateModeWritesTheCanvasWhenTheSeededHashDoesNotMatch(t *testing.T) {
 }
 
 // Dropping the hash on a run that wrote nothing would make the next run rewrite the canvas.
+// A run with the canvas disabled is such a run: it writes nothing and carries the seeded hash.
 func TestUpdateModeCarriesTheSeededHashWhenNothingIsWritten(t *testing.T) {
 	prs := canvasTestPRs()
 	seedState := runPostModeAndLoadSavedState(t, prs)
 
-	testCases := []struct {
-		name           string
-		canvasLink     string
-		prFetchStatus  int
-		prServiceError error
-	}{
-		{name: "the canvas is disabled"},
-		{
-			name:           "the canvas PR fetch fails",
-			canvasLink:     testCanvasLink,
-			prFetchStatus:  500,
-			prServiceError: errors.New("unable to fetch PRs"),
-		},
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:             config.RunModeUpdate,
+		config.InputPRTrackerCanvasLink: "",
+		config.EnvStateFilePath:         stateFilePath,
+	})
+
+	seedStateForRun := seedState
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                    prs,
+			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:              canvasTestMergedPRs(),
+			MockStateForUpdateMode: &seedStateForRun,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			stateFilePath := filepath.Join(t.TempDir(), stateFileName)
-			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
-				config.InputRunMode:             config.RunModeUpdate,
-				config.InputPRTrackerCanvasLink: tc.canvasLink,
-				config.EnvStateFilePath:         stateFilePath,
-			})
-			seedStateForRun := seedState
-
-			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
-			// The fetch-failure case fails the run, and saves state either way.
-			_ = main.Run(
-				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRs:                    prs,
-					PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
-					MergedPRs:              canvasTestMergedPRs(),
-					MockStateForUpdateMode: &seedStateForRun,
-					ListPRsResponseStatus:  tc.prFetchStatus,
-					PRServiceError:         tc.prServiceError,
-				}),
-				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
-			)
-
-			if mockSlackAPI.ReplacedCanvas.Called {
-				t.Error("Expected no canvas write")
-			}
-			var savedState state.State
-			if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
-				t.Fatalf("Failed to load the saved state file: %v", loadErr)
-			}
-			if savedState.CanvasContentHash != seedState.CanvasContentHash {
-				t.Errorf(
-					"Expected the saved hash to stay the seeded %s, got %s",
-					seedState.CanvasContentHash, savedState.CanvasContentHash,
-				)
-			}
-		})
+	if mockSlackAPI.ReplacedCanvas.Called {
+		t.Error("Expected no canvas write")
+	}
+	var savedState state.State
+	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
+		t.Fatalf("Failed to load the saved state file: %v", loadErr)
+	}
+	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+		t.Errorf(
+			"Expected the saved hash to stay the seeded %s, got %s",
+			seedState.CanvasContentHash, savedState.CanvasContentHash,
+		)
 	}
 }
 
@@ -895,5 +900,36 @@ func TestCanvasDoesNotChangeMessageBlocks(t *testing.T) {
 				index, blockWithoutCanvas, blocksWithCanvas[index],
 			)
 		}
+	}
+}
+
+// The merged PRs are fetched whatever the canvas setting is, and with no canvas to write they
+// reach nothing this run renders. A failed search is therefore logged and left at that.
+func TestMergedPRFetchFailureDoesNotFailACanvasDisabledRun(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), nil)
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                  canvasTestPRs(),
+			MergedPRs:            canvasTestMergedPRs(),
+			MergedPRsSearchError: errors.New("unable to search merged PRs"),
+			Recording:            &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	if recording.MergedPRFetches == 0 {
+		t.Error("Expected the merged PRs to be searched with the canvas disabled")
+	}
+	if mockSlackAPI.SentMessage.Blocks.GetPRCount() != 2 {
+		t.Errorf(
+			"Expected the reminder message to be sent anyway, got %d PRs in it",
+			mockSlackAPI.SentMessage.Blocks.GetPRCount(),
+		)
 	}
 }
