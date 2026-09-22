@@ -114,10 +114,6 @@ Setup where the latest message is also updated when PRs get reviewed/merged.
 An updated message lists the PRs that are open at that moment, including ones opened after the original message.
 PRs that merged since the original message move to the recently merged section.
 
-**Example:**
-
-<img src="docs/examples/example_2.png" alt="Example Slack message" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
-
 ```yaml
 name: PR Reminder
 

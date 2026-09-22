@@ -387,11 +387,14 @@ Touches `cmd/pr-slack-reminder/run.go`, `action.yml`, `README.md`, `docs/example
   setting. That is the section showing the message's layout
 - README pins `hellej/pr-slack-reminder-action@v1` in 4 usage examples, already stale at v2. Bump
   them to `@v3`
-- Both README screenshots show the old layout: `docs/examples/example_1.png` under § **Example
-  Output** and `docs/examples/example_2.png` under § **3. Update Mode Enabled**. Re-take both:
-  run `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, then
-  the same with `-f run-mode=update`, against the dev channel, and screenshot each message. Done
-  means both images show the four sections and the footer
+- `docs/examples/example_1.png` under § **Example Output** shows the old layout. Re-take it: run
+  `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` against the
+  dev channel and screenshot the message. Done means the image shows the four sections and the
+  footer
+- `docs/examples/example_2.png` under § **3. Update Mode Enabled** is dropped, along with its
+  `<img>` tag. Post and update mode now render the same block structure (headers, sections,
+  footer); only which PRs land in which section differs, which the section's prose already covers.
+  A second screenshot no longer earns its place
 
 ## 5. Merged PRs carry their reviewers, on both surfaces
 
