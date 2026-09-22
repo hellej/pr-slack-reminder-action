@@ -51,14 +51,7 @@ func (c Content) HasPRs() bool {
 		c.WaitingForReview.HasPRs() || c.Merged.HasPRs()
 }
 
-// GetContent splits the open PRs into the three next-action sections, oldest first, and takes
-// the merged section from the tracked PRs that have since merged, every PR merged since the post,
-// and the newest untracked merges from before it. Each section is bucketed by repository when
-// configured, in that same order.
-//
-// openPRs are open right now and already draft-filtered by the caller. trackedPRs are the PRs
-// the message was posted with, as re-fetched, in whatever state they are now: only the merged
-// ones are read. A zero messagePostedAt means no message is posted yet.
+// See messagecontent.spec.md for this function's full behaviour.
 func GetContent(
 	openPRs []prview.PR,
 	trackedPRs []prview.PR,
@@ -95,9 +88,7 @@ func GetContent(
 	return content
 }
 
-// The tracked merges and those since the post are kept whole, and the cap applies to the
-// fetch's merges from before the post alone. Sorting the fetch before capping keeps the 3 newest
-// of it from resting on another package's ordering.
+// Sorting the fetch before capping keeps the cap from resting on another package's ordering.
 func selectMergedPRsToShow(
 	trackedPRs []prview.PR,
 	recentlyMergedPRs []prview.PR,
