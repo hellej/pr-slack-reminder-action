@@ -275,11 +275,11 @@ func groupedOverTwoRepositories() messagecontent.PRSection {
 	return messagecontent.PRSection{
 		Groups: []messagecontent.PRsOfRepository{
 			{
-				RepositoryPath: "owner/repo-one",
+				RepositoryName: "repo-one",
 				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
 			},
 			{
-				RepositoryPath: "owner/repo-two",
+				RepositoryName: "repo-two",
 				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
 			},
 		},
@@ -307,9 +307,9 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 	if sectionHeading.Level != 2 {
 		t.Errorf("expected the section heading at level 2, got level %d", sectionHeading.Level)
 	}
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "owner/repo-one")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one")
 	assertSpacingBlock(t, message.Blocks.BlockSet[2])
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "owner/repo-two")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two")
 	if title := firstRowTitle(t, message.Blocks.BlockSet[1]); title != "PR in repo one" {
 		t.Errorf("expected the first repository's row under its own sub-heading, got %q", title)
 	}
@@ -323,7 +323,7 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 		GroupedByRepository: true,
 		WaitingForReview: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
-				RepositoryPath: "owner/repo-one",
+				RepositoryName: "repo-one",
 				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
 			}},
 		},
@@ -355,7 +355,7 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		GroupedByRepository: true,
 		ReadyToMerge: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
-				RepositoryPath: "owner/ready-repo",
+				RepositoryName: "ready-repo",
 				PRs:            []prview.PR{testPR(testPROptions{title: "Ready PR"})},
 			}},
 		},
@@ -372,9 +372,9 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		"section_waiting_for_review_repository_2",
 		"context",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "owner/ready-repo")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "owner/repo-one")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "owner/repo-two")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "repo-two")
 	expectedRowTitles := map[int]string{1: "Ready PR", 3: "PR in repo one", 5: "PR in repo two"}
 	for blockIndex, expectedTitle := range expectedRowTitles {
 		if title := firstRowTitle(t, message.Blocks.BlockSet[blockIndex]); title != expectedTitle {

@@ -122,7 +122,7 @@ func renderSectionBlocks(section section) []string {
 
 func renderRepositoryGroup(group prview.RepositoryPRs, section section) string {
 	heading := fmt.Sprintf(
-		"### [%s](%s)", escapeMarkdown(group.Repository.GetPath()), group.Repository.GetPullsURL(),
+		"### [%s](%s)", escapeMarkdown(group.Repository.Name), group.Repository.GetPullsURL(),
 	)
 	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
 }

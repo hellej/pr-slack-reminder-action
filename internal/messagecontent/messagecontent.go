@@ -32,7 +32,7 @@ func (section PRSection) HasPRs() bool {
 }
 
 type PRsOfRepository struct {
-	RepositoryPath string
+	RepositoryName string
 	PRs            []prview.PR
 }
 
@@ -145,7 +145,7 @@ func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
 			prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs),
 			func(group prview.RepositoryPRs) PRsOfRepository {
 				return PRsOfRepository{
-					RepositoryPath: group.Repository.GetPath(),
+					RepositoryName: group.Repository.Name,
 					PRs:            group.PRs,
 				}
 			},

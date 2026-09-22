@@ -109,9 +109,9 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 	assertEqual(
 		t, "grouped repositories",
 		utilities.Map(waitingForReview.Groups, func(group PRsOfRepository) string {
-			return group.RepositoryPath
+			return group.RepositoryName
 		}),
-		[]string{"test-org/zebra", "test-org/alpha"},
+		[]string{"zebra", "alpha"},
 	)
 	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].PRs), []int{1, 3})
 }

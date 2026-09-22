@@ -106,7 +106,7 @@ func buildRepositoryBlock(
 ) slack.Block {
 	subHeading := slack.NewRichTextSection(
 		slack.NewRichTextSectionTextElement(
-			group.RepositoryPath, &slack.RichTextSectionTextStyle{Bold: true},
+			group.RepositoryName, &slack.RichTextSectionTextStyle{Bold: true},
 		),
 		slack.NewRichTextSectionTextElement(":", &slack.RichTextSectionTextStyle{Bold: true}),
 	)

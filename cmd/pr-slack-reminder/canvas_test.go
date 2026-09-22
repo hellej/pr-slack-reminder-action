@@ -117,7 +117,7 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 			if !canvasFooterLine.MatchString(markdown) {
 				t.Errorf("Expected an updated-at footer line on the canvas, got:\n%s", markdown)
 			}
-			if tc.groupByRepository && !strings.Contains(markdown, "### [test-org/test-repo]") {
+			if tc.groupByRepository && !strings.Contains(markdown, "### [test-repo](https://github.com/test-org/test-repo/pulls)") {
 				t.Errorf("Expected a repository sub-heading on the canvas, got:\n%s", markdown)
 			}
 

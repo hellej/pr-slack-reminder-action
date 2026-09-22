@@ -120,6 +120,7 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 	repoA := models.Repository{Owner: "org", Name: "alpha"}
 	repoB := models.Repository{Owner: "org", Name: "beta"}
 	repoC := models.Repository{Owner: "another-org", Name: "gamma"}
+	repoD := models.Repository{Owner: "another-org", Name: "alpha"}
 
 	tests := []struct {
 		name                string
@@ -159,6 +160,20 @@ func TestGroupPRsByRepositoriesInGivenOrder(t *testing.T) {
 				"org/beta":          {4, 1},
 				"another-org/gamma": {2},
 				"org/alpha":         {3},
+			},
+		},
+		{
+			// repoD shares its Name with repoA but not its Owner, so grouping by GetPath()
+			// alone tells them apart; grouping by Name would merge them into one bucket.
+			name: "same repository name under different owners stays in separate groups",
+			prs: []prview.PR{
+				testPRInRepository(1, repoA),
+				testPRInRepository(2, repoD),
+			},
+			expectedRepos: []models.Repository{repoA, repoD},
+			expectedPRNumbersBy: map[string][]int{
+				"org/alpha":         {1},
+				"another-org/alpha": {2},
 			},
 		},
 	}

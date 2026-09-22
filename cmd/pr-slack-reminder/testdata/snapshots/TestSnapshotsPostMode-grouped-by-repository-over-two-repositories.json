@@ -19,7 +19,7 @@
           "elements": [
             {
               "type": "text",
-              "text": "test-org/repo-two",
+              "text": "repo-two",
               "style": {
                 "bold": true
               }
@@ -120,7 +120,7 @@
           "elements": [
             {
               "type": "text",
-              "text": "test-org/repo-one",
+              "text": "repo-one",
               "style": {
                 "bold": true
               }
