@@ -98,6 +98,12 @@ func (pr PR) IsMerged() bool {
 	return pr.GetMerged()
 }
 
+// GetPullRequestRef is the key that identifies this PR across fetches, independent of its
+// current state (open, merged, or gone from a later fetch entirely).
+func (pr PR) GetPullRequestRef() models.PullRequestRef {
+	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
+}
+
 func BuildPRViews(prs []githubclient.PR, config config.ContentInputs) []PR {
 	return utilities.Map(prs, func(pr githubclient.PR) PR {
 		return buildPRView(pr, config)

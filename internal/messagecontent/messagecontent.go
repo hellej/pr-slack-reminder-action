@@ -100,10 +100,10 @@ func GetContent(
 // another package's ordering.
 func selectMergedPRsToShow(trackedPRs []prview.PR, recentlyMergedPRs []prview.PR) []prview.PR {
 	trackedMergedPRs := utilities.Filter(trackedPRs, prview.PR.IsMerged)
-	isTracked := trackedRefs(trackedMergedPRs)
+	isTrackedByPRRef := getIsTrackedByPRRefMap(trackedMergedPRs)
 	untrackedMergedPRs := utilities.Filter(
 		sortByMergeTimeNewestFirst(recentlyMergedPRs),
-		func(pr prview.PR) bool { return !isTracked[refOf(pr)] },
+		func(pr prview.PR) bool { return !isTrackedByPRRef[pr.GetPullRequestRef()] },
 	)
 	if len(untrackedMergedPRs) > MaxUntrackedMergedPRs {
 		untrackedMergedPRs = untrackedMergedPRs[:MaxUntrackedMergedPRs]
@@ -115,16 +115,12 @@ func sortByMergeTimeNewestFirst(prs []prview.PR) []prview.PR {
 	return prview.SortPRsNewestFirst(prs, func(pr prview.PR) *time.Time { return pr.GetMergedAt() })
 }
 
-func trackedRefs(trackedPRs []prview.PR) map[models.PullRequestRef]bool {
-	refs := make(map[models.PullRequestRef]bool, len(trackedPRs))
+func getIsTrackedByPRRefMap(trackedPRs []prview.PR) map[models.PullRequestRef]bool {
+	isTrackedByPRRef := make(map[models.PullRequestRef]bool, len(trackedPRs))
 	for _, pr := range trackedPRs {
-		refs[refOf(pr)] = true
+		isTrackedByPRRef[pr.GetPullRequestRef()] = true
 	}
-	return refs
-}
-
-func refOf(pr prview.PR) models.PullRequestRef {
-	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
+	return isTrackedByPRRef
 }
 
 func prsWhoseNextActionIs(

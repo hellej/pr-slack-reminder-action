@@ -117,6 +117,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
 - **Keep exported type names exported:** Don't unexport a type just to shrink a package's API surface. Unexporting renames it, and lowercase type names read worse here. Funcs and consts are fine to unexport.
+- **Name a map `<value>By<key>`:** e.g. `isTrackedByPRRef` for a `map[PullRequestRef]bool`.
 
 ## Testing
 

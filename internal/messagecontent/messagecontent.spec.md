@@ -8,7 +8,7 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 - `openPRs` are open right now and already draft-filtered by the caller; `trackedPRs` are the PRs the message was posted with, as re-fetched, in whatever state they are now
 - Open sections: `openPRs` sorted oldest to newest, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
 - Merged section: every `trackedPRs` entry that has since merged, however long ago, plus the newest `MaxUntrackedMergedPRs` (3) entries of `recentlyMergedPRs` that aren't already among them, the whole result ordered newest merge first. The fetch's half is sorted before it is capped, so the 3 kept are the 3 newest whatever order the fetch arrived in
-- A tracked PR is recognised by its `models.PullRequestRef`, built here rather than through `state`
+- A tracked PR is recognised by its `models.PullRequestRef`, from `prview.PR.GetPullRequestRef()` rather than through `state`
 - Closed-but-not-merged `trackedPRs` reach no section
 - Each section is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order. This package adds each bucket's repository name, without its owner and with no link
 - `SummaryText`, Slack's plain-text fallback, reports the open PR count (singular phrasing for exactly 1), or is `"Nothing waiting for review 🎉"` when no open PR is listed. It is never empty
