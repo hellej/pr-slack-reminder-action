@@ -138,9 +138,12 @@ func TestGetContentMergesTrackedPRsWithTheNewestUntrackedOnes(t *testing.T) {
 }
 
 // Four untracked PRs merged since the post, one more than the cap, and the oldest of them would
-// be the one dropped. Before the post, only the newest 3 are kept.
+// be the one dropped. Before the post, only the newest 3 are kept, and the PR with no merge time
+// counts among them, sorted last. The tracked PR merged since the post is in the fetch too, and
+// shows once.
 func TestGetContentShowsEveryPRMergedSinceThePost(t *testing.T) {
 	messagePostedAt := *hoursBefore(10)
+	trackedMergedSincePost := testPR(testPROptions{number: 9, mergedAt: hoursBefore(2)})
 	recentlyMergedPRs := []prview.PR{
 		testPR(testPROptions{number: 1, mergedAt: hoursBefore(9)}),
 		testPR(testPROptions{number: 2, mergedAt: hoursBefore(7)}),
@@ -150,11 +153,16 @@ func TestGetContentShowsEveryPRMergedSinceThePost(t *testing.T) {
 		testPR(testPROptions{number: 6, mergedAt: hoursBefore(20)}),
 		testPR(testPROptions{number: 7, mergedAt: hoursBefore(40)}),
 		testPR(testPROptions{number: 8, mergedAt: hoursBefore(50)}),
+		testPR(testPROptions{number: 10}),
+		trackedMergedSincePost,
 	}
 
-	content := GetContent(nil, nil, recentlyMergedPRs, messagePostedAt, generatedAt, config.ContentInputs{})
+	content := GetContent(
+		nil, []prview.PR{trackedMergedSincePost}, recentlyMergedPRs, messagePostedAt, generatedAt,
+		config.ContentInputs{},
+	)
 
-	assertEqual(t, "merged", prNumbers(content.Merged.PRs), []int{4, 3, 2, 1, 6, 5, 7})
+	assertEqual(t, "merged", prNumbers(content.Merged.PRs), []int{9, 4, 3, 2, 1, 6, 5, 7})
 }
 
 func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {

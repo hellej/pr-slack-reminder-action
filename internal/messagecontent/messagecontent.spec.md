@@ -24,7 +24,6 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 
 - Doesn't filter `openPRs` at all: everything in that list is open and reaches a section
 - Doesn't read `trackedPRs` for anything but their merged state
-- Doesn't cap the tracked merges or those since the post, only the untracked ones from before it
 
 ## Oddities
 
