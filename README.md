@@ -8,6 +8,13 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 <img src="docs/examples/example_1.png" alt="Example Slack message" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
+<details>
+<summary>Grouped by repository</summary>
+
+<img src="docs/examples/example_1_grouped.png" alt="Example Slack message grouped by repository" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
+
+</details>
+
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
@@ -191,32 +198,7 @@ Both `filters` and `repository-filters` support:
 
 Optional: keep a Slack canvas updated with a live view of open, draft and recently merged PRs across all monitored repositories. The canvas is filtered by the same inputs as the scheduled reminder message. Every run rewrites it.
 
-```markdown
-## ✅ Ready to merge
-
-- **[Add wrong-lever trapdoor escape room booking](https://github.com/kuzcotopia/kuzcotopia-ios/pull/41)** _4 hours ago_ by Kuzco (✅ Pacha / 💬 Kronk)
-
-## 💬 Waiting for author
-
-- **[Fix potion inventory going negative](https://github.com/kuzcotopia/kuzcotopia-api/pull/18)** 🚨 `9 days old` by Yzma (💬 Pacha)
-
-## 👀 Waiting for review
-
-- **[Bump SwiftLint to 0.55](https://github.com/kuzcotopia/kuzcotopia-ios/pull/44)** _20 minutes ago_ by Bucky
-
-## 🔧 WIP
-
-- **[Spike: llama-safe zip line queue](https://github.com/kuzcotopia/kuzcotopia-ios/pull/40)** by Kronk `updated 2 hours ago`
-
-## 🚀 Merged
-
-- **[Add village relocation compensation tracker](https://github.com/kuzcotopia/kuzcotopia-api/pull/33)** _merged 6 hours ago_ by Chicha (✅ Kuzco)
-- **[Ship imperial llama meet-and-greet scheduler](https://github.com/kuzcotopia/kuzcotopia-ios/pull/38)** _merged 2 days ago_ by Pacha (✅ Kuzco / 💬 Yzma)
-
----
-
-_Updated 2026-09-22 21:40 UTC_
-```
+<img src="docs/examples/example_canvas.png" alt="Example PR tracker canvas" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
 Open PRs are split by whose turn it is: an approved PR with nothing outstanding is ready to merge (1); a PR carrying a review comment or a review thread its author hasn't answered, and an approved one that now conflicts, are waiting for the author (2); everything else is waiting for review (3).
 
@@ -225,7 +207,7 @@ Each open section is listed oldest first, WIP PRs by most recent activity, merge
 ### Setup
 
 1. Add a canvas tab to the channel that gets the reminders.
-2. Give the canvas a title, the action never sets one.
+2. Give the canvas a title.
 3. Open that canvas → ⋮ → **Copy link**.
 4. Paste the link into `pr-tracker-canvas-link`:
 
@@ -243,7 +225,7 @@ to be in the same channel as the canvas to have write access.
 - These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
 - The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
-- A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not lost data. Reload the canvas to see its real content.
+- A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not corrupted data. Reload the canvas to see its real content (Cmd + R or Ctrl + R).
 
 ## 💡 Tips
 
