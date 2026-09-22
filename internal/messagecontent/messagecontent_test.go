@@ -16,6 +16,7 @@ var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
 	number      int
+	owner       string
 	repository  string
 	createdAt   time.Time
 	mergedAt    *time.Time
@@ -29,8 +30,11 @@ type testPROptions struct {
 
 func testPR(options testPROptions) prview.PR {
 	repository := models.Repository{Owner: "test-org", Name: "test-repo"}
+	if options.owner != "" {
+		repository.Owner = options.owner
+	}
 	if options.repository != "" {
-		repository = models.Repository{Owner: "test-org", Name: options.repository}
+		repository.Name = options.repository
 	}
 	return prview.PR{
 		PR: &githubclient.PR{
@@ -114,6 +118,25 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 		[]string{"zebra", "alpha"},
 	)
 	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].PRs), []int{1, 3})
+}
+
+// The two repositories have different owners, so a URL built from the name alone, or from one
+// fixed owner, fails.
+func TestGetContentGivesEachRepositoryGroupItsPullsURL(t *testing.T) {
+	openPRs := []prview.PR{
+		testPR(testPROptions{number: 1, owner: "zebra-owner", repository: "zebra", createdAt: generatedAt.Add(-9 * time.Hour)}),
+		testPR(testPROptions{number: 2, owner: "alpha-owner", repository: "alpha", createdAt: generatedAt.Add(-4 * time.Hour)}),
+	}
+
+	content := GetContent(openPRs, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
+
+	assertEqual(
+		t, "repository pulls URLs",
+		utilities.Map(content.WaitingForReview.Groups, func(group PRsOfRepository) string {
+			return group.RepositoryPullsURL
+		}),
+		[]string{"https://github.com/zebra-owner/zebra/pulls", "https://github.com/alpha-owner/alpha/pulls"},
+	)
 }
 
 // The tracked PR merged longest ago is the one the cap would drop if it were counted as
