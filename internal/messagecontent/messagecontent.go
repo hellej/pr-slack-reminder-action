@@ -15,8 +15,9 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// How many merged PRs the message picks off the recently-merged fetch. The merged PRs the
-// message already tracks are never counted against it.
+// How many merged PRs the message picks off the recently-merged fetch from before the message
+// was posted. The merged PRs the message already tracks, and those merged since the post, are
+// never counted against it.
 const MaxUntrackedMergedPRs = 3
 
 const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
@@ -54,16 +55,18 @@ func (c Content) HasPRs() bool {
 }
 
 // GetContent splits the open PRs into the three next-action sections, oldest first, and takes
-// the merged section from the tracked PRs that have since merged plus the newest untracked
-// merges. Each section is bucketed by repository when configured, in that same order.
+// the merged section from the tracked PRs that have since merged, every PR merged since the post,
+// and the newest untracked merges from before it. Each section is bucketed by repository when
+// configured, in that same order.
 //
 // openPRs are open right now and already draft-filtered by the caller. trackedPRs are the PRs
 // the message was posted with, as re-fetched, in whatever state they are now: only the merged
-// ones are read.
+// ones are read. A zero messagePostedAt means no message is posted yet.
 func GetContent(
 	openPRs []prview.PR,
 	trackedPRs []prview.PR,
 	recentlyMergedPRs []prview.PR,
+	messagePostedAt time.Time,
 	generatedAt time.Time,
 	contentInputs config.ContentInputs,
 ) Content {
@@ -71,7 +74,7 @@ func GetContent(
 	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
 	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
 	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
-	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs)
+	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs, messagePostedAt)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests "+
@@ -95,20 +98,31 @@ func GetContent(
 	return content
 }
 
-// The tracked merges are kept whole, however long ago they landed, and the cap applies to the
-// fetch's half alone. Sorting the fetch before capping keeps the 3 newest of it from resting on
-// another package's ordering.
-func selectMergedPRsToShow(trackedPRs []prview.PR, recentlyMergedPRs []prview.PR) []prview.PR {
+// The tracked merges and those since the post are kept whole, and the cap applies to the
+// fetch's merges from before the post alone. Sorting the fetch before capping keeps the 3 newest
+// of it from resting on another package's ordering.
+func selectMergedPRsToShow(
+	trackedPRs []prview.PR,
+	recentlyMergedPRs []prview.PR,
+	messagePostedAt time.Time,
+) []prview.PR {
 	trackedMergedPRs := utilities.Filter(trackedPRs, prview.PR.IsMerged)
 	isTrackedByPRRef := getIsTrackedByPRRefMap(trackedMergedPRs)
 	untrackedMergedPRs := utilities.Filter(
 		sortByMergeTimeNewestFirst(recentlyMergedPRs),
 		func(pr prview.PR) bool { return !isTrackedByPRRef[pr.GetPullRequestRef()] },
 	)
-	if len(untrackedMergedPRs) > MaxUntrackedMergedPRs {
-		untrackedMergedPRs = untrackedMergedPRs[:MaxUntrackedMergedPRs]
+	isMergedSincePost := func(pr prview.PR) bool {
+		return !messagePostedAt.IsZero() && pr.GetMergedAt() != nil && pr.GetMergedAt().After(messagePostedAt)
 	}
-	return sortByMergeTimeNewestFirst(slices.Concat(trackedMergedPRs, untrackedMergedPRs))
+	mergedSincePost := utilities.Filter(untrackedMergedPRs, isMergedSincePost)
+	mergedBeforePost := utilities.Filter(untrackedMergedPRs, func(pr prview.PR) bool {
+		return !isMergedSincePost(pr)
+	})
+	if len(mergedBeforePost) > MaxUntrackedMergedPRs {
+		mergedBeforePost = mergedBeforePost[:MaxUntrackedMergedPRs]
+	}
+	return sortByMergeTimeNewestFirst(slices.Concat(trackedMergedPRs, mergedSincePost, mergedBeforePost))
 }
 
 func sortByMergeTimeNewestFirst(prs []prview.PR) []prview.PR {

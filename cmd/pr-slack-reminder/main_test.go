@@ -202,14 +202,20 @@ func filterPRsByNumbers(
 
 type GetTestStateOptions struct {
 	PRNumbers []int
+	// Defaults to an hour ago.
+	PostedHoursAgo float32
 }
 
 func getTestState(options GetTestStateOptions) state.State {
 	prRefs := utilities.Map(options.PRNumbers, stateRef)
+	postedHoursAgo := options.PostedHoursAgo
+	if postedHoursAgo == 0 {
+		postedHoursAgo = 1
+	}
 
 	return state.State{
 		SchemaVersion: 1,
-		CreatedAt:     time.Now().Add(-1 * time.Hour),
+		CreatedAt:     time.Now().Add(-time.Duration(postedHoursAgo * float32(time.Hour))),
 		SlackMessage: state.SlackRef{
 			ChannelID: "C12345678",
 			MessageTS: "1623850245.000200",
@@ -1596,7 +1602,7 @@ func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *tes
 			AuthorLogin: "bob", State: "closed", Merged: true, MergedHoursAgo: float32(hoursAgo),
 		}))
 	}
-	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}, PostedHoursAgo: 0.5})
 	recording := mockgithubclient.FetchRecording{}
 
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
@@ -1624,6 +1630,42 @@ func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *tes
 	}
 	if updatedMessage.SomePRItemContainsText("Merged 4h ago") {
 		t.Error("Expected the 4th newest untracked merge to be dropped by the cap")
+	}
+	if updatedMessage.GetPRCount() != 4 {
+		t.Errorf("Expected 4 merged PRs in the message, got %d", updatedMessage.GetPRCount())
+	}
+}
+
+// One more merge since the post than the untracked cap, so a capped run drops the oldest.
+func TestUpdateModeShowsEveryPRMergedSinceThePost(t *testing.T) {
+	setUpdateModeEnvironment(t)
+	mergesSincePost := []*github.PullRequest{}
+	for hoursAgo := 1; hoursAgo <= 4; hoursAgo++ {
+		mergesSincePost = append(mergesSincePost, getTestPR(GetTestPROptions{
+			Number: 10 + hoursAgo, Title: fmt.Sprintf("Merged %dh ago", hoursAgo),
+			AuthorLogin: "bob", State: "closed", Merged: true, MergedHoursAgo: float32(hoursAgo),
+		}))
+	}
+	loadedState := getTestState(GetTestStateOptions{PostedHoursAgo: 5})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRs:              mergesSincePost,
+			MockStateForUpdateMode: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	updatedMessage := mockSlackAPI.UpdatedMessage.Blocks
+	if !updatedMessage.SomePRItemContainsText("Merged 4h ago") {
+		t.Errorf(
+			"Expected the oldest merge since the post to be kept, got items %v",
+			updatedMessage.GetAllPRItemTexts(),
+		)
 	}
 	if updatedMessage.GetPRCount() != 4 {
 		t.Errorf("Expected 4 merged PRs in the message, got %d", updatedMessage.GetPRCount())
