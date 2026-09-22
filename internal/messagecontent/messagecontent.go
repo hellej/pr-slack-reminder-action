@@ -15,10 +15,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// How many merged PRs the message picks off the recently-merged fetch from before the message
-// was posted. The merged PRs the message already tracks, and those merged since the post, are
-// never counted against it.
-const MaxUntrackedMergedPRs = 3
+const MaxUntrackedPRsMergedBeforePost = 3
 
 const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
 
@@ -119,8 +116,8 @@ func selectMergedPRsToShow(
 	mergedBeforePost := utilities.Filter(untrackedMergedPRs, func(pr prview.PR) bool {
 		return !isMergedSincePost(pr)
 	})
-	if len(mergedBeforePost) > MaxUntrackedMergedPRs {
-		mergedBeforePost = mergedBeforePost[:MaxUntrackedMergedPRs]
+	if len(mergedBeforePost) > MaxUntrackedPRsMergedBeforePost {
+		mergedBeforePost = mergedBeforePost[:MaxUntrackedPRsMergedBeforePost]
 	}
 	return sortByMergeTimeNewestFirst(slices.Concat(trackedMergedPRs, mergedSincePost, mergedBeforePost))
 }

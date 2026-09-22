@@ -10,7 +10,7 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 - Merged section, ordered newest merge first:
   - every `trackedPRs` entry that has since merged, however long ago
   - every `recentlyMergedPRs` entry merged after `messagePostedAt`
-  - the newest `MaxUntrackedMergedPRs` (3) other `recentlyMergedPRs` entries not tracked. The fetch is sorted before it is capped, so the 3 kept are the 3 newest whatever order the fetch arrived in
+  - the newest `MaxUntrackedPRsMergedBeforePost` (3) other `recentlyMergedPRs` entries not tracked. The fetch is sorted before it is capped, so the 3 kept are the 3 newest whatever order the fetch arrived in
 - A zero `messagePostedAt` means no message is posted yet, so every untracked merge counts against the cap
 - A tracked PR is recognised by its `models.PullRequestRef`, from `prview.PR.GetPullRequestRef()` rather than through `state`
 - Closed-but-not-merged `trackedPRs` reach no section
