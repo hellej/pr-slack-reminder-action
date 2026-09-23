@@ -16,7 +16,7 @@ inputs: {
     required: true,
   },
   github-token-for-state: {
-    description: 'GitHub token that has read access to artifacts of the current repository (i.e. actions: read). Only needed if the run-mode is `update` and if the default github-token misses permissions.',
+    description: 'GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads. Only needed if the default github-token misses permissions.',
     required: false,
   },
   run-mode: {
@@ -25,7 +25,7 @@ inputs: {
     default: 'post',
   },
   state-artifact-name: {
-    description: 'Name of the artifact containing state from previous runs (required when run-mode is update)',
+    description: 'Name of the artifact containing state from previous runs (required when run-mode is update; post reads it to mark the previous message stale)',
     required: false,
     default: 'pr-slack-reminder-state',
   },

@@ -120,6 +120,7 @@ jobs:
 Setup where the latest message is also updated when PRs get reviewed/merged.
 An updated message lists the PRs that are open at that moment, including ones opened after the original message.
 PRs that merged since the original message move to the recently merged section.
+When the next `post` sends a new message, the previous one's footer changes from "Live" to "⚠️ Stale".
 
 ```yaml
 name: PR Reminder
@@ -159,7 +160,7 @@ jobs:
         with:
           name: pr-slack-reminder-state
           path: pr-slack-reminder-state.json
-          retention-days: 1
+          retention-days: 4 # outlasts the longest gap between posts (e.g. a weekend): the next post reads it to mark this message stale
 ```
 
 ## ➡️ Inputs
@@ -168,9 +169,9 @@ jobs:
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `slack-bot-token`                   | ✅       | Slack bot token for sending messages<br>Example: `${{ secrets.SLACK_BOT_TOKEN }}`                                                                                                          |
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                                                                                               |
-| `github-token-for-state`            | ❌       | GitHub token that has read access to artifacts of the current repository (i.e. actions: read). Only needed if the run-mode is `update` and if the default github-token misses permissions. |
+| `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads. Only needed if the default github-token misses permissions.                     |
 | `run-mode`                          | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                                                                                                   |
-| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous run (used when `run-mode` is `update`)<br>Default: `pr-slack-reminder-state`                                                           |
+| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous run (used when `run-mode` is `update`, and by `post` to mark the previous message stale)<br>Default: `pr-slack-reminder-state`         |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)                                                                                                                                        |
 | `slack-channel-id`                  | ❌       | Slack channel ID (use this OR `slack-channel-name`)<br>Example: `C1234567890`                                                                                                              |
 | `github-repositories`               | ❌       | Repositories to monitor (max 30) - defaults to current repo<br>Example:<br>`owner/repo1`<br>`owner/repo2`                                                                                  |
@@ -259,7 +260,7 @@ If you're using the default `GITHUB_TOKEN`, grant these via the job's `permissio
 permissions:
   pull-requests: read # listing/fetching PRs and reviews
   issues: read # reading PR comments (incl. /snooze comments)
-  actions: read # only needed for run-mode: update - downloading the previous run's state artifact
+  actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale
 ```
 
 ### Option 1: Default Token (Single Repository)

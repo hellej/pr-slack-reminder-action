@@ -60,4 +60,4 @@ jobs:
         with:
           name: pr-slack-reminder-state
           path: pr-slack-reminder-state.json
-          retention-days: 1
+          retention-days: 4
