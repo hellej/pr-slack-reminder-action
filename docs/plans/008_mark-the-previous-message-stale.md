@@ -7,7 +7,7 @@ status: draft
 
 - When a `post` run sends a new message, the message the previous state points at gets its
   footer swapped in place: `_Live, updated 9:58 AM_` becomes
-  `_⚠️ Stale, updated September 2 at 9:58 AM_`
+  `_⚠️ Stale, updated September 2nd at 9:58 AM_`
   - The timestamp is the one the old live footer showed
   - Every other block of the old message stays as last sent, not refreshed
 - Only the newest reminder reads "Live"
@@ -23,7 +23,7 @@ notify.
 - No change to the PR tracker canvas. This is about the channel message only
 - No new action input: marking is always on
 - No link to the new message: `chat.update` has no documented way to suppress its preview
-  (`slackapi/slack-api-specs`, `web-api/slack_web_openapi_v2.json`, `/chat.update` parameters)
+  ([chat.update](https://docs.slack.dev/reference/methods/chat.update) lists no `unfurl_links`)
 - No change to update mode's own edit or delete behaviour
 - No fix for the existing race where an update run loaded the previous state before the post
   finished (see **Caveats**)
@@ -39,9 +39,11 @@ notify.
 - `post` marks the previous message stale after sending the new one. See Step 3
 - The stale footer's time is `<!date^unix^{date_pretty} at {time}|Jan 2 15:04 UTC>`, rendered
   in each reader's timezone
-  ([formatting message text](https://docs.slack.dev/messaging/formatting-message-text)).
-  `{date_pretty}` reads `yesterday` for the usual daily case and `September 2` otherwise
-  (`slackapi/node-slack-sdk` `main`, `packages/types/src/block-kit/block-elements.ts`)
+  ([formatting message text](https://docs.slack.dev/messaging/formatting-message-text))
+  - `{date_pretty}` reads `yesterday` for the usual daily case, otherwise `{date}`'s
+    `September 2nd`, with the year only past six months
+  - A bot's edited message never shows the `(edited)` label
+    ([chat.update](https://docs.slack.dev/reference/methods/chat.update))
 
 ### Action inputs and permissions
 
@@ -139,7 +141,7 @@ marked stale. Link the README's workflow example.
     new message only
 - `slackclient.UpdateMessage` wraps Slack's `message_not_found`, `cant_update_message` and
   `edit_window_closed` in one sentinel, `ErrMessageNotEditable`, with `%w`
-  (`slackapi/slack-api-specs`, `web-api/slack_web_openapi_v2.json`, `/chat.update` errors)
+  ([chat.update](https://docs.slack.dev/reference/methods/chat.update) errors)
   - Post mode logs it and skips: that message cannot be marked
   - `DeleteMessage`'s string match on `message_not_found` stays as it is
   - `mockslackclient.UpdateMessage` returns the same sentinel for those errors
@@ -186,15 +188,13 @@ None
 
 - A previous state older than the artifact's retention, or missing, leaves that message reading
   "Live"
-- If Slack applies an edit window to a bot's own messages, a message past it keeps reading
-  "Live". The run stays green
+- `edit_window_closed` comes from the workspace's message edit settings. Unverified: whether they
+  apply to a bot's own messages. If they do, a message past the window keeps reading "Live", and
+  the run stays green
 - An update run that loaded the previous state before a post finished edits the old message
   afterwards, restoring its live footer, and its state upload then points later update runs at
   the old message. The post and update concurrency groups differ, so this can already happen
   today, and marking makes it visible
-- Unverified: that the mrkdwn `{date_pretty}` reads as the node SDK documents it for the
-  rich_text `date` element. The live check in Step 3 confirms `today` and `yesterday`, not the
-  `September 2` fallback
 - State artifacts grow by the message's JSON, a few KB at most
 
 ### Neutral

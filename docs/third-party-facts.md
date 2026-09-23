@@ -482,18 +482,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Rendering is unchanged, so a payload does not need to send `emoji` elements itself
 - A read-back of a message is therefore not byte-comparable with what was sent
 
-## Slack renders a timestamp in the reader's own timezone with `<!date^unix^{token}|fallback>` [2026-09-19]
+## Slack renders a timestamp in the reader's own timezone with `<!date^unix^{token}|fallback>` [2026-09-23]
 
 - Source: [formatting message text](https://docs.slack.dev/messaging/formatting-message-text);
   live post to the dev channel
 - Tokens: `{date_num}`, `{date}`, `{date_short}`, `{date_long}`, the three `_pretty` variants,
   `{time}`, `{time_secs}`, `{ago}`
 - `{time}` renders 12-hour or 24-hour by the reading client's own setting. No token forces either
-- The `_pretty` variants read `today`, `yesterday` or `tomorrow` when it applies, otherwise their
-  base token: `{date_pretty}` falls back to `{date}`'s `August 9`, no year, and
-  `{date_short_pretty}` to `{date_short}`'s `Aug 9, 2020` (`slackapi/node-slack-sdk` `main`,
-  `packages/types/src/block-kit/block-elements.ts`, the rich_text `date` element's `format` doc).
-  Unverified: that the mrkdwn tokens render the same as the rich_text element's
+- `{date}` renders `February 18th, 2014`, `{date_short}` `Feb 18, 2014`, `{date_long}`
+  `Tuesday, February 18th, 2014`. Each omits the year within six months of now
+- The `_pretty` variants read `yesterday`, `today` or `tomorrow` where it applies, otherwise their
+  base token's form
 - The text after `|` shows when a client cannot process the date, so it carries the timezone the
   sender means
 - It works inside a `context` block's `mrkdwn` element, and `_`-wrapping the whole line italicises
@@ -576,17 +575,22 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The link Slack's own "Copy link" gives is `https://<workspace>.slack.com/archives/...`. The
   subdomain is not in any `chat.postMessage` response, and `auth.test` would be an extra call
 
-## `chat.update` lists `message_not_found`, `cant_update_message` and `edit_window_closed` among its errors [2026-09-23]
+## `chat.update` errors: `message_not_found`, `cant_update_message`, and `edit_window_closed` from the workspace's edit settings [2026-09-23]
 
-- Source: `slackapi/slack-api-specs`, `web-api/slack_web_openapi_v2.json`,
-  `paths["/chat.update"]` error enum. The repository is archived, so the list may be stale
-- Unverified: what each means, and whether any edit window applies to a bot editing its own
-  message. [chat.update](https://docs.slack.dev/reference/methods/chat.update) was not reachable
-  to check
+- Source: [chat.update](https://docs.slack.dev/reference/methods/chat.update)
+- `message_not_found`: "No message exists with the requested timestamp"
+- `cant_update_message`: "Authenticated user does not have permission to update this message",
+  also returned for message types the method cannot update
+- `edit_window_closed`: "The message cannot be edited due to the team message edit settings".
+  Unverified: whether those settings apply to a bot editing its own message
+- `block_mismatch`: "Rich-text blocks cannot be replaced with non-rich-text blocks"
+- A message with a `bot_id` never shows the `(edited)` label
+- Slack always renders from `blocks` when given, and uses `text` only for notifications
 
 ## `chat.update` documents no `unfurl_links` or `unfurl_media`, where `chat.postMessage` does [2026-09-23]
 
-- Source: `slackapi/slack-api-specs` `web-api/slack_web_openapi_v2.json`, `paths["/chat.update"]`
+- Source: [chat.update](https://docs.slack.dev/reference/methods/chat.update) arguments;
+  `slackapi/slack-api-specs` `web-api/slack_web_openapi_v2.json`, `paths["/chat.update"]`
   parameters; `slackapi/node-slack-sdk` `main`, `packages/web-api/src/types/request/chat.ts`
   `ChatUpdateArguments`; `slackapi/python-slack-sdk` `main`, `slack_sdk/web/client.py`
   `chat_update`
