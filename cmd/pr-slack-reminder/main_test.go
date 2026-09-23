@@ -1,7 +1,9 @@
 package main_test
 
 import (
+	"bytes"
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -904,14 +906,177 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 	}
 }
 
+// The message a state file seeds, so a run that keeps it can be told apart from one that
+// records a message of its own.
+var seededLastSentMessage = state.LastSentMessage{
+	Blocks:      []byte(`[{"type":"divider"}]`),
+	SummaryText: "3 open PRs are waiting for attention 👀",
+	GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+}
+
+func loadSavedState(t *testing.T, stateFilePath string) state.State {
+	t.Helper()
+	var savedState state.State
+	if err := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); err != nil {
+		t.Fatalf("Failed to load the saved state file: %v", err)
+	}
+	return savedState
+}
+
+// State saving indents the stored blocks, so blocks compare compacted.
+func compactedJSON(t *testing.T, jsonBytes []byte) string {
+	t.Helper()
+	var compacted bytes.Buffer
+	if err := json.Compact(&compacted, jsonBytes); err != nil {
+		t.Fatalf("Expected valid JSON, got %v: %s", err, jsonBytes)
+	}
+	return compacted.String()
+}
+
+func assertLastSentMessageIsTheSeededOne(t *testing.T, saved state.LastSentMessage) {
+	t.Helper()
+	if len(saved.Blocks) == 0 || compactedJSON(t, saved.Blocks) != `[{"type":"divider"}]` {
+		t.Errorf("Expected the seeded blocks, got %s", saved.Blocks)
+	}
+	if saved.SummaryText != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the seeded summary text, got %q", saved.SummaryText)
+	}
+	if !saved.GeneratedAt.Equal(time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("Expected the seeded generatedAt, got %v", saved.GeneratedAt)
+	}
+}
+
+type expectedSentMessage struct {
+	summaryText string
+	prTitle     string
+	// The run stamps generatedAt from the real clock, so it can only be pinned between these
+	runStart time.Time
+	runEnd   time.Time
+}
+
+// Pins the saved message to the one the run sent: the same blocks as the sent-blocks record,
+// ending in a footer that shows the saved generatedAt.
+func assertLastSentMessageIsTheSentOne(
+	t *testing.T, saved state.LastSentMessage, sentSlackBlocksFilePath string, expected expectedSentMessage,
+) {
+	t.Helper()
+	if saved.SummaryText != expected.summaryText {
+		t.Errorf("Expected summary text %q, got %q", expected.summaryText, saved.SummaryText)
+	}
+	if saved.GeneratedAt.Before(expected.runStart) || saved.GeneratedAt.After(expected.runEnd) {
+		t.Errorf(
+			"Expected generatedAt between %v and %v, got %v",
+			expected.runStart, expected.runEnd, saved.GeneratedAt,
+		)
+	}
+	if len(saved.Blocks) == 0 {
+		t.Fatal("Expected saved blocks, got none")
+	}
+	sentBlocks, err := os.ReadFile(sentSlackBlocksFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read sent Slack blocks: %v", err)
+	}
+	if compactedJSON(t, saved.Blocks) != compactedJSON(t, sentBlocks) {
+		t.Errorf("Expected the saved blocks to be the sent ones.\nSaved:\n%s\nSent:\n%s", saved.Blocks, sentBlocks)
+	}
+	if !bytes.Contains(saved.Blocks, []byte(expected.prTitle)) {
+		t.Errorf("Expected the saved blocks to list %q, got %s", expected.prTitle, saved.Blocks)
+	}
+
+	var blocks []struct {
+		Type     string `json:"type"`
+		Elements []struct {
+			Text string `json:"text"`
+		} `json:"elements"`
+	}
+	if err := json.Unmarshal(saved.Blocks, &blocks); err != nil {
+		t.Fatalf("Failed to parse saved blocks: %v", err)
+	}
+	footer := blocks[len(blocks)-1]
+	expectedFooterText := fmt.Sprintf(
+		"_Live, updated <!date^%d^{time}|%s UTC>_",
+		saved.GeneratedAt.Unix(), saved.GeneratedAt.UTC().Format("15:04"),
+	)
+	if footer.Type != "context" || len(footer.Elements) != 1 || footer.Elements[0].Text != expectedFooterText {
+		t.Errorf("Expected a last block with footer %q, got %+v", expectedFooterText, footer)
+	}
+}
+
+func TestPostModeSavesTheSentMessage(t *testing.T) {
+	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+
+	runStart := time.Now()
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Mark the previous message stale", AuthorLogin: "alice"}),
+				getTestPR(GetTestPROptions{Number: 2, Title: "Store the last sent message", AuthorLogin: "bob"}),
+			},
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+	runEnd := time.Now()
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	assertLastSentMessageIsTheSentOne(t, savedState.LastSentMessage, sentSlackBlocksFilePath, expectedSentMessage{
+		summaryText: "2 open PRs are waiting for attention 👀",
+		prTitle:     "Store the last sent message",
+		runStart:    runStart,
+		runEnd:      runEnd,
+	})
+}
+
+func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
+	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+	overrides[config.InputRunMode] = config.RunModeUpdate
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	loadedState.LastSentMessage = seededLastSentMessage
+	openPR := getTestPR(GetTestPROptions{Number: 1, Title: "Still open since the post", AuthorLogin: "alice"})
+
+	runStart := time.Now()
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:               []*github.PullRequest{openPR},
+			PRsByNumber:       map[int]*github.PullRequest{1: openPR},
+			MockPreviousState: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+	runEnd := time.Now()
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	assertLastSentMessageIsTheSentOne(t, savedState.LastSentMessage, sentSlackBlocksFilePath, expectedSentMessage{
+		summaryText: "1 open PR is waiting for attention 👀",
+		prTitle:     "Still open since the post",
+		runStart:    runStart,
+		runEnd:      runEnd,
+	})
+}
+
 func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 	testCases := []struct {
-		name              string
-		configOverrides   map[string]any
-		prNumbersInState  []int
-		prByNumber        map[int]*github.PullRequest
-		listArtifactError error
-		expectStateSaved  bool
+		name                 string
+		configOverrides      map[string]any
+		prNumbersInState     []int
+		prByNumber           map[int]*github.PullRequest
+		openPRs              []*github.PullRequest
+		mergedPRsSearchError error
+		updateMessageError   error
+		listArtifactError    error
+		expectRunError       bool
+		expectStateSaved     bool
 	}{
 		{
 			name:             "message deleted because all PRs are gone",
@@ -923,6 +1088,29 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			expectStateSaved: true,
 		},
 		{
+			name:             "message kept because the merged PR fetch failed",
+			configOverrides:  map[string]any{config.InputGlobalFilters: "{\"ignored-authors\": [\"alice\"]}"},
+			prNumbersInState: []int{1},
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Filtered out PR", AuthorLogin: "alice"}),
+			},
+			mergedPRsSearchError: errors.New("search failed"),
+			expectStateSaved:     true,
+		},
+		{
+			name:             "message edit fails",
+			prNumbersInState: []int{1},
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+			},
+			openPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+			},
+			updateMessageError: errors.New("cant_update_message"),
+			expectRunError:     true,
+			expectStateSaved:   true,
+		},
+		{
 			name:             "loaded state has no PRs",
 			prNumbersInState: []int{},
 			expectStateSaved: true,
@@ -931,6 +1119,7 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			name:              "state load fails",
 			prNumbersInState:  []int{1},
 			listArtifactError: errors.New("artifact listing error"),
+			expectRunError:    true,
 			expectStateSaved:  false,
 		},
 	}
@@ -945,28 +1134,40 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			maps.Copy(overrides, tc.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 			loadedState := getTestState(GetTestStateOptions{PRNumbers: tc.prNumbersInState})
+			loadedState.LastSentMessage = seededLastSentMessage
 
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRsByNumber:        tc.prByNumber,
-					MockPreviousState:  &loadedState,
-					ListArtifactsError: tc.listArtifactError,
+					PRsByNumber:          tc.prByNumber,
+					PRs:                  tc.openPRs,
+					MergedPRsSearchError: tc.mergedPRsSearchError,
+					MockPreviousState:    &loadedState,
+					ListArtifactsError:   tc.listArtifactError,
 				}),
 				mockslackclient.MakeSlackClientGetter(
-					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+						UpdateMessageError: tc.updateMessageError,
+					}),
 				),
 			)
 
-			if tc.listArtifactError == nil && err != nil {
+			if !tc.expectRunError && err != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", err)
 			}
+			if tc.expectRunError && err == nil {
+				t.Fatal("Expected Run to fail, got no error")
+			}
 			_, statErr := os.Stat(stateFilePath)
-			if tc.expectStateSaved && statErr != nil {
-				t.Errorf("Expected the state file to be saved: %v", statErr)
+			if !tc.expectStateSaved {
+				if !os.IsNotExist(statErr) {
+					t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+				}
+				return
 			}
-			if !tc.expectStateSaved && !os.IsNotExist(statErr) {
-				t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+			if statErr != nil {
+				t.Fatalf("Expected the state file to be saved: %v", statErr)
 			}
+			assertLastSentMessageIsTheSeededOne(t, loadSavedState(t, stateFilePath).LastSentMessage)
 		})
 	}
 }

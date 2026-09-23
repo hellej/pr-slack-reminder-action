@@ -25,7 +25,17 @@ type State struct {
 	PullRequests  []models.PullRequestRef `json:"pullRequests"`
 	// Hash of the markdown last written to the PR tracker canvas, so a run rendering the same
 	// content can leave the canvas alone. Empty when no canvas was written.
-	CanvasContentHash string `json:"canvasContentHash"`
+	CanvasContentHash string          `json:"canvasContentHash"`
+	LastSentMessage   LastSentMessage `json:"lastSentMessage"`
+}
+
+// The message as last sent or edited, so a later run can re-send it with a different footer.
+type LastSentMessage struct {
+	// Without omitempty, nil blocks save as JSON null, which loads back as non-empty blocks
+	Blocks      json.RawMessage `json:"blocks,omitempty"`
+	SummaryText string          `json:"summaryText"`
+	// What the message's footer shows
+	GeneratedAt time.Time `json:"generatedAt"`
 }
 
 type SlackRef struct {
@@ -72,6 +82,8 @@ func Load(
 func NewPostState(
 	prViews []prview.PR,
 	messageInfo slackclient.SentMessageInfo,
+	summaryText string,
+	generatedAt time.Time,
 ) State {
 	return State{
 		SchemaVersion: CurrentSchemaVersion,
@@ -80,7 +92,29 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		PullRequests: utilities.Map(prViews, PRToPullRequestRef),
+		PullRequests:    utilities.Map(prViews, PRToPullRequestRef),
+		LastSentMessage: newLastSentMessage(messageInfo, summaryText, generatedAt),
+	}
+}
+
+// WithLastSentMessage returns a copy of the state recording an edit of its message.
+func WithLastSentMessage(
+	loadedState State,
+	messageInfo slackclient.SentMessageInfo,
+	summaryText string,
+	generatedAt time.Time,
+) State {
+	loadedState.LastSentMessage = newLastSentMessage(messageInfo, summaryText, generatedAt)
+	return loadedState
+}
+
+func newLastSentMessage(
+	messageInfo slackclient.SentMessageInfo, summaryText string, generatedAt time.Time,
+) LastSentMessage {
+	return LastSentMessage{
+		Blocks:      messageInfo.Blocks,
+		SummaryText: summaryText,
+		GeneratedAt: generatedAt,
 	}
 }
 

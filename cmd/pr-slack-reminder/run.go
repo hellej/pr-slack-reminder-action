@@ -122,7 +122,7 @@ func runPostMode(
 		return nil, err
 	}
 
-	postState := state.NewPostState(prViews, sentMessageInfo)
+	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt)
 	return &postState, sentMessageHandler(sentMessageInfo)
 }
 
@@ -199,7 +199,8 @@ func runUpdateMode(
 	if err != nil {
 		return loadedState, err
 	}
-	return loadedState, sentMessageHandler(sentMessageInfo)
+	editedState := state.WithLastSentMessage(*loadedState, sentMessageInfo, summaryText, generatedAt)
+	return &editedState, sentMessageHandler(sentMessageInfo)
 }
 
 // Resolves each tracked PR ref the run's own open and merged fetches didn't already answer for.

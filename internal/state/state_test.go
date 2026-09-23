@@ -1,11 +1,13 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -358,9 +360,12 @@ func TestNewPostStateSaveAndLoad(t *testing.T) {
 	messageInfo := slackclient.SentMessageInfo{
 		ChannelID: "C123456789",
 		Timestamp: "1729123456.123456",
+		Blocks:    json.RawMessage(`[{"type":"divider"},{"type":"context","elements":[]}]`),
 	}
+	generatedAt := time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC)
 
-	if err := Save(statePath, NewPostState(prViews, messageInfo)); err != nil {
+	postState := NewPostState(prViews, messageInfo, "2 open PRs are waiting for attention 👀", generatedAt)
+	if err := Save(statePath, postState); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}
 
@@ -385,6 +390,12 @@ func TestNewPostStateSaveAndLoad(t *testing.T) {
 		t.Errorf("MessageTS mismatch: got %s, want %s", loadedState.SlackMessage.MessageTS, messageInfo.Timestamp)
 	}
 
+	assertLastSentMessage(t, loadedState.LastSentMessage, LastSentMessage{
+		Blocks:      json.RawMessage(`[{"type":"divider"},{"type":"context","elements":[]}]`),
+		SummaryText: "2 open PRs are waiting for attention 👀",
+		GeneratedAt: time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC),
+	})
+
 	if len(loadedState.PullRequests) != 2 {
 		t.Errorf("Expected 2 PRs, got %d", len(loadedState.PullRequests))
 	}
@@ -402,6 +413,106 @@ func TestNewPostStateSaveAndLoad(t *testing.T) {
 			t.Errorf("PR 1 mismatch: got %+v", pr)
 		}
 	}
+}
+
+// Save indents the stored blocks along with the rest of the state, so blocks compare compacted.
+func assertLastSentMessage(t *testing.T, actual LastSentMessage, expected LastSentMessage) {
+	t.Helper()
+	var compactedBlocks bytes.Buffer
+	if len(actual.Blocks) > 0 {
+		if err := json.Compact(&compactedBlocks, actual.Blocks); err != nil {
+			t.Fatalf("Stored blocks are not valid JSON: %v", err)
+		}
+	}
+	if compactedBlocks.String() != string(expected.Blocks) {
+		t.Errorf("Expected blocks %s, got %s", expected.Blocks, actual.Blocks)
+	}
+	if actual.SummaryText != expected.SummaryText {
+		t.Errorf("Expected summary text %q, got %q", expected.SummaryText, actual.SummaryText)
+	}
+	if !actual.GeneratedAt.Equal(expected.GeneratedAt) {
+		t.Errorf("Expected generatedAt %v, got %v", expected.GeneratedAt, actual.GeneratedAt)
+	}
+}
+
+func TestStateSavedBeforeLastSentMessageDecodesItEmpty(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "old-state.json")
+	oldStateJSON := `{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-01T09:00:00Z",
+  "slackMessage": {"channelId": "C123456789", "messageTs": "1729123456.123456"},
+  "pullRequests": [],
+  "canvasContentHash": ""
+}`
+	if err := os.WriteFile(statePath, []byte(oldStateJSON), 0644); err != nil {
+		t.Fatalf("Failed to write old state: %v", err)
+	}
+
+	loadedState, err := LoadFromFile(statePath)
+	if err != nil {
+		t.Fatalf("Failed to load old state: %v", err)
+	}
+
+	assertLastSentMessage(t, loadedState.LastSentMessage, LastSentMessage{})
+	if loadedState.LastSentMessage.Blocks != nil {
+		t.Errorf("Expected nil blocks, got %s", loadedState.LastSentMessage.Blocks)
+	}
+}
+
+// Update mode saves a loaded state back as is, so an empty last sent message must survive a
+// save and load still empty, not as the JSON literal null.
+func TestEmptyLastSentMessageStaysEmptyThroughSaveAndLoad(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+
+	if err := Save(statePath, createTestState()); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	loadedState, err := LoadFromFile(statePath)
+	if err != nil {
+		t.Fatalf("Failed to load saved state: %v", err)
+	}
+
+	if len(loadedState.LastSentMessage.Blocks) != 0 {
+		t.Errorf("Expected no blocks, got %s", loadedState.LastSentMessage.Blocks)
+	}
+}
+
+func TestWithLastSentMessage(t *testing.T) {
+	loadedState := createTestState()
+	loadedState.CanvasContentHash = "loaded-hash"
+	loadedState.LastSentMessage = LastSentMessage{
+		Blocks:      json.RawMessage(`[{"type":"divider"}]`),
+		SummaryText: "1 open PR is waiting for attention 👀",
+		GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+	}
+	editInfo := slackclient.SentMessageInfo{
+		ChannelID: "C123456789",
+		Timestamp: "1729123456.123456",
+		Blocks:    json.RawMessage(`[{"type":"header"}]`),
+	}
+
+	updatedState := WithLastSentMessage(
+		loadedState, editInfo, "Nothing waiting for review 🎉", time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC),
+	)
+
+	assertLastSentMessage(t, updatedState.LastSentMessage, LastSentMessage{
+		Blocks:      json.RawMessage(`[{"type":"header"}]`),
+		SummaryText: "Nothing waiting for review 🎉",
+		GeneratedAt: time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC),
+	})
+	t.Run("keeps every other field", func(t *testing.T) {
+		updatedState.LastSentMessage = loadedState.LastSentMessage
+		if !reflect.DeepEqual(updatedState, loadedState) {
+			t.Errorf("Expected the other fields unchanged:\nwant %+v\ngot  %+v", loadedState, updatedState)
+		}
+	})
+	t.Run("leaves its input unchanged", func(t *testing.T) {
+		assertLastSentMessage(t, loadedState.LastSentMessage, LastSentMessage{
+			Blocks:      json.RawMessage(`[{"type":"divider"}]`),
+			SummaryText: "1 open PR is waiting for attention 👀",
+			GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+		})
+	})
 }
 
 func TestPRToPullRequestRef(t *testing.T) {

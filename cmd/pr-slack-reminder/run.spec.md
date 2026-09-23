@@ -14,7 +14,9 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
 - Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `CreatedAt`, the previous message's post time
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
-- State is only saved when a message was actually posted or updated, carrying whichever canvas content hash is now current
+- State is saved carrying whichever canvas content hash is now current:
+  - Post mode saves it only when the message was sent, recording the new message
+  - Update mode saves it whenever the previous state loaded. After a successful edit it records the edited message; when the message is deleted or kept, or the edit fails, the loaded state is saved back unchanged
 
 ## Doesn't Do
 

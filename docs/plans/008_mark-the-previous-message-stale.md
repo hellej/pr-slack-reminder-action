@@ -68,9 +68,9 @@ marked stale. Link the README's workflow example.
 
 - R1: Fix the sent-blocks record, which is empty in real runs
 - R2: Rename the mock's `MockStateForUpdateMode`
-- 1: Store the last sent message in state
+- 1: Store the last sent message in state, written by both run modes
 - 2: Build the stale message from stored blocks
-- 3: Mark the previous message stale in `post`, record the last sent message in `update`
+- 3: Mark the previous message stale in `post`
 - 4: Docs, example workflow and the release note
 
 ## Steps
@@ -113,12 +113,23 @@ marked stale. Link the README's workflow example.
   - `Blocks json.RawMessage`: the block array from `SentMessageInfo.Blocks`
   - `SummaryText string`
   - `GeneratedAt time.Time`: what the live footer shows
-- `NewPostState` takes the summary text and `generatedAt` and fills it
+  - `Blocks` is `omitempty`: a nil `json.RawMessage` saves as `null`, which loads back as the
+    bytes `null`, so a state update mode saves back unedited would no longer read as empty
+- `NewPostState` takes the summary text and `generatedAt` and fills it. `runPostMode` passes its
+  own
 - New pure `WithLastSentMessage(state, sentMessageInfo, summaryText, generatedAt) State` for
   update mode, returning a copy
+- `runUpdateMode` returns `state.WithLastSentMessage(...)` after a successful edit. The delete and
+  keep branches, and a failed edit, return the loaded state unchanged
+  - Wired here rather than in Step 3, since an unused `WithLastSentMessage` fails
+    `make check-dead-code`. Nothing reads the field until Step 3
 - `CurrentSchemaVersion` stays 1, as it did for `CanvasContentHash`. Nothing checks the version
+- Unit tests pin the field through save and load, an old artifact without it, and
+  `WithLastSentMessage` leaving its input alone. Integration tests in `main_test.go` pin the
+  message each mode saves, and the loaded one kept on update mode's early returns
 - Update `state.spec.md`: the new field, its empty value in older artifacts, and the oddity that
-  it is the only state update mode rewrites besides the canvas hash
+  it is the only state update mode rewrites besides the canvas hash. Update `run.spec.md`: each
+  mode saves the message it sent
 
 ### 2. Build the stale message from stored blocks
 
@@ -135,7 +146,7 @@ marked stale. Link the README's workflow example.
 - Update `messagebuilder.spec.md`: the stale footer, and that the stale message never re-renders
   content
 
-### 3. Mark the previous message stale, record the last sent message
+### 3. Mark the previous message stale
 
 - `runPostMode`, after a successful send:
   - Loads the previous state with `state.Load`. A failure logs and skips
@@ -152,10 +163,7 @@ marked stale. Link the README's workflow example.
   - `mockslackclient.UpdateMessage` returns the same sentinel for those errors
 - Any other error from the stale edit joins post mode's returned error. Post still returns the
   new state, so it is saved
-- `runUpdateMode` returns `state.WithLastSentMessage(...)` after a successful edit. The delete and
-  keep branches return the loaded state unchanged
-- Integration tests in `main_test.go` cover the mark, each skip path, the failing edit, and
-  update mode's recorded message
+- Integration tests in `main_test.go` cover the mark, each skip path, and the failing edit
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:
