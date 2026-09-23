@@ -156,17 +156,13 @@ func TestLoadInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "sent-blocks.json")
+func TestSaveSentSlackBlocksToFileWritesTheBlockArrayIndented(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "sent-blocks.json")
+	sentBlocks := json.RawMessage(
+		`[{"type":"rich_text","block_id":"no_open_prs","elements":[]},{"type":"divider"}]`,
+	)
 
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"no_open_prs","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"No open PRs, happy coding! 🎉"}]}]}`,
-		`{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
-	}
-
-	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
-	if err != nil {
+	if err := SaveSentSlackBlocksToFile(filePath, sentBlocks); err != nil {
 		t.Fatalf("SaveSentSlackBlocksToFile failed: %v", err)
 	}
 
@@ -174,73 +170,47 @@ func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read saved file: %v", err)
 	}
-
-	var savedBlocks []map[string]interface{}
-	err = json.Unmarshal(fileContent, &savedBlocks)
-	if err != nil {
-		t.Fatalf("Saved file contains invalid JSON: %v", err)
-	}
-
-	if len(savedBlocks) != 2 {
-		t.Errorf("Expected 2 blocks, got %d", len(savedBlocks))
-	}
-
-	// Verify the content doesn't contain escaped quotes (common sign of double-encoding)
-	contentStr := string(fileContent)
-	if strings.Contains(contentStr, `\"type\"`) {
-		t.Error("Saved JSON contains escaped quotes, indicating double-encoding")
-	}
-
-	if len(savedBlocks) > 0 {
-		if savedBlocks[0]["type"] != "rich_text" {
-			t.Errorf("Expected first block type to be 'rich_text', got %v", savedBlocks[0]["type"])
-		}
-		if savedBlocks[0]["block_id"] != "no_open_prs" {
-			t.Errorf("Expected first block_id to be 'no_open_prs', got %v", savedBlocks[0]["block_id"])
-		}
+	expectedContent := `[
+  {
+    "type": "rich_text",
+    "block_id": "no_open_prs",
+    "elements": []
+  },
+  {
+    "type": "divider"
+  }
+]`
+	if string(fileContent) != expectedContent {
+		t.Errorf("Expected file content:\n%s\ngot:\n%s", expectedContent, fileContent)
 	}
 }
 
-func TestSaveSentSlackBlocksToFileEmptySlice(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "empty-blocks.json")
+// Empty blocks mean the info did not come from a send. An empty record would hide that.
+func TestSaveSentSlackBlocksToFileRejectsEmptyBlocks(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "empty-blocks.json")
 
-	err := SaveSentSlackBlocksToFile(filePath, []string{})
-	if err != nil {
-		t.Fatalf("SaveSentSlackBlocksToFile failed with empty slice: %v", err)
+	err := SaveSentSlackBlocksToFile(filePath, nil)
+	if err == nil {
+		t.Fatal("Expected error when saving empty blocks, got nil")
 	}
-
-	fileContent, err := os.ReadFile(filePath)
-	if err != nil {
-		t.Fatalf("Failed to read saved file: %v", err)
+	if !strings.Contains(err.Error(), "failed to indent sent blocks") {
+		t.Errorf("Expected JSON indent error, got: %v", err)
 	}
-
-	var savedBlocks []map[string]interface{}
-	err = json.Unmarshal(fileContent, &savedBlocks)
-	if err != nil {
-		t.Fatalf("Saved file contains invalid JSON: %v", err)
-	}
-
-	if len(savedBlocks) != 0 {
-		t.Errorf("Expected empty array, got %d items", len(savedBlocks))
+	if _, statErr := os.Stat(filePath); !os.IsNotExist(statErr) {
+		t.Errorf("Expected no file written, stat returned: %v", statErr)
 	}
 }
 
 func TestSaveSentSlackBlocksToFileInvalidJSON(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "invalid-blocks.json")
+	filePath := filepath.Join(t.TempDir(), "invalid-blocks.json")
 
-	invalidJSON := []string{
-		`{"type":"rich_text",`, // Incomplete JSON
-	}
-
-	err := SaveSentSlackBlocksToFile(filePath, invalidJSON)
+	err := SaveSentSlackBlocksToFile(filePath, json.RawMessage(`[{"type":"rich_text",`))
 	if err == nil {
 		t.Fatal("Expected error when saving invalid JSON, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "failed to parse block") {
-		t.Errorf("Expected JSON parse error, got: %v", err)
+	if !strings.Contains(err.Error(), "failed to indent sent blocks") {
+		t.Errorf("Expected JSON indent error, got: %v", err)
 	}
 }
 
@@ -262,9 +232,7 @@ func TestSaveDirectoryCreationFailure(t *testing.T) {
 func TestSaveSentSlackBlocksToFileDirectoryCreationFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "nested", "blocks.json")
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"test"}`,
-	}
+	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
 
 	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
@@ -294,9 +262,7 @@ func TestSaveFileWriteFailure(t *testing.T) {
 func TestSaveSentSlackBlocksToFileFileWriteFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "blocks.json")
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"test"}`,
-	}
+	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
 
 	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {

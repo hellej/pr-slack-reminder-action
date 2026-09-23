@@ -7,7 +7,8 @@ Sends PR reminder messages to Slack and replaces PR tracker canvas content.
 - `Client.GetChannelIDByName` resolves a Slack channel ID by name, searching public then private conversations
 - `Client.SendMessage` posts a new Block Kit message; `UpdateMessage` edits an existing one by timestamp; `DeleteMessage` removes one
 - `Client.ReplaceCanvasContent` replaces a canvas's whole content with a markdown string, via one `canvases.edit` call with a `replace` change carrying no section ID. Requires the `canvases:write` scope and canvas access, which the bot gets implicitly when the canvas is a tab in a channel it is in
-- Send/update calls return `SentMessageInfo` (channel ID, timestamp, and the JSON actually sent) — used by [internal/state](../../state/state.spec.md) to record what was posted
+- Send/update calls return `SentMessageInfo`: channel ID, timestamp, and the block array as sent
+- `MarshalSentBlocks` returns a message's block array as sent. Send/update call it before the Slack call, so blocks that fail to marshal fail the call without reaching Slack
 
 ## Doesn't Do
 
@@ -21,3 +22,4 @@ Sends PR reminder messages to Slack and replaces PR tracker canvas content.
 - `GetChannelIDByName`'s error message differs depending on whether the public or private channel listing failed, and suggests using the channel-ID input instead
 - `DeleteMessage` treats a Slack "message not found" error as success (already-deleted is not an error)
 - A failed `ReplaceCanvasContent` wraps the Slack error with a fixed hint about the `canvases:write` scope and channel membership, since canvas access is the usual cause and the run log is the only place it surfaces
+- `SentMessageInfo.Blocks` is marshalled by this package, not read back from slack-go: slack-go v0.21.1 and later marshal blocks only when building the request, so `UnsafeApplyMsgOptions` returns no `blocks` key

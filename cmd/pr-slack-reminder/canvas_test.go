@@ -873,15 +873,11 @@ func TestCanvasDoesNotChangeMessageBlocks(t *testing.T) {
 		if readErr != nil {
 			t.Fatalf("Failed to read sent Slack blocks: %v", readErr)
 		}
-		// The file holds one entry per sent message, each entry the message's block array.
-		var sentMessages [][]json.RawMessage
-		if unmarshalErr := json.Unmarshal(sentBlocks, &sentMessages); unmarshalErr != nil {
+		var sentBlockArray []json.RawMessage
+		if unmarshalErr := json.Unmarshal(sentBlocks, &sentBlockArray); unmarshalErr != nil {
 			t.Fatalf("Failed to parse sent Slack blocks: %v", unmarshalErr)
 		}
-		if len(sentMessages) != 1 {
-			t.Fatalf("Expected exactly one sent message, got %d", len(sentMessages))
-		}
-		return sentMessages[0]
+		return sentBlockArray
 	}
 
 	blocksWithoutCanvas := runAndGetSentBlocks(t, "")

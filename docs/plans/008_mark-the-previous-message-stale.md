@@ -89,13 +89,18 @@ marked stale. Link the README's workflow example.
   `formSender.BuildRequestContext`)
   - It replaces `parseSentJSONBlocks`, and the mock calls it in place of its own `getJSONBlocks`,
     which goes away
+  - `SendMessage` and `UpdateMessage` call it before the Slack call and return its error, so
+    blocks that fail to marshal never reach Slack
 - `state.SaveSentSlackBlocksToFile` takes the `json.RawMessage` and writes it indented
   (`json.Indent`). The file changes from `[[…blocks…]]` to `[…blocks…]`
-- Re-record the ~10 snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` with
+  - Empty blocks are an error and write no file: they mean the info did not come from a send,
+    which an empty record would hide
+- Re-record the 11 snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` with
   `make update-test-snapshots`. The diff drops one nesting level only
+- `canvas_test.go`'s `TestCanvasDoesNotChangeMessageBlocks` parses the file as one block array
 - A `slackclient` test through the real client and a fake `SlackAPI` fails before the fix
-- Touches `slackclient`, `state`, `testhelpers/mockslackclient`, `run.go`'s sent-message handler.
-  Update `slackclient.spec.md` and `state.spec.md`
+- Touches `slackclient`, `state`, `testhelpers/mockslackclient`, `run.go`'s sent-message handler,
+  `canvas_test.go`. Update `slackclient.spec.md` and `state.spec.md`
 
 ### R2. Rename the mock's `MockStateForUpdateMode`
 

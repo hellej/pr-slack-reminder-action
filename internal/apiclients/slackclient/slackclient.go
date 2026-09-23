@@ -3,6 +3,7 @@
 package slackclient
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -13,9 +14,10 @@ import (
 )
 
 type SentMessageInfo struct {
-	ChannelID  string
-	Timestamp  string
-	JSONBlocks []string
+	ChannelID string
+	Timestamp string
+	// The block array as sent
+	Blocks json.RawMessage
 }
 
 type Client interface {
@@ -110,6 +112,11 @@ func (c *client) SendMessage(
 		)
 	}
 
+	sentBlocks, err := MarshalSentBlocks(message)
+	if err != nil {
+		return SentMessageInfo{}, err
+	}
+
 	log.Printf("\nSending message with summary: %s", summaryText)
 	responseChannelID, timestamp, err := c.slackAPI.PostMessage(
 		channelID,
@@ -122,9 +129,9 @@ func (c *client) SendMessage(
 	log.Printf("Sent message to Slack channel: %s", channelID)
 
 	return SentMessageInfo{
-		ChannelID:  responseChannelID,
-		Timestamp:  timestamp,
-		JSONBlocks: parseSentJSONBlocks(message),
+		ChannelID: responseChannelID,
+		Timestamp: timestamp,
+		Blocks:    sentBlocks,
 	}, nil
 }
 
@@ -134,8 +141,13 @@ func (c *client) UpdateMessage(
 	message slack.Message,
 	summaryText string,
 ) (SentMessageInfo, error) {
+	sentBlocks, err := MarshalSentBlocks(message)
+	if err != nil {
+		return SentMessageInfo{}, err
+	}
+
 	log.Printf("Updating message with timestamp %s and summary: %s", messageTS, summaryText)
-	_, _, _, err := c.slackAPI.UpdateMessage(
+	_, _, _, err = c.slackAPI.UpdateMessage(
 		channelID,
 		messageTS,
 		slack.MsgOptionBlocks(message.Blocks.BlockSet...),
@@ -147,9 +159,9 @@ func (c *client) UpdateMessage(
 	log.Printf("Updated message in Slack channel: %s", channelID)
 
 	return SentMessageInfo{
-		ChannelID:  channelID,
-		Timestamp:  messageTS,
-		JSONBlocks: parseSentJSONBlocks(message),
+		ChannelID: channelID,
+		Timestamp: messageTS,
+		Blocks:    sentBlocks,
 	}, nil
 }
 
@@ -192,19 +204,14 @@ func (c *client) ReplaceCanvasContent(canvasID string, markdown string) error {
 	return nil
 }
 
-func parseSentJSONBlocks(message slack.Message) []string {
-	var sentJSONBlocks []string
-	_, values, err := slack.UnsafeApplyMsgOptions(
-		"", "", "", slack.MsgOptionBlocks(message.Blocks.BlockSet...),
-	)
-	if err == nil {
-		if valuesBlocks, ok := values["blocks"]; ok && len(valuesBlocks) > 0 {
-			sentJSONBlocks = valuesBlocks
-		}
-	} else {
-		log.Printf("Warning: unable to parse sent JSON blocks: %v", err)
+// MarshalSentBlocks returns the block array exactly as slack-go sends it: its form sender
+// marshals the same BlockSet at request time, for posts and edits alike (slack-go v0.29.0 chat.go).
+func MarshalSentBlocks(message slack.Message) (json.RawMessage, error) {
+	blocks, err := json.Marshal(message.Blocks.BlockSet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal Slack message blocks: %w", err)
 	}
-	return sentJSONBlocks
+	return blocks, nil
 }
 
 func (c *client) fetchChannels(types []string) ([]slack.Channel, error) {

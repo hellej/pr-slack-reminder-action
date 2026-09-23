@@ -138,6 +138,8 @@ type mockSlackAPI struct {
 	deleteMessageError   error
 	editCanvasError      error
 	editCanvasParams     []slack.EditCanvasParams
+	postMessageCalls     int
+	updateMessageCalls   int
 }
 
 func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -160,10 +162,12 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 }
 
 func (m *mockSlackAPI) PostMessage(channelID string, _ ...slack.MsgOption) (string, string, error) {
+	m.postMessageCalls++
 	return "timestamp", channelID, nil
 }
 
 func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, _ ...slack.MsgOption) (string, string, string, error) {
+	m.updateMessageCalls++
 	return channelID, timestamp, "updated_timestamp", nil
 }
 
@@ -266,6 +270,63 @@ func TestUpdateMessage(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// slack-go marshals the blocks only when it builds the request, so this fake, which never
+// builds one, shows whether the client records the blocks itself.
+func TestSentMessageInfoRecordsTheBlockArrayAsSent(t *testing.T) {
+	message := slack.NewBlockMessage(
+		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*Open PRs*", false, false), nil, nil),
+		slack.NewDividerBlock(),
+	)
+	const expectedBlocks = `[{"type":"section","text":{"type":"mrkdwn","text":"*Open PRs*"}},{"type":"divider"}]`
+
+	client := slackclient.NewClient(&mockSlackAPI{})
+
+	sentInfo, err := client.SendMessage("C12345", message, "summary")
+	if err != nil {
+		t.Fatalf("SendMessage: expected no error, got %v", err)
+	}
+	if string(sentInfo.Blocks) != expectedBlocks {
+		t.Errorf("SendMessage: expected blocks %s, got %s", expectedBlocks, sentInfo.Blocks)
+	}
+
+	updatedInfo, err := client.UpdateMessage("C12345", "1234567890.123456", message, "summary")
+	if err != nil {
+		t.Fatalf("UpdateMessage: expected no error, got %v", err)
+	}
+	if string(updatedInfo.Blocks) != expectedBlocks {
+		t.Errorf("UpdateMessage: expected blocks %s, got %s", expectedBlocks, updatedInfo.Blocks)
+	}
+}
+
+type unmarshallableBlock struct{}
+
+func (unmarshallableBlock) BlockType() slack.MessageBlockType { return "unmarshallable" }
+func (unmarshallableBlock) ID() string                        { return "" }
+func (unmarshallableBlock) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("cannot marshal")
+}
+
+func TestUnmarshallableBlocksFailBeforeSending(t *testing.T) {
+	message := slack.NewBlockMessage(unmarshallableBlock{})
+	mockAPI := &mockSlackAPI{}
+	client := slackclient.NewClient(mockAPI)
+
+	if _, err := client.SendMessage("C12345", message, "summary"); err == nil ||
+		!strings.Contains(err.Error(), "cannot marshal") {
+		t.Errorf("SendMessage: expected the marshal error, got %v", err)
+	}
+	if _, err := client.UpdateMessage("C12345", "1234567890.123456", message, "summary"); err == nil ||
+		!strings.Contains(err.Error(), "cannot marshal") {
+		t.Errorf("UpdateMessage: expected the marshal error, got %v", err)
+	}
+	if mockAPI.postMessageCalls != 0 || mockAPI.updateMessageCalls != 0 {
+		t.Errorf(
+			"Expected no Slack call, got %d post and %d update calls",
+			mockAPI.postMessageCalls, mockAPI.updateMessageCalls,
+		)
 	}
 }
 

@@ -1,484 +1,482 @@
 [
-  [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "✅ Ready to merge",
-        "emoji": true
-      },
-      "block_id": "heading_ready_to_merge",
-      "level": 2
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "✅ Ready to merge",
+      "emoji": true
     },
-    {
-      "type": "rich_text",
-      "block_id": "section_ready_to_merge",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/72",
-                  "text": "Approved by two reviewers",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 9 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (✅ ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ", ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Erin Evans",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
+    "block_id": "heading_ready_to_merge",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_ready_to_merge",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/72",
+                "text": "Approved by two reviewers",
+                "style": {
+                  "bold": true
                 }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/71",
-                  "text": "Approved and ready to go",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 2 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Alice Anderson",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (✅ ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " 9 hours ago",
+                "style": {
+                  "italic": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ", ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/71",
+                "text": "Approved and ready to go",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 2 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "💬 Waiting for author",
+      "emoji": true
     },
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "💬 Waiting for author",
-        "emoji": true
-      },
-      "block_id": "heading_waiting_for_author",
-      "level": 2
+    "block_id": "heading_waiting_for_author",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_author",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/73",
+                "text": "Changes were requested here",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 1 day ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Carol Clark",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/74",
+                "text": "A reviewer left a comment",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 5 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "👀 Waiting for review",
+      "emoji": true
     },
-    {
-      "type": "rich_text",
-      "block_id": "section_waiting_for_author",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/73",
-                  "text": "Changes were requested here",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 1 day ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Carol Clark",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
+    "block_id": "heading_waiting_for_review",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/76",
+                "text": "Sitting here since last week",
+                "style": {
+                  "bold": true
                 }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/74",
-                  "text": "A reviewer left a comment",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 5 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Erin Evans",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " 🚨 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "7 days old",
+                "style": {
+                  "bold": true,
+                  "code": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/75",
+                "text": "Nobody has looked at this yet",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 1 hour ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "🚀 Recently merged",
+      "emoji": true
     },
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "👀 Waiting for review",
-        "emoji": true
-      },
-      "block_id": "heading_waiting_for_review",
-      "level": 2
-    },
-    {
-      "type": "rich_text",
-      "block_id": "section_waiting_for_review",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/76",
-                  "text": "Sitting here since last week",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 🚨 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "7 days old",
-                  "style": {
-                    "bold": true,
-                    "code": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Frank Foster",
-                  "style": {}
+    "block_id": "heading_merged",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_merged",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/83",
+                "text": "Landed an hour ago",
+                "style": {
+                  "bold": true
                 }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/75",
-                  "text": "Nobody has looked at this yet",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 1 hour ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Erin Evans",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " merged 1 hour ago",
+                "style": {
+                  "italic": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
-    },
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🚀 Recently merged",
-        "emoji": true
-      },
-      "block_id": "heading_merged",
-      "level": 2
-    },
-    {
-      "type": "rich_text",
-      "block_id": "section_merged",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/83",
-                  "text": "Landed an hour ago",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " merged 1 hour ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Carol Clark",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " (✅ ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Dana Davis",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": " / 💬 ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Erin Evans",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": ")",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Carol Clark",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / 💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/81",
+                "text": "Landed this morning",
+                "style": {
+                  "bold": true
                 }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/81",
-                  "text": "Landed this morning",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " merged 3 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Alice Anderson",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " merged 3 hours ago",
+                "style": {
+                  "italic": true
                 }
-              ]
-            },
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/82",
-                  "text": "Landed yesterday",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " merged 1 day ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/82",
+                "text": "Landed yesterday",
+                "style": {
+                  "bold": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
-    },
-    {
-      "type": "context",
-      "elements": [
-        {
-          "type": "mrkdwn",
-          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
-        }
-      ]
-    }
-  ]
+              },
+              {
+                "type": "text",
+                "text": " merged 1 day ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
+      }
+    ]
+  }
 ]

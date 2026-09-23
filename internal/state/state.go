@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -85,29 +86,18 @@ func NewPostState(
 
 func SaveSentSlackBlocksToFile(
 	filePath string,
-	sentBlocks []string,
+	sentBlocks json.RawMessage,
 ) error {
+	var indentedBlocks bytes.Buffer
+	if err := json.Indent(&indentedBlocks, sentBlocks, "", "  "); err != nil {
+		return fmt.Errorf("failed to indent sent blocks: %w", err)
+	}
+
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-
-	// Parse JSON strings back to raw JSON objects to avoid double-encoding
-	var parsedBlocks []json.RawMessage
-	for i, blockJSON := range sentBlocks {
-		var rawMessage json.RawMessage
-		if err := json.Unmarshal([]byte(blockJSON), &rawMessage); err != nil {
-			return fmt.Errorf("failed to parse block %d as JSON: %w", i, err)
-		}
-		parsedBlocks = append(parsedBlocks, rawMessage)
-	}
-
-	jsonData, err := json.MarshalIndent(parsedBlocks, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal sent blocks: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(filePath, indentedBlocks.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write sent blocks file %s: %w", filePath, err)
 	}
 	log.Printf("Saved sent Slack blocks JSON to %s", filePath)

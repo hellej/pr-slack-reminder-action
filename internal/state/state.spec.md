@@ -9,7 +9,8 @@ Persists and reloads the "post" run's PR set and Slack message reference, so "up
 - `NewPostState()` builds state from a "post" run's PR views and Slack send result. The only place stamping the schema version and creation time, and it leaves the canvas hash empty for the caller to fill in
 - `CreatedAt` is stamped after the Slack send, so it marks when the message was posted
 - `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
-- `SaveSentSlackBlocksToFile()` separately records the raw JSON actually sent to Slack, for inspection — not read back by this action
+- `SaveSentSlackBlocksToFile()` separately writes a sent message's block array to a file, indented, for inspection
+  - Errors on empty blocks rather than writing an empty record
 
 ## Doesn't Do
 

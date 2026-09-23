@@ -1,123 +1,121 @@
 [
-  [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "👀 Waiting for review",
-        "emoji": true
-      },
-      "block_id": "heading_waiting_for_review",
-      "level": 2
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "👀 Waiting for review",
+      "emoji": true
     },
-    {
-      "type": "rich_text",
-      "block_id": "section_waiting_for_review",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/91",
-                  "text": "The only open PR",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " 4 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Alice Anderson",
-                  "style": {}
+    "block_id": "heading_waiting_for_review",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/91",
+                "text": "The only open PR",
+                "style": {
+                  "bold": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
-    },
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🚀 Recently merged",
-        "emoji": true
-      },
-      "block_id": "heading_merged",
-      "level": 2
-    },
-    {
-      "type": "rich_text",
-      "block_id": "section_merged",
-      "elements": [
-        {
-          "type": "rich_text_list",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "link",
-                  "url": "https://github.com/test-org/test-repo/pull/92",
-                  "text": "The only merged PR",
-                  "style": {
-                    "bold": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " merged 5 hours ago",
-                  "style": {
-                    "italic": true
-                  }
-                },
-                {
-                  "type": "text",
-                  "text": " by ",
-                  "style": {}
-                },
-                {
-                  "type": "text",
-                  "text": "Bob Brown",
-                  "style": {}
+              },
+              {
+                "type": "text",
+                "text": " 4 hours ago",
+                "style": {
+                  "italic": true
                 }
-              ]
-            }
-          ],
-          "style": "bullet",
-          "indent": 0,
-          "border": 0,
-          "offset": 0
-        }
-      ]
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "🚀 Recently merged",
+      "emoji": true
     },
-    {
-      "type": "context",
-      "elements": [
-        {
-          "type": "mrkdwn",
-          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
-        }
-      ]
-    }
-  ]
+    "block_id": "heading_merged",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_merged",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/92",
+                "text": "The only merged PR",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " merged 5 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
+      }
+    ]
+  }
 ]

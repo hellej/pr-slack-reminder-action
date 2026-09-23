@@ -272,7 +272,7 @@ func findRecentlyMergedPRs(
 func getSentMessageHandler(config config.Config) func(slackclient.SentMessageInfo) error {
 	return func(sentMessageInfo slackclient.SentMessageInfo) error {
 		if err := state.SaveSentSlackBlocksToFile(
-			config.SentSlackBlocksFilePath, sentMessageInfo.JSONBlocks,
+			config.SentSlackBlocksFilePath, sentMessageInfo.Blocks,
 		); err != nil {
 			return err
 		}

@@ -108,11 +108,14 @@ func (m *MockSlackAPI) SendMessage(
 		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %v", m.postMessageError)
 	}
 
-	jsonBlocks := getJSONBlocks(message)
+	sentJSONBlocks, err := slackclient.MarshalSentBlocks(message)
+	if err != nil {
+		return slackclient.SentMessageInfo{}, err
+	}
 	return slackclient.SentMessageInfo{
-		ChannelID:  m.postMessageResponse.Channel,
-		Timestamp:  m.postMessageResponse.Timestamp,
-		JSONBlocks: jsonBlocks,
+		ChannelID: m.postMessageResponse.Channel,
+		Timestamp: m.postMessageResponse.Timestamp,
+		Blocks:    sentJSONBlocks,
 	}, nil
 }
 
@@ -138,11 +141,14 @@ func (m *MockSlackAPI) UpdateMessage(
 		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to update Slack message: %v", m.updateMessageError)
 	}
 
-	jsonBlocks := getJSONBlocks(message)
+	sentJSONBlocks, err := slackclient.MarshalSentBlocks(message)
+	if err != nil {
+		return slackclient.SentMessageInfo{}, err
+	}
 	return slackclient.SentMessageInfo{
-		ChannelID:  channelID,
-		Timestamp:  messageTS,
-		JSONBlocks: jsonBlocks,
+		ChannelID: channelID,
+		Timestamp: messageTS,
+		Blocks:    sentJSONBlocks,
 	}, nil
 }
 
@@ -215,12 +221,4 @@ func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
 		return BlocksWrapper{}, nil
 	}
 	return parseBlocks(blockBytes)
-}
-
-func getJSONBlocks(message slack.Message) []string {
-	blockBytes, err := json.Marshal(message.Blocks.BlockSet)
-	if err != nil {
-		return []string{}
-	}
-	return []string{string(blockBytes)}
 }
