@@ -489,6 +489,10 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Tokens: `{date_num}`, `{date}`, `{date_short}`, `{date_long}`, the three `_pretty` variants,
   `{time}`, `{time_secs}`, `{ago}`
 - `{time}` renders 12-hour or 24-hour by the reading client's own setting. No token forces either
+- `{date_short_pretty}` reads `today`, `yesterday` or `tomorrow` when it applies, otherwise
+  `{date_short}`'s `Aug 9, 2020` (`slackapi/node-slack-sdk` `main`,
+  `packages/types/src/block-kit/block-elements.ts`, the rich_text `date` element's `format` doc).
+  Unverified: that the mrkdwn token renders the same as the rich_text element's
 - The text after `|` shows when a client cannot process the date, so it carries the timezone the
   sender means
 - It works inside a `context` block's `mrkdwn` element, and `_`-wrapping the whole line italicises
@@ -540,3 +544,53 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - This holds for a string-typed input the same as `old-pr-threshold-hours` (int-shaped) or
   `group-by-repository` (bool-shaped): every action input is a string to the runner regardless of
   how its value reads
+
+## `slack-go` v0.21.1 and later return no `blocks` from `UnsafeApplyMsgOptions` [2026-09-23]
+
+- Source: `slack-go@v0.29.0/CHANGELOG.md`, `## [0.21.1]`; `chat.go` `UnsafeApplyMsgOptions`,
+  `formSender.BuildRequestContext`
+- Blocks are marshalled at send time inside `formSender.BuildRequestContext`, as
+  `json.Marshal(blockSet)`. `UnsafeApplyMsgOptions` returns the values before that, so they carry
+  no `blocks` key
+- The bytes a message is sent with are therefore `json.Marshal(message.Blocks.BlockSet)`
+
+## `slack.BlockFromJSON` re-sends one block's JSON byte for byte [2026-09-23]
+
+- Source: `slack-go@v0.29.0/block_json.go`
+- Returns a `RawJSONBlock` whose `MarshalJSON` returns the stored bytes unchanged
+- Given a JSON array, it keeps only the first block. A stored message has to be split into
+  per-block `json.RawMessage` values first
+- `MsgOptionBlocks` sends blocks through `json.Marshal`, so a `RawJSONBlock` goes out as stored
+- Unmarshalling into `slack.Blocks` also covers today's block types, but nothing in the library
+  tests that round trip for `header`, `rich_text` lists or `context`
+
+## A Slack message link without the workspace subdomain opens the message [2026-09-23]
+
+- Source: the maintainer clicked `https://slack.com/archives/<channel ID>/p<ts>` in the Slack
+  client, and it opened the message
+- `p<ts>` is the message timestamp with its dot removed: `1790146735.683649` becomes
+  `p1790146735683649`
+- The link Slack's own "Copy link" gives is `https://<workspace>.slack.com/archives/...`. The
+  subdomain is not in any `chat.postMessage` response, and `auth.test` would be an extra call
+
+## `chat.update` lists `message_not_found`, `cant_update_message` and `edit_window_closed` among its errors [2026-09-23]
+
+- Source: `slackapi/slack-api-specs`, `web-api/slack_web_openapi_v2.json`,
+  `paths["/chat.update"]` error enum. The repository is archived, so the list may be stale
+- Unverified: what each means, and whether any edit window applies to a bot editing its own
+  message. [chat.update](https://docs.slack.dev/reference/methods/chat.update) was not reachable
+  to check
+
+## `chat.update` documents no `unfurl_links` or `unfurl_media`, where `chat.postMessage` does [2026-09-23]
+
+- Source: `slackapi/slack-api-specs` `web-api/slack_web_openapi_v2.json`, `paths["/chat.update"]`
+  parameters; `slackapi/node-slack-sdk` `main`, `packages/web-api/src/types/request/chat.ts`
+  `ChatUpdateArguments`; `slackapi/python-slack-sdk` `main`, `slack_sdk/web/client.py`
+  `chat_update`
+- `chat.update` takes `as_user`, `attachments`, `blocks`, `channel`, `link_names`, `parse`,
+  `text`, `ts`. The Node SDK adds `file_ids`, `reply_broadcast` and metadata, still no unfurl
+  arguments
+- slack-go's `MsgOptionDisableLinkUnfurl` sets `unfurl_links=false` on whatever endpoint the
+  message goes to (`slack-go@v0.29.0/chat.go`), so it sends on an update, but Slack does not
+  document honouring it there
+- So an edit that adds a link has no documented way to suppress its preview
