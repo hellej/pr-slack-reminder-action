@@ -139,10 +139,14 @@ marked stale. Link the README's workflow example.
     the first block of an array (`slack-go@v0.29.0/block_json.go`)
   - Drops the last block, the live footer, and wraps the rest with `slack.BlockFromJSON`, which
     re-sends each byte for byte, so no block type has to survive an unmarshal round trip
+  - Does not check that the dropped block is a `context` block: `BuildMessage` always puts the
+    footer last, and nothing else writes the stored blocks
   - Appends a context block reading
     `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
   - Errors on blocks that do not parse or are empty
-- Unit tests pin byte-identical non-footer blocks, the stale footer, and the error cases
+- Unit tests pin byte-identical non-footer blocks, the same compact blocks from an indented
+  store, the stale footer, and the error cases
+- `make check-dead-code` flags `BuildStaleMessage` and its two helpers until Step 3 calls it
 - Update `messagebuilder.spec.md`: the stale footer, and that the stale message never re-renders
   content
 

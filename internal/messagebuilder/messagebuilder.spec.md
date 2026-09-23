@@ -1,6 +1,6 @@
 # messagebuilder
 
-Turns `messagecontent.Content` into a Slack message.
+Turns `messagecontent.Content` into a Slack message, and marks a sent message stale.
 
 ## Behaviour
 
@@ -17,10 +17,15 @@ Turns `messagecontent.Content` into a Slack message.
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
 - The last block is always a `context` block reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
 - The message is capped at 50 blocks; content blocks past the cap are dropped and logged, and the footer keeps the last slot
+- `BuildStaleMessage(sentBlocks, generatedAt)` rebuilds a sent message from its stored block array: every block but the last re-sends as stored, and the last, the live footer, becomes a `context` block reading `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
+  - `{date_pretty}` reads `today` or `yesterday` when it applies, otherwise a date; the fallback after the pipe carries the date and time in UTC
+  - Errors on blocks that do not parse, on an empty array or `null`, and on a block without a `type`
 
 ## Doesn't Do
 
 - Doesn't check any Slack limit other than block count, such as per-block text length or total payload size
+- `BuildStaleMessage` never re-renders content: rows, ages and headings stay as last sent
+- `BuildStaleMessage` doesn't check that the block it drops is a footer. It relies on `BuildMessage` always putting the footer last
 
 ## Oddities
 
@@ -29,3 +34,4 @@ Turns `messagecontent.Content` into a Slack message.
 - Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it. The cut ignores where a section starts, so a section heading can be left with all of its repositories dropped, and the last block before the footer can be a spacing block
 - A message with nothing to list at all is the footer alone, or the no-open-PRs line above it when that is set. Neither is worth sending, and it is the caller that decides
 - Same-named repositories under different owners get identical sub-headings: only their link targets tell those groups apart
+- `BuildStaleMessage` re-sends stored blocks compacted, whatever whitespace they were stored with, so an indented store sends the same JSON

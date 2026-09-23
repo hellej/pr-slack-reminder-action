@@ -4,6 +4,8 @@
 package messagebuilder
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -139,6 +141,40 @@ func buildFooterBlock(generatedAt time.Time) slack.Block {
 	footerText := fmt.Sprintf(
 		"_Live, updated <!date^%d^{time}|%s UTC>_",
 		generatedAt.Unix(), generatedAt.UTC().Format("15:04"),
+	)
+	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
+}
+
+// BuildStaleMessage rebuilds a sent message with its live footer, always the last block, swapped
+// for a stale one. The other blocks re-send as stored, so none has to survive a round trip
+// through slack-go's block types.
+func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
+	var sentBlockList []json.RawMessage
+	if err := json.Unmarshal(sentBlocks, &sentBlockList); err != nil {
+		return slack.Message{}, fmt.Errorf("failed to parse the sent blocks: %w", err)
+	}
+	if len(sentBlockList) == 0 {
+		return slack.Message{}, errors.New("no sent blocks to mark stale")
+	}
+	contentBlocks, err := utilities.MapWithError(sentBlockList[:len(sentBlockList)-1], blockFromJSON)
+	if err != nil {
+		return slack.Message{}, fmt.Errorf("failed to parse a sent block: %w", err)
+	}
+	return slack.NewBlockMessage(append(contentBlocks, buildStaleFooterBlock(generatedAt))...), nil
+}
+
+// slack.BlockFromJSON keeps only the first block of an array. Its block marshals back to the
+// stored bytes, compacted.
+func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
+	return slack.BlockFromJSON(string(sentBlock))
+}
+
+// {date_pretty} reads "today" or "yesterday" when it applies, otherwise a date like
+// "September 2nd". A stale message is read days later, so the fallback names the date too.
+func buildStaleFooterBlock(generatedAt time.Time) slack.Block {
+	footerText := fmt.Sprintf(
+		"_⚠️ Stale, updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
+		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
 	)
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
