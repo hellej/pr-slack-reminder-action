@@ -607,3 +607,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   page says nothing about edits
 - The maintainer sees no preview on PR links, including ones an update run's `chat.update` adds to
   the message after the post
+
+## `slack-go` v0.29.0 returns a Slack API error as `slack.SlackErrorResponse`, its `Err` the error code [2026-09-23]
+
+- Source: `slack-go@v0.29.0/misc.go` `SlackResponse.Err`, `SlackErrorResponse`; `chat.go`
+  `sendResponseFull`
+- A response with `ok: false` becomes `SlackErrorResponse{Err: t.Error, ...}`, a value type whose
+  `Error()` returns `Err` alone
+- `UpdateMessage` and `PostMessage` return it unwrapped from `sendResponseFull`, so
+  `errors.As(err, &slack.SlackErrorResponse{})` reaches the code

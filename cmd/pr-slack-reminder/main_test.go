@@ -20,6 +20,8 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/google/go-github/v78/github"
+	"github.com/slack-go/slack"
+
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -1063,6 +1065,255 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 		runStart:    runStart,
 		runEnd:      runEnd,
 	})
+}
+
+const (
+	previousHeadingBlock    = `{"type":"header","text":{"type":"plain_text","text":"👀 Waiting for review","emoji":true},"block_id":"heading_waiting_for_review","level":2}`
+	previousRowsBlock       = `{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/test-org/test-repo/pull/7","text":"Listed yesterday","style":{"bold":true}}]}],"style":"bullet","indent":0,"border":0,"offset":0}]}`
+	previousLiveFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
+)
+
+// A previous post's state whose message differs from the new one in channel, timestamp, summary
+// and content, so the stale edit can only have come from the stored message.
+func previousPostState() state.State {
+	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
+	previousState.SlackMessage = state.SlackRef{ChannelID: "C0PREVIOUS", MessageTS: "1788253200.000100"}
+	previousState.LastSentMessage = state.LastSentMessage{
+		Blocks:      []byte("[" + previousHeadingBlock + "," + previousRowsBlock + "," + previousLiveFooterBlock + "]"),
+		SummaryText: "3 open PRs are waiting for attention 👀",
+		GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+	}
+	return previousState
+}
+
+type postOverPreviousStateOptions struct {
+	previousState      *state.State
+	listArtifactsError error
+	updateMessageError error
+	postMessageError   error
+	// Leaves the run nothing to send, since the default config sets no no-prs-message
+	noOpenPRs bool
+}
+
+type postOverPreviousStateResult struct {
+	runErr                  error
+	mockSlackAPI            *mockslackclient.MockSlackAPI
+	stateFilePath           string
+	sentSlackBlocksFilePath string
+}
+
+func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOptions) postOverPreviousStateResult {
+	t.Helper()
+	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+		UpdateMessageError: options.updateMessageError,
+		PostMessageError:   options.postMessageError,
+	})
+	openPRs := []*github.PullRequest{
+		getTestPR(GetTestPROptions{Number: 8, Title: "Opened today", AuthorLogin: "alice"}),
+	}
+	if options.noOpenPRs {
+		openPRs = nil
+	}
+
+	runErr := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                openPRs,
+			MockPreviousState:  options.previousState,
+			ListArtifactsError: options.listArtifactsError,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	return postOverPreviousStateResult{
+		runErr:                  runErr,
+		mockSlackAPI:            mockSlackAPI,
+		stateFilePath:           overrides[config.EnvStateFilePath].(string),
+		sentSlackBlocksFilePath: sentSlackBlocksFilePath,
+	}
+}
+
+// The new state points at the new message whatever happened to the previous one.
+func assertNewPostStateSaved(t *testing.T, stateFilePath string) {
+	t.Helper()
+	savedState := loadSavedState(t, stateFilePath)
+	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1234567890.123456"}
+	if savedState.SlackMessage != expectedMessageRef {
+		t.Errorf("Expected the new message ref %+v, got %+v", expectedMessageRef, savedState.SlackMessage)
+	}
+	if savedState.LastSentMessage.SummaryText != "1 open PR is waiting for attention 👀" {
+		t.Errorf("Expected the new message's summary text, got %q", savedState.LastSentMessage.SummaryText)
+	}
+}
+
+func assertSentBlocksRecordTheNewMessageOnly(t *testing.T, sentSlackBlocksFilePath string) {
+	t.Helper()
+	sentBlocks, err := os.ReadFile(sentSlackBlocksFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read sent Slack blocks: %v", err)
+	}
+	if !strings.Contains(string(sentBlocks), "Opened today") || strings.Contains(string(sentBlocks), "Stale") {
+		t.Errorf("Expected the sent-blocks record to hold the new message only, got:\n%s", sentBlocks)
+	}
+}
+
+func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
+	previousState := previousPostState()
+
+	result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{previousState: &previousState})
+
+	if result.runErr != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+	}
+	staleEdit := result.mockSlackAPI.UpdatedMessage
+	if staleEdit.ChannelID != "C0PREVIOUS" || staleEdit.Timestamp != "1788253200.000100" {
+		t.Errorf(
+			"Expected the edit on C0PREVIOUS at 1788253200.000100, got %s at %s",
+			staleEdit.ChannelID, staleEdit.Timestamp,
+		)
+	}
+	if staleEdit.Text != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the stored summary text, got %q", staleEdit.Text)
+	}
+	expectedStaleBlocks := "[" + previousHeadingBlock + "," + previousRowsBlock + "," +
+		`{"type":"context","elements":[{"type":"mrkdwn","text":"_⚠️ Stale, updated \u003c!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC\u003e_"}]}` +
+		"]"
+	if string(staleEdit.SentBlocks) != expectedStaleBlocks {
+		t.Errorf("Expected the stale blocks\n%s\ngot\n%s", expectedStaleBlocks, staleEdit.SentBlocks)
+	}
+	assertNewPostStateSaved(t, result.stateFilePath)
+	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+}
+
+func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
+	previousState := previousPostState()
+
+	t.Run("the send fails", func(t *testing.T) {
+		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
+			previousState:    &previousState,
+			postMessageError: errors.New("invalid_auth"),
+		})
+
+		if result.runErr == nil || !strings.Contains(result.runErr.Error(), "invalid_auth") {
+			t.Fatalf("Expected Run to fail with the send error, got %v", result.runErr)
+		}
+		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
+			t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+		}
+	})
+
+	t.Run("there is nothing to send", func(t *testing.T) {
+		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
+			previousState: &previousState,
+			noOpenPRs:     true,
+		})
+
+		if result.runErr != nil {
+			t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+		}
+		if result.mockSlackAPI.SentMessage.ChannelID != "" {
+			t.Fatalf("Expected nothing sent, got %+v", result.mockSlackAPI.SentMessage)
+		}
+		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
+			t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+		}
+	})
+}
+
+func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
+	previousStateWithoutLastSentMessage := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
+	previousState := previousPostState()
+
+	testCases := []struct {
+		name    string
+		options postOverPreviousStateOptions
+	}{
+		{
+			name:    "the previous state does not load",
+			options: postOverPreviousStateOptions{listArtifactsError: errors.New("artifact listing error")},
+		},
+		{
+			name:    "the previous state predates the last sent message",
+			options: postOverPreviousStateOptions{previousState: &previousStateWithoutLastSentMessage},
+		},
+		{
+			name: "message_not_found",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "message_not_found"},
+			},
+		},
+		{
+			name: "cant_update_message",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "cant_update_message"},
+			},
+		},
+		{
+			name: "edit_window_closed",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "edit_window_closed"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runPostModeOverPreviousState(t, tc.options)
+
+			if result.runErr != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+			}
+			if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
+				t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			}
+			assertNewPostStateSaved(t, result.stateFilePath)
+			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+		})
+	}
+}
+
+func TestPostModeStaleEditFailureFailsTheRunButSavesTheNewState(t *testing.T) {
+	previousState := previousPostState()
+	previousStateWithUnbuildableBlocks := previousPostState()
+	previousStateWithUnbuildableBlocks.LastSentMessage.Blocks = []byte(
+		`[{"text":"no type"},` + previousLiveFooterBlock + `]`,
+	)
+
+	testCases := []struct {
+		name                  string
+		options               postOverPreviousStateOptions
+		expectedErrorFragment string
+	}{
+		{
+			name: "another Slack error",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "channel_not_found"},
+			},
+			expectedErrorFragment: "channel_not_found",
+		},
+		{
+			name:                  "stored blocks that do not rebuild",
+			options:               postOverPreviousStateOptions{previousState: &previousStateWithUnbuildableBlocks},
+			expectedErrorFragment: "block missing required 'type' field",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runPostModeOverPreviousState(t, tc.options)
+
+			if result.runErr == nil || !strings.Contains(result.runErr.Error(), tc.expectedErrorFragment) {
+				t.Fatalf("Expected Run to fail with %q, got %v", tc.expectedErrorFragment, result.runErr)
+			}
+			assertNewPostStateSaved(t, result.stateFilePath)
+			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+		})
+	}
 }
 
 func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {

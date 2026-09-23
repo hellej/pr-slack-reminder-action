@@ -7,11 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/slack-go/slack"
 )
+
+// ErrMessageNotEditable marks a chat.update error saying the message is gone or can no longer be
+// edited (https://docs.slack.dev/reference/methods/chat.update).
+var ErrMessageNotEditable = errors.New("message cannot be edited")
+
+var notEditableMessageErrorCodes = []string{"message_not_found", "cant_update_message", "edit_window_closed"}
 
 type SentMessageInfo struct {
 	ChannelID string
@@ -154,7 +161,7 @@ func (c *client) UpdateMessage(
 		slack.MsgOptionText(summaryText, false),
 	)
 	if err != nil {
-		return SentMessageInfo{}, fmt.Errorf("failed to update Slack message: %v", err)
+		return SentMessageInfo{}, WrapUpdateMessageError(err)
 	}
 	log.Printf("Updated message in Slack channel: %s", channelID)
 
@@ -163,6 +170,17 @@ func (c *client) UpdateMessage(
 		Timestamp: messageTS,
 		Blocks:    sentBlocks,
 	}, nil
+}
+
+// WrapUpdateMessageError wraps an UpdateMessage error, with ErrMessageNotEditable when Slack says
+// the message cannot be edited. slack-go returns a Slack API error as slack.SlackErrorResponse,
+// its Err the error code (slack-go v0.29.0 misc.go SlackResponse.Err).
+func WrapUpdateMessageError(err error) error {
+	var slackError slack.SlackErrorResponse
+	if errors.As(err, &slackError) && slices.Contains(notEditableMessageErrorCodes, slackError.Err) {
+		return fmt.Errorf("failed to update Slack message: %w: %w", ErrMessageNotEditable, err)
+	}
+	return fmt.Errorf("failed to update Slack message: %w", err)
 }
 
 func (c *client) DeleteMessage(channelID string, messageTS string) error {

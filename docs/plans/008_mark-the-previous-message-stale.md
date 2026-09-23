@@ -152,8 +152,10 @@ marked stale. Link the README's workflow example.
 
 ### 3. Mark the previous message stale
 
-- `runPostMode`, after a successful send:
-  - Loads the previous state with `state.Load`. A failure logs and skips
+- `runPostMode`, after a successful send, calls `markPreviousMessageStale`:
+  - Loads the previous state with `state.Load`, after the send, so a run that sends nothing
+    downloads no artifact. This run's own state is uploaded after it ends, so either order reads
+    the previous post's. A failure logs and skips
   - Skips with a log line when `LastSentMessage.Blocks` is empty
   - Builds the stale message and edits it with `slackClient.UpdateMessage`, on the previous
     state's channel ID and timestamp, with the stored summary text
@@ -164,10 +166,17 @@ marked stale. Link the README's workflow example.
   ([chat.update](https://docs.slack.dev/reference/methods/chat.update) errors)
   - Post mode logs it and skips: that message cannot be marked
   - `DeleteMessage`'s string match on `message_not_found` stays as it is
-  - `mockslackclient.UpdateMessage` returns the same sentinel for those errors
-- Any other error from the stale edit joins post mode's returned error. Post still returns the
-  new state, so it is saved
-- Integration tests in `main_test.go` cover the mark, each skip path, and the failing edit
+  - It matches the code on `slack.SlackErrorResponse`, which slack-go returns for an `ok: false`
+    response, its `Err` the error code (`slack-go@v0.29.0/misc.go`, `SlackResponse.Err`)
+  - The mapping is exported as `slackclient.WrapUpdateMessageError`, and
+    `mockslackclient.UpdateMessage` calls it, so the mock cannot drift from the real client
+- Any other error from the stale edit, a `BuildStaleMessage` error included, joins post mode's
+  returned error. Post still returns the new state, so it is saved
+- The mock's `UpdatedMessage` also records `SentBlocks`, the block array as sent, so a test pins
+  the stale edit byte for byte
+- A `slackclient` unit test through the fake `SlackAPI` pins the error mapping. Integration tests
+  in `main_test.go` cover the mark, each skip path, the failing edit, and no mark when the send
+  fails or there is nothing to send
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:

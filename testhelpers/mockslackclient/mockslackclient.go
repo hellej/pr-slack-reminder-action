@@ -130,21 +130,19 @@ func (m *MockSlackAPI) UpdateMessage(
 		panic("Failed to parse updated blocks in mock Slack API: " + err.Error())
 	}
 
-	if m.updateMessageError == nil {
-		m.UpdatedMessage.ChannelID = channelID
-		m.UpdatedMessage.Timestamp = messageTS
-		m.UpdatedMessage.Text = summaryText
-		m.UpdatedMessage.Blocks = updatedBlocks
-	}
-
-	if m.updateMessageError != nil {
-		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to update Slack message: %v", m.updateMessageError)
-	}
-
 	sentJSONBlocks, err := slackclient.MarshalSentBlocks(message)
 	if err != nil {
 		return slackclient.SentMessageInfo{}, err
 	}
+	if m.updateMessageError != nil {
+		return slackclient.SentMessageInfo{}, slackclient.WrapUpdateMessageError(m.updateMessageError)
+	}
+
+	m.UpdatedMessage.ChannelID = channelID
+	m.UpdatedMessage.Timestamp = messageTS
+	m.UpdatedMessage.Text = summaryText
+	m.UpdatedMessage.Blocks = updatedBlocks
+	m.UpdatedMessage.SentBlocks = sentJSONBlocks
 	return slackclient.SentMessageInfo{
 		ChannelID: channelID,
 		Timestamp: messageTS,
@@ -198,6 +196,8 @@ type UpdatedMessage struct {
 	Timestamp string
 	Blocks    BlocksWrapper
 	Text      string
+	// The block array as sent, for asserting a message re-sent from stored blocks byte for byte
+	SentBlocks json.RawMessage
 }
 
 type DeletedMessage struct {

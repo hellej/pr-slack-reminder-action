@@ -140,6 +140,7 @@ type mockSlackAPI struct {
 	editCanvasParams     []slack.EditCanvasParams
 	postMessageCalls     int
 	updateMessageCalls   int
+	updateMessageError   error
 }
 
 func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -168,6 +169,9 @@ func (m *mockSlackAPI) PostMessage(channelID string, _ ...slack.MsgOption) (stri
 
 func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, _ ...slack.MsgOption) (string, string, string, error) {
 	m.updateMessageCalls++
+	if m.updateMessageError != nil {
+		return "", "", "", m.updateMessageError
+	}
 	return channelID, timestamp, "updated_timestamp", nil
 }
 
@@ -327,6 +331,64 @@ func TestUnmarshallableBlocksFailBeforeSending(t *testing.T) {
 			"Expected no Slack call, got %d post and %d update calls",
 			mockAPI.postMessageCalls, mockAPI.updateMessageCalls,
 		)
+	}
+}
+
+// slack-go returns a Slack API error as slack.SlackErrorResponse, its Err the error code
+// (slack-go v0.29.0 misc.go SlackResponse.Err, chat.go sendResponseFull).
+func TestUpdateMessageErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		updateMessageError   error
+		expectNotEditable    bool
+		expectedErrorMessage string
+	}{
+		{
+			name:                 "message_not_found",
+			updateMessageError:   slack.SlackErrorResponse{Err: "message_not_found"},
+			expectNotEditable:    true,
+			expectedErrorMessage: "failed to update Slack message: message cannot be edited: message_not_found",
+		},
+		{
+			name:                 "cant_update_message",
+			updateMessageError:   slack.SlackErrorResponse{Err: "cant_update_message"},
+			expectNotEditable:    true,
+			expectedErrorMessage: "failed to update Slack message: message cannot be edited: cant_update_message",
+		},
+		{
+			name:                 "edit_window_closed",
+			updateMessageError:   slack.SlackErrorResponse{Err: "edit_window_closed"},
+			expectNotEditable:    true,
+			expectedErrorMessage: "failed to update Slack message: message cannot be edited: edit_window_closed",
+		},
+		{
+			name:                 "another Slack error",
+			updateMessageError:   slack.SlackErrorResponse{Err: "channel_not_found"},
+			expectedErrorMessage: "failed to update Slack message: channel_not_found",
+		},
+		{
+			name:                 "a non-Slack error carrying a not-editable code as text",
+			updateMessageError:   errors.New("message_not_found"),
+			expectedErrorMessage: "failed to update Slack message: message_not_found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := slackclient.NewClient(&mockSlackAPI{updateMessageError: tt.updateMessageError})
+
+			_, err := client.UpdateMessage("C12345", "1234567890.123456", slack.NewBlockMessage(), "summary")
+
+			if err == nil {
+				t.Fatal("Expected an error, got nil")
+			}
+			if err.Error() != tt.expectedErrorMessage {
+				t.Errorf("Expected error %q, got %q", tt.expectedErrorMessage, err.Error())
+			}
+			if errors.Is(err, slackclient.ErrMessageNotEditable) != tt.expectNotEditable {
+				t.Errorf("Expected errors.Is ErrMessageNotEditable to be %v, got %v", tt.expectNotEditable, !tt.expectNotEditable)
+			}
+		})
 	}
 }
 

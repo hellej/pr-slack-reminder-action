@@ -63,7 +63,7 @@ func Run(
 	switch cfg.RunMode {
 	case config.RunModePost:
 		stateToSave, messageErr = runPostMode(
-			slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
+			githubClient, slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		stateToSave, messageErr = runUpdateMode(
@@ -95,6 +95,7 @@ func Run(
 
 // Returns a nil state when there is nothing to send, so callers write nothing.
 func runPostMode(
+	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
 	openPRs githubclient.OpenPRsResult,
@@ -123,7 +124,54 @@ func runPostMode(
 	}
 
 	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt)
-	return &postState, sentMessageHandler(sentMessageInfo)
+	return &postState, errors.Join(
+		sentMessageHandler(sentMessageInfo),
+		markPreviousMessageStale(githubClient, slackClient, cfg),
+	)
+}
+
+// Swaps the previous post's live footer for a stale one, so only the newest reminder reads
+// "Live". Runs only after a successful send. This run's own state is uploaded after it ends, so
+// the load still finds the previous post's.
+func markPreviousMessageStale(
+	githubClient githubclient.Client, slackClient slackclient.Client, cfg config.Config,
+) error {
+	previousState, err := state.Load(
+		context.Background(),
+		githubClient,
+		cfg.CurrentRepository,
+		cfg.StateArtifactName,
+		cfg.StateFilePath,
+	)
+	if err != nil {
+		log.Printf("Not marking the previous message stale, its state did not load: %v", err)
+		return nil
+	}
+	lastSentMessage := previousState.LastSentMessage
+	if len(lastSentMessage.Blocks) == 0 {
+		log.Println("Not marking the previous message stale, its state records no sent message")
+		return nil
+	}
+
+	staleMessage, err := messagebuilder.BuildStaleMessage(lastSentMessage.Blocks, lastSentMessage.GeneratedAt)
+	if err != nil {
+		return fmt.Errorf("failed to mark the previous message stale: %w", err)
+	}
+	_, err = slackClient.UpdateMessage(
+		previousState.SlackMessage.ChannelID,
+		previousState.SlackMessage.MessageTS,
+		staleMessage,
+		lastSentMessage.SummaryText,
+	)
+	if errors.Is(err, slackclient.ErrMessageNotEditable) {
+		log.Printf("Not marking the previous message stale: %v", err)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to mark the previous message stale: %w", err)
+	}
+	log.Println("Marked the previous message stale")
+	return nil
 }
 
 func buildNonDraftPRViews(openPRs githubclient.OpenPRsResult, cfg config.Config) []prview.PR {
