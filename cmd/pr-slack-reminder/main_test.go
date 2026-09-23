@@ -867,7 +867,7 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "Surviving PR", AuthorLogin: "alice"}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Filtered out PR", AuthorLogin: "bob"}),
 			},
-			MockStateForUpdateMode: &loadedState,
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
@@ -948,9 +948,9 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRsByNumber:            tc.prByNumber,
-					MockStateForUpdateMode: &loadedState,
-					ListArtifactsError:     tc.listArtifactError,
+					PRsByNumber:        tc.prByNumber,
+					MockPreviousState:  &loadedState,
+					ListArtifactsError: tc.listArtifactError,
 				}),
 				mockslackclient.MakeSlackClientGetter(
 					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
@@ -1341,14 +1341,14 @@ func TestScenariosUpdateMode(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRsByNumber:            tc.prByNumber,
-				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
-				MergedPRs:              tc.mergedPRsFromSearch,
-				MergedPRsSearchError:   tc.mergedPRsSearchError,
-				ReviewsByPRNumber:      tc.reviewsByPRNumber,
-				MockStateForUpdateMode: tc.mockState,
-				ListArtifactsError:     tc.listArtifactsError,
-				DownloadArtifactError:  tc.downloadArtifactError,
+				PRsByNumber:           tc.prByNumber,
+				PRs:                   openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:             tc.mergedPRsFromSearch,
+				MergedPRsSearchError:  tc.mergedPRsSearchError,
+				ReviewsByPRNumber:     tc.reviewsByPRNumber,
+				MockPreviousState:     tc.mockState,
+				ListArtifactsError:    tc.listArtifactsError,
+				DownloadArtifactError: tc.downloadArtifactError,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
 				UpdateMessageError: tc.updateMessageError,
@@ -1443,8 +1443,8 @@ func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
 				Number: 3, Title: "Merged PR", AuthorLogin: "carol", MergedHoursAgo: 2,
 			})},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1493,9 +1493,9 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenTheStatePRsAreStillOpen(t *testing.
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    []*github.PullRequest{openPR1, openPR2},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			PRs:               []*github.PullRequest{openPR1, openPR2},
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1523,10 +1523,10 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenAStatePRMergedInsideTheWindow(t *te
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    []*github.PullRequest{getTestPR(GetTestPROptions{Number: 9, Title: "Open PR"})},
-			MergedPRs:              []*github.PullRequest{mergedStatePR},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			PRs:               []*github.PullRequest{getTestPR(GetTestPROptions{Number: 9, Title: "Open PR"})},
+			MergedPRs:         []*github.PullRequest{mergedStatePR},
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1563,8 +1563,8 @@ func TestUpdateModeFetchesOnlyTheStatePRsNeitherFetchResolved(t *testing.T) {
 			ReviewsByPRNumber: map[int][]*github.PullRequestReview{
 				2: {mockgithubclient.NewReview("dana", "Dana", "APPROVED")},
 			},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1608,9 +1608,9 @@ func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *tes
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			MergedPRs:              append([]*github.PullRequest{mergedStatePR}, newerMerges...),
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MergedPRs:         append([]*github.PullRequest{mergedStatePR}, newerMerges...),
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1651,8 +1651,8 @@ func TestUpdateModeShowsEveryPRMergedSinceThePost(t *testing.T) {
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			MergedPRs:              mergesSincePost,
-			MockStateForUpdateMode: &loadedState,
+			MergedPRs:         mergesSincePost,
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1682,8 +1682,8 @@ func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
 			PRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR not in state", AuthorLogin: "alice"}),
 			},
-			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
-			MockStateForUpdateMode: &loadedState,
+			ErrByPRNumber:     map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1707,8 +1707,8 @@ func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
-			MockStateForUpdateMode: &loadedState,
+			ErrByPRNumber:     map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)

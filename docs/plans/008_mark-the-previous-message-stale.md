@@ -105,7 +105,7 @@ marked stale. Link the README's workflow example.
 ### R2. Rename the mock's `MockStateForUpdateMode`
 
 - Post mode will read it too. Rename to `MockPreviousState` in `testhelpers/mockgithubclient`
-  across ~20 call sites, no behaviour change
+  and its 18 call sites in `cmd/pr-slack-reminder`'s tests, no behaviour change
 
 ### 1. Store the last sent message in state
 

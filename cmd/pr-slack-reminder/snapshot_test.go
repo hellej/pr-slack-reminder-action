@@ -488,11 +488,11 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 
 			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRsByNumber:            tc.prByNumber,
-				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
-				MergedPRs:              tc.mergedPRsFromSearch,
-				ReviewsByPRNumber:      tc.reviewsByPRNumber,
-				MockStateForUpdateMode: &mockState,
+				PRsByNumber:       tc.prByNumber,
+				PRs:               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:         tc.mergedPRsFromSearch,
+				ReviewsByPRNumber: tc.reviewsByPRNumber,
+				MockPreviousState: &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 

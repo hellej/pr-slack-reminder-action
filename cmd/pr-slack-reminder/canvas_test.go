@@ -247,11 +247,11 @@ func TestUpdateModeOpenPRFetchFailureStopsTheRun(t *testing.T) {
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRsByNumber:            map[int]*github.PullRequest{1: trackedPR},
-					PRs:                    []*github.PullRequest{trackedPR},
-					MockStateForUpdateMode: &mockState,
-					ListPRsResponseStatus:  500,
-					PRServiceError:         errors.New("unable to fetch PRs"),
+					PRsByNumber:           map[int]*github.PullRequest{1: trackedPR},
+					PRs:                   []*github.PullRequest{trackedPR},
+					MockPreviousState:     &mockState,
+					ListPRsResponseStatus: 500,
+					PRServiceError:        errors.New("unable to fetch PRs"),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 			)
@@ -345,10 +345,10 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRsByNumber:            map[int]*github.PullRequest{1: trackedOpenPR, 2: trackedMergedPR},
-			PRs:                    []*github.PullRequest{trackedOpenPR, untrackedOpenPR, untrackedDraftPR},
-			MergedPRs:              canvasTestMergedPRs(),
-			MockStateForUpdateMode: &mockState,
+			PRsByNumber:       map[int]*github.PullRequest{1: trackedOpenPR, 2: trackedMergedPR},
+			PRs:               []*github.PullRequest{trackedOpenPR, untrackedOpenPR, untrackedDraftPR},
+			MergedPRs:         canvasTestMergedPRs(),
+			MockPreviousState: &mockState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -666,10 +666,10 @@ func TestUpdateModeSkipsTheCanvasWriteWhenTheContentIsUnchanged(t *testing.T) {
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    prs,
-			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
-			MergedPRs:              canvasTestMergedPRs(),
-			MockStateForUpdateMode: &seedState,
+			PRs:               prs,
+			PRsByNumber:       map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:         canvasTestMergedPRs(),
+			MockPreviousState: &seedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -732,10 +732,10 @@ func TestUpdateModeWritesTheCanvasWhenTheSeededHashDoesNotMatch(t *testing.T) {
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRs:                    tc.prs,
-					PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
-					MergedPRs:              canvasTestMergedPRs(),
-					MockStateForUpdateMode: &seedState,
+					PRs:               tc.prs,
+					PRsByNumber:       map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+					MergedPRs:         canvasTestMergedPRs(),
+					MockPreviousState: &seedState,
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 			)
@@ -781,10 +781,10 @@ func TestUpdateModeCarriesTheSeededHashWhenNothingIsWritten(t *testing.T) {
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    prs,
-			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
-			MergedPRs:              canvasTestMergedPRs(),
-			MockStateForUpdateMode: &seedStateForRun,
+			PRs:               prs,
+			PRsByNumber:       map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:         canvasTestMergedPRs(),
+			MockPreviousState: &seedStateForRun,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -827,9 +827,9 @@ func TestUpdateModeKeepsTheSeededHashWhenTheCanvasWriteFails(t *testing.T) {
 			PRs: append(prs, getTestPR(GetTestPROptions{
 				Number: 4, Title: "Open PR three", AuthorLogin: "dave", AgeHours: 7,
 			})),
-			PRsByNumber:            map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
-			MergedPRs:              canvasTestMergedPRs(),
-			MockStateForUpdateMode: &seedState,
+			PRsByNumber:       map[int]*github.PullRequest{1: prs[0], 2: prs[1]},
+			MergedPRs:         canvasTestMergedPRs(),
+			MockPreviousState: &seedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
