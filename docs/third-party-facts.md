@@ -489,10 +489,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Tokens: `{date_num}`, `{date}`, `{date_short}`, `{date_long}`, the three `_pretty` variants,
   `{time}`, `{time_secs}`, `{ago}`
 - `{time}` renders 12-hour or 24-hour by the reading client's own setting. No token forces either
-- `{date_short_pretty}` reads `today`, `yesterday` or `tomorrow` when it applies, otherwise
-  `{date_short}`'s `Aug 9, 2020` (`slackapi/node-slack-sdk` `main`,
+- The `_pretty` variants read `today`, `yesterday` or `tomorrow` when it applies, otherwise their
+  base token: `{date_pretty}` falls back to `{date}`'s `August 9`, no year, and
+  `{date_short_pretty}` to `{date_short}`'s `Aug 9, 2020` (`slackapi/node-slack-sdk` `main`,
   `packages/types/src/block-kit/block-elements.ts`, the rich_text `date` element's `format` doc).
-  Unverified: that the mrkdwn token renders the same as the rich_text element's
+  Unverified: that the mrkdwn tokens render the same as the rich_text element's
 - The text after `|` shows when a client cannot process the date, so it carries the timezone the
   sender means
 - It works inside a `context` block's `mrkdwn` element, and `_`-wrapping the whole line italicises
@@ -553,6 +554,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `json.Marshal(blockSet)`. `UnsafeApplyMsgOptions` returns the values before that, so they carry
   no `blocks` key
 - The bytes a message is sent with are therefore `json.Marshal(message.Blocks.BlockSet)`
+- `chat.update` goes through the same `formSender` as `chat.postMessage`:
+  `sendConfig.BuildRequestContext` picks it for every mode but `chatResponse`
 
 ## `slack.BlockFromJSON` re-sends one block's JSON byte for byte [2026-09-23]
 
