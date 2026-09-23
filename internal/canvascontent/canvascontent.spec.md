@@ -20,7 +20,7 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 ## Doesn't Do
 
 - Doesn't read the clock: `GeneratedAt` is given by the caller, keeping `canvasbuilder`'s output deterministic under test
-- Doesn't read `PRListHeading` or `NoPRsMessage`: canvas headings and fallback lines are fixed strings owned by `canvasbuilder`, so there is no `<pr_count>` substitution either
+- Doesn't read `NoPRsMessage`: canvas headings and fallback lines are fixed strings owned by `canvasbuilder`
 - Doesn't have a whole-canvas "nothing to show" case: each section falls back on its own, and an empty open bucket is `canvasbuilder`'s to hide
 - Doesn't re-sort within a bucket, and filters the open PRs only by next action: no PR the fetch returned is dropped
 

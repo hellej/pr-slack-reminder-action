@@ -5,13 +5,18 @@ Turns `messagecontent.Content` into a Slack message.
 ## Behaviour
 
 - `BuildMessage(content)` returns the Slack message plus its summary text (used as Slack's plain-text fallback)
-- No-PRs case: renders `content.SummaryText` only
-- Ungrouped case: one heading followed by one bulleted list of all PRs
-- Grouped-by-repository case: per repository, a heading carrying the repository link from [internal/messagecontent](../messagecontent/messagecontent.spec.md), then its bulleted PR list, with a spacing block between repositories
-- Each PR entry shows: title (linked, struck through if closed-but-not-merged), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist), and a rocket marker if merged
-- The age and reviewer texts come from `prview`; this package supplies the surrounding spacing, the Block Kit styling, and the old-PR, merged and closed-but-not-merged markers
+- The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
+- Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
+- The headings are this package's own display text: `✅ Ready to merge`, `💬 Waiting for author`, `👀 Waiting for review`, `🚀 Recently merged`
+- Grouped-by-repository case: the section's rows come as one `rich_text` block per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them. The block opens with the repository name in bold, linked to the repository's pulls page, then holds that repository's rows
+- A spacing block, a `section` block of one blank space, sits between the repositories of a grouped section, never after its last one
+- Nothing sits between rendered sections: a `header` block carries its own vertical padding
+- An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist)
+- A merged PR row shows: title (linked), when it merged in italics, author, approvers/commenters. No age, no old-PR marker: the section heading says it landed
+- The age, merged and reviewer texts come from `prview`; this package supplies the surrounding spacing, the Block Kit styling and the old-PR marker
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
-- The message is capped at 50 content blocks; blocks past the cap are dropped and logged
+- The last block is always a `context` block reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
+- The message is capped at 50 blocks; content blocks past the cap are dropped and logged, and the footer keeps the last slot
 
 ## Doesn't Do
 
@@ -19,5 +24,8 @@ Turns `messagecontent.Content` into a Slack message.
 
 ## Oddities
 
-- The block cap bounds repository count, not PR count: grouped mode spends 3 blocks per repository, ungrouped mode puts every PR in one list block
-- Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it
+- Ungrouped, the block cap is out of reach: the layout spends at most 10 blocks whatever it lists, because a whole section's rows go in one block. Per-block text length is what a huge section would run into instead, and nothing checks it
+- Grouped by repository, a section costs 2 × repositories blocks (a block per repository, a spacing block between each pair, and the section heading), so the cap is reachable: 6 repositories with PRs in all four sections is the most that fits, at 48 content blocks plus the footer, one slot short of the cap. 7 build 56 content blocks, of which 7 are dropped
+- Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it. The cut ignores where a section starts, so a section heading can be left with all of its repositories dropped, and the last block before the footer can be a spacing block
+- A message with nothing to list at all is the footer alone, or the no-open-PRs line above it when that is set. Neither is worth sending, and it is the caller that decides
+- Same-named repositories under different owners get identical sub-headings: only their link targets tell those groups apart

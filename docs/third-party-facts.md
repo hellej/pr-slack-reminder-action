@@ -426,3 +426,117 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   installation token the page says success "only depends on the app's permissions"
 - So a green run in a public repository whose job grants `contents: read` proves the query
   works, never that a permission was unnecessary
+
+## A Slack `header` block takes a `level` of 1-4, and it is a message's only text larger than bold [2026-09-18]
+
+- Source: [header block](https://docs.slack.dev/reference/block-kit/blocks/header-block);
+  [rich text block](https://docs.slack.dev/reference/block-kit/blocks/rich-text-block);
+  [formatting message text](https://docs.slack.dev/messaging/formatting-message-text);
+  `slack-go@v0.29.0/block_header.go`, `block_rich_text.go`
+- `level` is an optional integer, 1-4 for H1-H4. `slack-go` builds it with
+  `NewHeaderBlock(textObj, HeaderBlockOptionLevel(n))`
+- `header` text must be a `plain_text` object, at most 150 characters: no links, no bold,
+  no italics inside it
+- `rich_text` has no heading element. Its element types are section, list, quote and
+  preformatted, and `RichTextSectionTextStyle` carries bold, italic, strike, code,
+  underline, highlight and unlink, no size
+- `mrkdwn` in a `section` block has no `#` heading syntax
+
+## One Slack `rich_text` block holds any mix of sections and lists, with no documented element cap [2026-09-18]
+
+- Source: [rich text block](https://docs.slack.dev/reference/block-kit/blocks/rich-text-block);
+  `slack-go@v0.29.0/block_rich_text.go`
+- `elements` is an array of `rich_text_section`, `rich_text_list`, `rich_text_quote` and
+  `rich_text_preformatted` objects, freely mixed. The only limit the page states on the block
+  is `block_id` at 255 characters
+- `slack-go` builds it with the variadic `NewRichTextBlock(blockID, elements...)`, over
+  `Elements []RichTextElement`
+- So a heading run, sub-heading runs and their lists fit in one block, and block count need not
+  grow with the number of lists rendered
+- How Slack spaces adjacent elements inside one block is not documented: only a live post shows it
+
+## An undeclared `with:` input warns on every run, it does not fail it [2026-09-19]
+
+- Source: [actions/runner#514](https://github.com/actions/runner/issues/514)
+- The runner emits `##[warning]Unexpected input '<name>', valid inputs are [...]` and continues
+- So removing an input from `action.yml` leaves every workflow that still sets it with a yellow
+  annotation on each run, until the caller deletes the line
+- [Metadata syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax)
+  documents `INPUT_<VARIABLE_NAME>` creation for declared inputs only, and does not cover this case
+
+## `chat.update` and `chat.delete` take a channel ID only, where `chat.postMessage` also takes a name [2026-09-19]
+
+- Source: live posts to the dev channel with `.agents/skills/slack-message-probe/send.sh`;
+  [chat.update](https://docs.slack.dev/reference/methods/chat.update)
+- `chat.postMessage` with `"channel": "pr-reminders-test"` returns `ok` and the channel ID
+- The same name on `chat.update` returns `ok: false`, `error: "channel_not_found"`
+- So an edit needs the ID the post's response carried
+
+## Slack rewrites a unicode emoji inside a `rich_text` text run into an `emoji` element [2026-09-19]
+
+- Source: live post to the dev channel, comparing the sent payload with the `message.blocks` the
+  response returned
+- `{"type": "text", "text": "✅ Ready to merge", "style": {"bold": true}}` comes back as an
+  `emoji` element with `name: "white_check_mark"` plus a `text` element holding `" Ready to merge"`,
+  each keeping the style
+- Rendering is unchanged, so a payload does not need to send `emoji` elements itself
+- A read-back of a message is therefore not byte-comparable with what was sent
+
+## Slack renders a timestamp in the reader's own timezone with `<!date^unix^{token}|fallback>` [2026-09-19]
+
+- Source: [formatting message text](https://docs.slack.dev/messaging/formatting-message-text);
+  live post to the dev channel
+- Tokens: `{date_num}`, `{date}`, `{date_short}`, `{date_long}`, the three `_pretty` variants,
+  `{time}`, `{time_secs}`, `{ago}`
+- `{time}` renders 12-hour or 24-hour by the reading client's own setting. No token forces either
+- The text after `|` shows when a client cannot process the date, so it carries the timezone the
+  sender means
+- It works inside a `context` block's `mrkdwn` element, and `_`-wrapping the whole line italicises
+  the rendered time with it
+
+## `slack-go` v0.29.0 builds a context block from `MixedElement`s, and `*TextBlockObject` is one [2026-09-19]
+
+- Source: `slack-go@v0.29.0/block_context.go`, `block_object.go`
+- `NewContextBlock(blockID string, mixedElements ...MixedElement) *ContextBlock`
+- `*TextBlockObject` implements `MixedElement` through `MixedElementType()`, so an mrkdwn context
+  line needs no wrapper type: `NewContextBlock("", NewTextBlockObject("mrkdwn", text, false, false))`
+
+## A Slack canvas renders `<!date^…>` as raw text, so canvas markdown has no local-time option [2026-09-19]
+
+- Source: live `canvases.edit` `insert_at_end` against the dev channel canvas, four variants read
+  back by eye in the Slack client
+- `<!date^1789807636^{time}|08:47 UTC>` renders literally, angle brackets and all. So do
+  `{date_num} {time}` and `{ago}`, and the fallback after `|` never takes over
+- The token works in message `mrkdwn`, canvas markdown is a different renderer
+- A canvas timestamp therefore has to name its timezone in the text, as `canvasbuilder`'s
+  `_Updated <date> <time> UTC_` does
+- `canvases.create` is refused on a free workspace (`free_teams_cannot_create_standalone_canvases`),
+  and `conversations.canvases.create` on a channel that already has one
+  (`free_team_canvas_tab_already_exists`). A probe has to edit the existing canvas
+- `conversations.info` gives the canvas's file ID under `channel.properties.tabs[]`, where a
+  `type: "canvas"` tab carries `data.file_id`. `properties.canvas` was absent
+
+## Two adjacent Slack `header` blocks stack their padding, and Block Kit exposes no spacing control [2026-09-21]
+
+- Source: live `post` runs of this action against the dev channel off
+  `message-sections-by-next-action`, read in the Slack client
+- A `header` block carries its own vertical padding. An H2 header immediately followed by an H3
+  header leaves a gap wider than either alone, with nothing between them in the payload
+- No block or element field sets spacing. The only lever is an extra block, a `section` block
+  holding a single space
+- A spacing block cannot sit inside a `rich_text` block, whose elements are section, list, quote
+  and preformatted only. So rows that need a spacing block between them have to be split across
+  blocks
+- Where a heading precedes a list with no gap wanted, a bold text run at the head of the list's
+  own `rich_text` block renders tighter than a `header` block does
+
+## An action input's `default:` applies only when `with:` omits the key, so an explicit `""` stays empty [2026-09-22]
+
+- Source: `actions/runner`, `src/Runner.Worker/ActionRunner.cs` on `main`, line 214:
+  `if (!inputs.ContainsKey(key)) { inputs[key] = manifestManager.EvaluateDefaultInput(...) }`
+- The runner decides on whether the caller's `with:` block contains the key at all, never on the
+  value. A workflow that sets an input to `""` keeps `""`; only omitting the key entirely gets the
+  `action.yml` default
+- This holds for a string-typed input the same as `old-pr-threshold-hours` (int-shaped) or
+  `group-by-repository` (bool-shaped): every action input is a string to the runner regardless of
+  how its value reads

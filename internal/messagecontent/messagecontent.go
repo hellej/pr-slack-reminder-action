@@ -1,82 +1,164 @@
-// Package messagecontent structures PR data and configuration into content
-// ready for message formatting. It handles text templating, PR grouping,
-// and message content preparation.
+// Package messagecontent structures PR views into the sections a reminder message shows: the
+// open PRs bucketed by next action, and the PRs that recently merged. It carries no rendering,
+// that belongs to messagebuilder.
 package messagecontent
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"log"
+	"slices"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-type Content struct {
-	SummaryText            string
-	PRListHeading          string
-	PRs                    []prview.PR
-	GroupedByRepository    bool
-	PRsGroupedByRepository []PRsOfRepository
+const MaxUntrackedPRsMergedBeforePost = 3
+
+const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
+
+// One message section's PRs, either as the flat list or as repository buckets.
+type PRSection struct {
+	PRs    []prview.PR
+	Groups []PRsOfRepository
 }
 
-func (c Content) HasPRs() bool {
-	return len(c.PRs) > 0 || len(c.PRsGroupedByRepository) > 0
+func (section PRSection) HasPRs() bool {
+	return len(section.PRs) > 0 || len(section.Groups) > 0
 }
 
 type PRsOfRepository struct {
-	HeadingPrefix       string
-	RepositoryLinkLabel string
-	RepositoryLink      string
-	PRs                 []prview.PR
+	RepositoryName     string
+	RepositoryPullsURL string
+	PRs                []prview.PR
 }
 
-func GetContent(openPRs []prview.PR, contentInputs config.ContentInputs) Content {
+type Content struct {
+	SummaryText         string
+	ReadyToMerge        PRSection
+	WaitingForAuthor    PRSection
+	WaitingForReview    PRSection
+	Merged              PRSection
+	NoOpenPRsText       string
+	GeneratedAt         time.Time
+	GroupedByRepository bool
+}
+
+func (c Content) HasPRs() bool {
+	return c.ReadyToMerge.HasPRs() || c.WaitingForAuthor.HasPRs() ||
+		c.WaitingForReview.HasPRs() || c.Merged.HasPRs()
+}
+
+// See messagecontent.spec.md for this function's full behaviour.
+func GetContent(
+	openPRs []prview.PR,
+	trackedPRs []prview.PR,
+	recentlyMergedPRs []prview.PR,
+	messagePostedAt time.Time,
+	generatedAt time.Time,
+	contentInputs config.ContentInputs,
+) Content {
 	sortedOpenPRs := prview.SortPRsOldestToNewest(openPRs)
+	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
+	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
+	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs, messagePostedAt)
 
-	switch {
-	case len(sortedOpenPRs) == 0:
-		return Content{
-			SummaryText: contentInputs.NoPRsMessage,
-		}
-	case contentInputs.GroupByRepository:
-		return Content{
-			SummaryText:            getSummaryText(len(sortedOpenPRs)),
-			PRsGroupedByRepository: groupPRsByRepositories(sortedOpenPRs),
-			GroupedByRepository:    true,
-		}
-	default:
-		return Content{
-			SummaryText:         getSummaryText(len(sortedOpenPRs)),
-			PRListHeading:       formatListHeading(contentInputs.PRListHeading, len(sortedOpenPRs)),
-			PRs:                 sortedOpenPRs,
-			GroupedByRepository: false,
-		}
-	}
-}
-
-func groupPRsByRepositories(openPRs []prview.PR) []PRsOfRepository {
-	return utilities.Map(
-		prview.GroupPRsByRepositories(openPRs),
-		func(group prview.RepositoryPRs) PRsOfRepository {
-			return PRsOfRepository{
-				HeadingPrefix:       "Open PRs in ",
-				RepositoryLinkLabel: group.Repository.GetPath(),
-				RepositoryLink:      group.Repository.GetPullsURL(),
-				PRs:                 group.PRs,
-			}
-		},
+	log.Printf(
+		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests "+
+			"and %d merged pull requests in the message",
+		len(readyToMerge), len(waitingForAuthor), len(waitingForReview), len(mergedPRs),
 	)
-}
 
-func getSummaryText(prCount int) string {
-	if prCount == 1 {
-		return "1 open PR is waiting for attention 👀"
+	groupByRepository := contentInputs.GroupByRepository
+	content := Content{
+		SummaryText:         getSummaryText(len(sortedOpenPRs)),
+		ReadyToMerge:        newPRSection(readyToMerge, groupByRepository),
+		WaitingForAuthor:    newPRSection(waitingForAuthor, groupByRepository),
+		WaitingForReview:    newPRSection(waitingForReview, groupByRepository),
+		Merged:              newPRSection(mergedPRs, groupByRepository),
+		GeneratedAt:         generatedAt,
+		GroupedByRepository: groupByRepository,
 	}
-	return fmt.Sprintf("%d open PRs are waiting for attention 👀", prCount)
+	if len(sortedOpenPRs) == 0 {
+		content.NoOpenPRsText = contentInputs.NoPRsMessage
+	}
+	return content
 }
 
-func formatListHeading(heading string, prCount int) string {
-	return strings.ReplaceAll(heading, "<pr_count>", strconv.Itoa(prCount))
+// Sorting the fetch before capping keeps the cap from resting on another package's ordering.
+func selectMergedPRsToShow(
+	trackedPRs []prview.PR,
+	recentlyMergedPRs []prview.PR,
+	messagePostedAt time.Time,
+) []prview.PR {
+	trackedMergedPRs := utilities.Filter(trackedPRs, prview.PR.IsMerged)
+	isTrackedByPRRef := getIsTrackedByPRRefMap(trackedMergedPRs)
+	untrackedMergedPRs := utilities.Filter(
+		sortByMergeTimeNewestFirst(recentlyMergedPRs),
+		func(pr prview.PR) bool { return !isTrackedByPRRef[pr.GetPullRequestRef()] },
+	)
+	isMergedSincePost := func(pr prview.PR) bool {
+		return !messagePostedAt.IsZero() && pr.GetMergedAt() != nil && pr.GetMergedAt().After(messagePostedAt)
+	}
+	mergedSincePost := utilities.Filter(untrackedMergedPRs, isMergedSincePost)
+	mergedBeforePost := utilities.Filter(untrackedMergedPRs, func(pr prview.PR) bool {
+		return !isMergedSincePost(pr)
+	})
+	if len(mergedBeforePost) > MaxUntrackedPRsMergedBeforePost {
+		mergedBeforePost = mergedBeforePost[:MaxUntrackedPRsMergedBeforePost]
+	}
+	return sortByMergeTimeNewestFirst(slices.Concat(trackedMergedPRs, mergedSincePost, mergedBeforePost))
+}
+
+func sortByMergeTimeNewestFirst(prs []prview.PR) []prview.PR {
+	return prview.SortPRsNewestFirst(prs, func(pr prview.PR) *time.Time { return pr.GetMergedAt() })
+}
+
+func getIsTrackedByPRRefMap(trackedPRs []prview.PR) map[models.PullRequestRef]bool {
+	isTrackedByPRRef := make(map[models.PullRequestRef]bool, len(trackedPRs))
+	for _, pr := range trackedPRs {
+		isTrackedByPRRef[pr.GetPullRequestRef()] = true
+	}
+	return isTrackedByPRRef
+}
+
+func prsWhoseNextActionIs(
+	sortedOpenPRs []prview.PR,
+	nextAction prview.PRNextAction,
+) []prview.PR {
+	return utilities.Filter(sortedOpenPRs, func(pr prview.PR) bool {
+		return pr.GetNextAction() == nextAction
+	})
+}
+
+func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
+	if !groupByRepository {
+		return PRSection{PRs: sortedPRs}
+	}
+	return PRSection{
+		Groups: utilities.Map(
+			prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs),
+			func(group prview.RepositoryPRs) PRsOfRepository {
+				return PRsOfRepository{
+					RepositoryName:     group.Repository.Name,
+					RepositoryPullsURL: group.Repository.GetPullsURL(),
+					PRs:                group.PRs,
+				}
+			},
+		),
+	}
+}
+
+func getSummaryText(openPRCount int) string {
+	switch openPRCount {
+	case 0:
+		return noOpenPRsSummaryText
+	case 1:
+		return "1 open PR is waiting for attention 👀"
+	default:
+		return fmt.Sprintf("%d open PRs are waiting for attention 👀", openPRCount)
+	}
 }

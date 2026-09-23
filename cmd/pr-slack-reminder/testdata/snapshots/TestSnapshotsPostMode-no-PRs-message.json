@@ -2,7 +2,7 @@
   [
     {
       "type": "rich_text",
-      "block_id": "no_prs_block",
+      "block_id": "no_open_prs",
       "elements": [
         {
           "type": "rich_text_section",
@@ -13,6 +13,15 @@
               "style": {}
             }
           ]
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
         }
       ]
     }

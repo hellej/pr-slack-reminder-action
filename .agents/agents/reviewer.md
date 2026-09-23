@@ -14,7 +14,8 @@ work in the same tree, so review only the files this change touched, per the tas
 implementer's report. Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
-  touched package's `.spec.md` updated if behaviour changed?
+  touched package's `.spec.md` updated if behaviour changed? The tree holds one end
+  state, so whether the test came first is unverifiable: skip it.
 - AGENTS.md **Code Style**
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
   docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
@@ -52,7 +53,19 @@ by `labels(first: 100)`, so `pullRequests(first: 20)` passes it. Doubt a test th
 feeds the case that passes: force the code's condition to always-true and see whether
 anything fails.
 
-Pick the targets yourself. A handful is usually enough. A pure refactor needs none.
+Pick the targets yourself, and spend them where the tests are the only net:
+
+- Code whose golden file this change re-recorded. A re-recorded golden file cannot catch
+  what the change that recorded it got wrong
+- Behaviour the change added that no golden file covers
+
+Code an unchanged golden file still covers has a net already. Read those tests instead.
+
+Three or four mutants is the budget. A pure refactor needs none. Past four, name in the
+report what each extra one was worth.
+
+A brief listing blind spots gives you candidates, not a checklist. The budget still
+applies, and choosing among them is yours.
 
 ### Mutation protocol
 

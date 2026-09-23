@@ -2,6 +2,7 @@ package githubclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -235,9 +236,8 @@ func mergedNodesSinceJSON(mergedAts ...string) []string {
 
 // The day-granularity qualifier returns up to one extra day of merges, so the exact cut is here.
 func TestFindRecentlyMergedPRsCutsTheWindowClientSide(t *testing.T) {
-	transport := &recordingTransport{
-		status: 200,
-		responseBody: searchResponseJSON(
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
 			map[string]int{"s0": 3},
 			map[string][]string{"s0": {
 				mergedPullRequestNodeJSON(1, "Merged inside the window", "2026-08-15T10:00:00Z"),
@@ -248,8 +248,8 @@ func TestFindRecentlyMergedPRsCutsTheWindowClientSide(t *testing.T) {
 				),
 			}},
 		),
-	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+		nil,
+	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
 		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
@@ -271,14 +271,13 @@ func TestFindRecentlyMergedPRsKeepsTheNewestUpToTheCap(t *testing.T) {
 	for index := range mergedAts {
 		mergedAts[index] = fmt.Sprintf("2026-08-16T%02d:00:00Z", index)
 	}
-	transport := &recordingTransport{
-		status: 200,
-		responseBody: searchResponseJSON(
+	testClient, enrich := mergedFetchClient(
+		searchResponseJSON(
 			map[string]int{"s0": len(mergedAts)},
 			map[string][]string{"s0": mergedNodesSinceJSON(mergedAts...)},
 		),
-	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+		reviewedAndCommentedFixtures(len(mergedAts), nil),
+	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
 		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
@@ -294,33 +293,9 @@ func TestFindRecentlyMergedPRsKeepsTheNewestUpToTheCap(t *testing.T) {
 	if numbers := prNumbersOf(prs); !reflect.DeepEqual(numbers, expectedNumbers) {
 		t.Errorf("PR numbers = %v, expected %v", numbers, expectedNumbers)
 	}
-}
-
-// Reviewers and the snooze are never fetched for a merged PR.
-func TestFindRecentlyMergedPRsFetchesNoReviewers(t *testing.T) {
-	transport := &recordingTransport{
-		status: 200,
-		responseBody: searchResponseJSON(
-			map[string]int{"s0": 1},
-			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z")},
-		),
-	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
-
-	prs, err := testClient.FindRecentlyMergedPRs(
-		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if transport.calls != 1 {
-		t.Errorf("GraphQL requests = %d, expected 1", transport.calls)
-	}
-	if len(prs) != 1 {
-		t.Fatalf("expected 1 PR, got %d", len(prs))
-	}
-	if prs[0].ApprovedByUsers != nil || prs[0].CommentedByUsers != nil || prs[0].SnoozedUntil != nil {
-		t.Errorf("expected no reviewers and no snooze on a merged PR, got %+v", prs[0])
+	// The enrichment is handed the capped set, never the whole search result.
+	if !reflect.DeepEqual(enrich.requestedNumbers, [][]int{expectedNumbers}) {
+		t.Errorf("enriched %v, expected one request for %v", enrich.requestedNumbers, expectedNumbers)
 	}
 }
 
@@ -358,14 +333,13 @@ func TestFindRecentlyMergedPRsAppliesFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			transport := &recordingTransport{
-				status: 200,
-				responseBody: searchResponseJSON(
+			testClient, _ := mergedFetchClient(
+				searchResponseJSON(
 					map[string]int{"s0": 2},
 					map[string][]string{"s0": {excludedNode, keptNode}},
 				),
-			}
-			testClient := &client{graphql: graphqlClient{transport: transport}}
+				nil,
+			)
 
 			prs, err := testClient.FindRecentlyMergedPRs(
 				context.Background(),
@@ -380,5 +354,97 @@ func TestFindRecentlyMergedPRsAppliesFilters(t *testing.T) {
 				t.Errorf("PR numbers = %v, expected [2]", numbers)
 			}
 		})
+	}
+}
+
+// The merged fetch runs a search and then an enrichment, two differently shaped requests.
+type mergedFetchTransport struct {
+	searchResponse string
+	enrich         *fakeEnrichTransport
+}
+
+func (t *mergedFetchTransport) Post(
+	ctx context.Context, body []byte,
+) (int, json.RawMessage, error) {
+	if strings.Contains(string(body), "type: ISSUE") {
+		return 200, json.RawMessage(t.searchResponse), nil
+	}
+	return t.enrich.Post(ctx, body)
+}
+
+func mergedFetchClient(
+	searchResponse string, fixtureByNumber map[int]enrichFixture,
+) (*client, *fakeEnrichTransport) {
+	enrich := &fakeEnrichTransport{fixtureByNumber: fixtureByNumber}
+	transport := &mergedFetchTransport{searchResponse: searchResponse, enrich: enrich}
+	return &client{graphql: graphqlClient{transport: transport}}, enrich
+}
+
+// The fixture PR is snoozed as well: the merged list keeps it, since a merged row asks for nothing.
+func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 1},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z")},
+		),
+		map[int]enrichFixture{1: {
+			reviews: []map[string]any{reviewNodeJSON("APPROVED", "approver-one")},
+			comments: []map[string]any{
+				commentNodeJSON("commenter-one", "nice", time.Now()),
+				commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),
+			},
+		}},
+	)
+
+	prs, err := testClient.FindRecentlyMergedPRs(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 1 {
+		t.Fatalf("expected 1 PR, got %d", len(prs))
+	}
+	assertLogins(t, "approvers", prs[0].ApprovedByUsers, []string{"approver-one"})
+	assertLogins(t, "commenters", prs[0].CommentedByUsers, []string{"commenter-one", "snoozer"})
+
+	expectedMergedAt := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+	if mergedAt := prs[0].GetMergedAt(); mergedAt == nil || !mergedAt.Equal(expectedMergedAt) {
+		t.Errorf("MergedAt = %v, expected %v: enrichment keeps the search's merge data", mergedAt, expectedMergedAt)
+	}
+	if prs[0].SnoozedUntil == nil {
+		t.Error("SnoozedUntil = nil, expected the snooze to be parsed off the comments")
+	}
+}
+
+// A reviewer query must not take down a canvas-enabled run.
+func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
+	withoutRetryDelay(t)
+	logOutput := captureLogOutput(t)
+
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 2},
+			map[string][]string{"s0": mergedNodesSinceJSON(
+				"2026-08-20T12:00:00Z", "2026-08-21T12:00:00Z",
+			)},
+		),
+		map[int]enrichFixture{1: {requestStatus: 500}},
+	)
+
+	prs, err := testClient.FindRecentlyMergedPRs(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if numbers := prNumbersOf(prs); !reflect.DeepEqual(numbers, []int{2, 1}) {
+		t.Fatalf("PR numbers = %v, expected [2 1]", numbers)
+	}
+	if prs[0].ApprovedByUsers != nil || prs[0].CommentedByUsers != nil {
+		t.Errorf("expected no reviewers after a failed enrichment, got %+v", prs[0])
+	}
+	if !strings.Contains(logOutput.String(), "status 500") {
+		t.Errorf("expected the enrichment failure to be logged, got:\n%s", logOutput.String())
 	}
 }

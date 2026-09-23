@@ -5,7 +5,6 @@
 package prview
 
 import (
-	"maps"
 	"slices"
 	"time"
 
@@ -99,8 +98,10 @@ func (pr PR) IsMerged() bool {
 	return pr.GetMerged()
 }
 
-func (pr PR) IsClosedButNotMerged() bool {
-	return pr.GetState() == "closed" && !pr.IsMerged()
+// GetPullRequestRef is the key that identifies this PR across fetches, independent of its
+// current state (open, merged, or gone from a later fetch entirely).
+func (pr PR) GetPullRequestRef() models.PullRequestRef {
+	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
 }
 
 func BuildPRViews(prs []githubclient.PR, config config.ContentInputs) []PR {
@@ -131,13 +132,6 @@ func withSlackUserIds(
 type RepositoryPRs struct {
 	Repository models.Repository
 	PRs        []PR
-}
-
-// Buckets PRs by repository, ordered alphabetically by repository path. PRs keep their given
-// order within a bucket.
-func GroupPRsByRepositories(prs []PR) []RepositoryPRs {
-	buckets := bucketPRsByRepository(prs)
-	return buckets.groupsForPaths(slices.Sorted(maps.Keys(buckets.repositoryByPath)))
 }
 
 // Buckets PRs by repository, ordered by each repository's first PR in the given list. PRs keep

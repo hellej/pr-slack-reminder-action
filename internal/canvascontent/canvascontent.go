@@ -67,9 +67,9 @@ func GetContent(
 		return pr.GetMergedAt()
 	})
 
-	readyToMerge := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
-	waitingForAuthor := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
-	waitingForReview := includePRsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
+	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
+	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
@@ -95,7 +95,7 @@ func GetContent(
 	}
 }
 
-func includePRsWhoseNextActionIs(
+func prsWhoseNextActionIs(
 	sortedOpenPRs []prview.PR,
 	nextAction prview.PRNextAction,
 ) []prview.PR {

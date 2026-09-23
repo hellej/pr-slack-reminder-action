@@ -1,13 +1,13 @@
-## Waiting for review
+## 👀 Waiting for review
 
 - **[Old PR past the threshold](https://github.com/test-org/test-repo/pull/4)** 🚨 `10 days old` by Bob Brown
 - **[Add pagination to the PR listing](https://github.com/test-org/test-repo/pull/1)** _5 hours ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
 
-## WIP
+## 🔧 WIP
 
 _No work in progress_
 
-## Merged
+## 🚀 Merged
 
 _No merged PRs_
 

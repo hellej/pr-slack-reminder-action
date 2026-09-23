@@ -28,6 +28,15 @@ const stateFileName = "pr-slack-reminder-state.json"
 
 var nonAlphanumericRuns = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
+var footerTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} UTC`)
+
+// Run stamps the footer with the real clock, so a snapshot recorded a second ago would never
+// match again. The rest of the message survives a moving clock: the fixture ages come off this
+// package's own `now`.
+func withFixedFooterTimestamp(blocks []byte) []byte {
+	return footerTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
+}
+
 func getSnapshotFilePath(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(snapshotDirectory, nonAlphanumericRuns.ReplaceAllString(t.Name(), "-")+".json")
@@ -50,6 +59,7 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 	if err != nil {
 		t.Fatalf("Failed to read sent Slack blocks from %s: %v", sentSlackBlocksFilePath, err)
 	}
+	sentBlocks = withFixedFooterTimestamp(sentBlocks)
 
 	snapshotFilePath := getSnapshotFilePath(t)
 	if *updateSnapshots {
@@ -83,6 +93,7 @@ func TestSnapshotsPostMode(t *testing.T) {
 		configOverrides            map[string]any
 		prs                        []*github.PullRequest
 		prsByRepo                  map[string][]*github.PullRequest
+		mergedPRs                  []*github.PullRequest
 		reviewsByPRNumber          map[int][]*github.PullRequestReview
 		timelineCommentsByPRNumber map[int][]*github.IssueComment
 	}{
@@ -213,6 +224,109 @@ func TestSnapshotsPostMode(t *testing.T) {
 			},
 		},
 		{
+			name: "every section under load",
+			configOverrides: map[string]any{
+				config.InputOldPRThresholdHours: 48,
+			},
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 71, Title: "Approved and ready to go", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/71",
+					AgeHours: 2,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 72, Title: "Approved by two reviewers", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/72",
+					AgeHours: 9,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 73, Title: "Changes were requested here", AuthorLogin: "carol",
+					AuthorName: "Carol Clark", HTMLURL: "https://github.com/test-org/test-repo/pull/73",
+					AgeHours: 30,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 74, Title: "A reviewer left a comment", AuthorLogin: "dana",
+					AuthorName: "Dana Davis", HTMLURL: "https://github.com/test-org/test-repo/pull/74",
+					AgeHours: 5,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 75, Title: "Nobody has looked at this yet", AuthorLogin: "erin",
+					AuthorName: "Erin Evans", HTMLURL: "https://github.com/test-org/test-repo/pull/75",
+					AgeHours: 1,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 76, Title: "Sitting here since last week", AuthorLogin: "frank",
+					AuthorName: "Frank Foster", HTMLURL: "https://github.com/test-org/test-repo/pull/76",
+					AgeHours: 170,
+				}),
+			},
+			// Four merges reach the cap of three, newest first.
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 81, Title: "Landed this morning", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/81",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 3,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 82, Title: "Landed yesterday", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/82",
+					AgeHours: 40, State: "closed", Merged: true, MergedHoursAgo: 26,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 83, Title: "Landed an hour ago", AuthorLogin: "carol",
+					AuthorName: "Carol Clark", HTMLURL: "https://github.com/test-org/test-repo/pull/83",
+					AgeHours: 12, State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 84, Title: "Landed three days ago", AuthorLogin: "dana",
+					AuthorName: "Dana Davis", HTMLURL: "https://github.com/test-org/test-repo/pull/84",
+					AgeHours: 100, State: "closed", Merged: true, MergedHoursAgo: 74,
+				}),
+			},
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				71: {mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED")},
+				72: {
+					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
+					mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED"),
+				},
+				73: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
+				74: {mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED")},
+				// Only one of the merged PRs was reviewed, so the snapshot keeps a merged row
+				// with reviewers apart from one without.
+				83: {
+					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
+					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
+				},
+			},
+		},
+		{
+			name: "one open PR and one merged PR",
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 91, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/91",
+					AgeHours: 4,
+				}),
+			},
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 92, Title: "The only merged PR", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/92",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+		},
+		{
+			name: "no open PRs and no no-prs-message, but a merged one",
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 93, Title: "Merged with nothing left open", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/93",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+		},
+		{
 			name: "no PRs message",
 			configOverrides: map[string]any{
 				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
@@ -229,6 +343,7 @@ func TestSnapshotsPostMode(t *testing.T) {
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 				PRs:                        tc.prs,
 				PRsByRepo:                  tc.prsByRepo,
+				MergedPRs:                  tc.mergedPRs,
 				ReviewsByPRNumber:          tc.reviewsByPRNumber,
 				TimelineCommentsByPRNumber: tc.timelineCommentsByPRNumber,
 			})
@@ -243,56 +358,149 @@ func TestSnapshotsPostMode(t *testing.T) {
 	}
 }
 
-func TestSnapshotUpdateModeWithOpenMergedAndClosedPRs(t *testing.T) {
-	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
-	overrides[config.InputRunMode] = config.RunModeUpdate
-	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
-
-	prByNumber := map[int]*github.PullRequest{
-		61: getTestPR(GetTestPROptions{
-			Number:      61,
-			Title:       "Still open PR",
-			HTMLURL:     "https://github.com/test-org/test-repo/pull/61",
-			AuthorLogin: "alice",
-			AuthorName:  "Alice Anderson",
-			Labels:      []string{"feature"},
-			AgeHours:    4,
-			State:       "open",
-		}),
-		62: getTestPR(GetTestPROptions{
-			Number:      62,
-			Title:       "Merged PR",
-			HTMLURL:     "https://github.com/test-org/test-repo/pull/62",
-			AuthorLogin: "bob",
-			AuthorName:  "Bob Brown",
-			Labels:      []string{"fix"},
-			AgeHours:    7,
-			State:       "closed",
-			Merged:      true,
-		}),
-		63: getTestPR(GetTestPROptions{
-			Number:      63,
-			Title:       "Closed PR without merge",
-			HTMLURL:     "https://github.com/test-org/test-repo/pull/63",
-			AuthorLogin: "carol",
-			AuthorName:  "Carol Clark",
-			Labels:      []string{"chore"},
-			AgeHours:    10,
-			State:       "closed",
-			Merged:      false,
-		}),
+func TestSnapshotsUpdateMode(t *testing.T) {
+	testCases := []struct {
+		name            string
+		configOverrides map[string]any
+		statePRNumbers  []int
+		prByNumber      map[int]*github.PullRequest
+		// The open-PR fetch is live, so it returns the state PRs that are still open, by number,
+		// and any PR opened since the message was posted.
+		openPRNumbers       []int
+		openPRsNotInState   []*github.PullRequest
+		mergedPRsFromSearch []*github.PullRequest
+		reviewsByPRNumber   map[int][]*github.PullRequestReview
+	}{
+		{
+			name: "every section under load",
+			configOverrides: map[string]any{
+				config.InputOldPRThresholdHours: 48,
+			},
+			statePRNumbers: []int{61, 62, 63, 64, 65, 66, 67, 68},
+			prByNumber: map[int]*github.PullRequest{
+				61: getTestPR(GetTestPROptions{
+					Number: 61, Title: "Approved and ready to go", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/61",
+					AgeHours: 2, State: "open",
+				}),
+				62: getTestPR(GetTestPROptions{
+					Number: 62, Title: "Changes were requested here", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/62",
+					AgeHours: 30, State: "open",
+				}),
+				63: getTestPR(GetTestPROptions{
+					Number: 63, Title: "Nobody has looked at this yet", AuthorLogin: "carol",
+					AuthorName: "Carol Clark", HTMLURL: "https://github.com/test-org/test-repo/pull/63",
+					AgeHours: 1, State: "open",
+				}),
+				64: getTestPR(GetTestPROptions{
+					Number: 64, Title: "Sitting here since last week", AuthorLogin: "dana",
+					AuthorName: "Dana Davis", HTMLURL: "https://github.com/test-org/test-repo/pull/64",
+					AgeHours: 170, State: "open",
+				}),
+				65: getTestPR(GetTestPROptions{
+					Number: 65, Title: "A reviewer left a comment", AuthorLogin: "erin",
+					AuthorName: "Erin Evans", HTMLURL: "https://github.com/test-org/test-repo/pull/65",
+					AgeHours: 6, State: "open",
+				}),
+				66: getTestPR(GetTestPROptions{
+					Number: 66, Title: "Landed an hour ago", AuthorLogin: "frank",
+					AuthorName: "Frank Foster", HTMLURL: "https://github.com/test-org/test-repo/pull/66",
+					AgeHours: 12, State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+				67: getTestPR(GetTestPROptions{
+					Number: 67, Title: "Landed three days ago", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/67",
+					AgeHours: 100, State: "closed", Merged: true, MergedHoursAgo: 74,
+				}),
+				68: getTestPR(GetTestPROptions{
+					Number: 68, Title: "Closed without merging", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/68",
+					AgeHours: 50, State: "closed", Merged: false,
+				}),
+			},
+			openPRNumbers: []int{61, 62, 63, 64, 65},
+			openPRsNotInState: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 69, Title: "Opened after the message was posted", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/69",
+					AgeHours: 3, State: "open",
+				}),
+			},
+			mergedPRsFromSearch: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 70, Title: "Merged without ever being listed", AuthorLogin: "heidi",
+					AuthorName: "Heidi Hill", HTMLURL: "https://github.com/test-org/test-repo/pull/70",
+					AgeHours: 40, State: "closed", Merged: true, MergedHoursAgo: 4,
+				}),
+			},
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				61: {mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED")},
+				62: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
+				65: {mockgithubclient.NewReview("frank", "Frank Foster", "COMMENTED")},
+				66: {mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED")},
+			},
+		},
+		{
+			name:           "one open PR and one merged PR",
+			statePRNumbers: []int{71, 72},
+			openPRNumbers:  []int{71},
+			prByNumber: map[int]*github.PullRequest{
+				71: getTestPR(GetTestPROptions{
+					Number: 71, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/71",
+					AgeHours: 4, State: "open",
+				}),
+				72: getTestPR(GetTestPROptions{
+					Number: 72, Title: "The only merged PR", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/72",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+		},
+		{
+			name: "no open PRs left with the no-prs-message set",
+			configOverrides: map[string]any{
+				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
+			},
+			statePRNumbers: []int{81, 82},
+			prByNumber: map[int]*github.PullRequest{
+				81: getTestPR(GetTestPROptions{
+					Number: 81, Title: "Merged since the message was posted", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/81",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 2,
+				}),
+				82: getTestPR(GetTestPROptions{
+					Number: 82, Title: "Closed without merging", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/82",
+					AgeHours: 30, State: "closed", Merged: false,
+				}),
+			},
+		},
 	}
 
-	mockState := getTestState(GetTestStateOptions{PRNumbers: []int{61, 62, 63}})
-	getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-		PRsByNumber:            prByNumber,
-		MockStateForUpdateMode: &mockState,
-	})
-	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+			overrides[config.InputRunMode] = config.RunModeUpdate
+			maps.Copy(overrides, tc.configOverrides)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-	if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
-		t.Fatalf("Expected Run to succeed, got error: %v", err)
+			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
+			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+				PRsByNumber:            tc.prByNumber,
+				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:              tc.mergedPRsFromSearch,
+				ReviewsByPRNumber:      tc.reviewsByPRNumber,
+				MockStateForUpdateMode: &mockState,
+			})
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+
+			if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+
+			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
+		})
 	}
-
-	assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 }

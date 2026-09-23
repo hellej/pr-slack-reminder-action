@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # PreToolUse hook, fires only on `git commit *` (see .claude/settings.json).
-# Nudges (non-blocking) when staged internal/**/*.go changes have no staged
-# <dirname>.spec.md update, per .agents/skills/spec-writer/SKILL.md.
+# Nudges (non-blocking) when staged internal/**/*.go or cmd/pr-slack-reminder/**/*.go
+# changes have no staged *.spec.md update, per .agents/skills/spec-writer/SKILL.md.
 
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
-go_dirs=$(echo "$staged" | grep -E '^internal/.*\.go$' | grep -v '_test\.go$' | xargs -r -n1 dirname | sort -u)
+go_dirs=$(echo "$staged" | grep -E '^(internal/|cmd/pr-slack-reminder/).*\.go$' | grep -v '_test\.go$' | xargs -r -n1 dirname | sort -u)
 
 missing=""
 for d in $go_dirs; do

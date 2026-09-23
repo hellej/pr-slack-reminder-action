@@ -2,11 +2,11 @@
 
 _No open PRs_
 
-## WIP
+## 🔧 WIP
 
 - **[Prototype canvas rendering](https://github.com/test-org/test-repo/pull/6)** by Alice Anderson
 
-## Merged
+## 🚀 Merged
 
 _No merged PRs_
 
