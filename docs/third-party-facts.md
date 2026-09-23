@@ -601,3 +601,9 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   message goes to (`slack-go@v0.29.0/chat.go`), so it sends on an update, but Slack does not
   document honouring it there
 - So an edit that adds a link has no documented way to suppress its preview
+- [Unfurling links in messages](https://docs.slack.dev/messaging/unfurling-links-in-messages):
+  in its `chat.postMessage` example, a link to text content does not unfurl unless
+  `unfurl_links: true` is passed. Media links unfurl by default, inside Block Kit blocks too. The
+  page says nothing about edits
+- The maintainer sees no preview on PR links, including ones an update run's `chat.update` adds to
+  the message after the post
