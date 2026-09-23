@@ -147,13 +147,14 @@ marked stale. Link the README's workflow example.
   new state, so it is saved
 - `runUpdateMode` returns `state.WithLastSentMessage(...)` after a successful edit. The delete and
   keep branches return the loaded state unchanged
-- The canvas refresh in `Run` is untouched
 - Integration tests in `main_test.go` cover the mark, each skip path, the failing edit, and
   update mode's recorded message
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
-  -f build-first=true`, run twice. The first run's message shows the stale footer, its other
-  blocks unchanged, and the date reads as expected
+  -f build-first=true`, run twice:
+  - The first run's message keeps its other blocks unchanged, and its footer reads
+    `⚠️ Stale, updated today at <time>`, not the raw `<!date…>` text or the `UTC` fallback
+  - Re-opened the next day, the same footer reads `yesterday at <time>`
 
 ### 4. Docs, example workflow and the release note
 
@@ -192,7 +193,8 @@ None
   the old message. The post and update concurrency groups differ, so this can already happen
   today, and marking makes it visible
 - Unverified: that the mrkdwn `{date_pretty}` reads as the node SDK documents it for the
-  rich_text `date` element. The live check in Step 3 confirms it
+  rich_text `date` element. The live check in Step 3 confirms `today` and `yesterday`, not the
+  `September 2` fallback
 - State artifacts grow by the message's JSON, a few KB at most
 
 ### Neutral
