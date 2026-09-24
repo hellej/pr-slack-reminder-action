@@ -157,6 +157,11 @@ marked stale. Link the README's workflow example.
     downloads no artifact. This run's own state is uploaded after it ends, so either order reads
     the previous post's. A failure logs and skips
   - Skips with a log line when `LastSentMessage.Blocks` is empty
+  - Skips with a log line naming both channels when the previous message is in another channel
+    than the new one. Two setups posting to different channels can share a state artifact name:
+    the e2e steps, on the default name, once marked the dev channel's message. Both IDs come from
+    Slack's send responses, the previous one stored by `NewPostState`, so they compare like for
+    like
   - Builds the stale message and edits it with `slackClient.UpdateMessage`, on the previous
     state's channel ID and timestamp, with the stored summary text
   - Does not pass the stale edit to `sentMessageHandler`: the debug file and snapshots record the
@@ -195,6 +200,9 @@ marked stale. Link the README's workflow example.
   - The permissions snippet's `actions: read` comment: needed by `update`, and lets `post` mark
     the previous message
 - `.github/workflows/pr-reminder.yml`: `retention-days: 4`
+- `.github/actions/e2e-tests/action.yml`: each of the 5 steps gets its own `state-artifact-name`,
+  so no e2e post reads the dev channel's state or another e2e step's. The steps upload no
+  artifact, so each post finds no state and skips marking
 - The PR description carries the `## Migration Guide (optional)` text from **Breaking change**,
   since the release skill drops README, workflow and `docs/plans/` commits from the notes
 - Done means the rendered README reads right and the PR description holds the migration text
@@ -221,6 +229,8 @@ None
   afterwards, restoring its live footer, and its state upload then points later update runs at
   the old message. The post and update concurrency groups differ, so this can already happen
   today, and marking makes it visible
+- Two setups posting to the same channel under one state artifact name mark each other's message
+  stale. The channel check only tells apart setups in different channels
 - State artifacts grow by the message's JSON, a few KB at most
 
 ### Neutral

@@ -1073,11 +1073,12 @@ const (
 	previousLiveFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
 )
 
-// A previous post's state whose message differs from the new one in channel, timestamp, summary
-// and content, so the stale edit can only have come from the stored message.
+// A previous post's state in the new post's channel, C12345678, whose message differs from the
+// new one in timestamp, summary and content, so the stale edit can only have come from the stored
+// message.
 func previousPostState() state.State {
 	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
-	previousState.SlackMessage = state.SlackRef{ChannelID: "C0PREVIOUS", MessageTS: "1788253200.000100"}
+	previousState.SlackMessage = state.SlackRef{ChannelID: "C12345678", MessageTS: "1788253200.000100"}
 	previousState.LastSentMessage = state.LastSentMessage{
 		Blocks:      []byte("[" + previousHeadingBlock + "," + previousRowsBlock + "," + previousLiveFooterBlock + "]"),
 		SummaryText: "3 open PRs are waiting for attention 👀",
@@ -1167,9 +1168,9 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 		t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 	}
 	staleEdit := result.mockSlackAPI.UpdatedMessage
-	if staleEdit.ChannelID != "C0PREVIOUS" || staleEdit.Timestamp != "1788253200.000100" {
+	if staleEdit.ChannelID != "C12345678" || staleEdit.Timestamp != "1788253200.000100" {
 		t.Errorf(
-			"Expected the edit on C0PREVIOUS at 1788253200.000100, got %s at %s",
+			"Expected the edit on C12345678 at 1788253200.000100, got %s at %s",
 			staleEdit.ChannelID, staleEdit.Timestamp,
 		)
 	}
@@ -1224,6 +1225,9 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	previousStateWithoutLastSentMessage := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
 	previousState := previousPostState()
+	// Another setup posting to its own channel under the same state artifact name
+	previousStateInAnotherChannel := previousPostState()
+	previousStateInAnotherChannel.SlackMessage.ChannelID = "C0OTHERCHANNEL"
 
 	testCases := []struct {
 		name    string
@@ -1232,6 +1236,10 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 		{
 			name:    "the previous state does not load",
 			options: postOverPreviousStateOptions{listArtifactsError: errors.New("artifact listing error")},
+		},
+		{
+			name:    "the previous message is in another channel",
+			options: postOverPreviousStateOptions{previousState: &previousStateInAnotherChannel},
 		},
 		{
 			name:    "the previous state predates the last sent message",
@@ -1267,8 +1275,8 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 			if result.runErr != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 			}
-			if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
-				t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			if staleEdit := result.mockSlackAPI.UpdatedMessage; staleEdit.ChannelID != "" {
+				t.Errorf("Expected no stale edit, got one on %s at %s", staleEdit.ChannelID, staleEdit.Timestamp)
 			}
 			assertNewPostStateSaved(t, result.stateFilePath)
 			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)

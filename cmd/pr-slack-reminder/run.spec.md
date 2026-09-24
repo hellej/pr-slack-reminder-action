@@ -13,6 +13,7 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
 - After a successful send, post mode marks the previous post's message stale: it loads the previous state and edits that message into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s stale message, with the stored summary text
   - Skips with a log line when the previous state does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
   - Any other failure joins the run's error. The new state is still saved
+  - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
   - The stale edit never reaches the sent-blocks record, which holds the new message only
 - Update mode loads the previous state, re-resolves each tracked PR ref the run's own fetches didn't already resolve, builds the message from the live open fetch plus the resolved tracked and merged PRs, and edits the existing message. It deletes the message only when there is nothing left to show and both the merged and residue fetches succeeded; a fetch failure keeps the message standing instead
 - Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `CreatedAt`, the previous message's post time
@@ -27,6 +28,7 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
 - Doesn't retry a GitHub or Slack call: a fetch or send failure past its timeout is final for that run
 - Doesn't fail the whole run because the canvas refresh failed, or vice versa: each surfaces its own error independently
 - Doesn't mark the previous message stale when post mode sends nothing: it keeps reading "Live"
+- Doesn't tell apart two setups posting to the same channel under one state artifact name: each marks the other's message stale
 - Doesn't distinguish, for its own caller, "empty because there is truly nothing" from "empty because a fetch failed": that distinction only changes whether update mode deletes the message
 
 ## Oddities

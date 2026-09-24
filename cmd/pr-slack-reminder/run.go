@@ -126,15 +126,22 @@ func runPostMode(
 	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt)
 	return &postState, errors.Join(
 		sentMessageHandler(sentMessageInfo),
-		markPreviousMessageStale(githubClient, slackClient, cfg),
+		markPreviousMessageStale(githubClient, slackClient, cfg, sentMessageInfo.ChannelID),
 	)
 }
 
 // Swaps the previous post's live footer for a stale one, so only the newest reminder reads
 // "Live". Runs only after a successful send. This run's own state is uploaded after it ends, so
 // the load still finds the previous post's.
+//
+// Two setups posting to different channels can share a state artifact name, so a previous state
+// in another channel belongs to another setup. Both channel IDs come from Slack's own send
+// responses, so they compare like for like.
 func markPreviousMessageStale(
-	githubClient githubclient.Client, slackClient slackclient.Client, cfg config.Config,
+	githubClient githubclient.Client,
+	slackClient slackclient.Client,
+	cfg config.Config,
+	newMessageChannelID string,
 ) error {
 	previousState, err := state.Load(
 		context.Background(),
@@ -150,6 +157,13 @@ func markPreviousMessageStale(
 	lastSentMessage := previousState.LastSentMessage
 	if len(lastSentMessage.Blocks) == 0 {
 		log.Println("Not marking the previous message stale, its state records no sent message")
+		return nil
+	}
+	if previousState.SlackMessage.ChannelID != newMessageChannelID {
+		log.Printf(
+			"Not marking the previous message stale, it is in channel %s, not in %s where this run posted",
+			previousState.SlackMessage.ChannelID, newMessageChannelID,
+		)
 		return nil
 	}
 
