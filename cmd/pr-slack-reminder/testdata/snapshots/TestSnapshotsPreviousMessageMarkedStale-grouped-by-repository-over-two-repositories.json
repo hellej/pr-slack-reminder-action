@@ -1,0 +1,183 @@
+[
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_⚠️ Stale, updated \u003c!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC\u003e_"
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "👀 Waiting for review",
+      "emoji": true
+    },
+    "block_id": "heading_waiting_for_review",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review_repository_1",
+    "elements": [
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "link",
+            "url": "https://github.com/test-org/repo-two/pulls",
+            "text": "repo-two",
+            "style": {
+              "bold": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-two/pull/22",
+                "text": "Bump the Slack SDK",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 8 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Carol Clark",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-two/pull/21",
+                "text": "Fix the flaky reminder test",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 5 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "text": {
+      "type": "mrkdwn",
+      "text": " "
+    }
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review_repository_2",
+    "elements": [
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "link",
+            "url": "https://github.com/test-org/repo-one/pulls",
+            "text": "repo-one",
+            "style": {
+              "bold": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-one/pull/11",
+                "text": "Add pagination to the PR listing",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 2 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_Updated \u003c!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC\u003e_"
+      }
+    ]
+  }
+]

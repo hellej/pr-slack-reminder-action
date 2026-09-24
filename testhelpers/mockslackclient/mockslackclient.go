@@ -17,6 +17,8 @@ type MockSlackClientOptions struct {
 	UpdateMessageError error
 	DeleteMessageError error
 	ReplaceCanvasError error
+	// The timestamp Slack gives the posted message, so chained runs can post distinct messages
+	PostMessageTimestamp string
 }
 
 func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclient.Client {
@@ -30,6 +32,9 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		opts.SlackChannels = []*SlackChannel{
 			{ID: "C12345678", Name: "some-channel-name"},
 		}
+	}
+	if opts.PostMessageTimestamp == "" {
+		opts.PostMessageTimestamp = "1234567890.123456"
 	}
 	channels := make([]slack.Channel, len(opts.SlackChannels))
 	for i, channel := range opts.SlackChannels {
@@ -50,7 +55,7 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		deleteMessageError: opts.DeleteMessageError,
 		replaceCanvasError: opts.ReplaceCanvasError,
 		postMessageResponse: PostMessageResponse{
-			Timestamp: "1234567890.123456",
+			Timestamp: opts.PostMessageTimestamp,
 			Channel:   "C12345678",
 		},
 	}

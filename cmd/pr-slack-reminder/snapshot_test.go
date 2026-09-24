@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"maps"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/google/go-github/v78/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/state"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockgithubclient"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/mockslackclient"
@@ -28,13 +31,16 @@ const stateFileName = "pr-slack-reminder-state.json"
 
 var nonAlphanumericRuns = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
-var footerTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} UTC`)
+var liveFooterTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} UTC`)
 
-// Run stamps the footer with the real clock, so a snapshot recorded a second ago would never
-// match again. The rest of the message survives a moving clock: the fixture ages come off this
-// package's own `now`.
-func withFixedFooterTimestamp(blocks []byte) []byte {
-	return footerTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
+var staleTimestamp = regexp.MustCompile(`!date\^\d+\^\{date_pretty\} at \{time\}\|[A-Z][a-z]{2} \d{1,2} \d{2}:\d{2} UTC`)
+
+// Run stamps the live footer, and the stale line and footer after it, with the real clock, so a
+// snapshot recorded a second ago would never match again. The rest of the message survives a
+// moving clock: the fixture ages come off this package's own `now`.
+func withFixedFooterTimestamps(blocks []byte) []byte {
+	blocks = liveFooterTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
+	return staleTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
 func getSnapshotFilePath(t *testing.T) string {
@@ -59,7 +65,12 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 	if err != nil {
 		t.Fatalf("Failed to read sent Slack blocks from %s: %v", sentSlackBlocksFilePath, err)
 	}
-	sentBlocks = withFixedFooterTimestamp(sentBlocks)
+	assertBlocksMatchSnapshot(t, sentBlocks)
+}
+
+func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
+	t.Helper()
+	sentBlocks = withFixedFooterTimestamps(sentBlocks)
 
 	snapshotFilePath := getSnapshotFilePath(t)
 	if *updateSnapshots {
@@ -87,16 +98,18 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 	}
 }
 
-func TestSnapshotsPostMode(t *testing.T) {
-	testCases := []struct {
-		name                       string
-		configOverrides            map[string]any
-		prs                        []*github.PullRequest
-		prsByRepo                  map[string][]*github.PullRequest
-		mergedPRs                  []*github.PullRequest
-		reviewsByPRNumber          map[int][]*github.PullRequestReview
-		timelineCommentsByPRNumber map[int][]*github.IssueComment
-	}{
+type postModeSnapshotScenario struct {
+	name                       string
+	configOverrides            map[string]any
+	prs                        []*github.PullRequest
+	prsByRepo                  map[string][]*github.PullRequest
+	mergedPRs                  []*github.PullRequest
+	reviewsByPRNumber          map[int][]*github.PullRequestReview
+	timelineCommentsByPRNumber map[int][]*github.IssueComment
+}
+
+func postModeSnapshotScenarios() []postModeSnapshotScenario {
+	return []postModeSnapshotScenario{
 		{
 			name: "grouped by repository over two repositories",
 			configOverrides: map[string]any{
@@ -333,27 +346,80 @@ func TestSnapshotsPostMode(t *testing.T) {
 			},
 		},
 	}
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+func runPostModeSnapshotScenario(
+	t *testing.T,
+	scenario postModeSnapshotScenario,
+	previousState *state.State,
+	postedMessageTimestamp string,
+) *mockslackclient.MockSlackAPI {
+	t.Helper()
+	getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+		PRs:                        scenario.prs,
+		PRsByRepo:                  scenario.prsByRepo,
+		MergedPRs:                  scenario.mergedPRs,
+		ReviewsByPRNumber:          scenario.reviewsByPRNumber,
+		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
+		MockPreviousState:          previousState,
+	})
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+		PostMessageTimestamp: postedMessageTimestamp,
+	})
+
+	if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	return mockSlackAPI
+}
+
+func TestSnapshotsPostMode(t *testing.T) {
+	for _, scenario := range postModeSnapshotScenarios() {
+		t.Run(scenario.name, func(t *testing.T) {
 			overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
-			maps.Copy(overrides, tc.configOverrides)
+			maps.Copy(overrides, scenario.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRs:                        tc.prs,
-				PRsByRepo:                  tc.prsByRepo,
-				MergedPRs:                  tc.mergedPRs,
-				ReviewsByPRNumber:          tc.reviewsByPRNumber,
-				TimelineCommentsByPRNumber: tc.timelineCommentsByPRNumber,
-			})
-			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
-
-			if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
-				t.Fatalf("Expected Run to succeed, got error: %v", err)
-			}
+			runPostModeSnapshotScenario(t, scenario, nil, "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
+		})
+	}
+}
+
+// Chains two posts of one scenario: the second marks the first one's message stale, rebuilt from
+// the state the first one saved.
+func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
+	scenarioNames := []string{"every section under load", "grouped by repository over two repositories"}
+
+	for _, scenarioName := range scenarioNames {
+		t.Run(scenarioName, func(t *testing.T) {
+			scenario, found := utilities.Find(postModeSnapshotScenarios(), func(scenario postModeSnapshotScenario) bool {
+				return scenario.name == scenarioName
+			})
+			if !found {
+				t.Fatalf("No post mode snapshot scenario named %q", scenarioName)
+			}
+			overrides, _ := getFilePathOverrides(t)
+			maps.Copy(overrides, scenario.configOverrides)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+
+			runPostModeSnapshotScenario(t, scenario, nil, "1234567890.123456")
+			firstPostState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+			mockSlackAPI := runPostModeSnapshotScenario(t, scenario, &firstPostState, "1234567899.000200")
+
+			staleEdit := mockSlackAPI.UpdatedMessage
+			if staleEdit.ChannelID != "C12345678" || staleEdit.Timestamp != "1234567890.123456" {
+				t.Fatalf(
+					"Expected the stale edit on the first post's message, C12345678 at 1234567890.123456, got %s at %s",
+					staleEdit.ChannelID, staleEdit.Timestamp,
+				)
+			}
+			var indentedStaleBlocks bytes.Buffer
+			if err := json.Indent(&indentedStaleBlocks, staleEdit.SentBlocks, "", "  "); err != nil {
+				t.Fatalf("Failed to indent the stale blocks: %v", err)
+			}
+			assertBlocksMatchSnapshot(t, indentedStaleBlocks.Bytes())
 		})
 	}
 }

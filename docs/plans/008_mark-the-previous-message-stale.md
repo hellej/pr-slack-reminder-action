@@ -155,8 +155,7 @@ marked stale. Link the README's workflow example.
     `BuildMessage` uses, told how many fixed blocks to leave room for
   - Errors on blocks that do not parse or are empty
 - Unit tests pin the cap at 49 and 50 stored blocks, and the error on `null` or `[]`. Step 3's
-  integration test pins the layout and the content blocks as stored, compacted: the mock artifact
-  is indented the way `state.Save` writes it
+  stale message snapshot pins the layout and the content blocks as stored
 - `make check-dead-code` flags `BuildStaleMessage` and its helpers until Step 3 calls it
 - Update `messagebuilder.spec.md`: the stale line and footer, the cap, and that the stale message
   never re-renders content
@@ -187,11 +186,19 @@ marked stale. Link the README's workflow example.
     `mockslackclient.UpdateMessage` calls it, so the mock cannot drift from the real client
 - Any other error from the stale edit, a `BuildStaleMessage` error included, joins post mode's
   returned error. Post still returns the new state, so it is saved
-- The mock's `UpdatedMessage` also records `SentBlocks`, the block array as sent, so a test pins
-  the stale edit byte for byte
+- The mock's `UpdatedMessage` also records `SentBlocks`, the block array as sent, so a snapshot
+  pins the stale edit
+- `snapshot_test.go`'s `TestSnapshotsPreviousMessageMarkedStale` chains two real posts of the
+  "every section under load" and grouped post-mode scenarios: the second post loads the state the
+  first one saved and marks its message stale. Its `SentBlocks`, indented, are the snapshot, so
+  the layout and the content blocks as stored are pinned at the boundary
+  - The mock's `PostMessageTimestamp` option gives the second post its own message timestamp
+  - The snapshot normalises the stale times like the live footer's, so the mark's integration
+    test pins them to the stored `GeneratedAt`
 - A `slackclient` unit test through the fake `SlackAPI` pins one not-editable code mapping to
-  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the mark, each skip path,
-  the failing edit, and no mark when the send fails or there is nothing to send
+  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the mark's channel, timestamp,
+  summary text and stored time, each skip path, the failing edit, and no mark when the send fails
+  or there is nothing to send
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:

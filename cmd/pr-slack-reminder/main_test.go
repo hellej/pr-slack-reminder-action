@@ -1187,13 +1187,11 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 	if staleEdit.Text != "3 open PRs are waiting for attention 👀" {
 		t.Errorf("Expected the stored summary text, got %q", staleEdit.Text)
 	}
-	expectedStaleBlocks := "[" +
-		`{"type":"context","elements":[{"type":"mrkdwn","text":"_⚠️ Stale, updated \u003c!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC\u003e_"}]}` +
-		"," + previousHeadingBlock + "," + previousRowsBlock + "," +
-		`{"type":"context","elements":[{"type":"mrkdwn","text":"_Updated \u003c!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC\u003e_"}]}` +
-		"]"
-	if string(staleEdit.SentBlocks) != expectedStaleBlocks {
-		t.Errorf("Expected the stale blocks\n%s\ngot\n%s", expectedStaleBlocks, staleEdit.SentBlocks)
+	// The snapshots normalise the stale times, so only this pins the stale line and footer to
+	// the stored GeneratedAt, not the clock
+	storedTimeInStaleText := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
+	if strings.Count(string(staleEdit.SentBlocks), storedTimeInStaleText) != 2 {
+		t.Errorf("Expected the stale line and footer to show %s, got\n%s", storedTimeInStaleText, staleEdit.SentBlocks)
 	}
 	assertNewPostStateSaved(t, result.stateFilePath)
 	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
