@@ -616,3 +616,13 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `Error()` returns `Err` alone
 - `UpdateMessage` and `PostMessage` return it unwrapped from `sendResponseFull`, so
   `errors.As(err, &slack.SlackErrorResponse{})` reaches the code
+
+## A bot's `chat.update` of a stored payload renders as posted, and `{date_pretty}` capitalises `Today` [2026-09-24]
+
+- Source: two live `post` runs of this action against the dev channel off
+  `claude/inspiring-shannon-2x6up8`, read in the Slack client
+- The edited message kept every stored block as it was, showed no `(edited)` label, and grew no
+  link preview
+- `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|…>_` in a context block's `mrkdwn`
+  rendered as `⚠️ Stale, updated Today at 9:10 PM`: the unicode emoji renders, and `Today` is
+  capitalised mid-sentence, where the formatting docs write `today`
