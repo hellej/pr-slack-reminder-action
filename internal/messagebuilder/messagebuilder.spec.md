@@ -17,7 +17,10 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
 - The last block is always a `context` block reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
 - The message is capped at 50 blocks; content blocks past the cap are dropped and logged, and the footer keeps the last slot
-- `BuildStaleMessage(sentBlocks, generatedAt)` rebuilds a sent message from its stored block array: every block but the last re-sends as stored, and the last, the live footer, becomes a `context` block reading `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
+- `BuildStaleMessage(sentBlocks, generatedAt)` rebuilds a sent message from its stored block array, every block but the last re-sent as stored, between two `context` blocks:
+  - First, a stale line reading `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
+  - Last, in place of the live footer, a stale footer reading `_Updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
+  - The stale message is one block longer than the stored one. Stored at the cap, it drops its last content block, logged, so it stays at 50
   - `{date_pretty}` reads `today` or `yesterday` when it applies, otherwise a date; the fallback after the pipe carries the date and time in UTC
   - Errors on blocks that do not parse, on an empty array or `null`, and on a block without a `type`
 

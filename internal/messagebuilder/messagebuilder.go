@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
@@ -37,7 +38,7 @@ func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 		blocks = append(blocks, buildNoOpenPRsBlock(content.NoOpenPRsText))
 	}
 	blocks = append(blocks, buildSectionBlocks(content)...)
-	blocks = limitMaximumMessageSize(blocks)
+	blocks = limitMaximumMessageSize(blocks, 1)
 	blocks = append(blocks, buildFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
@@ -145,9 +146,9 @@ func buildFooterBlock(generatedAt time.Time) slack.Block {
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
 
-// BuildStaleMessage rebuilds a sent message with its live footer, always the last block, swapped
-// for a stale one. The other blocks re-send as stored, so none has to survive a round trip
-// through slack-go's block types.
+// BuildStaleMessage rebuilds a sent message opening with a stale line, and with its live footer,
+// always the last block, replaced by a stale footer. The other blocks re-send as stored, so none
+// has to survive a round trip through slack-go's block types.
 func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
 	var sentBlockList []json.RawMessage
 	if err := json.Unmarshal(sentBlocks, &sentBlockList); err != nil {
@@ -160,7 +161,12 @@ func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack
 	if err != nil {
 		return slack.Message{}, fmt.Errorf("failed to parse a sent block: %w", err)
 	}
-	return slack.NewBlockMessage(append(contentBlocks, buildStaleFooterBlock(generatedAt))...), nil
+	staleBlocks := slices.Concat(
+		[]slack.Block{buildStaleLineBlock(generatedAt)},
+		limitMaximumMessageSize(contentBlocks, 2),
+		[]slack.Block{buildStaleFooterBlock(generatedAt)},
+	)
+	return slack.NewBlockMessage(staleBlocks...), nil
 }
 
 // slack.BlockFromJSON keeps only the first block of an array. Its block marshals back to the
@@ -171,17 +177,28 @@ func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 
 // {date_pretty} reads "today" or "yesterday" when it applies, otherwise a date like
 // "September 2nd". A stale message is read days later, so the fallback names the date too.
+func buildStaleLineBlock(generatedAt time.Time) slack.Block {
+	staleLineText := fmt.Sprintf(
+		"_⚠️ Stale, updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
+		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
+	)
+	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", staleLineText, false, false))
+}
+
+// Replaces the live footer. The stale line above already warns, so this one only dates the
+// content.
 func buildStaleFooterBlock(generatedAt time.Time) slack.Block {
 	footerText := fmt.Sprintf(
-		"_⚠️ Stale, updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
+		"_Updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
 		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
 	)
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
 
-// The footer is appended after this, so it gets the last slot.
-func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
-	maximumContentBlocks := maximumBlocksInSlackMessage - 1
+// Leaves room for the fixed blocks added around the content: the footer, and in a stale message
+// the stale line too.
+func limitMaximumMessageSize(blocks []slack.Block, fixedBlockCount int) []slack.Block {
+	maximumContentBlocks := maximumBlocksInSlackMessage - fixedBlockCount
 	if len(blocks) <= maximumContentBlocks {
 		return blocks
 	}

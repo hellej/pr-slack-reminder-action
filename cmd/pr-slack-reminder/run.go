@@ -130,9 +130,9 @@ func runPostMode(
 	)
 }
 
-// Swaps the previous post's live footer for a stale one, so only the newest reminder reads
-// "Live". Runs only after a successful send. This run's own state is uploaded after it ends, so
-// the load still finds the previous post's.
+// Edits the previous post's message to open with a stale line and swap its live footer for a
+// stale one, so only the newest reminder reads "Live". Runs only after a successful send. This
+// run's own state is uploaded after it ends, so the load still finds the previous post's.
 //
 // Two setups posting to different channels can share a state artifact name, so a previous state
 // in another channel belongs to another setup. Both channel IDs come from Slack's own send

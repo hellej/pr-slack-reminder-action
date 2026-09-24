@@ -3,6 +3,8 @@ package messagebuilder_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,7 +24,9 @@ var sentContentBlocks = []string{
 const sentLiveFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1789819920^{time}|12:12 UTC\u003e_"}]}`
 
 // generatedAt is 2026-09-19 12:12 UTC
-const expectedStaleFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_⚠️ Stale, updated \u003c!date^1789819920^{date_pretty} at {time}|Sep 19 12:12 UTC\u003e_"}]}`
+const expectedStaleFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_Updated \u003c!date^1789819920^{date_pretty} at {time}|Sep 19 12:12 UTC\u003e_"}]}`
+
+const expectedStaleLineBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_⚠️ Stale, updated \u003c!date^1789819920^{date_pretty} at {time}|Sep 19 12:12 UTC\u003e_"}]}`
 
 func sentMessageBlocks() json.RawMessage {
 	return json.RawMessage("[" + strings.Join(append(sentContentBlocks, sentLiveFooterBlock), ",") + "]")
@@ -57,10 +61,14 @@ func assertStaleBlocks(t *testing.T, actual []string, expected []string) {
 	}
 }
 
-func TestStaleMessageResendsTheContentBlocksAsSentAndSwapsTheFooter(t *testing.T) {
+func staleMessageBlocks(contentBlocks ...string) []string {
+	return slices.Concat([]string{expectedStaleLineBlock}, contentBlocks, []string{expectedStaleFooterBlock})
+}
+
+func TestStaleMessageOpensWithTheStaleLineAndEndsWithTheStaleFooter(t *testing.T) {
 	actual := buildAndMarshalStaleMessage(t, sentMessageBlocks())
 
-	assertStaleBlocks(t, actual, append(sentContentBlocks, expectedStaleFooterBlock))
+	assertStaleBlocks(t, actual, staleMessageBlocks(sentContentBlocks...))
 }
 
 // state.Save leaves the stored blocks indented
@@ -72,13 +80,61 @@ func TestStaleMessageFromIndentedBlocksResendsThemCompact(t *testing.T) {
 
 	actual := buildAndMarshalStaleMessage(t, indentedBlocks.Bytes())
 
-	assertStaleBlocks(t, actual, append(sentContentBlocks, expectedStaleFooterBlock))
+	assertStaleBlocks(t, actual, staleMessageBlocks(sentContentBlocks...))
 }
 
-func TestStaleMessageOfAFooterOnlyMessageIsTheStaleFooter(t *testing.T) {
+func TestStaleMessageOfAFooterOnlyMessageIsTheStaleLineAndFooter(t *testing.T) {
 	actual := buildAndMarshalStaleMessage(t, json.RawMessage("["+sentLiveFooterBlock+"]"))
 
-	assertStaleBlocks(t, actual, []string{expectedStaleFooterBlock})
+	assertStaleBlocks(t, actual, staleMessageBlocks())
+}
+
+func dividerBlocks(count int) []string {
+	blocks := make([]string, count)
+	for index := range blocks {
+		blocks[index] = fmt.Sprintf(`{"type":"divider","block_id":"divider_%d"}`, index)
+	}
+	return blocks
+}
+
+// BuildMessage caps a message at 50 blocks, footer included. The stale message adds a block, so
+// a full one has to give up a content block.
+func TestStaleMessageStaysWithinTheBlockCap(t *testing.T) {
+	testCases := []struct {
+		name               string
+		sentContentBlocks  int
+		expectedLastKeptID string
+	}{
+		{
+			name:               "49 sent blocks keep every content block",
+			sentContentBlocks:  48,
+			expectedLastKeptID: "divider_47",
+		},
+		{
+			name:               "50 sent blocks drop the last content block",
+			sentContentBlocks:  49,
+			expectedLastKeptID: "divider_47",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sentBlocks := append(dividerBlocks(tc.sentContentBlocks), sentLiveFooterBlock)
+
+			actual := buildAndMarshalStaleMessage(t, json.RawMessage("["+strings.Join(sentBlocks, ",")+"]"))
+
+			if len(actual) != 50 {
+				t.Fatalf("Expected 50 blocks, got %d", len(actual))
+			}
+			if actual[0] != expectedStaleLineBlock || actual[49] != expectedStaleFooterBlock {
+				t.Errorf("Expected the stale line first and the stale footer last, got %s and %s", actual[0], actual[49])
+			}
+			lastKept := fmt.Sprintf(`{"type":"divider","block_id":"%s"}`, tc.expectedLastKeptID)
+			if actual[48] != lastKept {
+				t.Errorf("Expected the last content block %s, got %s", lastKept, actual[48])
+			}
+		})
+	}
 }
 
 func TestStaleMessageErrors(t *testing.T) {

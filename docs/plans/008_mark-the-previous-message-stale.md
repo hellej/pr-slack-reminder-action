@@ -5,10 +5,11 @@ status: draft
 
 ## Goals
 
-- When a `post` run sends a new message, the message the previous state points at gets its
-  footer swapped in place: `_Live, updated 9:58 AM_` becomes
-  `_⚠️ Stale, updated September 2nd at 9:58 AM_`
-  - The timestamp is the one the old live footer showed
+- When a `post` run sends a new message, the message the previous state points at is edited in
+  place, both new lines in the live footer's own `context` block style:
+  - It opens with `_⚠️ Stale, updated September 2nd at 9:58 AM_`
+  - Its `_Live, updated 9:58 AM_` footer becomes `_Updated September 2nd at 9:58 AM_`
+  - Both timestamps are the one the old live footer showed
   - Every other block of the old message stays as last sent, not refreshed
 - Only the newest reminder reads "Live"
 - The work lands on branch `claude/inspiring-shannon-2x6up8`, plan and implementation in one PR
@@ -37,8 +38,8 @@ notify.
   - An artifact saved before this change decodes an empty `LastSentMessage`, so there is nothing
     to mark
 - `post` marks the previous message stale after sending the new one. See Step 3
-- The stale footer's time is `<!date^unix^{date_pretty} at {time}|Jan 2 15:04 UTC>`, rendered
-  in each reader's timezone
+- The stale line and stale footer show their time as
+  `<!date^unix^{date_pretty} at {time}|Jan 2 15:04 UTC>`, rendered in each reader's timezone
   ([formatting message text](https://docs.slack.dev/messaging/formatting-message-text))
   - `{date_pretty}` reads `yesterday` for the usual daily case, otherwise `{date}`'s
     `September 2nd`, with the year only past six months
@@ -141,14 +142,22 @@ marked stale. Link the README's workflow example.
     re-sends each byte for byte, so no block type has to survive an unmarshal round trip
   - Does not check that the dropped block is a `context` block: `BuildMessage` always puts the
     footer last, and nothing else writes the stored blocks
-  - Appends a context block reading
-    `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
+  - Opens the message with a stale line, a context block reading
+    `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`, so a reader
+    scrolling back sees it before any row
+  - Ends it with a stale footer in place of the live one, a context block reading
+    `_Updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`: no "Live", and no second
+    warning
+  - The stale message is one block longer than the stored one. A stored message at the 50-block
+    cap drops its last content block, logged, through the same `limitMaximumMessageSize` that
+    `BuildMessage` uses, told how many fixed blocks to leave room for
   - Errors on blocks that do not parse or are empty
-- Unit tests pin byte-identical non-footer blocks, the same compact blocks from an indented
-  store, the stale footer, and the error cases
-- `make check-dead-code` flags `BuildStaleMessage` and its two helpers until Step 3 calls it
-- Update `messagebuilder.spec.md`: the stale footer, and that the stale message never re-renders
-  content
+- Unit tests pin the stale line as the first block, the stored content blocks byte-identical
+  after it, the stale footer last, the same compact blocks from an indented store, the cap at 49
+  and 50 stored blocks, and the error cases
+- `make check-dead-code` flags `BuildStaleMessage` and its helpers until Step 3 calls it
+- Update `messagebuilder.spec.md`: the stale line and footer, the cap, and that the stale message
+  never re-renders content
 
 ### 3. Mark the previous message stale
 
@@ -185,9 +194,10 @@ marked stale. Link the README's workflow example.
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:
-  - The first run's message keeps its other blocks unchanged, and its footer reads
-    `⚠️ Stale, updated today at <time>`, not the raw `<!date…>` text or the `UTC` fallback
-  - Re-opened the next day, the same footer reads `yesterday at <time>`
+  - The first run's message keeps its other blocks unchanged, opens with
+    `⚠️ Stale, updated today at <time>`, not the raw `<!date…>` text or the `UTC` fallback, and
+    ends with `Updated today at <time>`
+  - Re-opened the next day, both read `yesterday at <time>`
 
 ### 4. Docs, example workflow and the release note
 
