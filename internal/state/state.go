@@ -29,7 +29,7 @@ type State struct {
 	LastSentMessage   LastSentMessage `json:"lastSentMessage"`
 }
 
-// The message as last sent or edited, so a later run can re-send it with a different footer.
+// The message as last sent or edited, so the next post can re-send it marked stale.
 type LastSentMessage struct {
 	// Without omitempty, nil blocks save as JSON null, which loads back as non-empty blocks
 	Blocks      json.RawMessage `json:"blocks,omitempty"`

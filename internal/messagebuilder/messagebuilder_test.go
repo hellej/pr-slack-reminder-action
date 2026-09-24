@@ -1,6 +1,7 @@
 package messagebuilder_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -483,5 +484,43 @@ func TestFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
 	}
 	if text.Type != "mrkdwn" {
 		t.Errorf("expected an mrkdwn footer element, got %q", text.Type)
+	}
+}
+
+func groupedOverRepositories(count int) messagecontent.PRSection {
+	groups := make([]messagecontent.PRsOfRepository, count)
+	for index := range groups {
+		groups[index] = messagecontent.PRsOfRepository{
+			RepositoryName: fmt.Sprintf("repo-%d", index+1),
+			PRs:            []prview.PR{testPR(testPROptions{title: fmt.Sprintf("PR in repo %d", index+1)})},
+		}
+	}
+	return messagecontent.PRSection{Groups: groups}
+}
+
+// 30 repositories build 60 content blocks: the heading, a block per repository and a spacing
+// block between each pair. Slack rejects a message of more than 50 blocks.
+func TestMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverRepositories(30),
+		GeneratedAt:         generatedAt,
+	})
+
+	blocks := message.Blocks.BlockSet
+	if len(blocks) != 50 {
+		t.Fatalf("expected 50 blocks, got %d", len(blocks))
+	}
+	ids := blockIDs(blocks)
+	if ids[47] != "section_waiting_for_review_repository_24" || ids[48] != "spacing" {
+		t.Errorf("expected the 24th repository and a spacing block before the footer, got %s and %s", ids[47], ids[48])
+	}
+	footer, isContextBlock := blocks[49].(*slack.ContextBlock)
+	if !isContextBlock {
+		t.Fatalf("expected the footer last, got %s", blocks[49].BlockType())
+	}
+	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject).Text
+	if text != "_Live, updated <!date^1789819920^{time}|12:12 UTC>_" {
+		t.Errorf("expected the live footer last, got %q", text)
 	}
 }

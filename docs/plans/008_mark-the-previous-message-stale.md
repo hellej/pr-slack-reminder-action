@@ -1,6 +1,6 @@
 # Mark the previous message stale
 
-date: 2026-09-23
+date: 2026-09-24
 status: draft
 
 ## Goals
@@ -41,8 +41,8 @@ notify.
 - The stale line and stale footer show their time as
   `<!date^unix^{date_pretty} at {time}|Jan 2 15:04 UTC>`, rendered in each reader's timezone
   ([formatting message text](https://docs.slack.dev/messaging/formatting-message-text))
-  - `{date_pretty}` reads `yesterday` for the usual daily case, otherwise `{date}`'s
-    `September 2nd`, with the year only past six months
+  - `{date_pretty}` reads `Yesterday`, capitalised even mid-sentence, for the usual daily case,
+    otherwise `{date}`'s `September 2nd`, with the year only past six months
   - A bot's edited message never shows the `(edited)` label
     ([chat.update](https://docs.slack.dev/reference/methods/chat.update))
 
@@ -139,7 +139,8 @@ marked stale. Link the README's workflow example.
   - Splits `sentBlocks` into per-block `json.RawMessage`, since `slack.BlockFromJSON` keeps only
     the first block of an array (`slack-go@v0.29.0/block_json.go`)
   - Drops the last block, the live footer, and wraps the rest with `slack.BlockFromJSON`, which
-    re-sends each byte for byte, so no block type has to survive an unmarshal round trip
+    re-sends each as stored, compacted: the same JSON whatever whitespace the stored state holds,
+    so no block type has to survive an unmarshal round trip
   - Does not check that the dropped block is a `context` block: `BuildMessage` always puts the
     footer last, and nothing else writes the stored blocks
   - Opens the message with a stale line, a context block reading
@@ -167,10 +168,9 @@ marked stale. Link the README's workflow example.
     the previous post's. A failure logs and skips
   - Skips with a log line when `LastSentMessage.Blocks` is empty
   - Skips with a log line naming both channels when the previous message is in another channel
-    than the new one. Two setups posting to different channels can share a state artifact name:
-    the e2e steps, on the default name, once marked the dev channel's message. Both IDs come from
-    Slack's send responses, the previous one stored by `NewPostState`, so they compare like for
-    like
+    than the new one: two setups posting to different channels can share a state artifact name,
+    and the previous message then belongs to the other setup. Both IDs come from Slack's send
+    responses, the previous one stored by `NewPostState`, so they compare like for like
   - Builds the stale message and edits it with `slackClient.UpdateMessage`, on the previous
     state's channel ID and timestamp, with the stored summary text
   - Does not pass the stale edit to `sentMessageHandler`: the debug file and snapshots record the
@@ -195,9 +195,9 @@ marked stale. Link the README's workflow example.
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:
   - The first run's message keeps its other blocks unchanged, opens with
-    `⚠️ Stale, updated today at <time>`, not the raw `<!date…>` text or the `UTC` fallback, and
-    ends with `Updated today at <time>`
-  - Re-opened the next day, both read `yesterday at <time>`
+    `⚠️ Stale, updated Today at <time>`, not the raw `<!date…>` text or the `UTC` fallback, and
+    ends with `Updated Today at <time>`
+  - Re-opened the next day, both read `Yesterday at <time>`
 
 ### 4. Docs, example workflow and the release note
 

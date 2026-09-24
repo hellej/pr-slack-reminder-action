@@ -32,13 +32,18 @@ const (
 // the section heading.
 const maximumBlocksInSlackMessage = 50
 
+const (
+	slotsForFooter             = 1
+	slotsForStaleLineAndFooter = 2
+)
+
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	var blocks []slack.Block
 	if content.NoOpenPRsText != "" {
 		blocks = append(blocks, buildNoOpenPRsBlock(content.NoOpenPRsText))
 	}
 	blocks = append(blocks, buildSectionBlocks(content)...)
-	blocks = limitMaximumMessageSize(blocks, 1)
+	blocks = limitMaximumMessageSize(blocks, slotsForFooter)
 	blocks = append(blocks, buildFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
@@ -163,7 +168,7 @@ func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack
 	}
 	staleBlocks := slices.Concat(
 		[]slack.Block{buildStaleLineBlock(generatedAt)},
-		limitMaximumMessageSize(contentBlocks, 2),
+		limitMaximumMessageSize(contentBlocks, slotsForStaleLineAndFooter),
 		[]slack.Block{buildStaleFooterBlock(generatedAt)},
 	)
 	return slack.NewBlockMessage(staleBlocks...), nil
@@ -175,30 +180,30 @@ func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }
 
-// {date_pretty} reads "today" or "yesterday" when it applies, otherwise a date like
-// "September 2nd". A stale message is read days later, so the fallback names the date too.
 func buildStaleLineBlock(generatedAt time.Time) slack.Block {
-	staleLineText := fmt.Sprintf(
-		"_⚠️ Stale, updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
-		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
-	)
+	staleLineText := "_⚠️ Stale, updated " + staleDateText(generatedAt) + "_"
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", staleLineText, false, false))
 }
 
 // Replaces the live footer. The stale line above already warns, so this one only dates the
 // content.
 func buildStaleFooterBlock(generatedAt time.Time) slack.Block {
-	footerText := fmt.Sprintf(
-		"_Updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
-		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
-	)
+	footerText := "_Updated " + staleDateText(generatedAt) + "_"
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
 
-// Leaves room for the fixed blocks added around the content: the footer, and in a stale message
-// the stale line too.
-func limitMaximumMessageSize(blocks []slack.Block, fixedBlockCount int) []slack.Block {
-	maximumContentBlocks := maximumBlocksInSlackMessage - fixedBlockCount
+// {date_pretty} reads "Today" or "Yesterday", capitalised even mid-sentence, when it applies,
+// otherwise a date like "September 2nd". A stale message is read days later, so the fallback
+// names the date too.
+func staleDateText(generatedAt time.Time) string {
+	return fmt.Sprintf(
+		"<!date^%d^{date_pretty} at {time}|%s UTC>",
+		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
+	)
+}
+
+func limitMaximumMessageSize(blocks []slack.Block, slotsForFixedBlocks int) []slack.Block {
+	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForFixedBlocks
 	if len(blocks) <= maximumContentBlocks {
 		return blocks
 	}

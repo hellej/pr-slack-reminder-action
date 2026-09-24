@@ -21,8 +21,8 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
   - First, a stale line reading `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
   - Last, in place of the live footer, a stale footer reading `_Updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
   - The stale message is one block longer than the stored one. Stored at the cap, it drops its last content block, logged, so it stays at 50
-  - `{date_pretty}` reads `today` or `yesterday` when it applies, otherwise a date; the fallback after the pipe carries the date and time in UTC
-  - Errors on blocks that do not parse, on an empty array or `null`, and on a block without a `type`
+  - `{date_pretty}` reads `Today` or `Yesterday`, capitalised even mid-sentence, when it applies, otherwise a date; the fallback after the pipe carries the date and time in UTC
+  - Errors on blocks that do not parse, on an empty array or `null`, and on a content block without a `type`. The dropped last block is never parsed
 
 ## Doesn't Do
 

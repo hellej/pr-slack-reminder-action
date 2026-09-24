@@ -148,7 +148,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Architecture
 
-Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
+Two run modes (`run-mode` input): **post** sends a new reminder, marks the previous one stale, and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
@@ -156,7 +156,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder and saves state;
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
 6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages
-7. **State** (`internal/state/`) — persists PR refs and the Slack message ref after `post`; loaded from a GitHub Actions artifact in `update` mode
+7. **State** (`internal/state/`) — persists PR refs, the Slack message ref and the last sent message after `post`; loaded from a GitHub Actions artifact in both modes
 
 ## Key Patterns
 

@@ -1,6 +1,6 @@
 # state
 
-Persists and reloads the "post" run's PR set and Slack message reference, so "update" mode can find and edit that message. See [AGENTS.md](../../AGENTS.md) for the two run-modes' overall flow.
+Persists and reloads the "post" run's PR set, Slack message reference and last sent message, so "update" mode can find and edit that message and the next "post" can mark it stale. See [AGENTS.md](../../AGENTS.md) for the two run-modes' overall flow.
 
 ## Behaviour
 
