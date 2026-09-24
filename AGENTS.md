@@ -124,6 +124,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
 - Use table-driven tests for functions with multiple input scenarios
+- Coverage counts across the whole suite, not per package. Pin behaviour at the user-facing boundary first: snapshot tests and the `main_test.go` integration tests. Add a package test only for what those can't reach cheaply, such as limits and error mapping. Don't repeat a case they already pin, so internals stay free to refactor
 - Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go` — integration tests using full pipeline with mocks

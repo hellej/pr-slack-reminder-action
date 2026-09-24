@@ -1065,6 +1065,16 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 		runStart:    runStart,
 		runEnd:      runEnd,
 	})
+	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1623850245.000200"}
+	if savedState.SlackMessage != expectedMessageRef {
+		t.Errorf("Expected the loaded message ref %+v, got %+v", expectedMessageRef, savedState.SlackMessage)
+	}
+	if !slices.Equal(savedState.PullRequests, []models.PullRequestRef{stateRef(1)}) {
+		t.Errorf("Expected the loaded PR 1, got %+v", savedState.PullRequests)
+	}
+	if !savedState.CreatedAt.Equal(loadedState.CreatedAt) {
+		t.Errorf("Expected the loaded CreatedAt %v, got %v", loadedState.CreatedAt, savedState.CreatedAt)
+	}
 }
 
 const (

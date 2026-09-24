@@ -90,8 +90,7 @@ marked stale. Link the README's workflow example.
   `formSender.BuildRequestContext`)
   - It replaces `parseSentJSONBlocks`, and the mock calls it in place of its own `getJSONBlocks`,
     which goes away
-  - `SendMessage` and `UpdateMessage` call it before the Slack call and return its error, so
-    blocks that fail to marshal never reach Slack
+  - `SendMessage` and `UpdateMessage` return its error
 - `state.SaveSentSlackBlocksToFile` takes the `json.RawMessage` and writes it indented
   (`json.Indent`). The file changes from `[[…blocks…]]` to `[…blocks…]`
   - Empty blocks are an error and write no file: they mean the info did not come from a send,
@@ -99,7 +98,8 @@ marked stale. Link the README's workflow example.
 - Re-record the 11 snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` with
   `make update-test-snapshots`. The diff drops one nesting level only
 - `canvas_test.go`'s `TestCanvasDoesNotChangeMessageBlocks` parses the file as one block array
-- A `slackclient` test through the real client and a fake `SlackAPI` fails before the fix
+- A `slackclient` test through the real client and a fake `SlackAPI` fails before the fix. A
+  `state` test pins the empty-blocks error, which nothing at the integration boundary can produce
 - Touches `slackclient`, `state`, `testhelpers/mockslackclient`, `run.go`'s sent-message handler,
   `canvas_test.go`. Update `slackclient.spec.md` and `state.spec.md`
 
@@ -125,9 +125,10 @@ marked stale. Link the README's workflow example.
   - Wired here rather than in Step 3, since an unused `WithLastSentMessage` fails
     `make check-dead-code`. Nothing reads the field until Step 3
 - `CurrentSchemaVersion` stays 1, as it did for `CanvasContentHash`. Nothing checks the version
-- Unit tests pin the field through save and load, an old artifact without it, and
-  `WithLastSentMessage` leaving its input alone. Integration tests in `main_test.go` pin the
-  message each mode saves, and the loaded one kept on update mode's early returns
+- A unit test pins the field through `NewPostState`, save and load. Integration tests in
+  `main_test.go` pin the message each mode saves, that an edit keeps the loaded message ref, PRs
+  and `CreatedAt`, and the loaded message kept on update mode's early returns. Step 3's skip for
+  a state without the field covers older artifacts and `omitempty`
 - Update `state.spec.md`: the new field, its empty value in older artifacts, and the oddity that
   it is the only state update mode rewrites besides the canvas hash. Update `run.spec.md`: each
   mode saves the message it sent
@@ -153,9 +154,9 @@ marked stale. Link the README's workflow example.
     cap drops its last content block, logged, through the same `limitMaximumMessageSize` that
     `BuildMessage` uses, told how many fixed blocks to leave room for
   - Errors on blocks that do not parse or are empty
-- Unit tests pin the stale line as the first block, the stored content blocks byte-identical
-  after it, the stale footer last, the same compact blocks from an indented store, the cap at 49
-  and 50 stored blocks, and the error cases
+- Unit tests pin the cap at 49 and 50 stored blocks, and the error on `null` or `[]`. Step 3's
+  integration test pins the layout and the content blocks as stored, compacted: the mock artifact
+  is indented the way `state.Save` writes it
 - `make check-dead-code` flags `BuildStaleMessage` and its helpers until Step 3 calls it
 - Update `messagebuilder.spec.md`: the stale line and footer, the cap, and that the stale message
   never re-renders content
@@ -188,9 +189,9 @@ marked stale. Link the README's workflow example.
   returned error. Post still returns the new state, so it is saved
 - The mock's `UpdatedMessage` also records `SentBlocks`, the block array as sent, so a test pins
   the stale edit byte for byte
-- A `slackclient` unit test through the fake `SlackAPI` pins the error mapping. Integration tests
-  in `main_test.go` cover the mark, each skip path, the failing edit, and no mark when the send
-  fails or there is nothing to send
+- A `slackclient` unit test through the fake `SlackAPI` pins one not-editable code mapping to
+  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the mark, each skip path,
+  the failing edit, and no mark when the send fails or there is nothing to send
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:

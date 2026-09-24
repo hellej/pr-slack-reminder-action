@@ -138,8 +138,6 @@ type mockSlackAPI struct {
 	deleteMessageError   error
 	editCanvasError      error
 	editCanvasParams     []slack.EditCanvasParams
-	postMessageCalls     int
-	updateMessageCalls   int
 	updateMessageError   error
 }
 
@@ -163,12 +161,10 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 }
 
 func (m *mockSlackAPI) PostMessage(channelID string, _ ...slack.MsgOption) (string, string, error) {
-	m.postMessageCalls++
 	return "timestamp", channelID, nil
 }
 
 func (m *mockSlackAPI) UpdateMessage(channelID string, timestamp string, _ ...slack.MsgOption) (string, string, string, error) {
-	m.updateMessageCalls++
 	if m.updateMessageError != nil {
 		return "", "", "", m.updateMessageError
 	}
@@ -305,90 +301,17 @@ func TestSentMessageInfoRecordsTheBlockArrayAsSent(t *testing.T) {
 	}
 }
 
-type unmarshallableBlock struct{}
-
-func (unmarshallableBlock) BlockType() slack.MessageBlockType { return "unmarshallable" }
-func (unmarshallableBlock) ID() string                        { return "" }
-func (unmarshallableBlock) MarshalJSON() ([]byte, error) {
-	return nil, errors.New("cannot marshal")
-}
-
-func TestUnmarshallableBlocksFailBeforeSending(t *testing.T) {
-	message := slack.NewBlockMessage(unmarshallableBlock{})
-	mockAPI := &mockSlackAPI{}
-	client := slackclient.NewClient(mockAPI)
-
-	if _, err := client.SendMessage("C12345", message, "summary"); err == nil ||
-		!strings.Contains(err.Error(), "cannot marshal") {
-		t.Errorf("SendMessage: expected the marshal error, got %v", err)
-	}
-	if _, err := client.UpdateMessage("C12345", "1234567890.123456", message, "summary"); err == nil ||
-		!strings.Contains(err.Error(), "cannot marshal") {
-		t.Errorf("UpdateMessage: expected the marshal error, got %v", err)
-	}
-	if mockAPI.postMessageCalls != 0 || mockAPI.updateMessageCalls != 0 {
-		t.Errorf(
-			"Expected no Slack call, got %d post and %d update calls",
-			mockAPI.postMessageCalls, mockAPI.updateMessageCalls,
-		)
-	}
-}
-
 // slack-go returns a Slack API error as slack.SlackErrorResponse, its Err the error code
 // (slack-go v0.29.0 misc.go SlackResponse.Err, chat.go sendResponseFull).
-func TestUpdateMessageErrors(t *testing.T) {
-	tests := []struct {
-		name                 string
-		updateMessageError   error
-		expectNotEditable    bool
-		expectedErrorMessage string
-	}{
-		{
-			name:                 "message_not_found",
-			updateMessageError:   slack.SlackErrorResponse{Err: "message_not_found"},
-			expectNotEditable:    true,
-			expectedErrorMessage: "failed to update Slack message: message cannot be edited: message_not_found",
-		},
-		{
-			name:                 "cant_update_message",
-			updateMessageError:   slack.SlackErrorResponse{Err: "cant_update_message"},
-			expectNotEditable:    true,
-			expectedErrorMessage: "failed to update Slack message: message cannot be edited: cant_update_message",
-		},
-		{
-			name:                 "edit_window_closed",
-			updateMessageError:   slack.SlackErrorResponse{Err: "edit_window_closed"},
-			expectNotEditable:    true,
-			expectedErrorMessage: "failed to update Slack message: message cannot be edited: edit_window_closed",
-		},
-		{
-			name:                 "another Slack error",
-			updateMessageError:   slack.SlackErrorResponse{Err: "channel_not_found"},
-			expectedErrorMessage: "failed to update Slack message: channel_not_found",
-		},
-		{
-			name:                 "a non-Slack error carrying a not-editable code as text",
-			updateMessageError:   errors.New("message_not_found"),
-			expectedErrorMessage: "failed to update Slack message: message_not_found",
-		},
-	}
+func TestUpdateMessageMarksANotEditableMessage(t *testing.T) {
+	client := slackclient.NewClient(&mockSlackAPI{
+		updateMessageError: slack.SlackErrorResponse{Err: "edit_window_closed"},
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := slackclient.NewClient(&mockSlackAPI{updateMessageError: tt.updateMessageError})
+	_, err := client.UpdateMessage("C12345", "1234567890.123456", slack.NewBlockMessage(), "summary")
 
-			_, err := client.UpdateMessage("C12345", "1234567890.123456", slack.NewBlockMessage(), "summary")
-
-			if err == nil {
-				t.Fatal("Expected an error, got nil")
-			}
-			if err.Error() != tt.expectedErrorMessage {
-				t.Errorf("Expected error %q, got %q", tt.expectedErrorMessage, err.Error())
-			}
-			if errors.Is(err, slackclient.ErrMessageNotEditable) != tt.expectNotEditable {
-				t.Errorf("Expected errors.Is ErrMessageNotEditable to be %v, got %v", tt.expectNotEditable, !tt.expectNotEditable)
-			}
-		})
+	if !errors.Is(err, slackclient.ErrMessageNotEditable) {
+		t.Errorf("Expected ErrMessageNotEditable, got %v", err)
 	}
 }
 

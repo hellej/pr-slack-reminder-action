@@ -577,7 +577,8 @@ func createMockArtifactZip(mockState *state.State) ([]byte, error) {
 		return nil, err
 	}
 
-	stateJSON, err := json.Marshal(mockState)
+	// Indented the way state.Save writes the artifact
+	stateJSON, err := json.MarshalIndent(mockState, "", "  ")
 	if err != nil {
 		return nil, err
 	}

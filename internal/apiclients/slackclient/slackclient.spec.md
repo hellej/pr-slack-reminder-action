@@ -9,7 +9,7 @@ Sends PR reminder messages to Slack and replaces PR tracker canvas content.
 - `Client.ReplaceCanvasContent` replaces a canvas's whole content with a markdown string, via one `canvases.edit` call with a `replace` change carrying no section ID. Requires the `canvases:write` scope and canvas access, which the bot gets implicitly when the canvas is a tab in a channel it is in
 - Send/update calls return `SentMessageInfo`: channel ID, timestamp, and the block array as sent
 - `UpdateMessage` wraps Slack's `message_not_found`, `cant_update_message` and `edit_window_closed` in `ErrMessageNotEditable`: the message is gone or can no longer be edited. `WrapUpdateMessageError` holds that mapping, exported so the mock shares it
-- `MarshalSentBlocks` returns a message's block array as sent. Send/update call it before the Slack call, so blocks that fail to marshal fail the call without reaching Slack
+- `MarshalSentBlocks` returns a message's block array as sent
 
 ## Doesn't Do
 
