@@ -1195,7 +1195,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	}
 }
 
-func TestPostModeStaleEditFailureFailsTheRunButSavesTheNewState(t *testing.T) {
+func TestPostModeFailsTheRunOnAStaleEditErrorButSavesTheNewState(t *testing.T) {
 	previousState := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks.LastSentMessage.Blocks = []byte(
