@@ -899,7 +899,7 @@ func assertLastSentMessageGeneratedDuringTheRun(
 	}
 }
 
-func assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t *testing.T, saved state.LastSentMessage) {
+func assertLastSentMessageEndsWithTheUpdateTimeFooterOfItsGeneratedAt(t *testing.T, saved state.LastSentMessage) {
 	t.Helper()
 	var blocks []struct {
 		Type     string `json:"type"`
@@ -971,7 +971,7 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 	}
 	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
 	assertLastSentMessageGeneratedDuringTheRun(t, savedState.LastSentMessage, runStart, runEnd)
-	assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t, savedState.LastSentMessage)
+	assertLastSentMessageEndsWithTheUpdateTimeFooterOfItsGeneratedAt(t, savedState.LastSentMessage)
 	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1623850245.000200"}
 	if savedState.SlackMessage != expectedMessageRef {
 		t.Errorf("Expected the loaded message ref %+v, got %+v", expectedMessageRef, savedState.SlackMessage)
@@ -985,16 +985,16 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 }
 
 const (
-	previousHeadingBlock    = `{"type":"header","text":{"type":"plain_text","text":"👀 Waiting for review","emoji":true},"block_id":"heading_waiting_for_review","level":2}`
-	previousRowsBlock       = `{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/test-org/test-repo/pull/7","text":"Listed yesterday","style":{"bold":true}}]}],"style":"bullet","indent":0,"border":0,"offset":0}]}`
-	previousLiveFooterBlock = `{"type":"context","block_id":"live_footer","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
+	previousHeadingBlock          = `{"type":"header","text":{"type":"plain_text","text":"👀 Waiting for review","emoji":true},"block_id":"heading_waiting_for_review","level":2}`
+	previousRowsBlock             = `{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/test-org/test-repo/pull/7","text":"Listed yesterday","style":{"bold":true}}]}],"style":"bullet","indent":0,"border":0,"offset":0}]}`
+	previousUpdateTimeFooterBlock = `{"type":"context","block_id":"update_time_footer","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
 )
 
 func previousStateInThisChannelEditedByAnUpdateRun() state.State {
 	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
 	previousState.SlackMessage = state.SlackRef{ChannelID: "C12345678", MessageTS: "1788253200.000100"}
 	previousState.LastSentMessage = state.LastSentMessage{
-		Blocks:      []byte("[" + previousHeadingBlock + "," + previousRowsBlock + "," + previousLiveFooterBlock + "]"),
+		Blocks:      []byte("[" + previousHeadingBlock + "," + previousRowsBlock + "," + previousUpdateTimeFooterBlock + "]"),
 		SummaryText: "3 open PRs are waiting for attention 👀",
 		GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
 	}
@@ -1079,21 +1079,21 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 	if result.runErr != nil {
 		t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 	}
-	staleEdit := result.mockSlackAPI.UpdatedMessage
-	if staleEdit.ChannelID != "C12345678" || staleEdit.Timestamp != "1788253200.000100" {
+	markingEdit := result.mockSlackAPI.UpdatedMessage
+	if markingEdit.ChannelID != "C12345678" || markingEdit.Timestamp != "1788253200.000100" {
 		t.Errorf(
 			"Expected the edit on C12345678 at 1788253200.000100, got %s at %s",
-			staleEdit.ChannelID, staleEdit.Timestamp,
+			markingEdit.ChannelID, markingEdit.Timestamp,
 		)
 	}
-	if staleEdit.Text != "3 open PRs are waiting for attention 👀" {
-		t.Errorf("Expected the stored summary text, got %q", staleEdit.Text)
+	if markingEdit.Text != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the stored summary text, got %q", markingEdit.Text)
 	}
-	// The snapshots normalise the stale time, so only this pins the stale line to the stored
-	// GeneratedAt, not the clock
-	storedTimeInStaleText := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
-	if strings.Count(string(staleEdit.BlocksAsSent), storedTimeInStaleText) != 1 {
-		t.Errorf("Expected the stale line alone to show %s, got\n%s", storedTimeInStaleText, staleEdit.BlocksAsSent)
+	// The snapshots normalise the staleness warning's time, so only this pins that time to the
+	// stored GeneratedAt, not the clock
+	storedTimeInStalenessWarning := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
+	if strings.Count(string(markingEdit.BlocksAsSent), storedTimeInStalenessWarning) != 1 {
+		t.Errorf("Expected the staleness warning alone to show %s, got\n%s", storedTimeInStalenessWarning, markingEdit.BlocksAsSent)
 	}
 	assertNewPostStateSaved(t, result.stateFilePath)
 	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
@@ -1112,7 +1112,7 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 			t.Fatalf("Expected Run to fail with the send error, got %v", result.runErr)
 		}
 		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
-			t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			t.Errorf("Expected no marking edit, got %+v", result.mockSlackAPI.UpdatedMessage)
 		}
 	})
 
@@ -1129,7 +1129,7 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 			t.Fatalf("Expected nothing sent, got %+v", result.mockSlackAPI.SentMessage)
 		}
 		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
-			t.Errorf("Expected no stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			t.Errorf("Expected no marking edit, got %+v", result.mockSlackAPI.UpdatedMessage)
 		}
 	})
 }
@@ -1186,8 +1186,8 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 			if result.runErr != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 			}
-			if staleEdit := result.mockSlackAPI.UpdatedMessage; staleEdit.ChannelID != "" {
-				t.Errorf("Expected no stale edit, got one on %s at %s", staleEdit.ChannelID, staleEdit.Timestamp)
+			if markingEdit := result.mockSlackAPI.UpdatedMessage; markingEdit.ChannelID != "" {
+				t.Errorf("Expected no marking edit, got one on %s at %s", markingEdit.ChannelID, markingEdit.Timestamp)
 			}
 			assertNewPostStateSaved(t, result.stateFilePath)
 			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
@@ -1195,11 +1195,11 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	}
 }
 
-func TestPostModeFailsTheRunOnAStaleEditErrorButSavesTheNewState(t *testing.T) {
+func TestPostModeFailsTheRunOnAMarkingEditErrorButSavesTheNewState(t *testing.T) {
 	previousState := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks.LastSentMessage.Blocks = []byte(
-		`[{"text":"no type"},` + previousLiveFooterBlock + `]`,
+		`[{"text":"no type"},` + previousUpdateTimeFooterBlock + `]`,
 	)
 
 	testCases := []struct {

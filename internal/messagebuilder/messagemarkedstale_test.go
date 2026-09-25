@@ -7,10 +7,10 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 )
 
-func TestStaleMessageErrorsOnNullOrEmptySentBlocks(t *testing.T) {
+func TestMessageMarkedStaleErrorsOnNullOrEmptySentBlocks(t *testing.T) {
 	for _, sentBlocks := range []string{`null`, `[]`} {
 		t.Run(sentBlocks, func(t *testing.T) {
-			if _, err := messagebuilder.BuildStaleMessage(json.RawMessage(sentBlocks), generatedAt); err == nil {
+			if _, err := messagebuilder.BuildMessageMarkedStale(json.RawMessage(sentBlocks), generatedAt); err == nil {
 				t.Error("Expected an error, got nil")
 			}
 		})

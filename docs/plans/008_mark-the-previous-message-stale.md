@@ -9,9 +9,10 @@ status: draft
   `_Live, updated 9:58 AM_` footer
 - When a `post` run sends a new message, the message the previous state points at is edited in
   place:
-  - It opens with `_⚠️ Stale, updated September 2nd at 9:58 AM_`, in the live footer's
+  - It opens with `_⚠️ Stale, updated September 2nd at 9:58 AM_`, in the update-time footer's
     `context` block style, its timestamp when its content was last built
-  - A live footer from an update run is dropped: the stale line already dates the content
+  - An update-time footer from an update run is dropped: the staleness warning already dates the
+    content
   - Every other block of the old message stays as last sent, not refreshed
 - Only the newest reminder reads as current
 - The work lands on branch `claude/inspiring-shannon-2x6up8`, plan and implementation in one PR
@@ -39,10 +40,10 @@ notify.
   - `post` writes it with the new message, `update` rewrites it after each successful edit
   - An artifact saved before this change decodes an empty `LastSentMessage`, so there is nothing
     to mark
-- `post` sends its message without a footer. `update`'s edit ends with the live footer, a block
-  with its own block ID, so the stale message can drop it. See Step 2
+- `post` sends its message without a footer. `update`'s edit ends with the update-time footer, a
+  block with its own block ID, so the message marked stale can drop it. See Step 2
 - `post` marks the previous message stale after sending the new one. See Step 3
-- The stale line shows its time as
+- The staleness warning shows its time as
   `<!date^unix^{date_pretty} at {time}|Jan 2 15:04 UTC>`, rendered in each reader's timezone
   ([formatting message text](https://docs.slack.dev/messaging/formatting-message-text))
   - `{date_pretty}` reads `Yesterday`, capitalised even mid-sentence, for the usual daily case,
@@ -74,7 +75,7 @@ marked stale. Link the README's workflow example.
 - R1: Fix the sent-blocks record, which is empty in real runs
 - R2: Rename the mock's `MockStateForUpdateMode`
 - 1: Store the last sent message in state, written by both run modes
-- 2: Build the stale message from stored blocks
+- 2: Build the message marked stale from stored blocks
 - 3: Mark the previous message stale in `post`
 - 4: Docs, example workflow and the release note
 
@@ -117,8 +118,8 @@ marked stale. Link the README's workflow example.
 - New `state.LastSentMessage` struct, field `LastSentMessage` on `State`:
   - `Blocks json.RawMessage`: the block array from `SentMessageInfo.BlocksAsSent`
   - `SummaryText string`
-  - `GeneratedAt time.Time`: when the content was built, what an edit's live footer and the
-    stale line show
+  - `GeneratedAt time.Time`: when the content was built, what an edit's update-time footer and
+    the staleness warning show
   - `Blocks` is `omitempty`: a nil `json.RawMessage` saves as `null`, which loads back as the
     bytes `null`, so a state update mode saves back unedited would no longer read as empty
 - `NewPostState` takes the summary text and `generatedAt` and fills it. `runPostMode` passes its
@@ -132,50 +133,52 @@ marked stale. Link the README's workflow example.
 - `CurrentSchemaVersion` stays 1, as it did for `LastWrittenCanvasMarkdownHash`. Nothing checks
   the version
 - `snapshot_test.go` pins the field: it snapshots the state file each post, update and
-  stale-chain scenario saves, as `<test>-<scenario>.state.json`: the exact JSON, keys included,
+  marking scenario saves, as `<test>-<scenario>.state.json`: the exact JSON, keys included,
   since the next run reads it, possibly under a newer action version
   - `createdAt` and `generatedAt` are normalised like the footer timestamps, except a zero time,
     which means the field was never set
   - An update case that deletes the message saves back a loaded state without the field, so
     `omitempty` shows in its snapshot
 - Integration tests in `main_test.go` pin what the snapshots can't: `generatedAt` stamped during
-  the run, an edit's live footer showing it, that an edit keeps the loaded message ref, PRs and
-  `CreatedAt`, and the loaded message kept on update mode's early returns
+  the run, an edit's update-time footer showing it, that an edit keeps the loaded message ref, PRs
+  and `CreatedAt`, and the loaded message kept on update mode's early returns
 - Update `state.spec.md`: the new field, its empty value in older artifacts, and the oddity that
   it is the only state update mode rewrites besides the canvas hash. Update `run.spec.md`: each
   mode saves the message it sent
 
-### 2. Build the stale message from stored blocks
+### 2. Build the message marked stale from stored blocks
 
 - `messagebuilder.BuildMessage` builds the posted message without a footer. New
-  `BuildMessageWithLiveFooter` appends the live footer, a context block with block ID
-  `live_footer`, for `runUpdateMode`'s edit. Two intent-named functions rather than a bool
+  `BuildMessageWithUpdateTimeFooter` appends the update-time footer, a context block with block ID
+  `update_time_footer`, for `runUpdateMode`'s edit. Two intent-named functions rather than a bool
   argument
-  - Both cap content at 49 blocks. The 50th slot holds the live footer of an edit, or the stale
-    line once a posted message is marked stale
-- New `messagebuilder.BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time)
+  - Both cap content at 49 blocks. The 50th slot holds the update-time footer of an edit, or the
+    staleness warning once a posted message is marked stale
+- New `messagebuilder.BuildMessageMarkedStale(sentBlocks json.RawMessage, generatedAt time.Time)
   (slack.Message, error)`. Plain arguments, so `messagebuilder` does not import `state`
   - Splits `sentBlocks` into per-block `json.RawMessage`, since `slack.BlockFromJSON` keeps only
     the first block of an array (`slack-go@v0.29.0/block_json.go`)
-  - Drops the block with block ID `live_footer`, present only when an update run last edited the
-    message, and wraps the rest with `slack.BlockFromJSON`, which re-sends each as stored,
-    compacted: the same JSON whatever whitespace the stored state holds, so no block type has to
-    survive an unmarshal round trip
-  - Opens the message with a stale line, a context block reading
+  - Drops the block with block ID `update_time_footer`, present only when an update run last
+    edited the message, and wraps the rest with `slack.BlockFromJSON`, which re-sends each as
+    stored, compacted: the same JSON whatever whitespace the stored state holds, so no block type
+    has to survive an unmarshal round trip
+  - Opens the message with a staleness warning, a context block reading
     `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`, so a reader
     scrolling back sees it before any row
-  - Adds no footer: the stale line already dates the content, so no "Live" is left
-  - Applies no block cap: the stored content was capped at 49 blocks, so the stale line makes at
-    most 50
+  - Adds no footer: the staleness warning already dates the content, so no "Live" is left
+  - Applies no block cap: the stored content was capped at 49 blocks, so the staleness warning
+    makes at most 50
   - Errors on blocks that do not parse or are empty
-- Unit tests pin the error on `null` or `[]`, the live message's cap at 50 with the footer last,
-  and a posted message at the cap marked stale at 50 blocks. Step 3's stale message snapshots pin
-  the layout, the content blocks as stored, and the dropped live footer
+- Unit tests pin the error on `null` or `[]`, an edited message's cap at 50 with the footer
+  last, and a posted message at the cap marked stale at 50 blocks. Step 3's snapshots of the
+  message marked stale pin the layout, the content blocks as stored, and the dropped update-time
+  footer
 - Re-record the snapshots: the post-mode ones lose their footer, the update-mode ones gain the
   footer's block ID
-- `make check-dead-code` flags `BuildStaleMessage` and its helpers until Step 3 calls it
-- Update `messagebuilder.spec.md`: the footer only on the live message, the 49-block content cap,
-  the stale line, the dropped live footer, and that the stale message never re-renders content
+- `make check-dead-code` flags `BuildMessageMarkedStale` and its helpers until Step 3 calls it
+- Update `messagebuilder.spec.md`: the footer only on the message an update run edits, the
+  49-block content cap, the staleness warning, the dropped update-time footer, and that the stale
+  message never re-renders content
 
 ### 3. Mark the previous message stale
 
@@ -188,9 +191,9 @@ marked stale. Link the README's workflow example.
     than the new one: two setups posting to different channels can share a state artifact name,
     and the previous message then belongs to the other setup. Both IDs come from Slack's send
     responses, the previous one stored by `NewPostState`, so they compare like for like
-  - Builds the stale message and edits it with `slackClient.UpdateMessage`, on the previous
+  - Builds the message marked stale and edits it with `slackClient.UpdateMessage`, on the previous
     state's channel ID and timestamp, with the stored summary text
-  - Does not pass the stale edit to `sentMessageHandler`: the debug file and snapshots record the
+  - Does not pass the marking edit to `sentMessageHandler`: the debug file and snapshots record the
     new message only
 - `slackclient.UpdateMessage` wraps Slack's `message_not_found`, `cant_update_message` and
   `edit_window_closed` in one sentinel, `ErrMessageNotEditable`, with `%w`
@@ -201,22 +204,22 @@ marked stale. Link the README's workflow example.
     response, its `Err` the error code (`slack-go@v0.29.0/misc.go`, `SlackResponse.Err`)
   - The mapping is exported as `slackclient.WrapUpdateMessageError`, and
     `mockslackclient.UpdateMessage` calls it, so the mock cannot drift from the real client
-- Any other error from the stale edit, a `BuildStaleMessage` error included, joins post mode's
-  returned error. Post still returns the new state, so it is saved
-- The mock's `UpdatedMessage` also records `BlocksAsSent`, so a snapshot pins the stale edit
+- Any other error from the marking edit, a `BuildMessageMarkedStale` error included, joins post
+  mode's returned error. Post still returns the new state, so it is saved
+- The mock's `UpdatedMessage` also records `BlocksAsSent`, so a snapshot pins the marking edit
 - `snapshot_test.go`'s `TestSnapshotsPreviousMessageMarkedStale` chains two real posts of the
   "every section under load" and grouped post-mode scenarios: the second post loads the state the
   first one saved and marks its message stale. Its `BlocksAsSent`, indented, are the snapshot, so
   the layout and the content blocks as stored are pinned at the boundary
-  - A third case runs an update run between the two posts, so the stale edit drops the live
-    footer that update gave the message
+  - A third case runs an update run between the two posts, so the marking edit drops the
+    update-time footer that update gave the message
   - The mock's `PostMessageTimestamp` option gives the second post its own message timestamp
-  - The snapshot normalises the stale line's time like the live footer's, so the mark's
-    integration test pins it to the stored `GeneratedAt`
+  - The snapshot normalises the staleness warning's time like the update-time footer's, so the
+    marking edit's integration test pins it to the stored `GeneratedAt`
 - A `slackclient` unit test through the fake `SlackAPI` pins one not-editable code mapping to
-  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the mark's channel, timestamp,
-  summary text and stored time, each skip path, the failing edit, and no mark when the send fails
-  or there is nothing to send
+  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the marking edit's channel,
+  timestamp, summary text and stored time, each skip path, the failing edit, and no marking edit
+  when the send fails or there is nothing to send
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:
@@ -224,8 +227,8 @@ marked stale. Link the README's workflow example.
     `⚠️ Stale, updated Today at <time>`, not the raw `<!date…>` text or the `UTC` fallback, and
     has no footer
   - Again with an update run between the two posts: the update gives the first message the
-    `Live, updated <time>` footer, and the second post's stale mark drops it
-  - Re-opened the next day, the stale line reads `Yesterday at <time>`
+    `Live, updated <time>` footer, and the second post's marking drops it
+  - Re-opened the next day, the staleness warning reads `Yesterday at <time>`
 
 ### 4. Docs, example workflow and the release note
 
@@ -264,8 +267,8 @@ None
   apply to a bot's own messages. If they do, a message past the window keeps reading as current,
   and the run stays green
 - An update run that loaded the previous state before a post finished edits the old message
-  afterwards, restoring its live footer, and its state upload then points later update runs at
-  the old message. The post and update concurrency groups differ, so this can already happen
+  afterwards, restoring its update-time footer, and its state upload then points later update runs
+  at the old message. The post and update concurrency groups differ, so this can already happen
   today, and marking makes it visible
 - Two setups posting to the same channel under one state artifact name mark each other's message
   stale. The channel check only tells apart setups in different channels

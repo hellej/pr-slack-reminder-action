@@ -31,16 +31,16 @@ const stateFileName = "pr-slack-reminder-state.json"
 
 var nonAlphanumericRuns = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
-var liveFooterTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} UTC`)
+var updateTimeFooterTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} UTC`)
 
-var staleTimestamp = regexp.MustCompile(`!date\^\d+\^\{date_pretty\} at \{time\}\|[A-Z][a-z]{2} \d{1,2} \d{2}:\d{2} UTC`)
+var stalenessWarningTimestamp = regexp.MustCompile(`!date\^\d+\^\{date_pretty\} at \{time\}\|[A-Z][a-z]{2} \d{1,2} \d{2}:\d{2} UTC`)
 
-// Run stamps the live footer, and the stale line after it, with the real clock, so a snapshot
-// recorded a second ago would never match again. The rest of the message survives a moving
-// clock: the fixture ages come off this package's own `now`.
+// Run stamps the update-time footer, and the staleness warning after it, with the real clock,
+// so a snapshot recorded a second ago would never match again. The rest of the message survives
+// a moving clock: the fixture ages come off this package's own `now`.
 func withFixedClockTimestamps(blocks []byte) []byte {
-	blocks = liveFooterTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
-	return staleTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
+	blocks = updateTimeFooterTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
+	return stalenessWarningTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
 var stateClockTimeField = regexp.MustCompile(`"(createdAt|generatedAt)": "[^"]*"`)
@@ -456,18 +456,18 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 			}
 			mockSlackAPI := runSnapshotScenario(t, scenario, &previousState, "1234567899.000200")
 
-			staleEdit := mockSlackAPI.UpdatedMessage
-			if staleEdit.ChannelID != "C12345678" || staleEdit.Timestamp != "1234567890.123456" {
+			markingEdit := mockSlackAPI.UpdatedMessage
+			if markingEdit.ChannelID != "C12345678" || markingEdit.Timestamp != "1234567890.123456" {
 				t.Fatalf(
-					"Expected the stale edit on the first post's message, C12345678 at 1234567890.123456, got %s at %s",
-					staleEdit.ChannelID, staleEdit.Timestamp,
+					"Expected the marking edit on the first post's message, C12345678 at 1234567890.123456, got %s at %s",
+					markingEdit.ChannelID, markingEdit.Timestamp,
 				)
 			}
-			var indentedStaleBlocks bytes.Buffer
-			if err := json.Indent(&indentedStaleBlocks, staleEdit.BlocksAsSent, "", "  "); err != nil {
-				t.Fatalf("Failed to indent the stale blocks: %v", err)
+			var indentedMarkedMessageBlocks bytes.Buffer
+			if err := json.Indent(&indentedMarkedMessageBlocks, markingEdit.BlocksAsSent, "", "  "); err != nil {
+				t.Fatalf("Failed to indent the marked message blocks: %v", err)
 			}
-			assertBlocksMatchSnapshot(t, indentedStaleBlocks.Bytes())
+			assertBlocksMatchSnapshot(t, indentedMarkedMessageBlocks.Bytes())
 			assertSavedStateMatchesSnapshot(t, stateFilePath)
 		})
 	}

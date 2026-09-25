@@ -504,7 +504,7 @@
       },
       {
         "type": "context",
-        "block_id": "live_footer",
+        "block_id": "update_time_footer",
         "elements": [
           {
             "type": "mrkdwn",

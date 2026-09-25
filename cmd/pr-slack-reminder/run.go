@@ -162,14 +162,14 @@ func markPreviousMessageStale(
 		return nil
 	}
 
-	staleMessage, err := messagebuilder.BuildStaleMessage(lastSentMessage.Blocks, lastSentMessage.GeneratedAt)
+	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(lastSentMessage.Blocks, lastSentMessage.GeneratedAt)
 	if err != nil {
 		return fmt.Errorf("failed to mark the previous message stale: %w", err)
 	}
 	_, err = slackClient.UpdateMessage(
 		previousState.SlackMessage.ChannelID,
 		previousState.SlackMessage.MessageTS,
-		staleMessage,
+		messageMarkedStale,
 		lastSentMessage.SummaryText,
 	)
 	if errors.Is(err, slackclient.ErrMessageNotEditable) {
@@ -245,7 +245,7 @@ func runUpdateMode(
 		log.Printf("Updating Slack message with no-prs-message: %s", content.NoOpenPRsText)
 	}
 
-	message, summaryText := messagebuilder.BuildMessageWithLiveFooter(content)
+	message, summaryText := messagebuilder.BuildMessageWithUpdateTimeFooter(content)
 
 	sentMessageInfo, err := slackClient.UpdateMessage(
 		loadedState.SlackMessage.ChannelID,

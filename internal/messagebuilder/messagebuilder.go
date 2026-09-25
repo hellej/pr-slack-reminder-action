@@ -32,16 +32,16 @@ const (
 // the section heading.
 const maximumBlocksInSlackMessage = 50
 
-const slotsForFooterOrStaleLine = 1
+const slotsForFooterOrStalenessWarning = 1
 
-const liveFooterBlockID = "live_footer"
+const updateTimeFooterBlockID = "update_time_footer"
 
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	return slack.NewBlockMessage(buildContentBlocks(content)...), content.SummaryText
 }
 
-func BuildMessageWithLiveFooter(content messagecontent.Content) (slack.Message, string) {
-	blocks := append(buildContentBlocks(content), buildLiveFooterBlock(content.GeneratedAt))
+func BuildMessageWithUpdateTimeFooter(content messagecontent.Content) (slack.Message, string) {
+	blocks := append(buildContentBlocks(content), buildUpdateTimeFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
 
@@ -149,17 +149,17 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 // <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a
 // client that cannot process it shows instead. A context block renders smaller and greyer than
 // a rich_text line, so the footer doesn't read as a fifth section.
-func buildLiveFooterBlock(generatedAt time.Time) slack.Block {
+func buildUpdateTimeFooterBlock(generatedAt time.Time) slack.Block {
 	footerText := fmt.Sprintf(
 		"_Live, updated <!date^%d^{time}|%s UTC>_",
 		generatedAt.Unix(), generatedAt.UTC().Format("15:04"),
 	)
-	return slack.NewContextBlock(liveFooterBlockID, slack.NewTextBlockObject("mrkdwn", footerText, false, false))
+	return slack.NewContextBlock(updateTimeFooterBlockID, slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
 
 // The stored blocks re-send as stored, so none has to survive a round trip through slack-go's
 // block types. No cap: see messagebuilder.spec.md § Doesn't Do.
-func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
+func BuildMessageMarkedStale(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
 	var sentBlockList []json.RawMessage
 	if err := json.Unmarshal(sentBlocks, &sentBlockList); err != nil {
 		return slack.Message{}, fmt.Errorf("failed to parse the sent blocks: %w", err)
@@ -167,21 +167,21 @@ func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack
 	if len(sentBlockList) == 0 {
 		return slack.Message{}, errors.New("no sent blocks to mark stale")
 	}
-	contentBlocks, err := utilities.MapWithError(utilities.Filter(sentBlockList, isNotLiveFooter), blockFromJSON)
+	contentBlocks, err := utilities.MapWithError(utilities.Filter(sentBlockList, isNotUpdateTimeFooter), blockFromJSON)
 	if err != nil {
 		return slack.Message{}, fmt.Errorf("failed to parse a sent block: %w", err)
 	}
-	staleBlocks := slices.Concat([]slack.Block{buildStaleLineBlock(generatedAt)}, contentBlocks)
-	return slack.NewBlockMessage(staleBlocks...), nil
+	markedMessageBlocks := slices.Concat([]slack.Block{buildStalenessWarningBlock(generatedAt)}, contentBlocks)
+	return slack.NewBlockMessage(markedMessageBlocks...), nil
 }
 
-func isNotLiveFooter(sentBlock json.RawMessage) bool {
+func isNotUpdateTimeFooter(sentBlock json.RawMessage) bool {
 	var identifiedBlock struct {
 		BlockID string `json:"block_id"`
 	}
 	// A block that does not parse is kept, for blockFromJSON to report
 	_ = json.Unmarshal(sentBlock, &identifiedBlock)
-	return identifiedBlock.BlockID != liveFooterBlockID
+	return identifiedBlock.BlockID != updateTimeFooterBlockID
 }
 
 // slack.BlockFromJSON keeps only the first block of an array. See docs/third-party-facts.md.
@@ -189,18 +189,18 @@ func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }
 
-// See messagebuilder.spec.md § Behaviour. A stale message is read days later, so the fallback
-// names the date too.
-func buildStaleLineBlock(generatedAt time.Time) slack.Block {
-	staleLineText := fmt.Sprintf(
+// See messagebuilder.spec.md § Behaviour. A message marked stale is read days later, so the
+// fallback names the date too.
+func buildStalenessWarningBlock(generatedAt time.Time) slack.Block {
+	stalenessWarningText := fmt.Sprintf(
 		"_⚠️ Stale, updated <!date^%d^{date_pretty} at {time}|%s UTC>_",
 		generatedAt.Unix(), generatedAt.UTC().Format("Jan 2 15:04"),
 	)
-	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", staleLineText, false, false))
+	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", stalenessWarningText, false, false))
 }
 
 func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
-	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForFooterOrStaleLine
+	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForFooterOrStalenessWarning
 	if len(blocks) <= maximumContentBlocks {
 		return blocks
 	}

@@ -468,13 +468,13 @@ func TestMessageWithNothingToListIsTheNoOpenPRsLineAlone(t *testing.T) {
 	assertBlockIDs(t, message, []string{"no_open_prs"})
 }
 
-func TestLiveFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
-	message, _ := messagebuilder.BuildMessageWithLiveFooter(messagecontent.Content{
+func TestUpdateTimeFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		SummaryText: "Nothing waiting for review 🎉",
 		GeneratedAt: generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"live_footer"})
+	assertBlockIDs(t, message, []string{"update_time_footer"})
 	footer := message.Blocks.BlockSet[0].(*slack.ContextBlock)
 	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject)
 	expected := "_Live, updated <!date^1789819920^{time}|12:12 UTC>_"
@@ -499,8 +499,8 @@ func groupedOverRepositories(count int) messagecontent.PRSection {
 
 const repositoriesBuildingSixtyContentBlocks = 30
 
-func TestLiveMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
-	message, _ := messagebuilder.BuildMessageWithLiveFooter(messagecontent.Content{
+func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
 		GeneratedAt:         generatedAt,
@@ -520,7 +520,7 @@ func TestLiveMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
 	}
 	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject).Text
 	if text != "_Live, updated <!date^1789819920^{time}|12:12 UTC>_" {
-		t.Errorf("expected the live footer last, got %q", text)
+		t.Errorf("expected the update-time footer last, got %q", text)
 	}
 }
 
@@ -535,26 +535,26 @@ func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T
 		t.Fatalf("Failed to marshal the posted message: %v", err)
 	}
 
-	staleMessage, err := messagebuilder.BuildStaleMessage(sentBlocks, generatedAt)
+	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(sentBlocks, generatedAt)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	staleBlocksJSON, err := json.Marshal(staleMessage.Blocks.BlockSet)
+	markedMessageBlocksJSON, err := json.Marshal(messageMarkedStale.Blocks.BlockSet)
 	if err != nil {
-		t.Fatalf("Failed to marshal the stale message: %v", err)
+		t.Fatalf("Failed to marshal the message marked stale: %v", err)
 	}
-	var staleBlocks []struct {
+	var markedMessageBlocks []struct {
 		Type    string `json:"type"`
 		BlockID string `json:"block_id"`
 	}
-	if err := json.Unmarshal(staleBlocksJSON, &staleBlocks); err != nil {
-		t.Fatalf("Failed to parse the stale message: %v", err)
+	if err := json.Unmarshal(markedMessageBlocksJSON, &markedMessageBlocks); err != nil {
+		t.Fatalf("Failed to parse the message marked stale: %v", err)
 	}
-	if len(staleBlocks) != 50 {
-		t.Fatalf("expected 50 blocks, got %d", len(staleBlocks))
+	if len(markedMessageBlocks) != 50 {
+		t.Fatalf("expected 50 blocks, got %d", len(markedMessageBlocks))
 	}
-	if staleBlocks[48].BlockID != "section_waiting_for_review_repository_24" || staleBlocks[49].Type != "section" {
-		t.Errorf("expected the 24th repository and a spacing block last, got %+v and %+v", staleBlocks[48], staleBlocks[49])
+	if markedMessageBlocks[48].BlockID != "section_waiting_for_review_repository_24" || markedMessageBlocks[49].Type != "section" {
+		t.Errorf("expected the 24th repository and a spacing block last, got %+v and %+v", markedMessageBlocks[48], markedMessageBlocks[49])
 	}
 }
