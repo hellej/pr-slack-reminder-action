@@ -626,3 +626,15 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|…>_` in a context block's `mrkdwn`
   rendered as `⚠️ Stale, updated Today at 9:10 PM`: the unicode emoji renders, and `Today` is
   capitalised mid-sentence, where the formatting docs write `today`
+
+## GitHub's repository-level "List artifacts" has no sort parameter and documents no order [2026-09-25]
+
+- Source: [REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts), "List
+  artifacts for a repository" and "List workflow run artifacts"
+- The repository-level list takes only `per_page` (max 100), `page` and `name`. The per-run list
+  also takes `direction`, default `desc`
+- Observed: the repository-level list returns newest first. A dev-channel run with 385 artifacts
+  named `pr-slack-reminder-state` downloaded one created 2 minutes earlier from page 1
+- `githubclient.FetchLatestArtifactByName` reads page 1 only, so past 100 artifacts it relies on
+  that undocumented order
+- Expired artifacts stay listed, with `expired: true`, and cannot be downloaded
