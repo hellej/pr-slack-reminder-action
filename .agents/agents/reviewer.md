@@ -20,11 +20,15 @@ implementer's report. Check it against:
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
   docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
   `nit`
-- Every comment the change added: does it state something the code cannot? Name the ones
-  that restate the code, and say what to rename so the comment can go. A comment decoding
-  an expression means the expression is the finding, not the comment. Read the comment
-  against the code it sits on, never on its own: a well-written comment that only repeats
-  its function body still earns a `nit`
+- Every comment the change added, production and test code, each with a verdict: keep, or
+  what to rename or refactor so it can go. List them all, never a sample
+  - A comment is kept only for what no name or code shape can say: an external fact, such
+    as an API's behaviour or a measured limit, or why a decision went one way
+  - Otherwise the finding is the code: the clearer name for a func, field, fixture or test
+    case, the extracted helper, or the expression written the other way round that makes
+    the comment unnecessary
+  - Read each comment against the code it sits on, never on its own
+  - Each such finding is `medium`: it breaks AGENTS.md Code Style
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
@@ -129,6 +133,7 @@ Report back:
   Otherwise `PASS`, even with nits open
 - Then each finding: `Fix (high|medium|nit)` or `Document`, `file:line`, what is wrong,
   why it matters. Most severe first
+- The comment list: each added comment with its verdict
 - One line on what you mutated, and how many survived. When you mutated in place, that
   the tree is restored
 - Nothing else. No praise, no summary of what the code does
