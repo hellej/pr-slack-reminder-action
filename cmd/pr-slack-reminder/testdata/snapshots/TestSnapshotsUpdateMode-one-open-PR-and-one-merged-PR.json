@@ -111,6 +111,7 @@
   },
   {
     "type": "context",
+    "block_id": "live_footer",
     "elements": [
       {
         "type": "mrkdwn",

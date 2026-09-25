@@ -35,10 +35,10 @@ var liveFooterTimestamp = regexp.MustCompile(`!date\^\d+\^\{time\}\|\d{2}:\d{2} 
 
 var staleTimestamp = regexp.MustCompile(`!date\^\d+\^\{date_pretty\} at \{time\}\|[A-Z][a-z]{2} \d{1,2} \d{2}:\d{2} UTC`)
 
-// Run stamps the live footer, and the stale line and footer after it, with the real clock, so a
-// snapshot recorded a second ago would never match again. The rest of the message survives a
-// moving clock: the fixture ages come off this package's own `now`.
-func withFixedFooterTimestamps(blocks []byte) []byte {
+// Run stamps the live footer, and the stale line after it, with the real clock, so a snapshot
+// recorded a second ago would never match again. The rest of the message survives a moving
+// clock: the fixture ages come off this package's own `now`.
+func withFixedClockTimestamps(blocks []byte) []byte {
 	blocks = liveFooterTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
 	return staleTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
@@ -70,7 +70,7 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 
 func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
 	t.Helper()
-	sentBlocks = withFixedFooterTimestamps(sentBlocks)
+	sentBlocks = withFixedClockTimestamps(sentBlocks)
 
 	snapshotFilePath := getSnapshotFilePath(t)
 	if *updateSnapshots {
@@ -98,7 +98,7 @@ func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
 	}
 }
 
-type postModeSnapshotScenario struct {
+type snapshotScenario struct {
 	name                       string
 	configOverrides            map[string]any
 	prs                        []*github.PullRequest
@@ -108,8 +108,8 @@ type postModeSnapshotScenario struct {
 	timelineCommentsByPRNumber map[int][]*github.IssueComment
 }
 
-func postModeSnapshotScenarios() []postModeSnapshotScenario {
-	return []postModeSnapshotScenario{
+func snapshotScenarios() []snapshotScenario {
+	return []snapshotScenario{
 		{
 			name: "grouped by repository over two repositories",
 			configOverrides: map[string]any{
@@ -348,9 +348,9 @@ func postModeSnapshotScenarios() []postModeSnapshotScenario {
 	}
 }
 
-func runPostModeSnapshotScenario(
+func runSnapshotScenario(
 	t *testing.T,
-	scenario postModeSnapshotScenario,
+	scenario snapshotScenario,
 	previousState *state.State,
 	postedMessageTimestamp string,
 ) *mockslackclient.MockSlackAPI {
@@ -374,13 +374,13 @@ func runPostModeSnapshotScenario(
 }
 
 func TestSnapshotsPostMode(t *testing.T) {
-	for _, scenario := range postModeSnapshotScenarios() {
+	for _, scenario := range snapshotScenarios() {
 		t.Run(scenario.name, func(t *testing.T) {
 			overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
 			maps.Copy(overrides, scenario.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runPostModeSnapshotScenario(t, scenario, nil, "")
+			runSnapshotScenario(t, scenario, nil, "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 		})
@@ -388,25 +388,46 @@ func TestSnapshotsPostMode(t *testing.T) {
 }
 
 // Chains two posts of one scenario: the second marks the first one's message stale, rebuilt from
-// the state the first one saved.
+// the state the first one saved, or from the state of an update run that edited it in between.
 func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
-	scenarioNames := []string{"every section under load", "grouped by repository over two repositories"}
+	testCases := []struct {
+		name              string
+		scenarioName      string
+		editedByUpdateRun bool
+	}{
+		{name: "every section under load", scenarioName: "every section under load"},
+		{name: "grouped by repository over two repositories", scenarioName: "grouped by repository over two repositories"},
+		{
+			name:              "every section under load, edited by an update run",
+			scenarioName:      "every section under load",
+			editedByUpdateRun: true,
+		},
+	}
 
-	for _, scenarioName := range scenarioNames {
-		t.Run(scenarioName, func(t *testing.T) {
-			scenario, found := utilities.Find(postModeSnapshotScenarios(), func(scenario postModeSnapshotScenario) bool {
-				return scenario.name == scenarioName
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			scenario, found := utilities.Find(snapshotScenarios(), func(scenario snapshotScenario) bool {
+				return scenario.name == tc.scenarioName
 			})
 			if !found {
-				t.Fatalf("No post mode snapshot scenario named %q", scenarioName)
+				t.Fatalf("No snapshot scenario named %q", tc.scenarioName)
 			}
 			overrides, _ := getFilePathOverrides(t)
 			maps.Copy(overrides, scenario.configOverrides)
+			stateFilePath := overrides[config.EnvStateFilePath].(string)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runPostModeSnapshotScenario(t, scenario, nil, "1234567890.123456")
-			firstPostState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
-			mockSlackAPI := runPostModeSnapshotScenario(t, scenario, &firstPostState, "1234567899.000200")
+			runSnapshotScenario(t, scenario, nil, "1234567890.123456")
+			previousState := loadSavedState(t, stateFilePath)
+			if tc.editedByUpdateRun {
+				updateOverrides := maps.Clone(overrides)
+				updateOverrides[config.InputRunMode] = config.RunModeUpdate
+				testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &updateOverrides)
+				runSnapshotScenario(t, scenario, &previousState, "")
+				previousState = loadSavedState(t, stateFilePath)
+				testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+			}
+			mockSlackAPI := runSnapshotScenario(t, scenario, &previousState, "1234567899.000200")
 
 			staleEdit := mockSlackAPI.UpdatedMessage
 			if staleEdit.ChannelID != "C12345678" || staleEdit.Timestamp != "1234567890.123456" {

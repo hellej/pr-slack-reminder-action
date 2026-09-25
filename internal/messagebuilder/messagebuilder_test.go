@@ -1,6 +1,7 @@
 package messagebuilder_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func blockIDs(blocks []slack.Block) []string {
 		case *slack.SectionBlock:
 			ids = append(ids, "spacing")
 		case *slack.ContextBlock:
-			ids = append(ids, "context")
+			ids = append(ids, typedBlock.BlockID)
 		default:
 			ids = append(ids, "unknown:"+string(block.BlockType()))
 		}
@@ -124,7 +125,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 
 	assertBlockIDs(t, message, []string{
 		"heading_waiting_for_review", "section_waiting_for_review",
-		"heading_merged", "section_merged", "context",
+		"heading_merged", "section_merged",
 	})
 	for _, blockIndex := range []int{1, 3} {
 		if elements := richTextElements(t, message.Blocks.BlockSet[blockIndex]); len(elements) != 1 {
@@ -150,7 +151,7 @@ func TestSectionHeadings(t *testing.T) {
 		"heading_ready_to_merge", "section_ready_to_merge",
 		"heading_waiting_for_author", "section_waiting_for_author",
 		"heading_waiting_for_review", "section_waiting_for_review",
-		"heading_merged", "section_merged", "context",
+		"heading_merged", "section_merged",
 	})
 	expectedHeadings := []string{
 		"✅ Ready to merge", "💬 Waiting for author", "👀 Waiting for review", "🚀 Recently merged",
@@ -255,7 +256,6 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 		"section_waiting_for_review_repository_1",
 		"spacing",
 		"section_waiting_for_review_repository_2",
-		"context",
 	})
 	sectionHeading := headerBlock(t, message.Blocks.BlockSet[0])
 	if sectionHeading.Text.Text != "👀 Waiting for review" {
@@ -288,7 +288,7 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"heading_waiting_for_review", "section_waiting_for_review_repository_1", "context",
+		"heading_waiting_for_review", "section_waiting_for_review_repository_1",
 	})
 }
 
@@ -313,7 +313,6 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		"section_waiting_for_review_repository_1",
 		"spacing",
 		"section_waiting_for_review_repository_2",
-		"context",
 	})
 	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
 	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one", "https://github.com/owner-one/repo-one/pulls")
@@ -448,7 +447,7 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"no_open_prs", "heading_merged", "section_merged", "context",
+		"no_open_prs", "heading_merged", "section_merged",
 	})
 	line := richTextElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
 	if text := line.Elements[0].(*slack.RichTextSectionTextElement).Text; text != "All caught up! 🎉" {
@@ -459,23 +458,23 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	}
 }
 
-func TestMessageWithNothingToListIsTheNoOpenPRsLineAndTheFooter(t *testing.T) {
+func TestMessageWithNothingToListIsTheNoOpenPRsLineAlone(t *testing.T) {
 	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
 		GeneratedAt:   generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"no_open_prs", "context"})
+	assertBlockIDs(t, message, []string{"no_open_prs"})
 }
 
-func TestFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+func TestLiveFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
+	message, _ := messagebuilder.BuildLiveMessage(messagecontent.Content{
 		SummaryText: "Nothing waiting for review 🎉",
 		GeneratedAt: generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"context"})
+	assertBlockIDs(t, message, []string{"live_footer"})
 	footer := message.Blocks.BlockSet[0].(*slack.ContextBlock)
 	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject)
 	expected := "_Live, updated <!date^1789819920^{time}|12:12 UTC>_"
@@ -500,8 +499,8 @@ func groupedOverRepositories(count int) messagecontent.PRSection {
 
 // 30 repositories build 60 content blocks: the heading, a block per repository and a spacing
 // block between each pair. Slack rejects a message of more than 50 blocks.
-func TestMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+func TestLiveMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
+	message, _ := messagebuilder.BuildLiveMessage(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(30),
 		GeneratedAt:         generatedAt,
@@ -522,5 +521,42 @@ func TestMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
 	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject).Text
 	if text != "_Live, updated <!date^1789819920^{time}|12:12 UTC>_" {
 		t.Errorf("expected the live footer last, got %q", text)
+	}
+}
+
+// A posted message has no footer, but keeps its slot free for the stale line it gets when the
+// next post marks it stale.
+func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
+	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverRepositories(30),
+		GeneratedAt:         generatedAt,
+	})
+	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)
+	if err != nil {
+		t.Fatalf("Failed to marshal the posted message: %v", err)
+	}
+
+	staleMessage, err := messagebuilder.BuildStaleMessage(sentBlocks, generatedAt)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	staleBlocksJSON, err := json.Marshal(staleMessage.Blocks.BlockSet)
+	if err != nil {
+		t.Fatalf("Failed to marshal the stale message: %v", err)
+	}
+	var staleBlocks []struct {
+		Type    string `json:"type"`
+		BlockID string `json:"block_id"`
+	}
+	if err := json.Unmarshal(staleBlocksJSON, &staleBlocks); err != nil {
+		t.Fatalf("Failed to parse the stale message: %v", err)
+	}
+	if len(staleBlocks) != 50 {
+		t.Fatalf("expected 50 blocks, got %d", len(staleBlocks))
+	}
+	if staleBlocks[48].BlockID != "section_waiting_for_review_repository_24" || staleBlocks[49].Type != "section" {
+		t.Errorf("expected the 24th repository and a spacing block last, got %+v and %+v", staleBlocks[48], staleBlocks[49])
 	}
 }

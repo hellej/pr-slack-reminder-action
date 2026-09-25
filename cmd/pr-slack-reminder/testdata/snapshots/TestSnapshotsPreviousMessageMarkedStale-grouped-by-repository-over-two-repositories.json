@@ -170,14 +170,5 @@
         "offset": 0
       }
     ]
-  },
-  {
-    "type": "context",
-    "elements": [
-      {
-        "type": "mrkdwn",
-        "text": "_Updated \u003c!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC\u003e_"
-      }
-    ]
   }
 ]

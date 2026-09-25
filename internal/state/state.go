@@ -34,7 +34,7 @@ type LastSentMessage struct {
 	// Without omitempty, nil blocks save as JSON null, which loads back as non-empty blocks
 	Blocks      json.RawMessage `json:"blocks,omitempty"`
 	SummaryText string          `json:"summaryText"`
-	// What the message's footer shows
+	// When the message's content was built: what its live footer shows, once an update run edits it
 	GeneratedAt time.Time `json:"generatedAt"`
 }
 

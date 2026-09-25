@@ -148,14 +148,5 @@
         "offset": 0
       }
     ]
-  },
-  {
-    "type": "context",
-    "elements": [
-      {
-        "type": "mrkdwn",
-        "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
-      }
-    ]
   }
 ]

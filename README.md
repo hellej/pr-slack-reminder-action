@@ -120,7 +120,8 @@ jobs:
 Setup where the latest message is also updated when PRs get reviewed/merged.
 An updated message lists the PRs that are open at that moment, including ones opened after the original message.
 PRs that merged since the original message move to the recently merged section.
-When the next `post` sends a new message, the previous one opens with a "⚠️ Stale" line, and its "Live, updated" footer becomes "Updated".
+Once an update run edits the message, it ends with a "Live, updated" footer.
+When the next `post` sends a new message, the previous one opens with a "⚠️ Stale" line and loses that footer.
 
 ```yaml
 name: PR Reminder

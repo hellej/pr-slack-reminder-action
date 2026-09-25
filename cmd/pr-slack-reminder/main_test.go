@@ -956,8 +956,7 @@ type expectedSentMessage struct {
 	runEnd   time.Time
 }
 
-// Pins the saved message to the one the run sent: the same blocks as the sent-blocks record,
-// ending in a footer that shows the saved generatedAt.
+// Pins the saved message to the one the run sent: the same blocks as the sent-blocks record.
 func assertLastSentMessageIsTheSentOne(
 	t *testing.T, saved state.LastSentMessage, sentSlackBlocksFilePath string, expected expectedSentMessage,
 ) {
@@ -984,7 +983,10 @@ func assertLastSentMessageIsTheSentOne(
 	if !bytes.Contains(saved.Blocks, []byte(expected.prTitle)) {
 		t.Errorf("Expected the saved blocks to list %q, got %s", expected.prTitle, saved.Blocks)
 	}
+}
 
+func assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t *testing.T, saved state.LastSentMessage) {
+	t.Helper()
 	var blocks []struct {
 		Type     string `json:"type"`
 		Elements []struct {
@@ -1065,6 +1067,7 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 		runStart:    runStart,
 		runEnd:      runEnd,
 	})
+	assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t, savedState.LastSentMessage)
 	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1623850245.000200"}
 	if savedState.SlackMessage != expectedMessageRef {
 		t.Errorf("Expected the loaded message ref %+v, got %+v", expectedMessageRef, savedState.SlackMessage)
@@ -1080,12 +1083,12 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 const (
 	previousHeadingBlock    = `{"type":"header","text":{"type":"plain_text","text":"👀 Waiting for review","emoji":true},"block_id":"heading_waiting_for_review","level":2}`
 	previousRowsBlock       = `{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/test-org/test-repo/pull/7","text":"Listed yesterday","style":{"bold":true}}]}],"style":"bullet","indent":0,"border":0,"offset":0}]}`
-	previousLiveFooterBlock = `{"type":"context","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
+	previousLiveFooterBlock = `{"type":"context","block_id":"live_footer","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
 )
 
 // A previous post's state in the new post's channel, C12345678, whose message differs from the
 // new one in timestamp, summary and content, so the stale edit can only have come from the stored
-// message.
+// message. An update run last edited it, so it ends with the live footer.
 func previousPostState() state.State {
 	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
 	previousState.SlackMessage = state.SlackRef{ChannelID: "C12345678", MessageTS: "1788253200.000100"}
@@ -1187,11 +1190,11 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 	if staleEdit.Text != "3 open PRs are waiting for attention 👀" {
 		t.Errorf("Expected the stored summary text, got %q", staleEdit.Text)
 	}
-	// The snapshots normalise the stale times, so only this pins the stale line and footer to
-	// the stored GeneratedAt, not the clock
+	// The snapshots normalise the stale time, so only this pins the stale line to the stored
+	// GeneratedAt, not the clock
 	storedTimeInStaleText := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
-	if strings.Count(string(staleEdit.SentBlocks), storedTimeInStaleText) != 2 {
-		t.Errorf("Expected the stale line and footer to show %s, got\n%s", storedTimeInStaleText, staleEdit.SentBlocks)
+	if strings.Count(string(staleEdit.SentBlocks), storedTimeInStaleText) != 1 {
+		t.Errorf("Expected the stale line alone to show %s, got\n%s", storedTimeInStaleText, staleEdit.SentBlocks)
 	}
 	assertNewPostStateSaved(t, result.stateFilePath)
 	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)

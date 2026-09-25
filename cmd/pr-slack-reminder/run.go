@@ -130,9 +130,9 @@ func runPostMode(
 	)
 }
 
-// Edits the previous post's message to open with a stale line and swap its live footer for a
-// stale one, so only the newest reminder reads "Live". Runs only after a successful send. This
-// run's own state is uploaded after it ends, so the load still finds the previous post's.
+// Edits the previous post's message to open with a stale line and drop the live footer an update
+// run gave it, so only the newest reminder reads as current. Runs only after a successful send.
+// This run's own state is uploaded after it ends, so the load still finds the previous post's.
 //
 // Two setups posting to different channels can share a state artifact name, so a previous state
 // in another channel belongs to another setup. Both channel IDs come from Slack's own send
@@ -250,7 +250,7 @@ func runUpdateMode(
 		log.Printf("Updating Slack message with no-prs-message: %s", content.NoOpenPRsText)
 	}
 
-	message, summaryText := messagebuilder.BuildMessage(content)
+	message, summaryText := messagebuilder.BuildLiveMessage(content)
 
 	sentMessageInfo, err := slackClient.UpdateMessage(
 		loadedState.SlackMessage.ChannelID,

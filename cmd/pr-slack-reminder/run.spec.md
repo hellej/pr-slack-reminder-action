@@ -9,8 +9,8 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
 - `Run(getGitHubClient, getSlackClient)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - The open-PR fetch and the merged-PR fetch (bounded by `githubclient.RecentlyMergedWindow` before `generatedAt`) share one `generatedAt`, used for both the merged-PR window and the canvas footer
 - A failed merged-PR fetch does not fail the run: the message and canvas publish without merged rows, and the error is carried through so it can still reach the run's exit code and, in update mode, affect whether the message may be deleted
-- Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
-- After a successful send, post mode marks the previous post's message stale: it loads the previous state and edits that message into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s stale message, which opens with a stale line and ends with a stale footer in place of the live one, with the stored summary text
+- Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
+- After a successful send, post mode marks the previous post's message stale: it loads the previous state and edits that message into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s stale message, which opens with a stale line and drops the live footer an update run gave it, with the stored summary text
   - Skips with a log line when the previous state does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
   - Any other failure joins the run's error. The new state is still saved
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
@@ -27,7 +27,7 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
 
 - Doesn't retry a GitHub or Slack call: a fetch or send failure past its timeout is final for that run
 - Doesn't fail the whole run because the canvas refresh failed, or vice versa: each surfaces its own error independently
-- Doesn't mark the previous message stale when post mode sends nothing: it keeps reading "Live"
+- Doesn't mark the previous message stale when post mode sends nothing: it keeps reading as current
 - Doesn't tell apart two setups posting to the same channel under one state artifact name: each marks the other's message stale
 - Doesn't distinguish, for its own caller, "empty because there is truly nothing" from "empty because a fetch failed": that distinction only changes whether update mode deletes the message
 

@@ -4,7 +4,7 @@ Persists and reloads the "post" run's PR set, Slack message reference and last s
 
 ## Behaviour
 
-- State carries a schema version, creation time, the sent Slack message's channel/timestamp, the list of PRs it covered, the hash of the markdown last written to the PR tracker canvas, and `LastSentMessage`: the message's blocks as last sent or edited, its summary text, and the `generatedAt` its footer shows
+- State carries a schema version, creation time, the sent Slack message's channel/timestamp, the list of PRs it covered, the hash of the markdown last written to the PR tracker canvas, and `LastSentMessage`: the message's blocks as last sent or edited, its summary text, and the `generatedAt` its content was built at
 - `Load()` fetches the most recent saved state for a repository (via a GitHub Actions artifact)
 - `NewPostState()` builds state from a "post" run's PR views, Slack send result, summary text and `generatedAt`. The only place stamping the schema version and creation time, and it leaves the canvas hash empty for the caller to fill in
 - `WithLastSentMessage()` returns a copy of a state with `LastSentMessage` replaced by an edit's blocks, summary text and `generatedAt`
