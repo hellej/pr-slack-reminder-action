@@ -120,8 +120,6 @@ jobs:
 Setup where the latest message is also updated when PRs get reviewed/merged.
 An updated message lists the PRs that are open at that moment, including ones opened after the original message.
 PRs that merged since the original message move to the recently merged section.
-Once an update run edits the message, it ends with a "Live, updated" footer.
-When the next `post` sends a new message, the previous one opens with a "⚠️ Stale" line and loses that footer.
 
 ```yaml
 name: PR Reminder
@@ -161,7 +159,7 @@ jobs:
         with:
           name: pr-slack-reminder-state
           path: pr-slack-reminder-state.json
-          retention-days: 4 # outlasts the longest gap between posts (e.g. a weekend): the next post reads it to mark this message stale
+          retention-days: 4
 ```
 
 ## ➡️ Inputs
@@ -170,7 +168,7 @@ jobs:
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `slack-bot-token`                   | ✅       | Slack bot token for sending messages<br>Example: `${{ secrets.SLACK_BOT_TOKEN }}`                                                                                                          |
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                                                                                               |
-| `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads. Only needed if the default github-token misses permissions.                     |
+| `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (i.e. actions: read), which `update` needs. Only needed if the default github-token misses permissions.                     |
 | `run-mode`                          | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                                                                                                   |
 | `state-artifact-name`               | ❌       | Name of the artifact containing state from previous run (used when `run-mode` is `update`, and by `post` to mark the previous message stale)<br>Default: `pr-slack-reminder-state`         |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)                                                                                                                                        |

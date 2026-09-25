@@ -184,7 +184,7 @@ func isNotLiveFooter(sentBlock json.RawMessage) bool {
 	return identifiedBlock.BlockID != liveFooterBlockID
 }
 
-// slack.BlockFromJSON keeps only the first block of an array. See messagebuilder.spec.md § Oddities.
+// slack.BlockFromJSON keeps only the first block of an array. See docs/third-party-facts.md.
 func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }
