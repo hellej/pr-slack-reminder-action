@@ -24,7 +24,7 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 3. Run `make test`; refactor if needed
 4. Update the package's `.spec.md` in the same change if behaviour changed (use [spec-writer skill](../spec-writer/SKILL.md))
 5. If you knowingly leave a rough edge, because the fix would need significant complexity for a rare case, add it to that spec's **Oddities** section instead of leaving it undocumented
-6. For each comment you added, name the fact it states that no name or code shape can: an external fact or why a decision went one way. If there is none, rename or refactor the code so the comment is unnecessary, and delete it. If the package's `.spec.md` already states the fact, shrink the comment to a pointer to it
+6. For each comment you added, name the fact it states that no name or code shape can: an external fact or why a decision went one way. If there is none, rename or refactor the code so the comment is unnecessary, and delete it. If the package's `.spec.md` already states the fact, shrink the comment to at most one short line plus a pointer to the spec
 7. Last, re-read the prose you wrote: `git diff -- '*.md'` and the remaining comments. Apply AGENTS.md § Output Style and see if anything can be clearer or cut
 
 ## Implementing a Plan

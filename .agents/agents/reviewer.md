@@ -27,8 +27,8 @@ implementer's report. Check it against:
   - Otherwise the finding is the code: the clearer name for a func, field, fixture or test
     case, the extracted helper, or the expression written the other way round that makes
     the comment unnecessary
-  - A kept comment whose fact the package's `.spec.md` already states shrinks to a pointer
-    to it, such as `// See state.spec.md § Oddities`
+  - A kept comment whose fact the package's `.spec.md` already states shrinks to at most
+    one short line of the fact plus a pointer, such as `// See state.spec.md § Oddities`
   - Read each comment against the code it sits on, never on its own
   - Each such finding is `medium`: it breaks AGENTS.md Code Style
 - Dead code: anything this change left unreachable, unused, or superseded, including
