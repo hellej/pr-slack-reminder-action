@@ -469,7 +469,7 @@ func TestMessageWithNothingToListIsTheNoOpenPRsLineAlone(t *testing.T) {
 }
 
 func TestLiveFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
-	message, _ := messagebuilder.BuildLiveMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageWithLiveFooter(messagecontent.Content{
 		SummaryText: "Nothing waiting for review 🎉",
 		GeneratedAt: generatedAt,
 	})
@@ -497,12 +497,12 @@ func groupedOverRepositories(count int) messagecontent.PRSection {
 	return messagecontent.PRSection{Groups: groups}
 }
 
-// 30 repositories build 60 content blocks: the heading, a block per repository and a spacing
-// block between each pair. Slack rejects a message of more than 50 blocks.
+const repositoriesBuildingSixtyContentBlocks = 30
+
 func TestLiveMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
-	message, _ := messagebuilder.BuildLiveMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageWithLiveFooter(messagecontent.Content{
 		GroupedByRepository: true,
-		WaitingForReview:    groupedOverRepositories(30),
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
 		GeneratedAt:         generatedAt,
 	})
 
@@ -524,12 +524,10 @@ func TestLiveMessageIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
 	}
 }
 
-// A posted message has no footer, but keeps its slot free for the stale line it gets when the
-// next post marks it stale.
 func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
 	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
 		GroupedByRepository: true,
-		WaitingForReview:    groupedOverRepositories(30),
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
 		GeneratedAt:         generatedAt,
 	})
 	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)

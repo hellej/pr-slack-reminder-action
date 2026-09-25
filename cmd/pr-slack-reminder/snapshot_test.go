@@ -43,9 +43,23 @@ func withFixedClockTimestamps(blocks []byte) []byte {
 	return staleTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
-func getSnapshotFilePath(t *testing.T) string {
+var stateClockTimeField = regexp.MustCompile(`"(createdAt|generatedAt)": "[^"]*"`)
+
+var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
+
+func withFixedStateClockTimes(stateJSON []byte) []byte {
+	return stateClockTimeField.ReplaceAllFunc(stateJSON, func(field []byte) []byte {
+		if bytes.HasSuffix(field, neverSetTimeJSON) {
+			return field
+		}
+		fieldName := stateClockTimeField.FindSubmatch(field)[1]
+		return []byte(`"` + string(fieldName) + `": "1970-01-01T00:00:00Z"`)
+	})
+}
+
+func getSnapshotFilePath(t *testing.T, extension string) string {
 	t.Helper()
-	return filepath.Join(snapshotDirectory, nonAlphanumericRuns.ReplaceAllString(t.Name(), "-")+".json")
+	return filepath.Join(snapshotDirectory, nonAlphanumericRuns.ReplaceAllString(t.Name(), "-")+extension)
 }
 
 // Points the run at temporary output files and returns the sent Slack blocks file path.
@@ -70,14 +84,28 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 
 func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
 	t.Helper()
-	sentBlocks = withFixedClockTimestamps(sentBlocks)
+	assertMatchesSnapshot(t, withFixedClockTimestamps(sentBlocks), getSnapshotFilePath(t, ".json"))
+}
 
-	snapshotFilePath := getSnapshotFilePath(t)
+// The saved state is read by the next run, possibly under a newer action version, so its exact
+// JSON is a contract.
+func assertSavedStateMatchesSnapshot(t *testing.T, stateFilePath string) {
+	t.Helper()
+	savedState, err := os.ReadFile(stateFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read the saved state from %s: %v", stateFilePath, err)
+	}
+	normalisedState := withFixedStateClockTimes(withFixedClockTimestamps(savedState))
+	assertMatchesSnapshot(t, normalisedState, getSnapshotFilePath(t, ".state.json"))
+}
+
+func assertMatchesSnapshot(t *testing.T, actual []byte, snapshotFilePath string) {
+	t.Helper()
 	if *updateSnapshots {
 		if err := os.MkdirAll(snapshotDirectory, 0755); err != nil {
 			t.Fatalf("Failed to create %s: %v", snapshotDirectory, err)
 		}
-		if err := os.WriteFile(snapshotFilePath, sentBlocks, 0644); err != nil {
+		if err := os.WriteFile(snapshotFilePath, actual, 0644); err != nil {
 			t.Fatalf("Failed to write snapshot %s: %v", snapshotFilePath, err)
 		}
 		return
@@ -90,10 +118,10 @@ func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
 	if err != nil {
 		t.Fatalf("Failed to read snapshot %s: %v", snapshotFilePath, err)
 	}
-	if !bytes.Equal(snapshot, sentBlocks) {
+	if !bytes.Equal(snapshot, actual) {
 		t.Errorf(
-			"Sent Slack blocks do not match snapshot %s.\nSnapshot:\n%s\n\nSent:\n%s",
-			snapshotFilePath, snapshot, sentBlocks,
+			"Output does not match snapshot %s.\nSnapshot:\n%s\n\nActual:\n%s",
+			snapshotFilePath, snapshot, actual,
 		)
 	}
 }
@@ -383,12 +411,11 @@ func TestSnapshotsPostMode(t *testing.T) {
 			runSnapshotScenario(t, scenario, nil, "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
+			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
 		})
 	}
 }
 
-// Chains two posts of one scenario: the second marks the first one's message stale, rebuilt from
-// the state the first one saved, or from the state of an update run that edited it in between.
 func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -437,10 +464,11 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 				)
 			}
 			var indentedStaleBlocks bytes.Buffer
-			if err := json.Indent(&indentedStaleBlocks, staleEdit.SentBlocks, "", "  "); err != nil {
+			if err := json.Indent(&indentedStaleBlocks, staleEdit.BlocksAsSent, "", "  "); err != nil {
 				t.Fatalf("Failed to indent the stale blocks: %v", err)
 			}
 			assertBlocksMatchSnapshot(t, indentedStaleBlocks.Bytes())
+			assertSavedStateMatchesSnapshot(t, stateFilePath)
 		})
 	}
 }
@@ -457,6 +485,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		openPRsNotInState   []*github.PullRequest
 		mergedPRsFromSearch []*github.PullRequest
 		reviewsByPRNumber   map[int][]*github.PullRequestReview
+		deletesTheMessage   bool
 	}{
 		{
 			name: "every section under load",
@@ -564,6 +593,18 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name:           "nothing left to show deletes a message saved before LastSentMessage existed",
+			statePRNumbers: []int{91},
+			prByNumber: map[int]*github.PullRequest{
+				91: getTestPR(GetTestPROptions{
+					Number: 91, Title: "Closed without merging", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/91",
+					AgeHours: 30, State: "closed", Merged: false,
+				}),
+			},
+			deletesTheMessage: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -587,7 +628,14 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				t.Fatalf("Expected Run to succeed, got error: %v", err)
 			}
 
-			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
+			if tc.deletesTheMessage {
+				if mockSlackAPI.DeletedMessage.Timestamp != "1623850245.000200" {
+					t.Fatalf("Expected the loaded message deleted, got %+v", mockSlackAPI.DeletedMessage)
+				}
+			} else {
+				assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
+			}
+			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
 		})
 	}
 }

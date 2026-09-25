@@ -769,63 +769,6 @@ func TestScenarios(t *testing.T) {
 	}
 }
 
-func TestPostModeStateSaving(t *testing.T) {
-	testStateFilePath := "/tmp/test-state.json"
-
-	postModeConfig := testhelpers.GetDefaultConfigFull()
-	configOverrides := map[string]any{
-		config.InputRunMode:     config.RunModePost,
-		config.EnvStateFilePath: testStateFilePath,
-	}
-	testhelpers.SetTestEnvironment(t, postModeConfig, &configOverrides)
-
-	testPRs := getTestPRs(GetTestPRsOptions{})
-
-	mockGitHubClientGetter := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-		PRs: testPRs.PRs,
-	})
-	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
-
-	err := main.Run(
-		mockGitHubClientGetter,
-		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
-	)
-
-	if err != nil {
-		t.Fatalf("Expected Run to succeed, but got error: %v", err)
-	}
-
-	if _, err := os.Stat(testStateFilePath); os.IsNotExist(err) {
-		t.Errorf("Expected state file to be created at %s, but it doesn't exist", testStateFilePath)
-		return
-	}
-
-	var loadedState state.State
-	err = testhelpers.LoadJSONFromFile(testStateFilePath, &loadedState)
-	if err != nil {
-		t.Fatalf("Failed to load state file: %v", err)
-	}
-
-	expectedChannelID := "C12345678" // From mock
-	if loadedState.SlackMessage.ChannelID != expectedChannelID {
-		t.Errorf("Expected channel ID %s, got %s", expectedChannelID, loadedState.SlackMessage.ChannelID)
-	}
-
-	if loadedState.SlackMessage.MessageTS == "" {
-		t.Error("Expected message timestamp to be set in state")
-	}
-
-	if len(loadedState.PullRequests) != len(testPRs.PRs) {
-		t.Errorf("Expected %d PRs in state, got %d", len(testPRs.PRs), len(loadedState.PullRequests))
-	}
-
-	defer func() {
-		if err := os.Remove(testStateFilePath); err != nil {
-			t.Logf("Failed to clean up test state file: %v", err)
-		}
-	}()
-}
-
 // State that points at a message Slack never accepted would make the next update run edit
 // somebody else's message, or nothing at all.
 func TestPostModeSavesNoStateWhenSendFails(t *testing.T) {
@@ -908,8 +851,6 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 	}
 }
 
-// The message a state file seeds, so a run that keeps it can be told apart from one that
-// records a message of its own.
 var seededLastSentMessage = state.LastSentMessage{
 	Blocks:      []byte(`[{"type":"divider"}]`),
 	SummaryText: "3 open PRs are waiting for attention 👀",
@@ -925,8 +866,7 @@ func loadSavedState(t *testing.T, stateFilePath string) state.State {
 	return savedState
 }
 
-// State saving indents the stored blocks, so blocks compare compacted.
-func compactedJSON(t *testing.T, jsonBytes []byte) string {
+func withoutStateSaveIndentation(t *testing.T, jsonBytes []byte) string {
 	t.Helper()
 	var compacted bytes.Buffer
 	if err := json.Compact(&compacted, jsonBytes); err != nil {
@@ -937,7 +877,7 @@ func compactedJSON(t *testing.T, jsonBytes []byte) string {
 
 func assertLastSentMessageIsTheSeededOne(t *testing.T, saved state.LastSentMessage) {
 	t.Helper()
-	if len(saved.Blocks) == 0 || compactedJSON(t, saved.Blocks) != `[{"type":"divider"}]` {
+	if len(saved.Blocks) == 0 || withoutStateSaveIndentation(t, saved.Blocks) != `[{"type":"divider"}]` {
 		t.Errorf("Expected the seeded blocks, got %s", saved.Blocks)
 	}
 	if saved.SummaryText != "3 open PRs are waiting for attention 👀" {
@@ -948,40 +888,14 @@ func assertLastSentMessageIsTheSeededOne(t *testing.T, saved state.LastSentMessa
 	}
 }
 
-type expectedSentMessage struct {
-	summaryText string
-	prTitle     string
-	// The run stamps generatedAt from the real clock, so it can only be pinned between these
-	runStart time.Time
-	runEnd   time.Time
-}
-
-// Pins the saved message to the one the run sent: the same blocks as the sent-blocks record.
-func assertLastSentMessageIsTheSentOne(
-	t *testing.T, saved state.LastSentMessage, sentSlackBlocksFilePath string, expected expectedSentMessage,
+// The run stamps generatedAt from the real clock, which the snapshots normalise, so it can only
+// be pinned between the run's start and end.
+func assertLastSentMessageGeneratedDuringTheRun(
+	t *testing.T, saved state.LastSentMessage, runStart time.Time, runEnd time.Time,
 ) {
 	t.Helper()
-	if saved.SummaryText != expected.summaryText {
-		t.Errorf("Expected summary text %q, got %q", expected.summaryText, saved.SummaryText)
-	}
-	if saved.GeneratedAt.Before(expected.runStart) || saved.GeneratedAt.After(expected.runEnd) {
-		t.Errorf(
-			"Expected generatedAt between %v and %v, got %v",
-			expected.runStart, expected.runEnd, saved.GeneratedAt,
-		)
-	}
-	if len(saved.Blocks) == 0 {
-		t.Fatal("Expected saved blocks, got none")
-	}
-	sentBlocks, err := os.ReadFile(sentSlackBlocksFilePath)
-	if err != nil {
-		t.Fatalf("Failed to read sent Slack blocks: %v", err)
-	}
-	if compactedJSON(t, saved.Blocks) != compactedJSON(t, sentBlocks) {
-		t.Errorf("Expected the saved blocks to be the sent ones.\nSaved:\n%s\nSent:\n%s", saved.Blocks, sentBlocks)
-	}
-	if !bytes.Contains(saved.Blocks, []byte(expected.prTitle)) {
-		t.Errorf("Expected the saved blocks to list %q, got %s", expected.prTitle, saved.Blocks)
+	if saved.GeneratedAt.Before(runStart) || saved.GeneratedAt.After(runEnd) {
+		t.Errorf("Expected generatedAt between %v and %v, got %v", runStart, runEnd, saved.GeneratedAt)
 	}
 }
 
@@ -1006,8 +920,8 @@ func assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t *testing.T, sa
 	}
 }
 
-func TestPostModeSavesTheSentMessage(t *testing.T) {
-	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+func TestPostModeSavesTheRunsGeneratedAt(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
 	runStart := time.Now()
@@ -1028,16 +942,11 @@ func TestPostModeSavesTheSentMessage(t *testing.T) {
 		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
 	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
-	assertLastSentMessageIsTheSentOne(t, savedState.LastSentMessage, sentSlackBlocksFilePath, expectedSentMessage{
-		summaryText: "2 open PRs are waiting for attention 👀",
-		prTitle:     "Store the last sent message",
-		runStart:    runStart,
-		runEnd:      runEnd,
-	})
+	assertLastSentMessageGeneratedDuringTheRun(t, savedState.LastSentMessage, runStart, runEnd)
 }
 
 func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
-	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+	overrides, _ := getFilePathOverrides(t)
 	overrides[config.InputRunMode] = config.RunModeUpdate
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
@@ -1061,12 +970,7 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
 	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
-	assertLastSentMessageIsTheSentOne(t, savedState.LastSentMessage, sentSlackBlocksFilePath, expectedSentMessage{
-		summaryText: "1 open PR is waiting for attention 👀",
-		prTitle:     "Still open since the post",
-		runStart:    runStart,
-		runEnd:      runEnd,
-	})
+	assertLastSentMessageGeneratedDuringTheRun(t, savedState.LastSentMessage, runStart, runEnd)
 	assertLastSentMessageEndsWithTheLiveFooterOfItsGeneratedAt(t, savedState.LastSentMessage)
 	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1623850245.000200"}
 	if savedState.SlackMessage != expectedMessageRef {
@@ -1086,10 +990,7 @@ const (
 	previousLiveFooterBlock = `{"type":"context","block_id":"live_footer","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
 )
 
-// A previous post's state in the new post's channel, C12345678, whose message differs from the
-// new one in timestamp, summary and content, so the stale edit can only have come from the stored
-// message. An update run last edited it, so it ends with the live footer.
-func previousPostState() state.State {
+func previousStateInThisChannelEditedByAnUpdateRun() state.State {
 	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
 	previousState.SlackMessage = state.SlackRef{ChannelID: "C12345678", MessageTS: "1788253200.000100"}
 	previousState.LastSentMessage = state.LastSentMessage{
@@ -1105,8 +1006,7 @@ type postOverPreviousStateOptions struct {
 	listArtifactsError error
 	updateMessageError error
 	postMessageError   error
-	// Leaves the run nothing to send, since the default config sets no no-prs-message
-	noOpenPRs bool
+	nothingToSend      bool
 }
 
 type postOverPreviousStateResult struct {
@@ -1127,7 +1027,7 @@ func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOpt
 	openPRs := []*github.PullRequest{
 		getTestPR(GetTestPROptions{Number: 8, Title: "Opened today", AuthorLogin: "alice"}),
 	}
-	if options.noOpenPRs {
+	if options.nothingToSend {
 		openPRs = nil
 	}
 
@@ -1148,7 +1048,6 @@ func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOpt
 	}
 }
 
-// The new state points at the new message whatever happened to the previous one.
 func assertNewPostStateSaved(t *testing.T, stateFilePath string) {
 	t.Helper()
 	savedState := loadSavedState(t, stateFilePath)
@@ -1173,7 +1072,7 @@ func assertSentBlocksRecordTheNewMessageOnly(t *testing.T, sentSlackBlocksFilePa
 }
 
 func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
-	previousState := previousPostState()
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
 
 	result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{previousState: &previousState})
 
@@ -1193,15 +1092,15 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 	// The snapshots normalise the stale time, so only this pins the stale line to the stored
 	// GeneratedAt, not the clock
 	storedTimeInStaleText := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
-	if strings.Count(string(staleEdit.SentBlocks), storedTimeInStaleText) != 1 {
-		t.Errorf("Expected the stale line alone to show %s, got\n%s", storedTimeInStaleText, staleEdit.SentBlocks)
+	if strings.Count(string(staleEdit.BlocksAsSent), storedTimeInStaleText) != 1 {
+		t.Errorf("Expected the stale line alone to show %s, got\n%s", storedTimeInStaleText, staleEdit.BlocksAsSent)
 	}
 	assertNewPostStateSaved(t, result.stateFilePath)
 	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
 }
 
 func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
-	previousState := previousPostState()
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
 
 	t.Run("the send fails", func(t *testing.T) {
 		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
@@ -1220,7 +1119,7 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 	t.Run("there is nothing to send", func(t *testing.T) {
 		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
 			previousState: &previousState,
-			noOpenPRs:     true,
+			nothingToSend: true,
 		})
 
 		if result.runErr != nil {
@@ -1237,10 +1136,9 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 
 func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	previousStateWithoutLastSentMessage := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
-	previousState := previousPostState()
-	// Another setup posting to its own channel under the same state artifact name
-	previousStateInAnotherChannel := previousPostState()
-	previousStateInAnotherChannel.SlackMessage.ChannelID = "C0OTHERCHANNEL"
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateOfASetupInAnotherChannel := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateOfASetupInAnotherChannel.SlackMessage.ChannelID = "C0OTHERCHANNEL"
 
 	testCases := []struct {
 		name    string
@@ -1252,7 +1150,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 		},
 		{
 			name:    "the previous message is in another channel",
-			options: postOverPreviousStateOptions{previousState: &previousStateInAnotherChannel},
+			options: postOverPreviousStateOptions{previousState: &previousStateOfASetupInAnotherChannel},
 		},
 		{
 			name:    "the previous state predates the last sent message",
@@ -1298,8 +1196,8 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 }
 
 func TestPostModeStaleEditFailureFailsTheRunButSavesTheNewState(t *testing.T) {
-	previousState := previousPostState()
-	previousStateWithUnbuildableBlocks := previousPostState()
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateWithUnbuildableBlocks := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks.LastSentMessage.Blocks = []byte(
 		`[{"text":"no type"},` + previousLiveFooterBlock + `]`,
 	)

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
-	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
@@ -315,82 +313,6 @@ func TestLoadFetchError(t *testing.T) {
 
 	if !errors.Is(err, expectedError) {
 		t.Errorf("Expected error %v, got %v", expectedError, err)
-	}
-}
-
-func TestNewPostStateSaveAndLoad(t *testing.T) {
-	tempDir := t.TempDir()
-	statePath := filepath.Join(tempDir, "post-state.json")
-
-	prViews := []prview.PR{
-		createTestPR(1, "owner1", "repo1"),
-		createTestPR(42, "owner2", "repo2"),
-	}
-
-	messageInfo := slackclient.SentMessageInfo{
-		ChannelID: "C123456789",
-		Timestamp: "1729123456.123456",
-		Blocks:    json.RawMessage(`[{"type":"divider"},{"type":"context","elements":[]}]`),
-	}
-	generatedAt := time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC)
-
-	postState := NewPostState(prViews, messageInfo, "2 open PRs are waiting for attention 👀", generatedAt)
-	if err := Save(statePath, postState); err != nil {
-		t.Fatalf("Save failed: %v", err)
-	}
-
-	loadedState, err := LoadFromFile(statePath)
-	if err != nil {
-		t.Fatalf("Failed to load saved state: %v", err)
-	}
-
-	if loadedState.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, CurrentSchemaVersion)
-	}
-
-	if loadedState.CreatedAt.IsZero() {
-		t.Error("Expected CreatedAt to be stamped")
-	}
-
-	if loadedState.SlackMessage.ChannelID != messageInfo.ChannelID {
-		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, messageInfo.ChannelID)
-	}
-
-	if loadedState.SlackMessage.MessageTS != messageInfo.Timestamp {
-		t.Errorf("MessageTS mismatch: got %s, want %s", loadedState.SlackMessage.MessageTS, messageInfo.Timestamp)
-	}
-
-	// Save indents the stored blocks along with the rest of the state
-	var compactedBlocks bytes.Buffer
-	if err := json.Compact(&compactedBlocks, loadedState.LastSentMessage.Blocks); err != nil {
-		t.Fatalf("Stored blocks are not valid JSON: %v", err)
-	}
-	if compactedBlocks.String() != `[{"type":"divider"},{"type":"context","elements":[]}]` {
-		t.Errorf("Expected the sent blocks, got %s", loadedState.LastSentMessage.Blocks)
-	}
-	if loadedState.LastSentMessage.SummaryText != "2 open PRs are waiting for attention 👀" {
-		t.Errorf("Expected the summary text, got %q", loadedState.LastSentMessage.SummaryText)
-	}
-	if !loadedState.LastSentMessage.GeneratedAt.Equal(time.Date(2026, 9, 2, 9, 58, 0, 0, time.UTC)) {
-		t.Errorf("Expected generatedAt 2026-09-02 09:58 UTC, got %v", loadedState.LastSentMessage.GeneratedAt)
-	}
-
-	if len(loadedState.PullRequests) != 2 {
-		t.Errorf("Expected 2 PRs, got %d", len(loadedState.PullRequests))
-	}
-
-	if len(loadedState.PullRequests) >= 1 {
-		pr := loadedState.PullRequests[0]
-		if pr.Number != 1 || pr.Repository.Owner != "owner1" || pr.Repository.Name != "repo1" {
-			t.Errorf("PR 0 mismatch: got %+v", pr)
-		}
-	}
-
-	if len(loadedState.PullRequests) >= 2 {
-		pr := loadedState.PullRequests[1]
-		if pr.Number != 42 || pr.Repository.Owner != "owner2" || pr.Repository.Name != "repo2" {
-			t.Errorf("PR 1 mismatch: got %+v", pr)
-		}
 	}
 }
 

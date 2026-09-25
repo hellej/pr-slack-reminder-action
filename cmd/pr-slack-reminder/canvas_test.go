@@ -596,7 +596,7 @@ func runPostModeAndLoadSavedState(t *testing.T, prs []*github.PullRequest) state
 	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 		t.Fatalf("Failed to load the state saved by the post run: %v", loadErr)
 	}
-	if savedState.CanvasContentHash == "" {
+	if savedState.LastWrittenCanvasMarkdownHash == "" {
 		t.Fatal("Expected the post run to save the hash of what it put on the canvas")
 	}
 	return savedState
@@ -641,10 +641,10 @@ func TestPostModeSavesTheHashOfTheWrittenCanvasMarkdown(t *testing.T) {
 	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 		t.Fatalf("Failed to load the saved state file: %v", loadErr)
 	}
-	if savedState.CanvasContentHash != expectedHash {
+	if savedState.LastWrittenCanvasMarkdownHash != expectedHash {
 		t.Errorf(
 			"Expected the hash of the written markdown %s, got %s",
-			expectedHash, savedState.CanvasContentHash,
+			expectedHash, savedState.LastWrittenCanvasMarkdownHash,
 		)
 	}
 }
@@ -687,10 +687,10 @@ func TestUpdateModeSkipsTheCanvasWriteWhenTheContentIsUnchanged(t *testing.T) {
 	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 		t.Fatalf("Failed to load the saved state file: %v", loadErr)
 	}
-	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+	if savedState.LastWrittenCanvasMarkdownHash != seedState.LastWrittenCanvasMarkdownHash {
 		t.Errorf(
 			"Expected the saved hash to stay %s, got %s",
-			seedState.CanvasContentHash, savedState.CanvasContentHash,
+			seedState.LastWrittenCanvasMarkdownHash, savedState.LastWrittenCanvasMarkdownHash,
 		)
 	}
 }
@@ -750,13 +750,13 @@ func TestUpdateModeWritesTheCanvasWhenTheSeededHashDoesNotMatch(t *testing.T) {
 			if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 				t.Fatalf("Failed to load the saved state file: %v", loadErr)
 			}
-			if savedState.CanvasContentHash == tc.seedState.CanvasContentHash {
+			if savedState.LastWrittenCanvasMarkdownHash == tc.seedState.LastWrittenCanvasMarkdownHash {
 				t.Errorf(
 					"Expected the saved hash to be the written content's, got the seeded %s",
-					savedState.CanvasContentHash,
+					savedState.LastWrittenCanvasMarkdownHash,
 				)
 			}
-			if savedState.CanvasContentHash == "" {
+			if savedState.LastWrittenCanvasMarkdownHash == "" {
 				t.Error("Expected the written content's hash to be saved")
 			}
 		})
@@ -799,10 +799,10 @@ func TestUpdateModeCarriesTheSeededHashWhenNothingIsWritten(t *testing.T) {
 	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 		t.Fatalf("Failed to load the saved state file: %v", loadErr)
 	}
-	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+	if savedState.LastWrittenCanvasMarkdownHash != seedState.LastWrittenCanvasMarkdownHash {
 		t.Errorf(
 			"Expected the saved hash to stay the seeded %s, got %s",
-			seedState.CanvasContentHash, savedState.CanvasContentHash,
+			seedState.LastWrittenCanvasMarkdownHash, savedState.LastWrittenCanvasMarkdownHash,
 		)
 	}
 }
@@ -841,10 +841,10 @@ func TestUpdateModeKeepsTheSeededHashWhenTheCanvasWriteFails(t *testing.T) {
 	if loadErr := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); loadErr != nil {
 		t.Fatalf("Failed to load the saved state file: %v", loadErr)
 	}
-	if savedState.CanvasContentHash != seedState.CanvasContentHash {
+	if savedState.LastWrittenCanvasMarkdownHash != seedState.LastWrittenCanvasMarkdownHash {
 		t.Errorf(
 			"Expected the saved hash to stay the seeded %s, got %s",
-			seedState.CanvasContentHash, savedState.CanvasContentHash,
+			seedState.LastWrittenCanvasMarkdownHash, savedState.LastWrittenCanvasMarkdownHash,
 		)
 	}
 }

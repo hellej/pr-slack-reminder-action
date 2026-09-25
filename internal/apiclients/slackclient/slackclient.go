@@ -14,17 +14,15 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// ErrMessageNotEditable marks a chat.update error saying the message is gone or can no longer be
-// edited (https://docs.slack.dev/reference/methods/chat.update).
+// See slackclient.spec.md § Behaviour.
 var ErrMessageNotEditable = errors.New("message cannot be edited")
 
 var notEditableMessageErrorCodes = []string{"message_not_found", "cant_update_message", "edit_window_closed"}
 
 type SentMessageInfo struct {
-	ChannelID string
-	Timestamp string
-	// The block array as sent
-	Blocks json.RawMessage
+	ChannelID    string
+	Timestamp    string
+	BlocksAsSent json.RawMessage
 }
 
 type Client interface {
@@ -119,7 +117,7 @@ func (c *client) SendMessage(
 		)
 	}
 
-	sentBlocks, err := MarshalSentBlocks(message)
+	sentBlocks, err := MarshalBlocksAsSent(message)
 	if err != nil {
 		return SentMessageInfo{}, err
 	}
@@ -136,9 +134,9 @@ func (c *client) SendMessage(
 	log.Printf("Sent message to Slack channel: %s", channelID)
 
 	return SentMessageInfo{
-		ChannelID: responseChannelID,
-		Timestamp: timestamp,
-		Blocks:    sentBlocks,
+		ChannelID:    responseChannelID,
+		Timestamp:    timestamp,
+		BlocksAsSent: sentBlocks,
 	}, nil
 }
 
@@ -148,7 +146,7 @@ func (c *client) UpdateMessage(
 	message slack.Message,
 	summaryText string,
 ) (SentMessageInfo, error) {
-	sentBlocks, err := MarshalSentBlocks(message)
+	sentBlocks, err := MarshalBlocksAsSent(message)
 	if err != nil {
 		return SentMessageInfo{}, err
 	}
@@ -166,15 +164,13 @@ func (c *client) UpdateMessage(
 	log.Printf("Updated message in Slack channel: %s", channelID)
 
 	return SentMessageInfo{
-		ChannelID: channelID,
-		Timestamp: messageTS,
-		Blocks:    sentBlocks,
+		ChannelID:    channelID,
+		Timestamp:    messageTS,
+		BlocksAsSent: sentBlocks,
 	}, nil
 }
 
-// WrapUpdateMessageError wraps an UpdateMessage error, with ErrMessageNotEditable when Slack says
-// the message cannot be edited. slack-go returns a Slack API error as slack.SlackErrorResponse,
-// its Err the error code (slack-go v0.29.0 misc.go SlackResponse.Err).
+// See slackclient.spec.md § Oddities.
 func WrapUpdateMessageError(err error) error {
 	var slackError slack.SlackErrorResponse
 	if errors.As(err, &slackError) && slices.Contains(notEditableMessageErrorCodes, slackError.Err) {
@@ -222,9 +218,8 @@ func (c *client) ReplaceCanvasContent(canvasID string, markdown string) error {
 	return nil
 }
 
-// MarshalSentBlocks returns the block array exactly as slack-go sends it: its form sender
-// marshals the same BlockSet at request time, for posts and edits alike (slack-go v0.29.0 chat.go).
-func MarshalSentBlocks(message slack.Message) (json.RawMessage, error) {
+// See slackclient.spec.md § Behaviour.
+func MarshalBlocksAsSent(message slack.Message) (json.RawMessage, error) {
 	blocks, err := json.Marshal(message.Blocks.BlockSet)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal Slack message blocks: %w", err)

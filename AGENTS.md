@@ -114,6 +114,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
 - **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
+  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: `// See state.spec.md § Oddities`
 - **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
@@ -139,7 +140,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - `make test` — run all tests
 - `make test-with-coverage` — run tests with coverage report (clears cache first)
-- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
+- `make update-test-snapshots` — re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` — try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "1970-01-01T00:00:00Z",
+  "slackMessage": {
+    "channelId": "C12345678",
+    "messageTs": "1234567890.123456"
+  },
+  "pullRequests": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 42
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 41
+    }
+  ],
+  "canvasContentHash": "",
+  "lastSentMessage": {
+    "blocks": [
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "👀 Waiting for review",
+          "emoji": true
+        },
+        "block_id": "heading_waiting_for_review",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_waiting_for_review",
+        "elements": [
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/42",
+                    "text": "Old PR past the threshold",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 🚨 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "3 days old",
+                    "style": {
+                      "bold": true,
+                      "code": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Bob Brown",
+                    "style": {}
+                  }
+                ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/41",
+                    "text": "Recent PR below the threshold",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 3 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Alice Anderson",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "summaryText": "2 open PRs are waiting for attention 👀",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  }
+}

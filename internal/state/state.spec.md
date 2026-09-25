@@ -21,7 +21,8 @@ Persists and reloads the "post" run's PR set, Slack message reference and last s
 ## Oddities
 
 - `SaveSentSlackBlocksToFile`'s output is never loaded back by this codebase — it exists as a side-channel debug artifact only
-- `CanvasContentHash` was added without bumping `CurrentSchemaVersion`. An artifact saved before it decodes an empty hash, which reads as "write the canvas"
+- `LastWrittenCanvasMarkdownHash` (JSON key `canvasContentHash`) was added without bumping `CurrentSchemaVersion`. An artifact saved before it decodes an empty hash, which reads as "write the canvas"
 - `LastSentMessage` was added the same way. An artifact saved before it decodes an empty `LastSentMessage`, and an empty one saves and loads back empty
 - `LastSentMessage` is the only state an update run rewrites besides the canvas hash. The PR set, message ref and `CreatedAt` stay the post run's
 - `Save()` indents the stored blocks with the rest of the file, so they load back with the same JSON but not the same bytes as sent
+- A PR ref's repository saves as `"Owner"` and `"Name"`, capitalised: `models.Repository` has no JSON tags. The state snapshots in `cmd/pr-slack-reminder` pin these keys, and renaming those Go fields would break reading older state files

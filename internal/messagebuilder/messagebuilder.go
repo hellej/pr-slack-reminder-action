@@ -32,19 +32,15 @@ const (
 // the section heading.
 const maximumBlocksInSlackMessage = 50
 
-// The live footer's slot in an edited message, the stale line's once the next post marks a
-// posted message stale.
 const slotsForFooterOrStaleLine = 1
 
 const liveFooterBlockID = "live_footer"
 
-// BuildMessage builds a message to post. It has no footer: nothing has updated it yet.
 func BuildMessage(content messagecontent.Content) (slack.Message, string) {
 	return slack.NewBlockMessage(buildContentBlocks(content)...), content.SummaryText
 }
 
-// BuildLiveMessage builds a message to edit in place, ending with the live footer.
-func BuildLiveMessage(content messagecontent.Content) (slack.Message, string) {
+func BuildMessageWithLiveFooter(content messagecontent.Content) (slack.Message, string) {
 	blocks := append(buildContentBlocks(content), buildLiveFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
 }
@@ -161,9 +157,8 @@ func buildLiveFooterBlock(generatedAt time.Time) slack.Block {
 	return slack.NewContextBlock(liveFooterBlockID, slack.NewTextBlockObject("mrkdwn", footerText, false, false))
 }
 
-// BuildStaleMessage rebuilds a sent message opening with a stale line, and without the live
-// footer an edit gave it. The other blocks re-send as stored, so none has to survive a round trip
-// through slack-go's block types. The content was capped with a slot left for the stale line.
+// The stored blocks re-send as stored, so none has to survive a round trip through slack-go's
+// block types. No cap: see messagebuilder.spec.md § Doesn't Do.
 func BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
 	var sentBlockList []json.RawMessage
 	if err := json.Unmarshal(sentBlocks, &sentBlockList); err != nil {
@@ -189,14 +184,12 @@ func isNotLiveFooter(sentBlock json.RawMessage) bool {
 	return identifiedBlock.BlockID != liveFooterBlockID
 }
 
-// slack.BlockFromJSON keeps only the first block of an array. Its block marshals back to the
-// stored bytes, compacted.
+// slack.BlockFromJSON keeps only the first block of an array. See messagebuilder.spec.md § Oddities.
 func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }
 
-// {date_pretty} reads "Today" or "Yesterday", capitalised even mid-sentence, when it applies,
-// otherwise a date like "September 2nd". A stale message is read days later, so the fallback
+// See messagebuilder.spec.md § Behaviour. A stale message is read days later, so the fallback
 // names the date too.
 func buildStaleLineBlock(generatedAt time.Time) slack.Block {
 	staleLineText := fmt.Sprintf(

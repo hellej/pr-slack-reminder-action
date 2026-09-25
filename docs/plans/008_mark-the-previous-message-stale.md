@@ -86,9 +86,9 @@ marked stale. Link the README's workflow example.
   marshalling to send time, so `UnsafeApplyMsgOptions` returns no `blocks` key
   (`slack-go@v0.29.0/CHANGELOG.md`, `## [0.21.1]`)
 - Tests miss it: the mock's `getJSONBlocks` marshals the blocks itself
-- Replace `SentMessageInfo.JSONBlocks []string` with `Blocks json.RawMessage`, the block array as
-  sent
-- New exported `slackclient.MarshalSentBlocks(message slack.Message) (json.RawMessage, error)`
+- Replace `SentMessageInfo.JSONBlocks []string` with `BlocksAsSent json.RawMessage`, the block
+  array as sent
+- New exported `slackclient.MarshalBlocksAsSent(message slack.Message) (json.RawMessage, error)`
   returns `json.Marshal(message.Blocks.BlockSet)`, which is what `formSender` sends for posts and
   edits alike (`slack-go@v0.29.0/chat.go`, `sendConfig.BuildRequestContext`,
   `formSender.BuildRequestContext`)
@@ -115,7 +115,7 @@ marked stale. Link the README's workflow example.
 ### 1. Store the last sent message in state
 
 - New `state.LastSentMessage` struct, field `LastSentMessage` on `State`:
-  - `Blocks json.RawMessage`: the block array from `SentMessageInfo.Blocks`
+  - `Blocks json.RawMessage`: the block array from `SentMessageInfo.BlocksAsSent`
   - `SummaryText string`
   - `GeneratedAt time.Time`: when the content was built, what an edit's live footer and the
     stale line show
@@ -129,11 +129,18 @@ marked stale. Link the README's workflow example.
   keep branches, and a failed edit, return the loaded state unchanged
   - Wired here rather than in Step 3, since an unused `WithLastSentMessage` fails
     `make check-dead-code`. Nothing reads the field until Step 3
-- `CurrentSchemaVersion` stays 1, as it did for `CanvasContentHash`. Nothing checks the version
-- A unit test pins the field through `NewPostState`, save and load. Integration tests in
-  `main_test.go` pin the message each mode saves, that an edit keeps the loaded message ref, PRs
-  and `CreatedAt`, and the loaded message kept on update mode's early returns. Step 3's skip for
-  a state without the field covers older artifacts and `omitempty`
+- `CurrentSchemaVersion` stays 1, as it did for `LastWrittenCanvasMarkdownHash`. Nothing checks
+  the version
+- `snapshot_test.go` pins the field: it snapshots the state file each post, update and
+  stale-chain scenario saves, as `<test>-<scenario>.state.json`: the exact JSON, keys included,
+  since the next run reads it, possibly under a newer action version
+  - `createdAt` and `generatedAt` are normalised like the footer timestamps, except a zero time,
+    which means the field was never set
+  - An update case that deletes the message saves back a loaded state without the field, so
+    `omitempty` shows in its snapshot
+- Integration tests in `main_test.go` pin what the snapshots can't: `generatedAt` stamped during
+  the run, an edit's live footer showing it, that an edit keeps the loaded message ref, PRs and
+  `CreatedAt`, and the loaded message kept on update mode's early returns
 - Update `state.spec.md`: the new field, its empty value in older artifacts, and the oddity that
   it is the only state update mode rewrites besides the canvas hash. Update `run.spec.md`: each
   mode saves the message it sent
@@ -141,8 +148,9 @@ marked stale. Link the README's workflow example.
 ### 2. Build the stale message from stored blocks
 
 - `messagebuilder.BuildMessage` builds the posted message without a footer. New
-  `BuildLiveMessage` appends the live footer, a context block with block ID `live_footer`, for
-  `runUpdateMode`'s edit. Two intent-named functions rather than a bool argument
+  `BuildMessageWithLiveFooter` appends the live footer, a context block with block ID
+  `live_footer`, for `runUpdateMode`'s edit. Two intent-named functions rather than a bool
+  argument
   - Both cap content at 49 blocks. The 50th slot holds the live footer of an edit, or the stale
     line once a posted message is marked stale
 - New `messagebuilder.BuildStaleMessage(sentBlocks json.RawMessage, generatedAt time.Time)
@@ -195,11 +203,10 @@ marked stale. Link the README's workflow example.
     `mockslackclient.UpdateMessage` calls it, so the mock cannot drift from the real client
 - Any other error from the stale edit, a `BuildStaleMessage` error included, joins post mode's
   returned error. Post still returns the new state, so it is saved
-- The mock's `UpdatedMessage` also records `SentBlocks`, the block array as sent, so a snapshot
-  pins the stale edit
+- The mock's `UpdatedMessage` also records `BlocksAsSent`, so a snapshot pins the stale edit
 - `snapshot_test.go`'s `TestSnapshotsPreviousMessageMarkedStale` chains two real posts of the
   "every section under load" and grouped post-mode scenarios: the second post loads the state the
-  first one saved and marks its message stale. Its `SentBlocks`, indented, are the snapshot, so
+  first one saved and marks its message stale. Its `BlocksAsSent`, indented, are the snapshot, so
   the layout and the content blocks as stored are pinned at the boundary
   - A third case runs an update run between the two posts, so the stale edit drops the live
     footer that update gave the message
@@ -266,6 +273,6 @@ None
 
 ### Neutral
 
-- `SentMessageInfo.JSONBlocks` becomes `Blocks`, an internal type change
+- `SentMessageInfo.JSONBlocks` becomes `BlocksAsSent`, an internal type change
 - The snapshot files lose one nesting level
 - A posted message carries no footer until an update run edits it

@@ -19,23 +19,20 @@ import (
 const CurrentSchemaVersion = 1
 
 type State struct {
-	SchemaVersion int                     `json:"schemaVersion"`
-	CreatedAt     time.Time               `json:"createdAt"`
-	SlackMessage  SlackRef                `json:"slackMessage"`
-	PullRequests  []models.PullRequestRef `json:"pullRequests"`
-	// Hash of the markdown last written to the PR tracker canvas, so a run rendering the same
-	// content can leave the canvas alone. Empty when no canvas was written.
-	CanvasContentHash string          `json:"canvasContentHash"`
-	LastSentMessage   LastSentMessage `json:"lastSentMessage"`
+	SchemaVersion                 int                     `json:"schemaVersion"`
+	CreatedAt                     time.Time               `json:"createdAt"`
+	SlackMessage                  SlackRef                `json:"slackMessage"`
+	PullRequests                  []models.PullRequestRef `json:"pullRequests"`
+	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
+	LastSentMessage               LastSentMessage         `json:"lastSentMessage"`
 }
 
-// The message as last sent or edited, so the next post can re-send it marked stale.
+// See state.spec.md.
 type LastSentMessage struct {
 	// Without omitempty, nil blocks save as JSON null, which loads back as non-empty blocks
 	Blocks      json.RawMessage `json:"blocks,omitempty"`
 	SummaryText string          `json:"summaryText"`
-	// When the message's content was built: what its live footer shows, once an update run edits it
-	GeneratedAt time.Time `json:"generatedAt"`
+	GeneratedAt time.Time       `json:"generatedAt"`
 }
 
 type SlackRef struct {
@@ -97,7 +94,6 @@ func NewPostState(
 	}
 }
 
-// WithLastSentMessage returns a copy of the state recording an edit of its message.
 func WithLastSentMessage(
 	loadedState State,
 	messageInfo slackclient.SentMessageInfo,
@@ -112,7 +108,7 @@ func newLastSentMessage(
 	messageInfo slackclient.SentMessageInfo, summaryText string, generatedAt time.Time,
 ) LastSentMessage {
 	return LastSentMessage{
-		Blocks:      messageInfo.Blocks,
+		Blocks:      messageInfo.BlocksAsSent,
 		SummaryText: summaryText,
 		GeneratedAt: generatedAt,
 	}

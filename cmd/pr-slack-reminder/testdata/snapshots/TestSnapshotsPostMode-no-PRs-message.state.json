@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "1970-01-01T00:00:00Z",
+  "slackMessage": {
+    "channelId": "C12345678",
+    "messageTs": "1234567890.123456"
+  },
+  "pullRequests": null,
+  "canvasContentHash": "",
+  "lastSentMessage": {
+    "blocks": [
+      {
+        "type": "rich_text",
+        "block_id": "no_open_prs",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "No open PRs, happy coding! 🎉",
+                "style": {}
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "summaryText": "Nothing waiting for review 🎉",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  }
+}

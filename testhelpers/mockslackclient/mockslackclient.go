@@ -17,7 +17,7 @@ type MockSlackClientOptions struct {
 	UpdateMessageError error
 	DeleteMessageError error
 	ReplaceCanvasError error
-	// The timestamp Slack gives the posted message, so chained runs can post distinct messages
+	// Lets chained runs post distinct messages
 	PostMessageTimestamp string
 }
 
@@ -113,14 +113,14 @@ func (m *MockSlackAPI) SendMessage(
 		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %v", m.postMessageError)
 	}
 
-	sentJSONBlocks, err := slackclient.MarshalSentBlocks(message)
+	sentJSONBlocks, err := slackclient.MarshalBlocksAsSent(message)
 	if err != nil {
 		return slackclient.SentMessageInfo{}, err
 	}
 	return slackclient.SentMessageInfo{
-		ChannelID: m.postMessageResponse.Channel,
-		Timestamp: m.postMessageResponse.Timestamp,
-		Blocks:    sentJSONBlocks,
+		ChannelID:    m.postMessageResponse.Channel,
+		Timestamp:    m.postMessageResponse.Timestamp,
+		BlocksAsSent: sentJSONBlocks,
 	}, nil
 }
 
@@ -135,7 +135,7 @@ func (m *MockSlackAPI) UpdateMessage(
 		panic("Failed to parse updated blocks in mock Slack API: " + err.Error())
 	}
 
-	sentJSONBlocks, err := slackclient.MarshalSentBlocks(message)
+	sentJSONBlocks, err := slackclient.MarshalBlocksAsSent(message)
 	if err != nil {
 		return slackclient.SentMessageInfo{}, err
 	}
@@ -147,11 +147,11 @@ func (m *MockSlackAPI) UpdateMessage(
 	m.UpdatedMessage.Timestamp = messageTS
 	m.UpdatedMessage.Text = summaryText
 	m.UpdatedMessage.Blocks = updatedBlocks
-	m.UpdatedMessage.SentBlocks = sentJSONBlocks
+	m.UpdatedMessage.BlocksAsSent = sentJSONBlocks
 	return slackclient.SentMessageInfo{
-		ChannelID: channelID,
-		Timestamp: messageTS,
-		Blocks:    sentJSONBlocks,
+		ChannelID:    channelID,
+		Timestamp:    messageTS,
+		BlocksAsSent: sentJSONBlocks,
 	}, nil
 }
 
@@ -197,12 +197,11 @@ type SentMessage struct {
 }
 
 type UpdatedMessage struct {
-	ChannelID string
-	Timestamp string
-	Blocks    BlocksWrapper
-	Text      string
-	// The block array as sent, for asserting a message re-sent from stored blocks byte for byte
-	SentBlocks json.RawMessage
+	ChannelID    string
+	Timestamp    string
+	Blocks       BlocksWrapper
+	Text         string
+	BlocksAsSent json.RawMessage
 }
 
 type DeletedMessage struct {

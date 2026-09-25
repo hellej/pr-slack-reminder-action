@@ -74,20 +74,20 @@ func Run(
 		return fmt.Errorf("unsupported run mode: %s", cfg.RunMode)
 	}
 
-	var canvasContentHash string
+	var lastWrittenCanvasMarkdownHash string
 	if stateToSave != nil {
-		canvasContentHash = stateToSave.CanvasContentHash
+		lastWrittenCanvasMarkdownHash = stateToSave.LastWrittenCanvasMarkdownHash
 	}
 	if cfg.CanvasEnabled() {
-		canvasContentHash, canvasErr = refreshPRTrackerCanvas(
-			slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt, canvasContentHash,
+		lastWrittenCanvasMarkdownHash, canvasErr = refreshPRTrackerCanvas(
+			slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt, lastWrittenCanvasMarkdownHash,
 		)
 	}
 	if canvasErr != nil {
 		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
 	}
 	if stateToSave != nil {
-		stateToSave.CanvasContentHash = canvasContentHash
+		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
 	}
 	return errors.Join(messageErr, canvasErr, stateErr)
@@ -130,13 +130,8 @@ func runPostMode(
 	)
 }
 
-// Edits the previous post's message to open with a stale line and drop the live footer an update
-// run gave it, so only the newest reminder reads as current. Runs only after a successful send.
 // This run's own state is uploaded after it ends, so the load still finds the previous post's.
-//
-// Two setups posting to different channels can share a state artifact name, so a previous state
-// in another channel belongs to another setup. Both channel IDs come from Slack's own send
-// responses, so they compare like for like.
+// Channel check: see run.spec.md § Behaviour.
 func markPreviousMessageStale(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
@@ -250,7 +245,7 @@ func runUpdateMode(
 		log.Printf("Updating Slack message with no-prs-message: %s", content.NoOpenPRsText)
 	}
 
-	message, summaryText := messagebuilder.BuildLiveMessage(content)
+	message, summaryText := messagebuilder.BuildMessageWithLiveFooter(content)
 
 	sentMessageInfo, err := slackClient.UpdateMessage(
 		loadedState.SlackMessage.ChannelID,
@@ -335,7 +330,7 @@ func findRecentlyMergedPRs(
 func getSentMessageHandler(config config.Config) func(slackclient.SentMessageInfo) error {
 	return func(sentMessageInfo slackclient.SentMessageInfo) error {
 		if err := state.SaveSentSlackBlocksToFile(
-			config.SentSlackBlocksFilePath, sentMessageInfo.Blocks,
+			config.SentSlackBlocksFilePath, sentMessageInfo.BlocksAsSent,
 		); err != nil {
 			return err
 		}

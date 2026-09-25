@@ -273,8 +273,7 @@ func TestUpdateMessage(t *testing.T) {
 	}
 }
 
-// slack-go marshals the blocks only when it builds the request, so this fake, which never
-// builds one, shows whether the client records the blocks itself.
+// See slackclient.spec.md § Oddities.
 func TestSentMessageInfoRecordsTheBlockArrayAsSent(t *testing.T) {
 	message := slack.NewBlockMessage(
 		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*Open PRs*", false, false), nil, nil),
@@ -288,21 +287,19 @@ func TestSentMessageInfoRecordsTheBlockArrayAsSent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendMessage: expected no error, got %v", err)
 	}
-	if string(sentInfo.Blocks) != expectedBlocks {
-		t.Errorf("SendMessage: expected blocks %s, got %s", expectedBlocks, sentInfo.Blocks)
+	if string(sentInfo.BlocksAsSent) != expectedBlocks {
+		t.Errorf("SendMessage: expected blocks %s, got %s", expectedBlocks, sentInfo.BlocksAsSent)
 	}
 
 	updatedInfo, err := client.UpdateMessage("C12345", "1234567890.123456", message, "summary")
 	if err != nil {
 		t.Fatalf("UpdateMessage: expected no error, got %v", err)
 	}
-	if string(updatedInfo.Blocks) != expectedBlocks {
-		t.Errorf("UpdateMessage: expected blocks %s, got %s", expectedBlocks, updatedInfo.Blocks)
+	if string(updatedInfo.BlocksAsSent) != expectedBlocks {
+		t.Errorf("UpdateMessage: expected blocks %s, got %s", expectedBlocks, updatedInfo.BlocksAsSent)
 	}
 }
 
-// slack-go returns a Slack API error as slack.SlackErrorResponse, its Err the error code
-// (slack-go v0.29.0 misc.go SlackResponse.Err, chat.go sendResponseFull).
 func TestUpdateMessageMarksANotEditableMessage(t *testing.T) {
 	client := slackclient.NewClient(&mockSlackAPI{
 		updateMessageError: slack.SlackErrorResponse{Err: "edit_window_closed"},
