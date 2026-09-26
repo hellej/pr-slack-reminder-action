@@ -44,8 +44,6 @@ that it is there, not that it is true.
   is running on memory
 - A citation too vague to point at anything, or pointing at the wrong page: `Fix`, at the
   severity the claim's weight earns
-- A citation naming `docs/third-party-facts.md`: `Fix`. The plan cites the source that
-  entry names, not the entry
 
 Read a cited source yourself only when the claim looks wrong. Then the module cache
 (`go env GOMODCACHE`) at the version `go.mod` pins, a vendor dir, or the linked doc page.

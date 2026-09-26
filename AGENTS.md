@@ -99,7 +99,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - [docs/third-party-facts.md](docs/third-party-facts.md) records what past work confirmed about external APIs and libraries, each entry with its source
 - Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
 - Add to it whenever you confirm such a fact, or rule an approach out
-- Cite the source an entry names, never the entry
+- Plans and code may cite an entry by its heading, e.g. `See docs/third-party-facts.md § <heading>`, or the source it names
 
 ## Git
 

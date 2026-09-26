@@ -6,7 +6,7 @@ GitHub GraphQL and search APIs, Slack methods and scopes, GitHub token permissio
 - External facts only. Behaviour of a package under `internal/` belongs in its
   `<package>.spec.md`
 - Dead ends count as much as confirmations
-- An entry is not a source. A plan cites what the entry names, never this file
+- Plans and code may cite an entry by its heading, or the source it names
 - Correct a wrong entry in place
 - Bullets, not prose. One claim each, sub-bullets for the detail under it
 - Write entries in the [writing skill](../.agents/skills/writing/SKILL.md)'s style
