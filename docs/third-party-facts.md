@@ -717,3 +717,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The next upload's `overwrite: true` logged `Artifact … (ID: 10903097879) deleted`, so the download was this run's artifact, not an earlier run's
 - The e2e GitHub App token downloads them too. On this public repository that says nothing about
   `actions: read`. See § A public repository's artifacts list and download without `actions: read`
+
+## Dependabot skips Go tool directive modules unless allow-listed [2026-09-26]
+
+- Source: [dependabot/dependabot-core#12050](https://github.com/dependabot/dependabot-core/issues/12050), open since 2025-04-14, and [octomation/go-module#546](https://github.com/octomation/go-module/issues/546)
+- Go writes every `tool` module's requirement as `// indirect`, also after `go mod tidy` (checked on `tools/go.mod` with Go 1.26)
+- Dependabot version updates skip indirect Go modules by default, so a tool pin never gets a PR
+- Reported working: an `allow` entry per tool module with `dependency-type: "all"`
+  - An `allow` list replaces the default for its whole update entry, so the tools module needs an entry of its own
+- Unverified: whether `dependency-type: "all"` with no `dependency-name` covers them too

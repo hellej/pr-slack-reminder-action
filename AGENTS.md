@@ -108,7 +108,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
   - GitHub Actions: the full commit SHA, with the version in a trailing comment
   - Go dev tools: `tool` directives in `tools/go.mod`, a module apart from the action binary's `go.mod`. `tools/go.sum` hashes lock the versions
   - Add one with `go get -modfile=tools/go.mod -tool <package>@<version>`, run it with `go tool -modfile=tools/go.mod <tool>` (`GO_TOOL` in the Makefile)
-- Dependabot updates the pins weekly
+- Dependabot updates the pins weekly. A new Go tool also needs an `allow` entry in `.github/dependabot.yml`. See docs/third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed
 
 ## Git
 
