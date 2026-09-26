@@ -47,15 +47,8 @@ type testResponseData struct {
 	P0 *testAliasData `json:"p0"`
 }
 
-func withoutRetryDelay(t *testing.T) {
-	t.Helper()
-	original := retryDelay
-	retryDelay = 0
-	t.Cleanup(func() { retryDelay = original })
-}
-
 func TestGraphQLDo(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	tests := []struct {
 		name                 string
@@ -232,19 +225,27 @@ func TestGraphQLDo(t *testing.T) {
 			expectedErrorClass: "query",
 		},
 		{
-			name:               "server error is retried once and then fails",
-			status:             502,
+			name:               "server error is tried 3 times and then fails",
+			status:             500,
 			responseBody:       `{"message":"Server Error"}`,
 			aliases:            []string{"r0"},
-			expectedAttempts:   2,
+			expectedAttempts:   3,
 			expectedErrorClass: "transport",
 		},
 		{
-			name:               "rate limit status is retried once and then fails",
+			name:               "client error just below the server errors fails without a retry",
+			status:             499,
+			responseBody:       `{"message":"Client Closed Request"}`,
+			aliases:            []string{"r0"},
+			expectedAttempts:   1,
+			expectedErrorClass: "transport",
+		},
+		{
+			name:               "rate limit status is tried 3 times and then fails",
 			status:             429,
 			responseBody:       `{"message":"Too Many Requests"}`,
 			aliases:            []string{"r0"},
-			expectedAttempts:   2,
+			expectedAttempts:   3,
 			expectedErrorClass: "transport",
 		},
 		{
@@ -264,11 +265,11 @@ func TestGraphQLDo(t *testing.T) {
 			expectedErrorClass: "transport",
 		},
 		{
-			name:               "unparseable body is retried once and then fails",
+			name:               "unparseable body is tried 3 times and then fails",
 			status:             200,
 			responseBody:       `<html>not json</html>`,
 			aliases:            []string{"r0"},
-			expectedAttempts:   2,
+			expectedAttempts:   3,
 			expectedErrorClass: "transport",
 		},
 	}
@@ -445,7 +446,7 @@ func assertEqualStrings(t *testing.T, name, actual, expected string) {
 }
 
 func TestGraphQLDoRetrySucceeds(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	tests := []struct {
 		name            string
@@ -489,8 +490,45 @@ func TestGraphQLDoRetrySucceeds(t *testing.T) {
 	}
 }
 
+// Answers 200 once the first attempt's ctx is done, after blocking that attempt until then.
+type hangingOnceTransport struct {
+	calls int
+}
+
+func (t *hangingOnceTransport) Post(ctx context.Context, body []byte) (int, json.RawMessage, error) {
+	t.calls++
+	if t.calls == 1 {
+		<-ctx.Done()
+		return 0, nil, ctx.Err()
+	}
+	return 200, json.RawMessage(`{"data":{"r0":{"number":3}}}`), nil
+}
+
+func TestGraphQLDoRetriesAnAttemptCutOffByItsDeadline(t *testing.T) {
+	recorder := withoutRetryWaits(t)
+	withAttemptTimeout(t, 20*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	transport := &hangingOnceTransport{}
+	client := graphqlClient{transport: transport}
+
+	var data testResponseData
+	_, err := client.Do(ctx, "query{}", nil, []string{"r0"}, &data)
+
+	if err != nil {
+		t.Fatalf("expected the second attempt to succeed, got %v", err)
+	}
+	if transport.calls != 2 {
+		t.Errorf("expected 2 attempts, got %d", transport.calls)
+	}
+	if waits := recorder.requestedWaits(); len(waits) != 1 || waits[0] != 2*time.Second {
+		t.Errorf("expected one 2s wait, got %v", waits)
+	}
+	assertAliasData(t, "r0", data.R0, &testAliasData{Number: 3})
+}
+
 func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	pullRequestNotFound := `{"type":"NOT_FOUND","path":["p3","pullRequest"],"message":"no pull request"}`
 	repositoryForbidden := `{"type":"FORBIDDEN","path":["p7"],"message":"no access"}`
@@ -548,10 +586,6 @@ func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
 }
 
 func TestGraphQLDoStopsRetryingOnCancelledContext(t *testing.T) {
-	original := retryDelay
-	retryDelay = 5 * time.Second
-	t.Cleanup(func() { retryDelay = original })
-
 	ctx, cancel := context.WithCancel(context.Background())
 	transport := &cancellingTransport{cancel: cancel}
 	client := graphqlClient{transport: transport}
@@ -579,7 +613,7 @@ func (t *cancellingTransport) Post(ctx context.Context, body []byte) (int, json.
 }
 
 func TestGraphQLDoPostsQueryAndVariables(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	transport := &recordingTransport{status: 200, responseBody: `{"data":{}}`}
 	client := graphqlClient{transport: transport}

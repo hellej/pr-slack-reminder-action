@@ -23,13 +23,15 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Batches run at most `defaultGitHubAPIConcurrencyLimit` (3) requests at a time
 - Per PR 100 reviews, 100 timeline comments and 100 review threads are read (GitHub's maximum page size), oldest first by GitHub's default connection order since the query sets none; a thread carries its last comment's author only, and review comments are not read at all (their authors always have a review of their own)
 - A collaborator carries a display name only when GitHub returns one for a user, and the login otherwise
-- Per-call timeouts: `pullRequestListTimeout` (30s) for the open PR listing and for the merged PR search, `reviewsFetchTimeout` (10s) per batch; each covers that request's retry as well
+- A GraphQL request is tried up to 3 times, 2s before the second attempt and 5s before the third, and only on a transient failure: no response (network error, attempt deadline), a 5xx, a 429 or an unparseable body
+- Each attempt has its own 15s deadline, the same for every call: past GitHub's own 10s processing limit, so its 502 or 504 arrives first. The caller's ctx bounds the whole call: once it is done, no further attempt starts
+- Each retry logs one line naming the API, the attempt number, the wait and the error. A retry is never an annotation
 - A PR with an active `/snooze [pr-reminder] for N (day|days|d)` comment (case-insensitive; most recent matching comment wins) is excluded from `FindOpenPRs` results until the snooze expires. `GetPRs` and `FindRecentlyMergedPRs` keep such a PR and only record the expiry on it: a snooze suppresses a request for attention, and the merged rows those two serve ask for nothing
 - `FetchLatestArtifactByName` downloads the newest GitHub Actions artifact matching a given name and decodes a named JSON file from it into a caller-supplied target, used by [internal/state](../../state/state.spec.md) to load prior-run state
 
 ## Doesn't Do
 
-- No retries on the REST artifact calls; a failed GraphQL request is retried once after a fixed 1s wait (5xx, 429, network errors, unparseable bodies), never on another 4xx and never on an HTTP 200 carrying an errors array; the rate-limit headers are never read
+- No retries on the REST artifact calls. A GraphQL request is never retried on another 4xx, nor on an HTTP 200 carrying an errors array. The rate-limit headers are never read
 - Doesn't page past a repository's 100 newest open PRs, nor past the first 100 merges a repository has inside the window. A repository over that gets a truncated merged list and a log line saying so, read off `issueCount`
 - Doesn't report a merged search per repository: any error fails the whole merged search, the only part of the merged fetch that can fail it
 - In `FindOpenPRs` and `FindRecentlyMergedPRs`, a failure scoped to one PR (its `pullRequest`, or the `reviews`, `comments` and `reviewThreads` below it) doesn't fail the call: that PR is returned without reviewer info. A query- or repository-scoped error, and any transport or decode failure, fails `FindOpenPRs` and drops `FindRecentlyMergedPRs` back to unenriched merged rows

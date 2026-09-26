@@ -200,7 +200,7 @@ func TestPostModeCanvasIsNotRefreshedWhenFetchFails(t *testing.T) {
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 			PRs:                   canvasTestPRs(),
-			ListPRsResponseStatus: 500,
+			ListPRsResponseStatus: 403,
 			PRServiceError:        errors.New("unable to fetch PRs"),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
@@ -250,7 +250,7 @@ func TestUpdateModeOpenPRFetchFailureStopsTheRun(t *testing.T) {
 					PRsByNumber:           map[int]*github.PullRequest{1: trackedPR},
 					PRs:                   []*github.PullRequest{trackedPR},
 					MockPreviousState:     &mockState,
-					ListPRsResponseStatus: 500,
+					ListPRsResponseStatus: 403,
 					PRServiceError:        errors.New("unable to fetch PRs"),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),

@@ -138,7 +138,7 @@ func TestLogErrorWritesOneErrorAnnotationPerFailedCanvasPart(t *testing.T) {
 			mergedPRsSearchError: errors.New("search failed"),
 			expectedErrorLines: []string{
 				"::error title=PR Slack Reminder::PR tracker canvas refresh failed: canvas update failed: canvas_not_found",
-				"::error title=PR Slack Reminder::PR tracker canvas refresh failed: error fetching merged pull requests: GraphQL request failed with status 500: unexpected response: {\"message\":\"search failed\"}",
+				"::error title=PR Slack Reminder::PR tracker canvas refresh failed: error fetching merged pull requests: GraphQL request failed with status 403: unexpected response: {\"message\":\"search failed\"}",
 			},
 		},
 	}

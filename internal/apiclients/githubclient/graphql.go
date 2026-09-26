@@ -9,17 +9,11 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"time"
 )
 
 const graphqlEndpoint = "https://api.github.com/graphql"
 
 const graphqlUserAgent = "pr-slack-reminder-action"
-
-const graphqlMaxAttempts = 2
-
-// Not a const so that in-package tests can zero it.
-var retryDelay = 1 * time.Second
 
 type graphqlTransport interface {
 	Post(ctx context.Context, body []byte) (status int, responseBody json.RawMessage, err error)
@@ -193,49 +187,32 @@ func decodeData(data json.RawMessage, out any) error {
 	return nil
 }
 
-type attempt struct {
-	response  graphqlResponse
-	err       error
-	retryable bool
-}
-
 func (c graphqlClient) postWithRetry(ctx context.Context, requestBody []byte) (graphqlResponse, error) {
-	for attemptNumber := 1; ; attemptNumber++ {
-		result := c.post(ctx, requestBody)
-		if result.err == nil {
-			return result.response, nil
-		}
-		if !result.retryable || attemptNumber == graphqlMaxAttempts {
-			return graphqlResponse{}, result.err
-		}
-		select {
-		case <-ctx.Done():
-			return graphqlResponse{}, transportError{err: ctx.Err()}
-		case <-time.After(retryDelay):
-		}
-	}
+	return retryTransientFailures(ctx, "GraphQL", func(attemptCtx context.Context) attemptResult[graphqlResponse] {
+		return c.post(attemptCtx, requestBody)
+	})
 }
 
-func (c graphqlClient) post(ctx context.Context, requestBody []byte) attempt {
+func (c graphqlClient) post(ctx context.Context, requestBody []byte) attemptResult[graphqlResponse] {
 	status, responseBody, err := c.transport.Post(ctx, requestBody)
 	if err != nil {
-		return attempt{err: transportError{status: status, err: err}, retryable: true}
+		return attemptResult[graphqlResponse]{err: transportError{status: status, err: err}, transient: true}
 	}
 	if status != http.StatusOK {
-		return attempt{
+		return attemptResult[graphqlResponse]{
 			err:       transportError{status: status, err: fmt.Errorf("unexpected response: %s", responseBody)},
-			retryable: status >= http.StatusInternalServerError || status == http.StatusTooManyRequests,
+			transient: status >= http.StatusInternalServerError || status == http.StatusTooManyRequests,
 		}
 	}
 
 	var response graphqlResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return attempt{
+		return attemptResult[graphqlResponse]{
 			err:       transportError{status: status, err: fmt.Errorf("unparseable response: %w", err)},
-			retryable: true,
+			transient: true,
 		}
 	}
-	return attempt{response: response}
+	return attemptResult[graphqlResponse]{value: response}
 }
 
 // GitHub decides the order of the errors array, so the returned hard error is the most severe

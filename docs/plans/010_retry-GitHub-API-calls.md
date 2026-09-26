@@ -55,9 +55,11 @@ Serves AGENTS.md § Purpose: the daily `post` is the one notification the team p
   - The waits and the deadline stay package `var`s, as `retryDelay` is today, so in-package tests can shrink them
   - The loop stops early when the caller's ctx is done, and logs each retry
 - `graphql.go`: `postWithRetry` moves onto the new loop, keeping its transient-failure classification. `graphqlMaxAttempts` and `retryDelay` go
-- The ~4 `graphql.Do` callers drop their own `context.WithTimeout`. `pullRequestListTimeout` and `reviewsFetchTimeout` go
+- The 4 `graphql.Do` callers drop their own `context.WithTimeout`. `pullRequestListTimeout` and `reviewsFetchTimeout` go
 - `cmd/pr-slack-reminder/run.go`: `prFetchTimeout` to 2 minutes
 - Tests: the retry policy and attempt deadline; existing retry tests in `graphql_test.go` follow the new attempt count
+  - The retry wait is a package `var` func too, so tests record the waits asked for and skip them
+  - `cmd/pr-slack-reminder` tests fail their GraphQL fetches with a 403 instead of a 500, as does the mock's merged search failure: a 5xx now costs 7s of real waits, and fixtures dated off `time.Now()` go stale meanwhile
 - `githubclient.spec.md`: the timeouts bullet and the retry line in Doesn't Do. `run.spec.md`: Doesn't Do's "Doesn't retry a GitHub or Slack call" becomes Slack only
 
 ### 2. State artifact load retry and attempt deadline

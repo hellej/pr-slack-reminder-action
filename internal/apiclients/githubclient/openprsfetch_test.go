@@ -85,7 +85,7 @@ func pullRequestNodeJSON(number int, title string) string {
 }
 
 func TestListOpenPRs(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	notFoundMessage := "repository owner-one/repo-one not found - check the repository name and permissions"
 
@@ -363,7 +363,7 @@ func assertLogins(t *testing.T, label string, collaborators []Collaborator, expe
 }
 
 func TestEnrichPRs(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 
 	tests := []struct {
 		name             string
@@ -535,7 +535,7 @@ func TestEnrichPRs(t *testing.T) {
 }
 
 func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
-	withoutRetryDelay(t)
+	withoutRetryWaits(t)
 	logOutput := captureLogOutput(t)
 
 	transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{

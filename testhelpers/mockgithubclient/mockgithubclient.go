@@ -245,7 +245,8 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 }
 
 // The merged PR search has its own failure knob: a canvas refresh fetches merged PRs and open
-// PRs separately, and only one of the two failing is the interesting case.
+// PRs separately, and only one of the two failing is the interesting case. It fails with a 403,
+// since githubclient waits seconds before retrying a 5xx.
 func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
 	if t.opts.Recording != nil {
 		t.opts.Recording.recordMergedPRFetch()
@@ -254,7 +255,7 @@ func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json
 		body, err := json.Marshal(
 			map[string]string{"message": t.opts.MergedPRsSearchError.Error()},
 		)
-		return http.StatusInternalServerError, body, err
+		return http.StatusForbidden, body, err
 	}
 
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}

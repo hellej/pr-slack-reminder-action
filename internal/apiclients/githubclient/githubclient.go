@@ -131,10 +131,6 @@ type OpenPRsResult struct {
 	DraftPRsCapped bool
 }
 
-// Per-call timeout defaults.
-const pullRequestListTimeout = 30 * time.Second
-const reviewsFetchTimeout = 10 * time.Second
-
 // Returns an error if listing the PRs of any repository fails.
 func (c *client) FindOpenPRs(
 	ctx context.Context,
