@@ -88,10 +88,11 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Package Specs
 
-- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source
+- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source, plus any related package's spec needed to understand how a change fits
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
+  - A rough edge you knowingly leave, because the fix would need significant complexity for a rare case, goes in the spec's **Oddities** section
 - `make check-style` fails when a package directory has no spec file
 - A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`): safe to proceed if the change was a pure refactor
 
@@ -134,7 +135,9 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Testing
 
-- **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
+- **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor. No exceptions for small changes
+  - Run the new test and confirm it fails for the expected reason before implementing
+  - When a snapshot or golden file already covers the change's visible effect, that file is the test. Change the code, read the failing diff to confirm it is what you meant, then re-record. Add a separate assertion only for a mutant that fails it but passes the goldens
 - Use table-driven tests for functions with multiple input scenarios
 - Coverage counts across the whole suite, not per package
   - Snapshot anything a user sees in Slack or on the canvas, whenever feasible
@@ -142,6 +145,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
   - Add a package test only for what neither reaches cheaply, such as limits and error mapping
   - Don't repeat a case a broader test already pins, so internals stay free to refactor
 - Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
+  - An expectation derived from the value under test asserts nothing. Pin the value literally, and feed the boundary itself
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go`: integration tests using full pipeline with mocks
 - `testhelpers/confighelpers.go`: `TestConfig` struct and `SetTestEnvironment()` for consistent test setup

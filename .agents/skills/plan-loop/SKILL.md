@@ -40,15 +40,12 @@ They become the plan's first section.
 
 ## The Facts File
 
-[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) holds what past plans
-confirmed about APIs outside this repo.
+[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) follows AGENTS.md
+§ Third-party Facts. Reading that section is mandatory.
 
-- Grep its `##` headings before fanning out. An entry answers a question, or narrows it to
-  "confirm this still holds at the version `go.mod` pins now"
+- Check it before fanning out. An entry answers a question, or narrows it to "confirm this
+  still holds at the version `go.mod` pins now"
 - You write it, as you write the plan. Sub-agents report a fact and its source
-- File what outlives the plan: a method's shape, a scope, a limit, an approach the API
-  cannot support
-- Dead ends above all. Nothing else records them
 
 ## Research Fan-out
 

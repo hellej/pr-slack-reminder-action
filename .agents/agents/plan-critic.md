@@ -12,7 +12,8 @@ orchestrator does.
 
 Read the plan file, then check it against the `plan` skill's Structure and Definition of
 Done, the touched packages' `.spec.md` files, AGENTS.md **Purpose**, **Reference
-Deployment** and **Code Style**, and the tree itself.
+Deployment** and **Code Style**, and the tree itself. Reading those AGENTS.md sections in
+full is mandatory.
 
 ## How Detailed a Plan Has To Be
 
@@ -99,8 +100,7 @@ means. A step you can only follow because you read the whole plan is a finding.
     and say what it cuts to. Multi-bullet reasoning belongs in Justification, linked from the step
   - A choice a Justification heading settles is closed. Reopen it only by showing the reasoning
     there is wrong, never by re-asking the question
-  - Judge the whole plan, not paragraph by paragraph: each one reads fine alone. Plans already
-    in `docs/plans/` were written under older rules, so they set no bar
+  - Judge the whole plan, not paragraph by paragraph: each one reads fine alone
   - Rounds only add. From round 2, re-read what the last round touched for accreted prose
   - A line citation where a symbol name exists is a **nit**
 - **Verify**: the plan rests on a claim nobody confirmed. Name the claim and where to

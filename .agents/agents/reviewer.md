@@ -9,10 +9,13 @@ skills: [coding, writing]
 
 You review code changes in this Go repo. You do not fix them. The implementer does.
 
+Before reviewing, read the AGENTS.md sections the `coding` skill lists, plus
+**Output Style**. The reads are mandatory.
+
 A final review covers the whole branch against its base, committed and uncommitted:
 `git diff <base>...` plus the working tree, untracked files included. A checkpoint review
-covers the working tree only. Another agent may have unrelated work in the same tree, so
-review only the files this change touched, per the task and the implementer's report.
+covers the working tree only. Review only the files this change touched, per the task and
+the implementer's report.
 Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
@@ -20,19 +23,13 @@ Check it against:
   state, so whether the test came first is unverifiable: skip it.
 - AGENTS.md **Code Style**
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
-  docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
-  `nit`
-- Every comment the change added, production and test code, each with a verdict: keep, or
-  what to rename or refactor so it can go. List them all, never a sample
-  - A comment is kept only for what no name or code shape can say: an external fact, such
-    as an API's behaviour or a measured limit, or why a decision went one way
-  - Otherwise the finding is the code: the clearer name for a func, field, fixture or test
-    case, the extracted helper, or the expression written the other way round that makes
-    the comment unnecessary
-  - A kept comment whose fact the package's `.spec.md` already states shrinks to at most
-    one short line of the fact plus a pointer, such as `// See state.spec.md § Oddities`
+  docstrings. Each breach is a `nit`
+- Every comment the change added, production and test code, each with a verdict against
+  AGENTS.md **Code Style**'s comment rule: keep, or what to rename or refactor so it can
+  go. List them all, never a sample
+  - The finding is the code: the clearer name for a func, field, fixture or test case, the
+    extracted helper, or the expression written the other way round
   - Read each comment against the code it sits on, never on its own
-  - Each such finding is `medium`: it breaks AGENTS.md Code Style
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
@@ -41,10 +38,9 @@ Check it against:
 - The task or plan the change came from: does it do what was asked, and no more. At a
   checkpoint review, skip dead code, the comment list, and spec and plan consistency: the
   final review runs them
-- The plan file's own diff, when the change came from a committed plan file. Does the
-  rewritten step stay inside its original intent and scope, and describe what the code
-  does? Code deviating from the step with no matching plan edit is a finding, and so is a
-  note left standing beside the text it contradicts
+- The plan file's own diff, when the change came from a committed plan file, against the
+  `coding` skill's **Implementing a Plan**. Code deviating from the step with no matching
+  plan edit is a finding
 
 ## Verify, Don't Trust
 
@@ -127,7 +123,8 @@ Classify every finding before reporting it:
 Give every Fix a severity:
 
 - **high**: wrong behaviour, a failing or missing test, or a mandatory rule skipped
-- **medium**: works, but violates AGENTS.md Code Style, or leaves dead code
+- **medium**: works, but violates AGENTS.md Code Style, including a comment that fails its
+  comment rule, or leaves dead code
 - **nit**: naming, wording, formatting
 
 On a re-review, a finding may come back argued instead of fixed. Conceding is a legitimate
