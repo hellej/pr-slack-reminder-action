@@ -84,21 +84,10 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## References
 
-Write a reference in one of these forms. `make check-style` checks each one resolves (`.github/scripts/checkreferences/`):
-
-- Docs read on GitHub, such as `README.md`, link with anchors. Agent files, specs and code comments use `§`
-- Section: `<file>.md § <Heading>`, or `` the `<name>` skill § <Heading> `` or `` the `<name>` agent § <Heading> ``
-  - Name the file right before the `§`. A later pointer on the same line reuses it: `AGENTS.md § Git and § Testing`
-  - `§ <Heading>` with no file before it points into the file holding it. A code comment always names the file
-  - The text after `§` starts with a heading or a bold label of that file, such as a Code Style rule
-  - A facts file entry: its full heading, date left out
-- Repository path: backticked, from the repository root, e.g. `internal/state/`
-- Skill or agent: its backticked name followed by `skill` or `agent`, or a list: `` the `plan` and `writing` skills ``
-  - A skill's or agent's frontmatter `name:` matches its folder or file name
-- Make target: backticked, e.g. `make check-style`
-- Link: relative, optionally with a `#heading` anchor
-- Checked in Markdown, Go comments, and `#` comments in YAML, Makefile and shell files. Skill and agent names in Markdown only
-  - A link or `§` pointer inside a code span or code block is an example, not checked
+- Docs read on GitHub, such as `README.md`, link with anchors. Agent files, specs and code comments use `§`: `AGENTS.md § Testing`, `` the `plan` skill § Structure ``
+- Name the file right before the `§`. A code comment always names it. Cite a facts file entry by its full heading, date left out
+- Backtick repository paths from the root, skill and agent names followed by `skill` or `agent`, and make targets
+- `make check-style` checks them. Examples of what it checks and skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
 
 ## Releasing
 
