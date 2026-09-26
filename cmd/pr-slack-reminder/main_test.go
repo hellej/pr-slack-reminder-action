@@ -1,7 +1,9 @@
 package main_test
 
 import (
+	"bytes"
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -18,6 +20,8 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/google/go-github/v78/github"
+	"github.com/slack-go/slack"
+
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -214,9 +218,9 @@ func getTestState(options GetTestStateOptions) state.State {
 	}
 
 	return state.State{
-		SchemaVersion: 1,
-		CreatedAt:     time.Now().Add(-time.Duration(postedHoursAgo * float32(time.Hour))),
-		SlackMessage: state.SlackRef{
+		SchemaVersion:   1,
+		MessagePostedAt: time.Now().Add(-time.Duration(postedHoursAgo * float32(time.Hour))),
+		MessageRef: state.SlackRef{
 			ChannelID: "C12345678",
 			MessageTS: "1623850245.000200",
 		},
@@ -765,63 +769,6 @@ func TestScenarios(t *testing.T) {
 	}
 }
 
-func TestPostModeStateSaving(t *testing.T) {
-	testStateFilePath := "/tmp/test-state.json"
-
-	postModeConfig := testhelpers.GetDefaultConfigFull()
-	configOverrides := map[string]any{
-		config.InputRunMode:     config.RunModePost,
-		config.EnvStateFilePath: testStateFilePath,
-	}
-	testhelpers.SetTestEnvironment(t, postModeConfig, &configOverrides)
-
-	testPRs := getTestPRs(GetTestPRsOptions{})
-
-	mockGitHubClientGetter := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-		PRs: testPRs.PRs,
-	})
-	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
-
-	err := main.Run(
-		mockGitHubClientGetter,
-		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
-	)
-
-	if err != nil {
-		t.Fatalf("Expected Run to succeed, but got error: %v", err)
-	}
-
-	if _, err := os.Stat(testStateFilePath); os.IsNotExist(err) {
-		t.Errorf("Expected state file to be created at %s, but it doesn't exist", testStateFilePath)
-		return
-	}
-
-	var loadedState state.State
-	err = testhelpers.LoadJSONFromFile(testStateFilePath, &loadedState)
-	if err != nil {
-		t.Fatalf("Failed to load state file: %v", err)
-	}
-
-	expectedChannelID := "C12345678" // From mock
-	if loadedState.SlackMessage.ChannelID != expectedChannelID {
-		t.Errorf("Expected channel ID %s, got %s", expectedChannelID, loadedState.SlackMessage.ChannelID)
-	}
-
-	if loadedState.SlackMessage.MessageTS == "" {
-		t.Error("Expected message timestamp to be set in state")
-	}
-
-	if len(loadedState.PullRequests) != len(testPRs.PRs) {
-		t.Errorf("Expected %d PRs in state, got %d", len(testPRs.PRs), len(loadedState.PullRequests))
-	}
-
-	defer func() {
-		if err := os.Remove(testStateFilePath); err != nil {
-			t.Logf("Failed to clean up test state file: %v", err)
-		}
-	}()
-}
-
 // State that points at a message Slack never accepted would make the next update run edit
 // somebody else's message, or nothing at all.
 func TestPostModeSavesNoStateWhenSendFails(t *testing.T) {
@@ -867,7 +814,7 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 				1: getTestPR(GetTestPROptions{Number: 1, Title: "Surviving PR", AuthorLogin: "alice"}),
 				2: getTestPR(GetTestPROptions{Number: 2, Title: "Filtered out PR", AuthorLogin: "bob"}),
 			},
-			MockStateForUpdateMode: &loadedState,
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
@@ -888,15 +835,15 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 	if !slices.Equal(savedPRNumbers, []int{1, 2}) {
 		t.Errorf("Expected the loaded PRs 1 and 2 in the saved state, got %v", savedPRNumbers)
 	}
-	if savedState.SlackMessage != loadedState.SlackMessage {
+	if savedState.MessageRef != loadedState.MessageRef {
 		t.Errorf(
 			"Expected the loaded Slack message ref %+v, got %+v",
-			loadedState.SlackMessage, savedState.SlackMessage,
+			loadedState.MessageRef, savedState.MessageRef,
 		)
 	}
-	if !savedState.CreatedAt.Equal(loadedState.CreatedAt) {
+	if !savedState.MessagePostedAt.Equal(loadedState.MessagePostedAt) {
 		t.Errorf(
-			"Expected the loaded CreatedAt %v, got %v", loadedState.CreatedAt, savedState.CreatedAt,
+			"Expected the loaded MessagePostedAt %v, got %v", loadedState.MessagePostedAt, savedState.MessagePostedAt,
 		)
 	}
 	if savedState.SchemaVersion != 1 {
@@ -904,14 +851,402 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 	}
 }
 
+var seededLastWrittenMessage = state.LastWrittenMessage{
+	Blocks:      []byte(`[{"type":"divider"}]`),
+	SummaryText: "3 open PRs are waiting for attention 👀",
+	GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+}
+
+func loadSavedState(t *testing.T, stateFilePath string) state.State {
+	t.Helper()
+	var savedState state.State
+	if err := testhelpers.LoadJSONFromFile(stateFilePath, &savedState); err != nil {
+		t.Fatalf("Failed to load the saved state file: %v", err)
+	}
+	return savedState
+}
+
+func withoutStateSaveIndentation(t *testing.T, jsonBytes []byte) string {
+	t.Helper()
+	var compacted bytes.Buffer
+	if err := json.Compact(&compacted, jsonBytes); err != nil {
+		t.Fatalf("Expected valid JSON, got %v: %s", err, jsonBytes)
+	}
+	return compacted.String()
+}
+
+func assertLastWrittenMessageIsTheSeededOne(t *testing.T, saved state.LastWrittenMessage) {
+	t.Helper()
+	if len(saved.Blocks) == 0 || withoutStateSaveIndentation(t, saved.Blocks) != `[{"type":"divider"}]` {
+		t.Errorf("Expected the seeded blocks, got %s", saved.Blocks)
+	}
+	if saved.SummaryText != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the seeded summary text, got %q", saved.SummaryText)
+	}
+	if !saved.GeneratedAt.Equal(time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("Expected the seeded generatedAt, got %v", saved.GeneratedAt)
+	}
+}
+
+// The run stamps generatedAt from the real clock, which the snapshots normalise, so it can only
+// be pinned between the run's start and end.
+func assertLastWrittenMessageGeneratedDuringTheRun(
+	t *testing.T, saved state.LastWrittenMessage, runStart time.Time, runEnd time.Time,
+) {
+	t.Helper()
+	if saved.GeneratedAt.Before(runStart) || saved.GeneratedAt.After(runEnd) {
+		t.Errorf("Expected generatedAt between %v and %v, got %v", runStart, runEnd, saved.GeneratedAt)
+	}
+}
+
+func assertLastWrittenMessageEndsWithTheUpdateTimeFooterOfItsGeneratedAt(t *testing.T, saved state.LastWrittenMessage) {
+	t.Helper()
+	var blocks []struct {
+		Type     string `json:"type"`
+		Elements []struct {
+			Text string `json:"text"`
+		} `json:"elements"`
+	}
+	if err := json.Unmarshal(saved.Blocks, &blocks); err != nil {
+		t.Fatalf("Failed to parse saved blocks: %v", err)
+	}
+	footer := blocks[len(blocks)-1]
+	expectedFooterText := fmt.Sprintf(
+		"_Live, updated <!date^%d^{time}|%s UTC>_",
+		saved.GeneratedAt.Unix(), saved.GeneratedAt.UTC().Format("15:04"),
+	)
+	if footer.Type != "context" || len(footer.Elements) != 1 || footer.Elements[0].Text != expectedFooterText {
+		t.Errorf("Expected a last block with footer %q, got %+v", expectedFooterText, footer)
+	}
+}
+
+func TestPostModeSavesTheRunsGeneratedAt(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+
+	runStart := time.Now()
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Mark the previous message stale", AuthorLogin: "alice"}),
+				getTestPR(GetTestPROptions{Number: 2, Title: "Store the last written message", AuthorLogin: "bob"}),
+			},
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+	runEnd := time.Now()
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	assertLastWrittenMessageGeneratedDuringTheRun(t, savedState.LastWrittenMessage, runStart, runEnd)
+}
+
+func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	overrides[config.InputRunMode] = config.RunModeUpdate
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	loadedState.LastWrittenMessage = seededLastWrittenMessage
+	openPR := getTestPR(GetTestPROptions{Number: 1, Title: "Still open since the post", AuthorLogin: "alice"})
+
+	runStart := time.Now()
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:               []*github.PullRequest{openPR},
+			PRsByNumber:       map[int]*github.PullRequest{1: openPR},
+			MockPreviousState: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+	runEnd := time.Now()
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	assertLastWrittenMessageGeneratedDuringTheRun(t, savedState.LastWrittenMessage, runStart, runEnd)
+	assertLastWrittenMessageEndsWithTheUpdateTimeFooterOfItsGeneratedAt(t, savedState.LastWrittenMessage)
+	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1623850245.000200"}
+	if savedState.MessageRef != expectedMessageRef {
+		t.Errorf("Expected the loaded message ref %+v, got %+v", expectedMessageRef, savedState.MessageRef)
+	}
+	if !slices.Equal(savedState.PullRequests, []models.PullRequestRef{stateRef(1)}) {
+		t.Errorf("Expected the loaded PR 1, got %+v", savedState.PullRequests)
+	}
+	if !savedState.MessagePostedAt.Equal(loadedState.MessagePostedAt) {
+		t.Errorf("Expected the loaded MessagePostedAt %v, got %v", loadedState.MessagePostedAt, savedState.MessagePostedAt)
+	}
+}
+
+const (
+	previousHeadingBlock          = `{"type":"header","text":{"type":"plain_text","text":"👀 Waiting for review","emoji":true},"block_id":"heading_waiting_for_review","level":2}`
+	previousRowsBlock             = `{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/test-org/test-repo/pull/7","text":"Listed yesterday","style":{"bold":true}}]}],"style":"bullet","indent":0,"border":0,"offset":0}]}`
+	previousUpdateTimeFooterBlock = `{"type":"context","block_id":"update_time_footer","elements":[{"type":"mrkdwn","text":"_Live, updated \u003c!date^1788253200^{time}|09:00 UTC\u003e_"}]}`
+)
+
+func previousStateInThisChannelEditedByAnUpdateRun() state.State {
+	previousState := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
+	previousState.MessageRef = state.SlackRef{ChannelID: "C12345678", MessageTS: "1788253200.000100"}
+	previousState.LastWrittenMessage = state.LastWrittenMessage{
+		Blocks:      []byte("[" + previousHeadingBlock + "," + previousRowsBlock + "," + previousUpdateTimeFooterBlock + "]"),
+		SummaryText: "3 open PRs are waiting for attention 👀",
+		GeneratedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+	}
+	return previousState
+}
+
+type postOverPreviousStateOptions struct {
+	previousState      *state.State
+	listArtifactsError error
+	updateMessageError error
+	postMessageError   error
+	nothingToSend      bool
+}
+
+type postOverPreviousStateResult struct {
+	runErr                  error
+	mockSlackAPI            *mockslackclient.MockSlackAPI
+	stateFilePath           string
+	sentSlackBlocksFilePath string
+}
+
+func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOptions) postOverPreviousStateResult {
+	t.Helper()
+	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+		UpdateMessageError: options.updateMessageError,
+		PostMessageError:   options.postMessageError,
+	})
+	openPRs := []*github.PullRequest{
+		getTestPR(GetTestPROptions{Number: 8, Title: "Opened today", AuthorLogin: "alice"}),
+	}
+	if options.nothingToSend {
+		openPRs = nil
+	}
+
+	runErr := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:                openPRs,
+			MockPreviousState:  options.previousState,
+			ListArtifactsError: options.listArtifactsError,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	return postOverPreviousStateResult{
+		runErr:                  runErr,
+		mockSlackAPI:            mockSlackAPI,
+		stateFilePath:           overrides[config.EnvStateFilePath].(string),
+		sentSlackBlocksFilePath: sentSlackBlocksFilePath,
+	}
+}
+
+func assertNewPostStateSaved(t *testing.T, stateFilePath string) {
+	t.Helper()
+	savedState := loadSavedState(t, stateFilePath)
+	expectedMessageRef := state.SlackRef{ChannelID: "C12345678", MessageTS: "1234567890.123456"}
+	if savedState.MessageRef != expectedMessageRef {
+		t.Errorf("Expected the new message ref %+v, got %+v", expectedMessageRef, savedState.MessageRef)
+	}
+	if savedState.LastWrittenMessage.SummaryText != "1 open PR is waiting for attention 👀" {
+		t.Errorf("Expected the new message's summary text, got %q", savedState.LastWrittenMessage.SummaryText)
+	}
+}
+
+func assertSentBlocksRecordTheNewMessageOnly(t *testing.T, sentSlackBlocksFilePath string) {
+	t.Helper()
+	sentBlocks, err := os.ReadFile(sentSlackBlocksFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read sent Slack blocks: %v", err)
+	}
+	if !strings.Contains(string(sentBlocks), "Opened today") || strings.Contains(string(sentBlocks), "Stale") {
+		t.Errorf("Expected the sent-blocks record to hold the new message only, got:\n%s", sentBlocks)
+	}
+}
+
+func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+
+	result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{previousState: &previousState})
+
+	if result.runErr != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+	}
+	markAsStaleEdit := result.mockSlackAPI.UpdatedMessage
+	if markAsStaleEdit.ChannelID != "C12345678" || markAsStaleEdit.Timestamp != "1788253200.000100" {
+		t.Errorf(
+			"Expected the edit on C12345678 at 1788253200.000100, got %s at %s",
+			markAsStaleEdit.ChannelID, markAsStaleEdit.Timestamp,
+		)
+	}
+	if markAsStaleEdit.Text != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the stored summary text, got %q", markAsStaleEdit.Text)
+	}
+	// The snapshots normalise the staleness warning's time, so only this pins that time to the
+	// stored GeneratedAt, not the clock
+	storedTimeInStalenessWarning := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
+	if strings.Count(string(markAsStaleEdit.BlocksAsSent), storedTimeInStalenessWarning) != 1 {
+		t.Errorf("Expected the staleness warning alone to show %s, got\n%s", storedTimeInStalenessWarning, markAsStaleEdit.BlocksAsSent)
+	}
+	assertNewPostStateSaved(t, result.stateFilePath)
+	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+}
+
+func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+
+	t.Run("the send fails", func(t *testing.T) {
+		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
+			previousState:    &previousState,
+			postMessageError: errors.New("invalid_auth"),
+		})
+
+		if result.runErr == nil || !strings.Contains(result.runErr.Error(), "invalid_auth") {
+			t.Fatalf("Expected Run to fail with the send error, got %v", result.runErr)
+		}
+		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
+			t.Errorf("Expected no mark-as-stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+		}
+	})
+
+	t.Run("there is nothing to send", func(t *testing.T) {
+		result := runPostModeOverPreviousState(t, postOverPreviousStateOptions{
+			previousState: &previousState,
+			nothingToSend: true,
+		})
+
+		if result.runErr != nil {
+			t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+		}
+		if result.mockSlackAPI.SentMessage.ChannelID != "" {
+			t.Fatalf("Expected nothing sent, got %+v", result.mockSlackAPI.SentMessage)
+		}
+		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
+			t.Errorf("Expected no mark-as-stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+		}
+	})
+}
+
+func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
+	previousStateWithoutLastWrittenMessage := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateOfASetupInAnotherChannel := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateOfASetupInAnotherChannel.MessageRef.ChannelID = "C0OTHERCHANNEL"
+
+	testCases := []struct {
+		name    string
+		options postOverPreviousStateOptions
+	}{
+		{
+			name:    "the previous state does not load",
+			options: postOverPreviousStateOptions{listArtifactsError: errors.New("artifact listing error")},
+		},
+		{
+			name:    "the previous message is in another channel",
+			options: postOverPreviousStateOptions{previousState: &previousStateOfASetupInAnotherChannel},
+		},
+		{
+			name:    "the previous state predates the last written message",
+			options: postOverPreviousStateOptions{previousState: &previousStateWithoutLastWrittenMessage},
+		},
+		{
+			name: "message_not_found",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "message_not_found"},
+			},
+		},
+		{
+			name: "cant_update_message",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "cant_update_message"},
+			},
+		},
+		{
+			name: "edit_window_closed",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "edit_window_closed"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runPostModeOverPreviousState(t, tc.options)
+
+			if result.runErr != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
+			}
+			if markAsStaleEdit := result.mockSlackAPI.UpdatedMessage; markAsStaleEdit.ChannelID != "" {
+				t.Errorf("Expected no mark-as-stale edit, got one on %s at %s", markAsStaleEdit.ChannelID, markAsStaleEdit.Timestamp)
+			}
+			assertNewPostStateSaved(t, result.stateFilePath)
+			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+		})
+	}
+}
+
+func TestPostModeFailsTheRunOnAMarkAsStaleEditErrorButSavesTheNewState(t *testing.T) {
+	previousState := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateWithUnbuildableBlocks := previousStateInThisChannelEditedByAnUpdateRun()
+	previousStateWithUnbuildableBlocks.LastWrittenMessage.Blocks = []byte(
+		`[{"text":"no type"},` + previousUpdateTimeFooterBlock + `]`,
+	)
+
+	testCases := []struct {
+		name                  string
+		options               postOverPreviousStateOptions
+		expectedErrorFragment string
+	}{
+		{
+			name: "another Slack error",
+			options: postOverPreviousStateOptions{
+				previousState:      &previousState,
+				updateMessageError: slack.SlackErrorResponse{Err: "channel_not_found"},
+			},
+			expectedErrorFragment: "channel_not_found",
+		},
+		{
+			name:                  "stored blocks that do not rebuild",
+			options:               postOverPreviousStateOptions{previousState: &previousStateWithUnbuildableBlocks},
+			expectedErrorFragment: "block missing required 'type' field",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runPostModeOverPreviousState(t, tc.options)
+
+			if result.runErr == nil || !strings.Contains(result.runErr.Error(), tc.expectedErrorFragment) {
+				t.Fatalf("Expected Run to fail with %q, got %v", tc.expectedErrorFragment, result.runErr)
+			}
+			assertNewPostStateSaved(t, result.stateFilePath)
+			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+		})
+	}
+}
+
 func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 	testCases := []struct {
-		name              string
-		configOverrides   map[string]any
-		prNumbersInState  []int
-		prByNumber        map[int]*github.PullRequest
-		listArtifactError error
-		expectStateSaved  bool
+		name                 string
+		configOverrides      map[string]any
+		prNumbersInState     []int
+		prByNumber           map[int]*github.PullRequest
+		openPRs              []*github.PullRequest
+		mergedPRsSearchError error
+		updateMessageError   error
+		listArtifactError    error
+		expectRunError       bool
+		expectStateSaved     bool
 	}{
 		{
 			name:             "message deleted because all PRs are gone",
@@ -923,6 +1258,29 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			expectStateSaved: true,
 		},
 		{
+			name:             "message kept because the merged PR fetch failed",
+			configOverrides:  map[string]any{config.InputGlobalFilters: "{\"ignored-authors\": [\"alice\"]}"},
+			prNumbersInState: []int{1},
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Filtered out PR", AuthorLogin: "alice"}),
+			},
+			mergedPRsSearchError: errors.New("search failed"),
+			expectStateSaved:     true,
+		},
+		{
+			name:             "message edit fails",
+			prNumbersInState: []int{1},
+			prByNumber: map[int]*github.PullRequest{
+				1: getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+			},
+			openPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+			},
+			updateMessageError: errors.New("cant_update_message"),
+			expectRunError:     true,
+			expectStateSaved:   true,
+		},
+		{
 			name:             "loaded state has no PRs",
 			prNumbersInState: []int{},
 			expectStateSaved: true,
@@ -931,6 +1289,7 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			name:              "state load fails",
 			prNumbersInState:  []int{1},
 			listArtifactError: errors.New("artifact listing error"),
+			expectRunError:    true,
 			expectStateSaved:  false,
 		},
 	}
@@ -945,28 +1304,40 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			maps.Copy(overrides, tc.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 			loadedState := getTestState(GetTestStateOptions{PRNumbers: tc.prNumbersInState})
+			loadedState.LastWrittenMessage = seededLastWrittenMessage
 
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-					PRsByNumber:            tc.prByNumber,
-					MockStateForUpdateMode: &loadedState,
-					ListArtifactsError:     tc.listArtifactError,
+					PRsByNumber:          tc.prByNumber,
+					PRs:                  tc.openPRs,
+					MergedPRsSearchError: tc.mergedPRsSearchError,
+					MockPreviousState:    &loadedState,
+					ListArtifactsError:   tc.listArtifactError,
 				}),
 				mockslackclient.MakeSlackClientGetter(
-					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
+						UpdateMessageError: tc.updateMessageError,
+					}),
 				),
 			)
 
-			if tc.listArtifactError == nil && err != nil {
+			if !tc.expectRunError && err != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", err)
 			}
+			if tc.expectRunError && err == nil {
+				t.Fatal("Expected Run to fail, got no error")
+			}
 			_, statErr := os.Stat(stateFilePath)
-			if tc.expectStateSaved && statErr != nil {
-				t.Errorf("Expected the state file to be saved: %v", statErr)
+			if !tc.expectStateSaved {
+				if !os.IsNotExist(statErr) {
+					t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+				}
+				return
 			}
-			if !tc.expectStateSaved && !os.IsNotExist(statErr) {
-				t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+			if statErr != nil {
+				t.Fatalf("Expected the state file to be saved: %v", statErr)
 			}
+			assertLastWrittenMessageIsTheSeededOne(t, loadSavedState(t, stateFilePath).LastWrittenMessage)
 		})
 	}
 }
@@ -1341,14 +1712,14 @@ func TestScenariosUpdateMode(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRsByNumber:            tc.prByNumber,
-				PRs:                    openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
-				MergedPRs:              tc.mergedPRsFromSearch,
-				MergedPRsSearchError:   tc.mergedPRsSearchError,
-				ReviewsByPRNumber:      tc.reviewsByPRNumber,
-				MockStateForUpdateMode: tc.mockState,
-				ListArtifactsError:     tc.listArtifactsError,
-				DownloadArtifactError:  tc.downloadArtifactError,
+				PRsByNumber:           tc.prByNumber,
+				PRs:                   openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:             tc.mergedPRsFromSearch,
+				MergedPRsSearchError:  tc.mergedPRsSearchError,
+				ReviewsByPRNumber:     tc.reviewsByPRNumber,
+				MockPreviousState:     tc.mockState,
+				ListArtifactsError:    tc.listArtifactsError,
+				DownloadArtifactError: tc.downloadArtifactError,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
 				UpdateMessageError: tc.updateMessageError,
@@ -1443,8 +1814,8 @@ func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
 				Number: 3, Title: "Merged PR", AuthorLogin: "carol", MergedHoursAgo: 2,
 			})},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1493,9 +1864,9 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenTheStatePRsAreStillOpen(t *testing.
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    []*github.PullRequest{openPR1, openPR2},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			PRs:               []*github.PullRequest{openPR1, openPR2},
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1523,10 +1894,10 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenAStatePRMergedInsideTheWindow(t *te
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			PRs:                    []*github.PullRequest{getTestPR(GetTestPROptions{Number: 9, Title: "Open PR"})},
-			MergedPRs:              []*github.PullRequest{mergedStatePR},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			PRs:               []*github.PullRequest{getTestPR(GetTestPROptions{Number: 9, Title: "Open PR"})},
+			MergedPRs:         []*github.PullRequest{mergedStatePR},
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1563,8 +1934,8 @@ func TestUpdateModeFetchesOnlyTheStatePRsNeitherFetchResolved(t *testing.T) {
 			ReviewsByPRNumber: map[int][]*github.PullRequestReview{
 				2: {mockgithubclient.NewReview("dana", "Dana", "APPROVED")},
 			},
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1608,9 +1979,9 @@ func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *tes
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			MergedPRs:              append([]*github.PullRequest{mergedStatePR}, newerMerges...),
-			MockStateForUpdateMode: &loadedState,
-			Recording:              &recording,
+			MergedPRs:         append([]*github.PullRequest{mergedStatePR}, newerMerges...),
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1651,8 +2022,8 @@ func TestUpdateModeShowsEveryPRMergedSinceThePost(t *testing.T) {
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			MergedPRs:              mergesSincePost,
-			MockStateForUpdateMode: &loadedState,
+			MergedPRs:         mergesSincePost,
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1682,8 +2053,8 @@ func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
 			PRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR not in state", AuthorLogin: "alice"}),
 			},
-			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
-			MockStateForUpdateMode: &loadedState,
+			ErrByPRNumber:     map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)
@@ -1707,8 +2078,8 @@ func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-			ErrByPRNumber:          map[int]error{2: errors.New("tracked PR fetch failed")},
-			MockStateForUpdateMode: &loadedState,
+			ErrByPRNumber:     map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)

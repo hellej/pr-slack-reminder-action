@@ -99,7 +99,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - [docs/third-party-facts.md](docs/third-party-facts.md) records what past work confirmed about external APIs and libraries, each entry with its source
 - Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
 - Add to it whenever you confirm such a fact, or rule an approach out
-- Cite the source an entry names, never the entry
+- Plans and code may cite an entry by its heading, e.g. `See docs/third-party-facts.md § <heading>`, or the source it names
 
 ## Git
 
@@ -113,7 +113,9 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - **Readability > Speed:** Data sets are tiny; never trade clarity for execution speed or micro-optimizations.
 - **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
 - **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
+  - Name a UI element by what it shows: `updateTimeFooter`, not `liveFooter`. Don't put an adjective before a noun it doesn't describe: the edit marking a message stale is a `markAsStaleEdit`, not a `staleEdit`
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
+  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// Kept for the next post's mark-as-stale edit. See state.spec.md § Oddities`
 - **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
@@ -124,6 +126,11 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
 - Use table-driven tests for functions with multiple input scenarios
+- Coverage counts across the whole suite, not per package
+  - Snapshot anything a user sees in Slack or on the canvas, whenever feasible
+  - Use `main_test.go` integration tests for behaviour a snapshot can't show, such as what gets saved, skipped or failed
+  - Add a package test only for what neither reaches cheaply, such as limits and error mapping
+  - Don't repeat a case a broader test already pins, so internals stay free to refactor
 - Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go` — integration tests using full pipeline with mocks
@@ -134,7 +141,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - `make test` — run all tests
 - `make test-with-coverage` — run tests with coverage report (clears cache first)
-- `make update-test-snapshots` — re-record the Slack payload snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
+- `make update-test-snapshots` — re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run` — run locally (requires env vars, see Makefile for the pattern)
 - `make build` — build linux binaries
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` — try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
@@ -148,7 +155,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Architecture
 
-Two run modes (`run-mode` input): **post** sends a new reminder and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
+Two run modes (`run-mode` input): **post** sends a new reminder, marks the previous one stale, and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
 1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
@@ -156,7 +163,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder and saves state;
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
 6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages
-7. **State** (`internal/state/`) — persists PR refs and the Slack message ref after `post`; loaded from a GitHub Actions artifact in `update` mode
+7. **State** (`internal/state/`) — persists PR refs, the Slack message ref and the last written message after `post`; loaded from a GitHub Actions artifact in both modes
 
 ## Key Patterns
 

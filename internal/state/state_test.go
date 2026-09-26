@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
-	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
@@ -46,9 +45,9 @@ func setupReadOnlyDir(t *testing.T) string {
 
 func createTestState() State {
 	return State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -72,9 +71,9 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 	statePath := filepath.Join(tempDir, "state.json")
 
 	originalState := State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -99,16 +98,16 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, originalState.SchemaVersion)
 	}
 
-	if !loadedState.CreatedAt.Equal(originalState.CreatedAt) {
-		t.Errorf("CreatedAt mismatch: got %v, want %v", loadedState.CreatedAt, originalState.CreatedAt)
+	if !loadedState.MessagePostedAt.Equal(originalState.MessagePostedAt) {
+		t.Errorf("MessagePostedAt mismatch: got %v, want %v", loadedState.MessagePostedAt, originalState.MessagePostedAt)
 	}
 
-	if loadedState.SlackMessage.ChannelID != originalState.SlackMessage.ChannelID {
-		t.Errorf("SlackMessage.ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, originalState.SlackMessage.ChannelID)
+	if loadedState.MessageRef.ChannelID != originalState.MessageRef.ChannelID {
+		t.Errorf("MessageRef.ChannelID mismatch: got %s, want %s", loadedState.MessageRef.ChannelID, originalState.MessageRef.ChannelID)
 	}
 
-	if loadedState.SlackMessage.MessageTS != originalState.SlackMessage.MessageTS {
-		t.Errorf("SlackMessage.MessageTS mismatch: got %s, want %s", loadedState.SlackMessage.MessageTS, originalState.SlackMessage.MessageTS)
+	if loadedState.MessageRef.MessageTS != originalState.MessageRef.MessageTS {
+		t.Errorf("MessageRef.MessageTS mismatch: got %s, want %s", loadedState.MessageRef.MessageTS, originalState.MessageRef.MessageTS)
 	}
 
 	if len(loadedState.PullRequests) != len(originalState.PullRequests) {
@@ -156,91 +155,32 @@ func TestLoadInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSaveSentSlackBlocksToFileProperJSON(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "sent-blocks.json")
+// Empty blocks mean the info did not come from a send. An empty record would hide that.
+func TestSaveSentSlackBlocksToFileRejectsEmptyBlocks(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "empty-blocks.json")
 
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"no_open_prs","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"No open PRs, happy coding! 🎉"}]}]}`,
-		`{"type":"rich_text","block_id":"section_waiting_for_review","elements":[{"type":"rich_text_list","elements":[{"type":"rich_text_section","elements":[{"type":"link","url":"https://github.com/owner/repo/pull/1","text":"Test PR","style":{"bold":true}}]}],"style":"bullet"}]}`,
+	err := SaveSentSlackBlocksToFile(filePath, nil)
+	if err == nil {
+		t.Fatal("Expected error when saving empty blocks, got nil")
 	}
-
-	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
-	if err != nil {
-		t.Fatalf("SaveSentSlackBlocksToFile failed: %v", err)
+	if !strings.Contains(err.Error(), "failed to indent sent blocks") {
+		t.Errorf("Expected JSON indent error, got: %v", err)
 	}
-
-	fileContent, err := os.ReadFile(filePath)
-	if err != nil {
-		t.Fatalf("Failed to read saved file: %v", err)
-	}
-
-	var savedBlocks []map[string]interface{}
-	err = json.Unmarshal(fileContent, &savedBlocks)
-	if err != nil {
-		t.Fatalf("Saved file contains invalid JSON: %v", err)
-	}
-
-	if len(savedBlocks) != 2 {
-		t.Errorf("Expected 2 blocks, got %d", len(savedBlocks))
-	}
-
-	// Verify the content doesn't contain escaped quotes (common sign of double-encoding)
-	contentStr := string(fileContent)
-	if strings.Contains(contentStr, `\"type\"`) {
-		t.Error("Saved JSON contains escaped quotes, indicating double-encoding")
-	}
-
-	if len(savedBlocks) > 0 {
-		if savedBlocks[0]["type"] != "rich_text" {
-			t.Errorf("Expected first block type to be 'rich_text', got %v", savedBlocks[0]["type"])
-		}
-		if savedBlocks[0]["block_id"] != "no_open_prs" {
-			t.Errorf("Expected first block_id to be 'no_open_prs', got %v", savedBlocks[0]["block_id"])
-		}
-	}
-}
-
-func TestSaveSentSlackBlocksToFileEmptySlice(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "empty-blocks.json")
-
-	err := SaveSentSlackBlocksToFile(filePath, []string{})
-	if err != nil {
-		t.Fatalf("SaveSentSlackBlocksToFile failed with empty slice: %v", err)
-	}
-
-	fileContent, err := os.ReadFile(filePath)
-	if err != nil {
-		t.Fatalf("Failed to read saved file: %v", err)
-	}
-
-	var savedBlocks []map[string]interface{}
-	err = json.Unmarshal(fileContent, &savedBlocks)
-	if err != nil {
-		t.Fatalf("Saved file contains invalid JSON: %v", err)
-	}
-
-	if len(savedBlocks) != 0 {
-		t.Errorf("Expected empty array, got %d items", len(savedBlocks))
+	if _, statErr := os.Stat(filePath); !os.IsNotExist(statErr) {
+		t.Errorf("Expected no file written, stat returned: %v", statErr)
 	}
 }
 
 func TestSaveSentSlackBlocksToFileInvalidJSON(t *testing.T) {
-	tempDir := t.TempDir()
-	filePath := filepath.Join(tempDir, "invalid-blocks.json")
+	filePath := filepath.Join(t.TempDir(), "invalid-blocks.json")
 
-	invalidJSON := []string{
-		`{"type":"rich_text",`, // Incomplete JSON
-	}
-
-	err := SaveSentSlackBlocksToFile(filePath, invalidJSON)
+	err := SaveSentSlackBlocksToFile(filePath, json.RawMessage(`[{"type":"rich_text",`))
 	if err == nil {
 		t.Fatal("Expected error when saving invalid JSON, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "failed to parse block") {
-		t.Errorf("Expected JSON parse error, got: %v", err)
+	if !strings.Contains(err.Error(), "failed to indent sent blocks") {
+		t.Errorf("Expected JSON indent error, got: %v", err)
 	}
 }
 
@@ -262,9 +202,7 @@ func TestSaveDirectoryCreationFailure(t *testing.T) {
 func TestSaveSentSlackBlocksToFileDirectoryCreationFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "nested", "blocks.json")
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"test"}`,
-	}
+	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
 
 	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
@@ -294,9 +232,7 @@ func TestSaveFileWriteFailure(t *testing.T) {
 func TestSaveSentSlackBlocksToFileFileWriteFailure(t *testing.T) {
 	readOnlyDir := setupReadOnlyDir(t)
 	filePath := filepath.Join(readOnlyDir, "blocks.json")
-	slackBlocksJSON := []string{
-		`{"type":"rich_text","block_id":"test"}`,
-	}
+	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
 
 	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
 	if err == nil {
@@ -332,9 +268,9 @@ func (m *mockStateArtifactFetcher) FetchLatestArtifactByName(
 
 func TestLoadSuccessful(t *testing.T) {
 	expectedState := &State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -356,8 +292,8 @@ func TestLoadSuccessful(t *testing.T) {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, expectedState.SchemaVersion)
 	}
 
-	if loadedState.SlackMessage.ChannelID != expectedState.SlackMessage.ChannelID {
-		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, expectedState.SlackMessage.ChannelID)
+	if loadedState.MessageRef.ChannelID != expectedState.MessageRef.ChannelID {
+		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.MessageRef.ChannelID, expectedState.MessageRef.ChannelID)
 	}
 
 	if len(loadedState.PullRequests) != len(expectedState.PullRequests) {
@@ -380,64 +316,6 @@ func TestLoadFetchError(t *testing.T) {
 	}
 }
 
-func TestNewPostStateSaveAndLoad(t *testing.T) {
-	tempDir := t.TempDir()
-	statePath := filepath.Join(tempDir, "post-state.json")
-
-	prViews := []prview.PR{
-		createTestPR(1, "owner1", "repo1"),
-		createTestPR(42, "owner2", "repo2"),
-	}
-
-	messageInfo := slackclient.SentMessageInfo{
-		ChannelID: "C123456789",
-		Timestamp: "1729123456.123456",
-	}
-
-	if err := Save(statePath, NewPostState(prViews, messageInfo)); err != nil {
-		t.Fatalf("Save failed: %v", err)
-	}
-
-	loadedState, err := LoadFromFile(statePath)
-	if err != nil {
-		t.Fatalf("Failed to load saved state: %v", err)
-	}
-
-	if loadedState.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, CurrentSchemaVersion)
-	}
-
-	if loadedState.CreatedAt.IsZero() {
-		t.Error("Expected CreatedAt to be stamped")
-	}
-
-	if loadedState.SlackMessage.ChannelID != messageInfo.ChannelID {
-		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, messageInfo.ChannelID)
-	}
-
-	if loadedState.SlackMessage.MessageTS != messageInfo.Timestamp {
-		t.Errorf("MessageTS mismatch: got %s, want %s", loadedState.SlackMessage.MessageTS, messageInfo.Timestamp)
-	}
-
-	if len(loadedState.PullRequests) != 2 {
-		t.Errorf("Expected 2 PRs, got %d", len(loadedState.PullRequests))
-	}
-
-	if len(loadedState.PullRequests) >= 1 {
-		pr := loadedState.PullRequests[0]
-		if pr.Number != 1 || pr.Repository.Owner != "owner1" || pr.Repository.Name != "repo1" {
-			t.Errorf("PR 0 mismatch: got %+v", pr)
-		}
-	}
-
-	if len(loadedState.PullRequests) >= 2 {
-		pr := loadedState.PullRequests[1]
-		if pr.Number != 42 || pr.Repository.Owner != "owner2" || pr.Repository.Name != "repo2" {
-			t.Errorf("PR 1 mismatch: got %+v", pr)
-		}
-	}
-}
-
 func TestPRToPullRequestRef(t *testing.T) {
 	pr := createTestPR(123, "test-owner", "test-repo")
 
@@ -453,5 +331,48 @@ func TestPRToPullRequestRef(t *testing.T) {
 
 	if ref.Repository.Name != "test-repo" {
 		t.Errorf("Expected Name to be 'test-repo', got %s", ref.Repository.Name)
+	}
+}
+
+func TestStateDecodesTheLegacyMessageKeysWhenTheNewOnesAreAbsent(t *testing.T) {
+	tests := []struct {
+		name                    string
+		stateJSON               string
+		expectedMessagePostedAt time.Time
+		expectedMessageRef      SlackRef
+	}{
+		{
+			name: "legacy keys only",
+			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"}}`,
+			expectedMessagePostedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+			expectedMessageRef:      SlackRef{ChannelID: "C-LEGACY", MessageTS: "1788253200.000100"},
+		},
+		{
+			name: "new keys win over legacy ones",
+			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"},` +
+				`"messagePostedAt":"2026-09-02T09:00:00Z",` +
+				`"messageRef":{"channelId":"C-NEW","messageTs":"1788339600.000200"}}`,
+			expectedMessagePostedAt: time.Date(2026, 9, 2, 9, 0, 0, 0, time.UTC),
+			expectedMessageRef:      SlackRef{ChannelID: "C-NEW", MessageTS: "1788339600.000200"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var decoded State
+			if err := json.Unmarshal([]byte(tt.stateJSON), &decoded); err != nil {
+				t.Fatalf("Unmarshal failed: %v", err)
+			}
+			if !decoded.MessagePostedAt.Equal(tt.expectedMessagePostedAt) {
+				t.Errorf("MessagePostedAt: got %v, want %v", decoded.MessagePostedAt, tt.expectedMessagePostedAt)
+			}
+			if decoded.MessageRef != tt.expectedMessageRef {
+				t.Errorf("MessageRef: got %+v, want %+v", decoded.MessageRef, tt.expectedMessageRef)
+			}
+			if decoded.SchemaVersion != 1 {
+				t.Errorf("SchemaVersion: got %d, want 1", decoded.SchemaVersion)
+			}
+		})
 	}
 }

@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews uncommitted changes in this repo against the task and the mandatory TDD/spec-sync rules. Use after an implementer sub-agent finishes a step, or before committing a change.
+description: Reviews changes in this repo against the task and the mandatory TDD/spec-sync rules. Use after an implementer sub-agent finishes a plan or a checkpoint, or before committing a change.
 model: opus
 effort: high
 disallowedTools: [Edit, Write, NotebookEdit]
@@ -9,9 +9,11 @@ skills: [coding, writing]
 
 You review code changes in this Go repo. You do not fix them. The implementer does.
 
-Review the working tree diff, including untracked files. Another agent may have unrelated
-work in the same tree, so review only the files this change touched, per the task and the
-implementer's report. Check it against:
+A final review covers the whole branch against its base, committed and uncommitted:
+`git diff <base>...` plus the working tree, untracked files included. A checkpoint review
+covers the working tree only. Another agent may have unrelated work in the same tree, so
+review only the files this change touched, per the task and the implementer's report.
+Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
@@ -20,17 +22,25 @@ implementer's report. Check it against:
 - AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
   docstrings. A clause restating its own rule as its reason, or a stacked hedge, is a
   `nit`
-- Every comment the change added: does it state something the code cannot? Name the ones
-  that restate the code, and say what to rename so the comment can go. A comment decoding
-  an expression means the expression is the finding, not the comment. Read the comment
-  against the code it sits on, never on its own: a well-written comment that only repeats
-  its function body still earns a `nit`
+- Every comment the change added, production and test code, each with a verdict: keep, or
+  what to rename or refactor so it can go. List them all, never a sample
+  - A comment is kept only for what no name or code shape can say: an external fact, such
+    as an API's behaviour or a measured limit, or why a decision went one way
+  - Otherwise the finding is the code: the clearer name for a func, field, fixture or test
+    case, the extracted helper, or the expression written the other way round that makes
+    the comment unnecessary
+  - A kept comment whose fact the package's `.spec.md` already states shrinks to at most
+    one short line of the fact plus a pointer, such as `// See state.spec.md § Oddities`
+  - Read each comment against the code it sits on, never on its own
+  - Each such finding is `medium`: it breaks AGENTS.md Code Style
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
   `internal/utilities` (`Map`, `Filter`, `Find`), and layers the change now makes
   collapsible
-- The task or plan step the change came from: does it do what was asked, and no more
+- The task or plan the change came from: does it do what was asked, and no more. At a
+  checkpoint review, skip dead code, the comment list, and spec and plan consistency: the
+  final review runs them
 - The plan file's own diff, when the change came from a committed plan file. Does the
   rewritten step stay inside its original intent and scope, and describe what the code
   does? Code deviating from the step with no matching plan edit is a finding, and so is a
@@ -61,8 +71,8 @@ Pick the targets yourself, and spend them where the tests are the only net:
 
 Code an unchanged golden file still covers has a net already. Read those tests instead.
 
-Three or four mutants is the budget. A pure refactor needs none. Past four, name in the
-report what each extra one was worth.
+The budget is about one mutant per behaviour the change adds or alters, three at least. A
+pure refactor needs none. Past the budget, name in the report what each extra one was worth.
 
 A brief listing blind spots gives you candidates, not a checklist. The budget still
 applies, and choosing among them is yours.
@@ -129,6 +139,7 @@ Report back:
   Otherwise `PASS`, even with nits open
 - Then each finding: `Fix (high|medium|nit)` or `Document`, `file:line`, what is wrong,
   why it matters. Most severe first
+- The comment list: each added comment with its verdict
 - One line on what you mutated, and how many survived. When you mutated in place, that
   the tree is restored
 - Nothing else. No praise, no summary of what the code does

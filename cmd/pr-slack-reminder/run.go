@@ -63,7 +63,7 @@ func Run(
 	switch cfg.RunMode {
 	case config.RunModePost:
 		stateToSave, messageErr = runPostMode(
-			slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
+			githubClient, slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		stateToSave, messageErr = runUpdateMode(
@@ -74,20 +74,20 @@ func Run(
 		return fmt.Errorf("unsupported run mode: %s", cfg.RunMode)
 	}
 
-	var canvasContentHash string
+	var lastWrittenCanvasMarkdownHash string
 	if stateToSave != nil {
-		canvasContentHash = stateToSave.CanvasContentHash
+		lastWrittenCanvasMarkdownHash = stateToSave.LastWrittenCanvasMarkdownHash
 	}
 	if cfg.CanvasEnabled() {
-		canvasContentHash, canvasErr = refreshPRTrackerCanvas(
-			slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt, canvasContentHash,
+		lastWrittenCanvasMarkdownHash, canvasErr = refreshPRTrackerCanvas(
+			slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt, lastWrittenCanvasMarkdownHash,
 		)
 	}
 	if canvasErr != nil {
 		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
 	}
 	if stateToSave != nil {
-		stateToSave.CanvasContentHash = canvasContentHash
+		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
 	}
 	return errors.Join(messageErr, canvasErr, stateErr)
@@ -95,6 +95,7 @@ func Run(
 
 // Returns a nil state when there is nothing to send, so callers write nothing.
 func runPostMode(
+	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
 	openPRs githubclient.OpenPRsResult,
@@ -115,15 +116,71 @@ func runPostMode(
 		log.Println("No PRs found and no-prs-message is set to empty, exiting")
 		return nil, nil
 	}
-	message, summaryText := messagebuilder.BuildMessage(content)
+	message, summaryText := messagebuilder.BuildMessageToPost(content)
 
 	sentMessageInfo, err := slackClient.SendMessage(cfg.SlackChannelID, message, summaryText)
 	if err != nil {
 		return nil, err
 	}
 
-	postState := state.NewPostState(prViews, sentMessageInfo)
-	return &postState, sentMessageHandler(sentMessageInfo)
+	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt)
+	return &postState, errors.Join(
+		sentMessageHandler(sentMessageInfo),
+		markPreviousMessageStale(githubClient, slackClient, cfg, sentMessageInfo.ChannelID),
+	)
+}
+
+// This run's own state is uploaded after it ends, so the load still finds the previous post's.
+// Channel check: see run.spec.md § Behaviour.
+func markPreviousMessageStale(
+	githubClient githubclient.Client,
+	slackClient slackclient.Client,
+	cfg config.Config,
+	newMessageChannelID string,
+) error {
+	previousState, err := state.Load(
+		context.Background(),
+		githubClient,
+		cfg.CurrentRepository,
+		cfg.StateArtifactName,
+		cfg.StateFilePath,
+	)
+	if err != nil {
+		log.Printf("Not marking the previous message stale, its state did not load: %v", err)
+		return nil
+	}
+	lastWrittenMessage := previousState.LastWrittenMessage
+	if len(lastWrittenMessage.Blocks) == 0 {
+		log.Println("Not marking the previous message stale, its state records no sent message")
+		return nil
+	}
+	if previousState.MessageRef.ChannelID != newMessageChannelID {
+		log.Printf(
+			"Not marking the previous message stale, it is in channel %s, not in %s where this run posted",
+			previousState.MessageRef.ChannelID, newMessageChannelID,
+		)
+		return nil
+	}
+
+	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(lastWrittenMessage.Blocks, lastWrittenMessage.GeneratedAt)
+	if err != nil {
+		return fmt.Errorf("failed to mark the previous message stale: %w", err)
+	}
+	_, err = slackClient.UpdateMessage(
+		previousState.MessageRef.ChannelID,
+		previousState.MessageRef.MessageTS,
+		messageMarkedStale,
+		lastWrittenMessage.SummaryText,
+	)
+	if errors.Is(err, slackclient.ErrMessageNotEditable) {
+		log.Printf("Not marking the previous message stale: %v", err)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to mark the previous message stale: %w", err)
+	}
+	log.Println("Marked the previous message stale")
+	return nil
 }
 
 func buildNonDraftPRViews(openPRs githubclient.OpenPRsResult, cfg config.Config) []prview.PR {
@@ -164,7 +221,7 @@ func runUpdateMode(
 		buildNonDraftPRViews(openPRs, cfg),
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
-		loadedState.CreatedAt,
+		loadedState.MessagePostedAt,
 		generatedAt,
 		cfg.ContentInputs,
 	)
@@ -177,8 +234,8 @@ func runUpdateMode(
 		log.Println("Nothing left to show: no open PRs and no merged ones")
 		log.Println("Deleting Slack message as no-prs-message is set to empty")
 		if err := slackClient.DeleteMessage(
-			loadedState.SlackMessage.ChannelID,
-			loadedState.SlackMessage.MessageTS,
+			loadedState.MessageRef.ChannelID,
+			loadedState.MessageRef.MessageTS,
 		); err != nil {
 			log.Printf("Warning: failed to delete message: %v", err)
 		}
@@ -188,18 +245,19 @@ func runUpdateMode(
 		log.Printf("Updating Slack message with no-prs-message: %s", content.NoOpenPRsText)
 	}
 
-	message, summaryText := messagebuilder.BuildMessage(content)
+	message, summaryText := messagebuilder.BuildMessageWithUpdateTimeFooter(content)
 
 	sentMessageInfo, err := slackClient.UpdateMessage(
-		loadedState.SlackMessage.ChannelID,
-		loadedState.SlackMessage.MessageTS,
+		loadedState.MessageRef.ChannelID,
+		loadedState.MessageRef.MessageTS,
 		message,
 		summaryText,
 	)
 	if err != nil {
 		return loadedState, err
 	}
-	return loadedState, sentMessageHandler(sentMessageInfo)
+	editedState := state.WithLastWrittenMessage(*loadedState, sentMessageInfo, summaryText, generatedAt)
+	return &editedState, sentMessageHandler(sentMessageInfo)
 }
 
 // Resolves each tracked PR ref the run's own open and merged fetches didn't already answer for.
@@ -272,7 +330,7 @@ func findRecentlyMergedPRs(
 func getSentMessageHandler(config config.Config) func(slackclient.SentMessageInfo) error {
 	return func(sentMessageInfo slackclient.SentMessageInfo) error {
 		if err := state.SaveSentSlackBlocksToFile(
-			config.SentSlackBlocksFilePath, sentMessageInfo.JSONBlocks,
+			config.SentSlackBlocksFilePath, sentMessageInfo.BlocksAsSent,
 		); err != nil {
 			return err
 		}

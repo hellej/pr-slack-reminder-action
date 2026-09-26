@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
+    "channelId": "C12345678",
+    "messageTs": "1234567890.123456"
+  },
+  "pullRequests": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "repo-two"
+      },
+      "number": 22
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "repo-two"
+      },
+      "number": 21
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "repo-one"
+      },
+      "number": 11
+    }
+  ],
+  "canvasContentHash": "",
+  "lastWrittenMessage": {
+    "blocks": [
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "👀 Waiting for review",
+          "emoji": true
+        },
+        "block_id": "heading_waiting_for_review",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_waiting_for_review_repository_1",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-two/pulls",
+                "text": "repo-two",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/repo-two/pull/22",
+                    "text": "Bump the Slack SDK",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 8 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Carol Clark",
+                    "style": {}
+                  }
+                ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/repo-two/pull/21",
+                    "text": "Fix the flaky reminder test",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 5 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Bob Brown",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": " "
+        }
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_waiting_for_review_repository_2",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-one/pulls",
+                "text": "repo-one",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/repo-one/pull/11",
+                    "text": "Add pagination to the PR listing",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 2 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Alice Anderson",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "summaryText": "3 open PRs are waiting for attention 👀",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  }
+}

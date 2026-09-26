@@ -1,6 +1,8 @@
 package messagebuilder_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -63,7 +65,7 @@ func blockIDs(blocks []slack.Block) []string {
 		case *slack.SectionBlock:
 			ids = append(ids, "spacing")
 		case *slack.ContextBlock:
-			ids = append(ids, "context")
+			ids = append(ids, typedBlock.BlockID)
 		default:
 			ids = append(ids, "unknown:"+string(block.BlockType()))
 		}
@@ -112,7 +114,7 @@ func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack
 }
 
 func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
-	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:      "2 open PRs are waiting for attention 👀",
 		WaitingForReview: messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})}},
 		Merged: messagecontent.PRSection{
@@ -123,7 +125,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 
 	assertBlockIDs(t, message, []string{
 		"heading_waiting_for_review", "section_waiting_for_review",
-		"heading_merged", "section_merged", "context",
+		"heading_merged", "section_merged",
 	})
 	for _, blockIndex := range []int{1, 3} {
 		if elements := richTextElements(t, message.Blocks.BlockSet[blockIndex]); len(elements) != 1 {
@@ -137,7 +139,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 
 func TestSectionHeadings(t *testing.T) {
 	onePR := messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "PR"})}}
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		ReadyToMerge:     onePR,
 		WaitingForAuthor: onePR,
 		WaitingForReview: onePR,
@@ -149,7 +151,7 @@ func TestSectionHeadings(t *testing.T) {
 		"heading_ready_to_merge", "section_ready_to_merge",
 		"heading_waiting_for_author", "section_waiting_for_author",
 		"heading_waiting_for_review", "section_waiting_for_review",
-		"heading_merged", "section_merged", "context",
+		"heading_merged", "section_merged",
 	})
 	expectedHeadings := []string{
 		"✅ Ready to merge", "💬 Waiting for author", "👀 Waiting for review", "🚀 Recently merged",
@@ -243,7 +245,7 @@ func groupedOverTwoRepositories() messagecontent.PRSection {
 }
 
 func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverTwoRepositories(),
 		GeneratedAt:         generatedAt,
@@ -254,7 +256,6 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 		"section_waiting_for_review_repository_1",
 		"spacing",
 		"section_waiting_for_review_repository_2",
-		"context",
 	})
 	sectionHeading := headerBlock(t, message.Blocks.BlockSet[0])
 	if sectionHeading.Text.Text != "👀 Waiting for review" {
@@ -275,7 +276,7 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 }
 
 func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
@@ -287,12 +288,12 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"heading_waiting_for_review", "section_waiting_for_review_repository_1", "context",
+		"heading_waiting_for_review", "section_waiting_for_review_repository_1",
 	})
 }
 
 func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		ReadyToMerge: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
@@ -312,7 +313,6 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		"section_waiting_for_review_repository_1",
 		"spacing",
 		"section_waiting_for_review_repository_2",
-		"context",
 	})
 	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
 	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one", "https://github.com/owner-one/repo-one/pulls")
@@ -326,7 +326,7 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 }
 
 func TestOpenPRRow(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Open PR", slackUserID: "U12345678"})},
 		},
@@ -351,7 +351,7 @@ func TestOpenPRRow(t *testing.T) {
 }
 
 func TestOldPRWarningMarker(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Old PR", isOldPR: true})},
 		},
@@ -373,7 +373,7 @@ func TestOldPRWarningMarker(t *testing.T) {
 }
 
 func TestAuthorFallsBackToGitHubName(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})},
 		},
@@ -392,7 +392,7 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 
 func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 	mergedAt := time.Now().Add(-2 * time.Hour)
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		Merged: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{
 				title: "Merged PR", mergedAt: &mergedAt, isOldPR: true, approvers: []string{"Dana Davis"},
@@ -427,7 +427,7 @@ func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 }
 
 func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		Merged:      messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
 		GeneratedAt: generatedAt,
 	})
@@ -439,7 +439,7 @@ func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
 }
 
 func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
-	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
 		Merged:        messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
@@ -447,7 +447,7 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"no_open_prs", "heading_merged", "section_merged", "context",
+		"no_open_prs", "heading_merged", "section_merged",
 	})
 	line := richTextElements(t, message.Blocks.BlockSet[0])[0].(*slack.RichTextSection)
 	if text := line.Elements[0].(*slack.RichTextSectionTextElement).Text; text != "All caught up! 🎉" {
@@ -458,23 +458,23 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	}
 }
 
-func TestMessageWithNothingToListIsTheNoOpenPRsLineAndTheFooter(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+func TestMessageWithNothingToListIsTheNoOpenPRsLineAlone(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
 		GeneratedAt:   generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"no_open_prs", "context"})
+	assertBlockIDs(t, message, []string{"no_open_prs"})
 }
 
-func TestFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+func TestUpdateTimeFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		SummaryText: "Nothing waiting for review 🎉",
 		GeneratedAt: generatedAt,
 	})
 
-	assertBlockIDs(t, message, []string{"context"})
+	assertBlockIDs(t, message, []string{"update_time_footer"})
 	footer := message.Blocks.BlockSet[0].(*slack.ContextBlock)
 	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject)
 	expected := "_Live, updated <!date^1789819920^{time}|12:12 UTC>_"
@@ -483,5 +483,78 @@ func TestFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.T) {
 	}
 	if text.Type != "mrkdwn" {
 		t.Errorf("expected an mrkdwn footer element, got %q", text.Type)
+	}
+}
+
+func groupedOverRepositories(count int) messagecontent.PRSection {
+	groups := make([]messagecontent.PRsOfRepository, count)
+	for index := range groups {
+		groups[index] = messagecontent.PRsOfRepository{
+			RepositoryName: fmt.Sprintf("repo-%d", index+1),
+			PRs:            []prview.PR{testPR(testPROptions{title: fmt.Sprintf("PR in repo %d", index+1)})},
+		}
+	}
+	return messagecontent.PRSection{Groups: groups}
+}
+
+const repositoriesBuildingSixtyContentBlocks = 30
+
+func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
+		GeneratedAt:         generatedAt,
+	})
+
+	blocks := message.Blocks.BlockSet
+	if len(blocks) != 50 {
+		t.Fatalf("expected 50 blocks, got %d", len(blocks))
+	}
+	ids := blockIDs(blocks)
+	if ids[47] != "section_waiting_for_review_repository_24" || ids[48] != "spacing" {
+		t.Errorf("expected the 24th repository and a spacing block before the footer, got %s and %s", ids[47], ids[48])
+	}
+	footer, isContextBlock := blocks[49].(*slack.ContextBlock)
+	if !isContextBlock {
+		t.Fatalf("expected the footer last, got %s", blocks[49].BlockType())
+	}
+	text := footer.ContextElements.Elements[0].(*slack.TextBlockObject).Text
+	if text != "_Live, updated <!date^1789819920^{time}|12:12 UTC>_" {
+		t.Errorf("expected the update-time footer last, got %q", text)
+	}
+}
+
+func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
+		GeneratedAt:         generatedAt,
+	})
+	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)
+	if err != nil {
+		t.Fatalf("Failed to marshal the posted message: %v", err)
+	}
+
+	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(sentBlocks, generatedAt)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	markedMessageBlocksJSON, err := json.Marshal(messageMarkedStale.Blocks.BlockSet)
+	if err != nil {
+		t.Fatalf("Failed to marshal the message marked stale: %v", err)
+	}
+	var markedMessageBlocks []struct {
+		Type    string `json:"type"`
+		BlockID string `json:"block_id"`
+	}
+	if err := json.Unmarshal(markedMessageBlocksJSON, &markedMessageBlocks); err != nil {
+		t.Fatalf("Failed to parse the message marked stale: %v", err)
+	}
+	if len(markedMessageBlocks) != 50 {
+		t.Fatalf("expected 50 blocks, got %d", len(markedMessageBlocks))
+	}
+	if markedMessageBlocks[48].BlockID != "section_waiting_for_review_repository_24" || markedMessageBlocks[49].Type != "section" {
+		t.Errorf("expected the 24th repository and a spacing block last, got %+v and %+v", markedMessageBlocks[48], markedMessageBlocks[49])
 	}
 }

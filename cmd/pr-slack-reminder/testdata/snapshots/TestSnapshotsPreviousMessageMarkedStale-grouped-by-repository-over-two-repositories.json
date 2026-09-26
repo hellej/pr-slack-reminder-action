@@ -1,81 +1,10 @@
 [
   {
-    "type": "header",
-    "text": {
-      "type": "plain_text",
-      "text": "✅ Ready to merge",
-      "emoji": true
-    },
-    "block_id": "heading_ready_to_merge",
-    "level": 2
-  },
-  {
-    "type": "rich_text",
-    "block_id": "section_ready_to_merge",
+    "type": "context",
     "elements": [
       {
-        "type": "rich_text_list",
-        "elements": [
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/31",
-                "text": "Refactor the review fetching",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 4 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Alice Anderson",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (✅ ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Dana Davis",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " / 💬 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Erin Evans",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
-          }
-        ],
-        "style": "bullet",
-        "indent": 0,
-        "border": 0,
-        "offset": 0
+        "type": "mrkdwn",
+        "text": "_⚠️ Stale, updated \u003c!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC\u003e_"
       }
     ]
   },
@@ -91,8 +20,21 @@
   },
   {
     "type": "rich_text",
-    "block_id": "section_waiting_for_review",
+    "block_id": "section_waiting_for_review_repository_1",
     "elements": [
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "link",
+            "url": "https://github.com/test-org/repo-two/pulls",
+            "text": "repo-two",
+            "style": {
+              "bold": true
+            }
+          }
+        ]
+      },
       {
         "type": "rich_text_list",
         "elements": [
@@ -101,15 +43,45 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/32",
-                "text": "PR whose only reviewer input is a timeline comment",
+                "url": "https://github.com/test-org/repo-two/pull/22",
+                "text": "Bump the Slack SDK",
                 "style": {
                   "bold": true
                 }
               },
               {
                 "type": "text",
-                "text": " 6 hours ago",
+                "text": " 8 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Carol Clark",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-two/pull/21",
+                "text": "Fix the flaky reminder test",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 5 hours ago",
                 "style": {
                   "italic": true
                 }
@@ -123,20 +95,70 @@
                 "type": "text",
                 "text": "Bob Brown",
                 "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "text": {
+      "type": "mrkdwn",
+      "text": " "
+    }
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review_repository_2",
+    "elements": [
+      {
+        "type": "rich_text_section",
+        "elements": [
+          {
+            "type": "link",
+            "url": "https://github.com/test-org/repo-one/pulls",
+            "text": "repo-one",
+            "style": {
+              "bold": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/repo-one/pull/11",
+                "text": "Add pagination to the PR listing",
+                "style": {
+                  "bold": true
+                }
               },
               {
                 "type": "text",
-                "text": " (💬 ",
+                "text": " 2 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
                 "style": {}
               },
               {
                 "type": "text",
-                "text": "Frank Foster",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
+                "text": "Alice Anderson",
                 "style": {}
               }
             ]

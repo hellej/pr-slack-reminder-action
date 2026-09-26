@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
+    "channelId": "C12345678",
+    "messageTs": "1623850245.000200"
+  },
+  "pullRequests": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 91
+    }
+  ],
+  "canvasContentHash": "",
+  "lastWrittenMessage": {
+    "summaryText": "",
+    "generatedAt": "0001-01-01T00:00:00Z"
+  }
+}

@@ -35,7 +35,7 @@ type MockGitHubClientOptions struct {
 	TimelineCommentsByPRNumber map[int][]*github.IssueComment
 	PRServiceError             error
 	IssueServiceError          error
-	MockStateForUpdateMode     *state.State
+	MockPreviousState          *state.State
 	ListArtifactsError         error
 	DownloadArtifactError      error
 	Recording                  *FetchRecording
@@ -76,8 +76,8 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			response: &http.Response{
 				StatusCode: 200,
 			},
-			err:                    opts.DownloadArtifactError,
-			mockStateForUpdateMode: opts.MockStateForUpdateMode,
+			err:               opts.DownloadArtifactError,
+			mockPreviousState: opts.MockPreviousState,
 		}
 		mockActionsService := &mockActionsService{
 			response: &github.Response{
@@ -85,8 +85,8 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 					StatusCode: 200,
 				},
 			},
-			err:                    opts.ListArtifactsError,
-			mockStateForUpdateMode: opts.MockStateForUpdateMode,
+			err:               opts.ListArtifactsError,
+			mockPreviousState: opts.MockPreviousState,
 		}
 		return githubclient.NewClient(
 			mockHTTPClient,
@@ -505,9 +505,9 @@ func postedPullRequestRefs(variables map[string]any) []pullRequestRef {
 }
 
 type mockActionsService struct {
-	response               *github.Response
-	err                    error
-	mockStateForUpdateMode *state.State
+	response          *github.Response
+	err               error
+	mockPreviousState *state.State
 }
 
 func (m *mockActionsService) ListArtifacts(
@@ -518,7 +518,7 @@ func (m *mockActionsService) ListArtifacts(
 	}
 
 	artifacts := []*github.Artifact{}
-	if m.mockStateForUpdateMode != nil {
+	if m.mockPreviousState != nil {
 		artifacts = append(artifacts, &github.Artifact{
 			ID:        github.Ptr(int64(123)),
 			Name:      github.Ptr("pr-slack-reminder-state"),
@@ -543,9 +543,9 @@ func (m *mockActionsService) DownloadArtifact(
 }
 
 type mockHTTPClient struct {
-	response               *http.Response
-	err                    error
-	mockStateForUpdateMode *state.State
+	response          *http.Response
+	err               error
+	mockPreviousState *state.State
 }
 
 func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
@@ -553,8 +553,8 @@ func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
 		return m.response, m.err
 	}
 
-	if url == "https://example.com/mock-download-url" && m.mockStateForUpdateMode != nil {
-		zipData, err := createMockArtifactZip(m.mockStateForUpdateMode)
+	if url == "https://example.com/mock-download-url" && m.mockPreviousState != nil {
+		zipData, err := createMockArtifactZip(m.mockPreviousState)
 		if err != nil {
 			return nil, err
 		}
@@ -577,7 +577,8 @@ func createMockArtifactZip(mockState *state.State) ([]byte, error) {
 		return nil, err
 	}
 
-	stateJSON, err := json.Marshal(mockState)
+	// Indented the way state.Save writes the artifact
+	stateJSON, err := json.MarshalIndent(mockState, "", "  ")
 	if err != nil {
 		return nil, err
 	}

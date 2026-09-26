@@ -37,6 +37,7 @@ runs:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name-1 }}
+        state-artifact-name: pr-slack-reminder-e2e-basic-state
         github-user-slack-user-id-mapping: |
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
@@ -47,6 +48,7 @@ runs:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name-1 }}
+        state-artifact-name: pr-slack-reminder-e2e-multi-repo-state
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
@@ -62,6 +64,7 @@ runs:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name-1 }}
+        state-artifact-name: pr-slack-reminder-e2e-canvas-state
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
@@ -75,6 +78,7 @@ runs:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name-2 }}
+        state-artifact-name: pr-slack-reminder-e2e-grouped-state
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
@@ -95,6 +99,7 @@ runs:
         github-token: ${{ steps.app-token.outputs.token }}
         slack-bot-token: ${{ inputs.slack-bot-token }}
         slack-channel-name: ${{ inputs.slack-channel-name-2 }}
+        state-artifact-name: pr-slack-reminder-e2e-grouped-canvas-state
         github-repositories: |
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
+    "channelId": "C12345678",
+    "messageTs": "1623850245.000200"
+  },
+  "pullRequests": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 81
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 82
+    }
+  ],
+  "canvasContentHash": "",
+  "lastWrittenMessage": {
+    "blocks": [
+      {
+        "type": "rich_text",
+        "block_id": "no_open_prs",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "No open PRs, happy coding! 🎉",
+                "style": {}
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "🚀 Recently merged",
+          "emoji": true
+        },
+        "block_id": "heading_merged",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_merged",
+        "elements": [
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/81",
+                    "text": "Merged since the message was posted",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " merged 2 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Alice Anderson",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "context",
+        "block_id": "update_time_footer",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
+          }
+        ]
+      }
+    ],
+    "summaryText": "Nothing waiting for review 🎉",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  }
+}

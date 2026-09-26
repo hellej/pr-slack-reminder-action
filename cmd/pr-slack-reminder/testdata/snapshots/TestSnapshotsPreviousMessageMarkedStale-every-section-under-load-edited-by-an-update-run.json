@@ -1,5 +1,14 @@
 [
   {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_⚠️ Stale, updated \u003c!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC\u003e_"
+      }
+    ]
+  },
+  {
     "type": "header",
     "text": {
       "type": "plain_text",
@@ -21,7 +30,62 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/61",
+                "url": "https://github.com/test-org/test-repo/pull/72",
+                "text": "Approved by two reviewers",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 9 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ", ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/71",
                 "text": "Approved and ready to go",
                 "style": {
                   "bold": true
@@ -91,7 +155,7 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/62",
+                "url": "https://github.com/test-org/test-repo/pull/73",
                 "text": "Changes were requested here",
                 "style": {
                   "bold": true
@@ -111,7 +175,7 @@
               },
               {
                 "type": "text",
-                "text": "Bob Brown",
+                "text": "Carol Clark",
                 "style": {}
               },
               {
@@ -136,7 +200,7 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/65",
+                "url": "https://github.com/test-org/test-repo/pull/74",
                 "text": "A reviewer left a comment",
                 "style": {
                   "bold": true
@@ -144,7 +208,7 @@
               },
               {
                 "type": "text",
-                "text": " 6 hours ago",
+                "text": " 5 hours ago",
                 "style": {
                   "italic": true
                 }
@@ -156,7 +220,7 @@
               },
               {
                 "type": "text",
-                "text": "Erin Evans",
+                "text": "Dana Davis",
                 "style": {}
               },
               {
@@ -166,7 +230,7 @@
               },
               {
                 "type": "text",
-                "text": "Frank Foster",
+                "text": "Erin Evans",
                 "style": {}
               },
               {
@@ -206,7 +270,7 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/64",
+                "url": "https://github.com/test-org/test-repo/pull/76",
                 "text": "Sitting here since last week",
                 "style": {
                   "bold": true
@@ -232,7 +296,7 @@
               },
               {
                 "type": "text",
-                "text": "Dana Davis",
+                "text": "Frank Foster",
                 "style": {}
               }
             ]
@@ -242,37 +306,7 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/69",
-                "text": "Opened after the message was posted",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 3 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Grace Green",
-                "style": {}
-              }
-            ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/63",
+                "url": "https://github.com/test-org/test-repo/pull/75",
                 "text": "Nobody has looked at this yet",
                 "style": {
                   "bold": true
@@ -292,7 +326,7 @@
               },
               {
                 "type": "text",
-                "text": "Carol Clark",
+                "text": "Erin Evans",
                 "style": {}
               }
             ]
@@ -327,7 +361,7 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/66",
+                "url": "https://github.com/test-org/test-repo/pull/83",
                 "text": "Landed an hour ago",
                 "style": {
                   "bold": true
@@ -347,12 +381,22 @@
               },
               {
                 "type": "text",
-                "text": "Frank Foster",
+                "text": "Carol Clark",
                 "style": {}
               },
               {
                 "type": "text",
                 "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / 💬 ",
                 "style": {}
               },
               {
@@ -372,45 +416,15 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/70",
-                "text": "Merged without ever being listed",
+                "url": "https://github.com/test-org/test-repo/pull/81",
+                "text": "Landed this morning",
                 "style": {
                   "bold": true
                 }
               },
               {
                 "type": "text",
-                "text": " merged 4 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Heidi Hill",
-                "style": {}
-              }
-            ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/67",
-                "text": "Landed three days ago",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " merged 3 days ago",
+                "text": " merged 3 hours ago",
                 "style": {
                   "italic": true
                 }
@@ -426,22 +440,42 @@
                 "style": {}
               }
             ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/82",
+                "text": "Landed yesterday",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " merged 1 day ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              }
+            ]
           }
         ],
         "style": "bullet",
         "indent": 0,
         "border": 0,
         "offset": 0
-      }
-    ]
-  },
-  {
-    "type": "context",
-    "block_id": "update_time_footer",
-    "elements": [
-      {
-        "type": "mrkdwn",
-        "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
       }
     ]
   }

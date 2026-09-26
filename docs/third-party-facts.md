@@ -6,7 +6,7 @@ GitHub GraphQL and search APIs, Slack methods and scopes, GitHub token permissio
 - External facts only. Behaviour of a package under `internal/` belongs in its
   `<package>.spec.md`
 - Dead ends count as much as confirmations
-- An entry is not a source. A plan cites what the entry names, never this file
+- Plans and code may cite an entry by its heading, or the source it names
 - Correct a wrong entry in place
 - Bullets, not prose. One claim each, sub-bullets for the detail under it
 - Write entries in the [writing skill](../.agents/skills/writing/SKILL.md)'s style
@@ -482,13 +482,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Rendering is unchanged, so a payload does not need to send `emoji` elements itself
 - A read-back of a message is therefore not byte-comparable with what was sent
 
-## Slack renders a timestamp in the reader's own timezone with `<!date^unix^{token}|fallback>` [2026-09-19]
+## Slack renders a timestamp in the reader's own timezone with `<!date^unix^{token}|fallback>` [2026-09-23]
 
 - Source: [formatting message text](https://docs.slack.dev/messaging/formatting-message-text);
   live post to the dev channel
 - Tokens: `{date_num}`, `{date}`, `{date_short}`, `{date_long}`, the three `_pretty` variants,
   `{time}`, `{time_secs}`, `{ago}`
 - `{time}` renders 12-hour or 24-hour by the reading client's own setting. No token forces either
+- `{date}` renders `February 18th, 2014`, `{date_short}` `Feb 18, 2014`, `{date_long}`
+  `Tuesday, February 18th, 2014`. Each omits the year within six months of now
+- The `_pretty` variants read `yesterday`, `today` or `tomorrow` where it applies, otherwise their
+  base token's form
 - The text after `|` shows when a client cannot process the date, so it carries the timezone the
   sender means
 - It works inside a `context` block's `mrkdwn` element, and `_`-wrapping the whole line italicises
@@ -540,3 +544,143 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - This holds for a string-typed input the same as `old-pr-threshold-hours` (int-shaped) or
   `group-by-repository` (bool-shaped): every action input is a string to the runner regardless of
   how its value reads
+
+## `slack-go` v0.21.1 and later return no `blocks` from `UnsafeApplyMsgOptions` [2026-09-23]
+
+- Source: `slack-go@v0.29.0/CHANGELOG.md`, `## [0.21.1]`; `chat.go` `UnsafeApplyMsgOptions`,
+  `formSender.BuildRequestContext`
+- Blocks are marshalled at send time inside `formSender.BuildRequestContext`, as
+  `json.Marshal(blockSet)`. `UnsafeApplyMsgOptions` returns the values before that, so they carry
+  no `blocks` key
+- The bytes a message is sent with are therefore `json.Marshal(message.Blocks.BlockSet)`
+- `chat.update` goes through the same `formSender` as `chat.postMessage`:
+  `sendConfig.BuildRequestContext` picks it for every mode but `chatResponse`
+
+## `slack.BlockFromJSON` re-sends one block's JSON byte for byte [2026-09-23]
+
+- Source: `slack-go@v0.29.0/block_json.go`
+- Returns a `RawJSONBlock` whose `MarshalJSON` returns the stored bytes unchanged
+- Given a JSON array, it keeps only the first block. A stored message has to be split into
+  per-block `json.RawMessage` values first
+- `MsgOptionBlocks` sends blocks through `json.Marshal`, so a `RawJSONBlock` goes out as stored
+- Unmarshalling into `slack.Blocks` also covers today's block types, but nothing in the library
+  tests that round trip for `header`, `rich_text` lists or `context`
+
+## A Slack message link without the workspace subdomain opens the message [2026-09-23]
+
+- Source: the maintainer clicked `https://slack.com/archives/<channel ID>/p<ts>` in the Slack
+  client, and it opened the message
+- `p<ts>` is the message timestamp with its dot removed: `1790146735.683649` becomes
+  `p1790146735683649`
+- The link Slack's own "Copy link" gives is `https://<workspace>.slack.com/archives/...`. The
+  subdomain is not in any `chat.postMessage` response, and `auth.test` would be an extra call
+
+## `chat.update` errors: `message_not_found`, `cant_update_message`, and `edit_window_closed` from the workspace's edit settings [2026-09-23]
+
+- Source: [chat.update](https://docs.slack.dev/reference/methods/chat.update)
+- `message_not_found`: "No message exists with the requested timestamp"
+- `cant_update_message`: "Authenticated user does not have permission to update this message",
+  also returned for message types the method cannot update
+- `edit_window_closed`: "The message cannot be edited due to the team message edit settings".
+  Unverified: whether those settings apply to a bot editing its own message
+- `block_mismatch`: "Rich-text blocks cannot be replaced with non-rich-text blocks"
+- A message with a `bot_id` never shows the `(edited)` label
+- Slack always renders from `blocks` when given, and uses `text` only for notifications
+
+## `chat.update` documents no `unfurl_links` or `unfurl_media`, where `chat.postMessage` does [2026-09-23]
+
+- Source: [chat.update](https://docs.slack.dev/reference/methods/chat.update) arguments;
+  `slackapi/slack-api-specs` `web-api/slack_web_openapi_v2.json`, `paths["/chat.update"]`
+  parameters; `slackapi/node-slack-sdk` `main`, `packages/web-api/src/types/request/chat.ts`
+  `ChatUpdateArguments`; `slackapi/python-slack-sdk` `main`, `slack_sdk/web/client.py`
+  `chat_update`
+- `chat.update` takes `as_user`, `attachments`, `blocks`, `channel`, `link_names`, `parse`,
+  `text`, `ts`. The Node SDK adds `file_ids`, `reply_broadcast` and metadata, still no unfurl
+  arguments
+- slack-go's `MsgOptionDisableLinkUnfurl` sets `unfurl_links=false` on whatever endpoint the
+  message goes to (`slack-go@v0.29.0/chat.go`), so it sends on an update, but Slack does not
+  document honouring it there
+- So an edit that adds a link has no documented way to suppress its preview
+- [Unfurling links in messages](https://docs.slack.dev/messaging/unfurling-links-in-messages):
+  in its `chat.postMessage` example, a link to text content does not unfurl unless
+  `unfurl_links: true` is passed. Media links unfurl by default, inside Block Kit blocks too. The
+  page says nothing about edits
+- The maintainer sees no preview on PR links, including ones an update run's `chat.update` adds to
+  the message after the post
+
+## `slack-go` v0.29.0 returns a Slack API error as `slack.SlackErrorResponse`, its `Err` the error code [2026-09-23]
+
+- Source: `slack-go@v0.29.0/misc.go` `SlackResponse.Err`, `SlackErrorResponse`; `chat.go`
+  `sendResponseFull`
+- A response with `ok: false` becomes `SlackErrorResponse{Err: t.Error, ...}`, a value type whose
+  `Error()` returns `Err` alone
+- `UpdateMessage` and `PostMessage` return it unwrapped from `sendResponseFull`, so
+  `errors.As(err, &slack.SlackErrorResponse{})` reaches the code
+
+## A bot's `chat.update` of a stored payload renders as posted, and `{date_pretty}` capitalises `Today` [2026-09-24]
+
+- Source: two live `post` runs of this action against the dev channel off
+  `claude/inspiring-shannon-2x6up8`, read in the Slack client
+- The edited message kept every stored block as it was, showed no `(edited)` label, and grew no
+  link preview
+- `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|…>_` in a context block's `mrkdwn`
+  rendered as `⚠️ Stale, updated Today at 9:10 PM`: the unicode emoji renders, and `Today` is
+  capitalised mid-sentence, where the formatting docs write `today`
+
+## GitHub's repository-level "List artifacts" has no sort parameter and documents no order [2026-09-25]
+
+- Source: [REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts), "List
+  artifacts for a repository" and "List workflow run artifacts"
+- The repository-level list takes only `per_page` (max 100), `page` and `name`. The per-run list
+  also takes `direction`, default `desc`
+- Observed: the repository-level list returns newest first. A dev-channel run with 385 artifacts
+  named `pr-slack-reminder-state` downloaded one created 2 minutes earlier from page 1
+- `githubclient.FetchLatestArtifactByName` reads page 1 only, so past 100 artifacts it relies on
+  that undocumented order
+- Expired artifacts stay listed, with `expired: true`, and cannot be downloaded
+
+## `::warning::` and `::error::` annotations cap at 10 per type per step and 4096 characters each [2026-09-26]
+
+- Source: [Workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands);
+  [REST: check runs](https://docs.github.com/en/rest/checks/runs); `actions/runner@15231be`
+  `src/Runner.Worker/ExecutionContext.cs` (`_maxCountPerIssueType = 10`,
+  `_maxIssueMessageLength = 4096`)
+- Syntax: `::warning file={name},line={line},endLine={endLine},title={title}::{message}`, every
+  parameter optional, so `::warning::message` works. Command and parameter names are case
+  insensitive
+- Each shows in the job log and as an annotation on the run's summary page
+- "GitHub Actions are limited to 10 warning annotations and 10 error annotations per step."
+  Past that, the line still prints to the log, without an annotation
+- The runner truncates a message past 4096 characters. No docs page states this length
+
+## A workflow command's message escapes `%`, CR and LF as `%25`, `%0D` and `%0A` [2026-09-26]
+
+- Source: `actions/toolkit@a7911ca` `packages/core/src/command.ts` (`escapeData`,
+  `escapeProperty`); `actions/runner@15231be` `src/Runner.Common/ActionCommand.cs`
+  (`UnescapeData`), `src/Runner.Sdk/ProcessInvoker.cs`. The workflow commands docs page never
+  mentions escaping
+- `escapeData` replaces `%` first, then `\r` and `\n`. Properties such as `title` also map `:` to
+  `%3A` and `,` to `%2C`
+- The runner reads output one line at a time, so an unescaped multiline message annotates its
+  first line only, and the rest prints as plain log lines
+- The runner restores real newlines from the escaped form. Unverified: whether the annotation UI
+  shows them as line breaks
+
+## The runner parses workflow commands from stderr as well as stdout, but only at a line's start [2026-09-26]
+
+- Source: `actions/runner@15231be` `src/Runner.Worker/Handlers/NodeScriptActionHandler.cs`
+  (one command-parsing `OutputManager` each for stdout and stderr),
+  `src/Runner.Common/ActionCommand.cs` `TryParseV2`
+- The docs only say commands go "to the runner over `stdout`". Stderr parsing is runner
+  behaviour, not a documented contract
+- `TryParseV2` trims leading whitespace, then requires the line to start with `::`. Any prefix,
+  such as a `log` timestamp, turns the command into plain text
+- A child process run with `stdio: 'inherit'` by a node action writes straight to the streams
+  the runner reads
+
+## GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches [2026-09-26]
+
+- Source: Build run 36230375245 (job 108372278091, PR #67). Each e2e step logged
+  `Found 0 artifacts with name "pr-slack-reminder-e2e-…-state"` using the e2e GitHub App token
+- The repository-level list returns HTTP 200 with `total_count` 0, never a 404
+- So a missing artifact is detectable only by the empty list

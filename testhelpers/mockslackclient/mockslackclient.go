@@ -17,6 +17,8 @@ type MockSlackClientOptions struct {
 	UpdateMessageError error
 	DeleteMessageError error
 	ReplaceCanvasError error
+	// Lets chained runs post distinct messages
+	PostMessageTimestamp string
 }
 
 func MakeSlackClientGetter(slackAPI *MockSlackAPI) func(token string) slackclient.Client {
@@ -30,6 +32,9 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		opts.SlackChannels = []*SlackChannel{
 			{ID: "C12345678", Name: "some-channel-name"},
 		}
+	}
+	if opts.PostMessageTimestamp == "" {
+		opts.PostMessageTimestamp = "1234567890.123456"
 	}
 	channels := make([]slack.Channel, len(opts.SlackChannels))
 	for i, channel := range opts.SlackChannels {
@@ -50,7 +55,7 @@ func GetMockSlackAPI(opts MockSlackClientOptions) *MockSlackAPI {
 		deleteMessageError: opts.DeleteMessageError,
 		replaceCanvasError: opts.ReplaceCanvasError,
 		postMessageResponse: PostMessageResponse{
-			Timestamp: "1234567890.123456",
+			Timestamp: opts.PostMessageTimestamp,
 			Channel:   "C12345678",
 		},
 	}
@@ -108,11 +113,14 @@ func (m *MockSlackAPI) SendMessage(
 		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %v", m.postMessageError)
 	}
 
-	jsonBlocks := getJSONBlocks(message)
+	sentJSONBlocks, err := slackclient.MarshalBlocksAsSent(message)
+	if err != nil {
+		return slackclient.SentMessageInfo{}, err
+	}
 	return slackclient.SentMessageInfo{
-		ChannelID:  m.postMessageResponse.Channel,
-		Timestamp:  m.postMessageResponse.Timestamp,
-		JSONBlocks: jsonBlocks,
+		ChannelID:    m.postMessageResponse.Channel,
+		Timestamp:    m.postMessageResponse.Timestamp,
+		BlocksAsSent: sentJSONBlocks,
 	}, nil
 }
 
@@ -127,22 +135,23 @@ func (m *MockSlackAPI) UpdateMessage(
 		panic("Failed to parse updated blocks in mock Slack API: " + err.Error())
 	}
 
-	if m.updateMessageError == nil {
-		m.UpdatedMessage.ChannelID = channelID
-		m.UpdatedMessage.Timestamp = messageTS
-		m.UpdatedMessage.Text = summaryText
-		m.UpdatedMessage.Blocks = updatedBlocks
+	sentJSONBlocks, err := slackclient.MarshalBlocksAsSent(message)
+	if err != nil {
+		return slackclient.SentMessageInfo{}, err
 	}
-
 	if m.updateMessageError != nil {
-		return slackclient.SentMessageInfo{}, fmt.Errorf("failed to update Slack message: %v", m.updateMessageError)
+		return slackclient.SentMessageInfo{}, slackclient.WrapUpdateMessageError(m.updateMessageError)
 	}
 
-	jsonBlocks := getJSONBlocks(message)
+	m.UpdatedMessage.ChannelID = channelID
+	m.UpdatedMessage.Timestamp = messageTS
+	m.UpdatedMessage.Text = summaryText
+	m.UpdatedMessage.Blocks = updatedBlocks
+	m.UpdatedMessage.BlocksAsSent = sentJSONBlocks
 	return slackclient.SentMessageInfo{
-		ChannelID:  channelID,
-		Timestamp:  messageTS,
-		JSONBlocks: jsonBlocks,
+		ChannelID:    channelID,
+		Timestamp:    messageTS,
+		BlocksAsSent: sentJSONBlocks,
 	}, nil
 }
 
@@ -188,10 +197,11 @@ type SentMessage struct {
 }
 
 type UpdatedMessage struct {
-	ChannelID string
-	Timestamp string
-	Blocks    BlocksWrapper
-	Text      string
+	ChannelID    string
+	Timestamp    string
+	Blocks       BlocksWrapper
+	Text         string
+	BlocksAsSent json.RawMessage
 }
 
 type DeletedMessage struct {
@@ -215,12 +225,4 @@ func parseBlocksFromMessage(message slack.Message) (BlocksWrapper, error) {
 		return BlocksWrapper{}, nil
 	}
 	return parseBlocks(blockBytes)
-}
-
-func getJSONBlocks(message slack.Message) []string {
-	blockBytes, err := json.Marshal(message.Blocks.BlockSet)
-	if err != nil {
-		return []string{}
-	}
-	return []string{string(blockBytes)}
 }
