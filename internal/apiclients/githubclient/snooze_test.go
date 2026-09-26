@@ -59,6 +59,11 @@ func TestParseSnoozeComment(t *testing.T) {
 			expected: timePtr(baseTime.Add(365 * 24 * time.Hour)),
 		},
 		{
+			name:     "days beyond the int range capped to 365",
+			body:     "/snooze for 99999999999999999999 days",
+			expected: timePtr(baseTime.Add(365 * 24 * time.Hour)),
+		},
+		{
 			name:     "missing slash does not match",
 			body:     "snooze for 4 days",
 			expected: nil,
