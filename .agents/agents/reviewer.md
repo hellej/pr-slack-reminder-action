@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews uncommitted changes in this repo against the task and the mandatory TDD/spec-sync rules. Use after an implementer sub-agent finishes a step, or before committing a change.
+description: Reviews uncommitted changes in this repo against the task and the mandatory TDD/spec-sync rules. Use after an implementer sub-agent finishes a plan or a checkpoint, or before committing a change.
 model: opus
 effort: high
 disallowedTools: [Edit, Write, NotebookEdit]
@@ -36,7 +36,9 @@ implementer's report. Check it against:
 - Simplification: code the change could have reused instead of adding, especially
   `internal/utilities` (`Map`, `Filter`, `Find`), and layers the change now makes
   collapsible
-- The task or plan step the change came from: does it do what was asked, and no more
+- The task or plan the change came from: does it do what was asked, and no more. At a
+  checkpoint review, skip dead code, the comment list, and spec and plan consistency: the
+  final review runs them
 - The plan file's own diff, when the change came from a committed plan file. Does the
   rewritten step stay inside its original intent and scope, and describe what the code
   does? Code deviating from the step with no matching plan edit is a finding, and so is a
@@ -67,8 +69,8 @@ Pick the targets yourself, and spend them where the tests are the only net:
 
 Code an unchanged golden file still covers has a net already. Read those tests instead.
 
-Three or four mutants is the budget. A pure refactor needs none. Past four, name in the
-report what each extra one was worth.
+The budget is about one mutant per behaviour the change adds or alters, three at least. A
+pure refactor needs none. Past the budget, name in the report what each extra one was worth.
 
 A brief listing blind spots gives you candidates, not a checklist. The budget still
 applies, and choosing among them is yours.
