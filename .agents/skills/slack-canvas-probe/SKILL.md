@@ -36,8 +36,8 @@ it exists.
 
    The script prints the raw `canvases.edit` response. There is no post/edit/delete split like
    slack-message-probe's messages: every call rewrites the whole canvas, so re-run it after each edit.
-5. Report that it's done and let the user look. Checking the rendered canvas in Slack is the
-   user's half, per the verification split.
+5. Report that it's done and let the user look. You write the canvas; the user checks how it
+   renders in Slack.
 6. Iterate: edit the markdown file, run the script again.
 
 ## Canvas
