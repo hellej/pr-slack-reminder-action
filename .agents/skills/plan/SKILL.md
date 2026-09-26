@@ -61,6 +61,7 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
    - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
    - Don't plan tests as their own step — writing tests is a natural, inherent part of implementing each step (see the [coding skill](../coding/SKILL.md)'s TDD steps) — unless the feature is complex enough to need its own test-suite shape/refactor planned up front
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
+   - A live check names the exact dispatch or edit that sets it up. Check the workflow can actually take it
 6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing
    - **Negative** is for effects that leave the repo worse off than not implementing the plan at all
    - **Caveats** is for the costs of a change that is still worth making: a limit it doesn't lift, a rough edge it leaves, a thing it makes harder. Don't put these under **Negative**
