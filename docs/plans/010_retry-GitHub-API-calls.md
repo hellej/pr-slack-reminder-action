@@ -69,9 +69,11 @@ Serves AGENTS.md § Purpose: the daily `post` is the one notification the team p
   - The zip download is transient on a network error, a 5xx, or a failed body read
   - The download unit reads the whole body inside the attempt, so the deadline covers the body read
 - `HTTPClient` changes from `Get(url)` to `Do(*http.Request)`, so the zip download carries the attempt ctx. `*http.Client` satisfies it, so the `httpClient` wrapper goes
-  - The ~3 mocks implementing `Get` follow, in `testhelpers/mockgithubclient` and the `githubclient` tests
-- Tests: which state-load failures are transient, and that a failed zip download fetches a fresh download URL
-- `githubclient.spec.md`: `FetchLatestArtifactByName`'s bullet and the "No retries on the REST artifact calls" line
+  - The 3 mocks implementing `Get` follow, in `testhelpers/mockgithubclient` and the `githubclient` tests
+  - The shared mock's `DownloadArtifactError` fails `DownloadArtifact` with a 404, where it failed the zip GET with a network error: a transient failure costs `cmd/pr-slack-reminder` tests 7s of real waits
+- Tests: which state-load failures are transient, that a failed zip download fetches a fresh download URL, and that the attempt deadline cuts off a hung zip response or body read
+  - `fetchartifact_test.go` moves into package `githubclient`, to reach the retry waits and the attempt deadline. `mockgithubclient.UnusedGraphQLTransport` loses its last user and goes
+- `githubclient.spec.md`: `FetchLatestArtifactByName`'s bullet, the retry bullets now covering every GitHub request, and the retry line in Doesn't Do
 - Live check, done means both runs green and neither log showing a retry line:
   - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`
   - then the same with `-f run-mode=update`, which loads the state the post saved

@@ -59,13 +59,7 @@ type GithubActionsService interface {
 }
 
 type HTTPClient interface {
-	Get(url string) (resp *http.Response, err error)
-}
-
-type httpClient struct{}
-
-func (h httpClient) Get(url string) (*http.Response, error) {
-	return http.Get(url)
+	Do(request *http.Request) (*http.Response, error)
 }
 
 func NewClient(
@@ -93,7 +87,7 @@ func GetAuthenticatedClient(token, tokenForState string) Client {
 	}
 
 	return NewClient(
-		httpClient{},
+		http.DefaultClient,
 		ghClientForState.Actions,
 		newHTTPGraphQLTransport(token),
 	)

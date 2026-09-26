@@ -38,7 +38,7 @@ func (m *mockActionsService) DownloadArtifact(
 
 type mockHTTPClient struct{}
 
-func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
+func (m *mockHTTPClient) Do(request *http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: 200}, nil
 }
 
