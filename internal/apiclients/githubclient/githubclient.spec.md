@@ -35,7 +35,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - In `FindOpenPRs` and `FindRecentlyMergedPRs`, a failure scoped to one PR (its `pullRequest`, or the `reviews`, `comments` and `reviewThreads` below it) doesn't fail the call: that PR is returned without reviewer info. A query- or repository-scoped error, and any transport or decode failure, fails `FindOpenPRs` and drops `FindRecentlyMergedPRs` back to unenriched merged rows
 - In `GetPRs`, a missing PR fails the call, as does any error scoped to the query, a repository or a `pullRequest`; an error below one of those (on `reviews`, `comments` or `reviewThreads`) is only logged
 - Doesn't read a review thread's `isOutdated`: an unresolved thread blocks whether or not newer commits moved it. Doesn't read `reviewDecision` either, which is null on an approved PR in a repository without required-reviewer rules and so cannot report approval
-- `FetchLatestArtifactByName` doesn't treat a missing artifact as empty state: no artifact matching the name is an error
+- `FetchLatestArtifactByName` doesn't treat a missing artifact as empty state: no artifact matching the name is an error wrapping `ErrNoArtifactFound`, so a caller can tell it from a failed load. GitHub reports the missing artifact only as an empty list
 
 ## Oddities
 
