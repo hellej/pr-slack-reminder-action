@@ -1,10 +1,8 @@
 package githubclient
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log"
 	"slices"
 	"strings"
 	"sync"
@@ -23,8 +21,7 @@ func (r *retryWaitRecorder) requestedWaits() []time.Duration {
 	return slices.Clone(r.waits)
 }
 
-// Replaces the retry wait with one that returns at once, recording each wait requested.
-func withoutRetryWaits(t *testing.T) *retryWaitRecorder {
+func skipAndRecordRetryWaits(t *testing.T) *retryWaitRecorder {
 	t.Helper()
 	recorder := &retryWaitRecorder{}
 	original := waitBeforeRetry
@@ -43,19 +40,6 @@ func withAttemptTimeout(t *testing.T, timeout time.Duration) {
 	original := attemptTimeout
 	attemptTimeout = timeout
 	t.Cleanup(func() { attemptTimeout = original })
-}
-
-func captureLog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	var output bytes.Buffer
-	originalWriter, originalFlags := log.Writer(), log.Flags()
-	log.SetOutput(&output)
-	log.SetFlags(0)
-	t.Cleanup(func() {
-		log.SetOutput(originalWriter)
-		log.SetFlags(originalFlags)
-	})
-	return &output
 }
 
 type scriptedAttempts struct {
@@ -124,8 +108,8 @@ func TestRetryTransientFailures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := withoutRetryWaits(t)
-			logOutput := captureLog(t)
+			recorder := skipAndRecordRetryWaits(t)
+			logOutput := captureLogOutput(t)
 			attempts := &scriptedAttempts{results: tt.results}
 
 			value, err := retryTransientFailures(context.Background(), "artifact list", attempts.run)
@@ -161,7 +145,7 @@ func TestRetryTransientFailuresStopsWhenTheCallerIsDone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logOutput := captureLog(t)
+			logOutput := captureLogOutput(t)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

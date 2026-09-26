@@ -509,8 +509,9 @@ type mockActionsService struct {
 func (m *mockActionsService) ListArtifacts(
 	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
 ) (*github.ArtifactList, *github.Response, error) {
+	// A 403, not a 5xx or a 2xx: githubclient waits seconds before retrying either.
 	if m.listErr != nil {
-		return nil, m.response, m.listErr
+		return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusForbidden}}, m.listErr
 	}
 
 	artifacts := []*github.Artifact{}
@@ -531,7 +532,7 @@ func (m *mockActionsService) ListArtifacts(
 func (m *mockActionsService) DownloadArtifact(
 	ctx context.Context, owner, repo string, artifactID int64, maxRedirects int,
 ) (*url.URL, *github.Response, error) {
-	// A 404, not a 5xx: githubclient waits seconds before retrying a 5xx.
+	// A 404, not a 5xx or a 2xx: githubclient waits seconds before retrying either.
 	if m.downloadErr != nil {
 		return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}, m.downloadErr
 	}

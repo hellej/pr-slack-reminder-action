@@ -48,7 +48,7 @@ type testResponseData struct {
 }
 
 func TestGraphQLDo(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	tests := []struct {
 		name                 string
@@ -446,7 +446,7 @@ func assertEqualStrings(t *testing.T, name, actual, expected string) {
 }
 
 func TestGraphQLDoRetrySucceeds(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	tests := []struct {
 		name            string
@@ -490,7 +490,6 @@ func TestGraphQLDoRetrySucceeds(t *testing.T) {
 	}
 }
 
-// Answers 200 once the first attempt's ctx is done, after blocking that attempt until then.
 type hangingOnceTransport struct {
 	calls int
 }
@@ -505,7 +504,7 @@ func (t *hangingOnceTransport) Post(ctx context.Context, body []byte) (int, json
 }
 
 func TestGraphQLDoRetriesAnAttemptCutOffByItsDeadline(t *testing.T) {
-	recorder := withoutRetryWaits(t)
+	recorder := skipAndRecordRetryWaits(t)
 	withAttemptTimeout(t, 20*time.Millisecond)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -528,7 +527,7 @@ func TestGraphQLDoRetriesAnAttemptCutOffByItsDeadline(t *testing.T) {
 }
 
 func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	pullRequestNotFound := `{"type":"NOT_FOUND","path":["p3","pullRequest"],"message":"no pull request"}`
 	repositoryForbidden := `{"type":"FORBIDDEN","path":["p7"],"message":"no access"}`
@@ -613,7 +612,7 @@ func (t *cancellingTransport) Post(ctx context.Context, body []byte) (int, json.
 }
 
 func TestGraphQLDoPostsQueryAndVariables(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	transport := &recordingTransport{status: 200, responseBody: `{"data":{}}`}
 	client := graphqlClient{transport: transport}

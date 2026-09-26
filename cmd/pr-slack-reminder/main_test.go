@@ -1583,8 +1583,8 @@ func TestScenariosUpdateMode(t *testing.T) {
 				config.InputRunMode: config.RunModeUpdate,
 			},
 			mockState:             testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1}})),
-			downloadArtifactError: errors.New("http client error"),
-			expectedErrorMsg:      "http client error",
+			downloadArtifactError: errors.New("artifact download URL error"),
+			expectedErrorMsg:      "get artifact download URL: artifact download URL error",
 		},
 		{
 			name:   "update mode fails when state artifact is not found",

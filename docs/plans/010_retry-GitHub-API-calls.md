@@ -65,14 +65,15 @@ Serves AGENTS.md § Purpose: the daily `post` is the one notification the team p
 ### 2. State artifact load retry and attempt deadline
 
 - `fetchartifact.go`: the two retried units from the target shape run through the step 1 loop
-  - A go-github failure is transient when its `*Response` is nil or its status is 5xx. Read the status off the `*Response`, not the error, since `DownloadArtifact` returns a plain error
+  - A go-github failure is transient when its `*Response` is nil, or its status is 5xx or 2xx. Read the status off the `*Response`, not the error, since `DownloadArtifact` returns a plain error
+    - A 2xx with an error is a body read or decode that failed, as when the attempt deadline cuts off the body. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
   - The zip download is transient on a network error, a 5xx, or a failed body read
   - The download unit reads the whole body inside the attempt, so the deadline covers the body read
 - `HTTPClient` changes from `Get(url)` to `Do(*http.Request)`, so the zip download carries the attempt ctx. `*http.Client` satisfies it, so the `httpClient` wrapper goes
   - The 3 mocks implementing `Get` follow, in `testhelpers/mockgithubclient` and the `githubclient` tests
-  - The shared mock's `DownloadArtifactError` fails `DownloadArtifact` with a 404, where it failed the zip GET with a network error: a transient failure costs `cmd/pr-slack-reminder` tests 7s of real waits
-- Tests: which state-load failures are transient, that a failed zip download fetches a fresh download URL, and that the attempt deadline cuts off a hung zip response or body read
-  - `fetchartifact_test.go` moves into package `githubclient`, to reach the retry waits and the attempt deadline. `mockgithubclient.UnusedGraphQLTransport` loses its last user and goes
+  - The shared mock's `DownloadArtifactError` fails `DownloadArtifact` with a 404, where it failed the zip GET with a network error, and its `ListArtifactsError` arrives with a 403 instead of a 200: a transient failure costs `cmd/pr-slack-reminder` tests 7s of real waits
+- Tests: which state-load failures are transient, that a failed zip download fetches a fresh download URL, that every call carries a 15s attempt deadline, and that the deadline cuts off a hung zip response or body read
+  - `fetchartifact_test.go` moves into package `githubclient`, to reach the retry waits and the attempt deadline, and onto one scripted harness. `mockgithubclient.UnusedGraphQLTransport` loses its last user and goes
 - `githubclient.spec.md`: `FetchLatestArtifactByName`'s bullet, the retry bullets now covering every GitHub request, and the retry line in Doesn't Do
 - Live check, done means both runs green and neither log showing a retry line:
   - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`

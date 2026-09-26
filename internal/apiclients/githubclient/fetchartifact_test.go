@@ -3,8 +3,8 @@ package githubclient
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,386 +24,6 @@ type testState struct {
 	Message string `json:"message"`
 }
 
-type mockActionsServiceWithArtifacts struct {
-	artifacts      []*github.Artifact
-	downloadURL    *url.URL
-	listError      error
-	downloadError  error
-	mockHTTPClient *mockHTTPClientWithZip
-}
-
-func (m *mockActionsServiceWithArtifacts) ListArtifacts(
-	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
-) (*github.ArtifactList, *github.Response, error) {
-	if m.listError != nil {
-		return nil, &github.Response{
-			Response: &http.Response{StatusCode: 500, Status: "500 Internal Server Error"},
-		}, m.listError
-	}
-	return &github.ArtifactList{
-		TotalCount: github.Ptr(int64(len(m.artifacts))),
-		Artifacts:  m.artifacts,
-	}, &github.Response{Response: &http.Response{StatusCode: 200}}, nil
-}
-
-func (m *mockActionsServiceWithArtifacts) DownloadArtifact(
-	ctx context.Context, owner string, repo string, artifactID int64, maxRedirects int,
-) (*url.URL, *github.Response, error) {
-	if m.downloadError != nil {
-		return nil, &github.Response{Response: &http.Response{StatusCode: 500}}, m.downloadError
-	}
-	return m.downloadURL, &github.Response{Response: &http.Response{StatusCode: 200}}, nil
-}
-
-type mockHTTPClientWithZip struct {
-	zipData       []byte
-	statusCode    int
-	err           error
-	bodyReadError error
-}
-
-func (m *mockHTTPClientWithZip) Do(request *http.Request) (*http.Response, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	var body io.Reader = bytes.NewReader(m.zipData)
-	if m.bodyReadError != nil {
-		body = iotest.ErrReader(m.bodyReadError)
-	}
-	return &http.Response{StatusCode: m.statusCode, Body: io.NopCloser(body)}, nil
-}
-
-func createTestZip(filename string, content []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
-
-	file, err := zipWriter.Create(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := file.Write(content); err != nil {
-		return nil, err
-	}
-
-	if err := zipWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func TestFetchLatestArtifactByName(t *testing.T) {
-	withoutRetryWaits(t)
-
-	tests := []struct {
-		name                  string
-		artifactName          string
-		jsonFilePath          string
-		artifacts             []*github.Artifact
-		zipFilename           string
-		zipContent            testState
-		zipJSON               string // replaces zipContent, for JSON that testState can't marshal to
-		zipData               []byte // replaces the whole zip, when zipFilename is empty
-		listError             error
-		downloadError         error
-		httpError             error
-		bodyReadError         error
-		httpStatus            int
-		expectedData          testState
-		expectError           bool
-		errorContains         string
-		expectNoArtifactFound bool
-	}{
-		{
-			name:         "successful fetch with exact filename match",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:  "state.json",
-			zipContent:   testState{Version: 1, Message: "test data"},
-			httpStatus:   200,
-			expectedData: testState{Version: 1, Message: "test data"},
-			expectError:  false,
-		},
-		{
-			name:         "successful fetch with path in jsonFilePath",
-			artifactName: "test-artifact",
-			jsonFilePath: "/tmp/state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:  "state.json",
-			zipContent:   testState{Version: 2, Message: "path test"},
-			httpStatus:   200,
-			expectedData: testState{Version: 2, Message: "path test"},
-			expectError:  false,
-		},
-		{
-			name:         "successful fetch with path in zip file",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:  "path/to/state.json",
-			zipContent:   testState{Version: 3, Message: "nested path"},
-			httpStatus:   200,
-			expectedData: testState{Version: 3, Message: "nested path"},
-			expectError:  false,
-		},
-		{
-			name:         "multiple artifacts returns latest",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now().Add(-2 * time.Hour)},
-				},
-				{
-					ID:        github.Ptr(int64(456)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now().Add(-1 * time.Hour)},
-				},
-			},
-			zipFilename:  "state.json",
-			zipContent:   testState{Version: 4, Message: "latest"},
-			httpStatus:   200,
-			expectedData: testState{Version: 4, Message: "latest"},
-			expectError:  false,
-		},
-		{
-			name:                  "no artifacts found",
-			artifactName:          "missing-artifact",
-			jsonFilePath:          "state.json",
-			artifacts:             []*github.Artifact{},
-			expectError:           true,
-			errorContains:         "no artifacts found with name \"missing-artifact\"",
-			expectNoArtifactFound: true,
-		},
-		{
-			name:          "list artifacts error",
-			artifactName:  "test-artifact",
-			jsonFilePath:  "state.json",
-			listError:     fmt.Errorf("403 Forbidden"),
-			expectError:   true,
-			errorContains: "failed to list artifacts: 403 Forbidden status=500 Internal Server Error",
-		},
-		{
-			name:         "download artifact error",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			downloadError: fmt.Errorf("download failed"),
-			expectError:   true,
-			errorContains: "get artifact download URL",
-		},
-		{
-			name:         "HTTP error downloading zip",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			httpError:     fmt.Errorf("network error"),
-			expectError:   true,
-			errorContains: "download artifact zip",
-		},
-		{
-			name:         "HTTP status error",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:   "state.json",
-			zipContent:    testState{Version: 1, Message: "test"},
-			httpStatus:    404,
-			expectError:   true,
-			errorContains: "unexpected status code 404",
-		},
-		{
-			name:         "file not found in zip",
-			artifactName: "test-artifact",
-			jsonFilePath: "missing.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:   "state.json",
-			zipContent:    testState{Version: 1, Message: "test"},
-			httpStatus:    200,
-			expectError:   true,
-			errorContains: "not found inside artifact zip",
-		},
-		{
-			name:         "download interrupted while reading the zip",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			bodyReadError: errors.New("connection reset"),
-			httpStatus:    200,
-			expectError:   true,
-			errorContains: "read artifact zip: connection reset",
-		},
-		{
-			name:         "downloaded file is not a zip",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipData:       []byte("not a zip"),
-			httpStatus:    200,
-			expectError:   true,
-			errorContains: "open zip",
-		},
-		{
-			name:         "JSON file does not match the target type",
-			artifactName: "test-artifact",
-			jsonFilePath: "state.json",
-			artifacts: []*github.Artifact{
-				{
-					ID:        github.Ptr(int64(123)),
-					Name:      github.Ptr("test-artifact"),
-					CreatedAt: &github.Timestamp{Time: time.Now()},
-				},
-			},
-			zipFilename:   "state.json",
-			zipJSON:       `{"version":"one"}`,
-			httpStatus:    200,
-			expectError:   true,
-			errorContains: `decode json "state.json"`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			zipData := tt.zipData
-			var err error
-
-			if tt.zipFilename != "" {
-				jsonContent := []byte(tt.zipJSON)
-				if tt.zipJSON == "" {
-					jsonContent, _ = json.Marshal(tt.zipContent)
-				}
-				zipData, err = createTestZip(tt.zipFilename, jsonContent)
-				if err != nil {
-					t.Fatalf("Failed to create test zip: %v", err)
-				}
-			}
-
-			mockHTTPClient := &mockHTTPClientWithZip{
-				zipData:       zipData,
-				statusCode:    tt.httpStatus,
-				err:           tt.httpError,
-				bodyReadError: tt.bodyReadError,
-			}
-
-			downloadURL, _ := url.Parse("https://example.com/download")
-			mockActions := &mockActionsServiceWithArtifacts{
-				artifacts:      tt.artifacts,
-				downloadURL:    downloadURL,
-				listError:      tt.listError,
-				downloadError:  tt.downloadError,
-				mockHTTPClient: mockHTTPClient,
-			}
-
-			client := NewClient(mockHTTPClient, mockActions, nil)
-
-			var result testState
-			err = client.FetchLatestArtifactByName(
-				context.Background(),
-				"test-owner",
-				"test-repo",
-				tt.artifactName,
-				tt.jsonFilePath,
-				&result,
-			)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error containing %q, got nil", tt.errorContains)
-					return
-				}
-				if tt.errorContains != "" && !contains(err.Error(), tt.errorContains) {
-					t.Errorf("Expected error containing %q, got %q", tt.errorContains, err.Error())
-				}
-				if errors.Is(err, ErrNoArtifactFound) != tt.expectNoArtifactFound {
-					t.Errorf("Expected errors.Is(err, ErrNoArtifactFound) to be %v, got %q", tt.expectNoArtifactFound, err)
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Expected no error, got: %v", err)
-				return
-			}
-
-			if result.Version != tt.expectedData.Version || result.Message != tt.expectedData.Message {
-				t.Errorf("Expected data %+v, got %+v", tt.expectedData, result)
-			}
-		})
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsSubstring(s, substr))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-// One scripted GitHub API answer. A zero status is no response at all, as on a network error.
 type githubCallResult struct {
 	status int
 	err    error
@@ -413,24 +33,32 @@ func (r githubCallResult) response() *github.Response {
 	if r.status == 0 {
 		return nil
 	}
-	return &github.Response{Response: &http.Response{StatusCode: r.status}}
+	return &github.Response{Response: &http.Response{
+		StatusCode: r.status,
+		Status:     strings.TrimSpace(fmt.Sprintf("%d %s", r.status, http.StatusText(r.status))),
+	}}
 }
 
-// Answers each call with the next scripted result, repeating the last one, and succeeds once the
-// script runs out. Every download URL is new, so a test can tell a fresh URL from a reused one.
+// Call N fails with the Nth scripted result when that result carries an error, and succeeds
+// otherwise, past the script's end too. Every download URL is new, so a test can tell a fresh
+// URL from a reused one.
 type scriptedActionsService struct {
-	listResults     []githubCallResult
-	downloadResults []githubCallResult
-	artifacts       []*github.Artifact
-	listCalls       int
-	downloadCalls   int
+	listResults           []githubCallResult
+	downloadResults       []githubCallResult
+	artifacts             []*github.Artifact
+	listCalls             int
+	downloadCalls         int
+	downloadedArtifactIDs []int64
+	listCallDeadlines     []time.Time
+	downloadCallDeadlines []time.Time
 }
 
 func (s *scriptedActionsService) ListArtifacts(
 	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
 ) (*github.ArtifactList, *github.Response, error) {
 	s.listCalls++
-	if result, isScripted := scriptedResult(s.listResults, s.listCalls); isScripted {
+	s.listCallDeadlines = append(s.listCallDeadlines, deadlineOf(ctx))
+	if result, isScripted := scriptedFailure(s.listResults, s.listCalls); isScripted {
 		return nil, result.response(), result.err
 	}
 	return &github.ArtifactList{
@@ -443,18 +71,25 @@ func (s *scriptedActionsService) DownloadArtifact(
 	ctx context.Context, owner string, repo string, artifactID int64, maxRedirects int,
 ) (*url.URL, *github.Response, error) {
 	s.downloadCalls++
-	if result, isScripted := scriptedResult(s.downloadResults, s.downloadCalls); isScripted {
+	s.downloadCallDeadlines = append(s.downloadCallDeadlines, deadlineOf(ctx))
+	s.downloadedArtifactIDs = append(s.downloadedArtifactIDs, artifactID)
+	if result, isScripted := scriptedFailure(s.downloadResults, s.downloadCalls); isScripted {
 		return nil, result.response(), result.err
 	}
 	downloadURL, _ := url.Parse(fmt.Sprintf("https://example.com/download/%d", s.downloadCalls))
 	return downloadURL, githubCallResult{status: 302}.response(), nil
 }
 
-func scriptedResult(results []githubCallResult, callNumber int) (githubCallResult, bool) {
+func scriptedFailure(results []githubCallResult, callNumber int) (githubCallResult, bool) {
 	if callNumber > len(results) || results[callNumber-1].err == nil {
 		return githubCallResult{}, false
 	}
 	return results[callNumber-1], true
+}
+
+func deadlineOf(ctx context.Context) time.Time {
+	deadline, _ := ctx.Deadline()
+	return deadline
 }
 
 type zipDownloadResult struct {
@@ -468,17 +103,16 @@ type zipDownloadResult struct {
 // Serves the zip once the script runs out. A hanging attempt blocks until its request's ctx is
 // done, or fails the test after a second if that ctx never ends.
 type scriptedZipClient struct {
-	t                  *testing.T
-	results            []zipDownloadResult
-	zipData            []byte
-	requestedURLs      []string
-	requestHasDeadline []bool
+	t                *testing.T
+	results          []zipDownloadResult
+	zipData          []byte
+	requestedURLs    []string
+	requestDeadlines []time.Time
 }
 
 func (c *scriptedZipClient) Do(request *http.Request) (*http.Response, error) {
 	c.requestedURLs = append(c.requestedURLs, request.URL.String())
-	_, hasDeadline := request.Context().Deadline()
-	c.requestHasDeadline = append(c.requestHasDeadline, hasDeadline)
+	c.requestDeadlines = append(c.requestDeadlines, deadlineOf(request.Context()))
 
 	result := zipDownloadResult{status: 200}
 	if len(c.requestedURLs) <= len(c.results) {
@@ -510,18 +144,59 @@ func (c *scriptedZipClient) waitUntilDone(ctx context.Context) error {
 	}
 }
 
-func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
+func createTestZip(filename string, content []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+
+	file, err := zipWriter.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := file.Write(content); err != nil {
+		return nil, err
+	}
+	if err := zipWriter.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func testZip(t *testing.T, filename, jsonContent string) []byte {
+	t.Helper()
+	zipData, err := createTestZip(filename, []byte(jsonContent))
+	if err != nil {
+		t.Fatalf("failed to create test zip: %v", err)
+	}
+	return zipData
+}
+
+func testArtifact(id int64, age time.Duration) *github.Artifact {
+	return &github.Artifact{
+		ID:        github.Ptr(id),
+		Name:      github.Ptr("test-artifact"),
+		CreatedAt: &github.Timestamp{Time: time.Now().Add(-age)},
+	}
+}
+
+const loadedStateJSON = `{"version":7,"message":"loaded"}`
+
+func TestFetchLatestArtifactByName(t *testing.T) {
 	noResponse := githubCallResult{err: errors.New("connection reset")}
-	serverError := githubCallResult{status: 500, err: errors.New("500 Internal Server Error")}
+	serverError := githubCallResult{status: 500, err: errors.New("server error")}
 
 	tests := []struct {
 		name                  string
+		artifacts             []*github.Artifact
+		jsonFilePath          string
+		zipFilename           string
+		zipJSON               string
+		zipData               []byte // replaces the whole zip
 		listResults           []githubCallResult
 		downloadResults       []githubCallResult
 		zipResults            []zipDownloadResult
-		noArtifacts           bool
-		zipData               []byte
-		expectError           bool
+		expectedError         string
+		expectNoArtifactFound bool
+		expectedArtifactID    int64
 		expectedListCalls     int
 		expectedDownloadCalls int
 		expectedZipDownloads  int
@@ -529,44 +204,107 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 		expectedRetryLog      string
 	}{
 		{
+			name:                  "state loads on the first attempt",
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name: "newest of several artifacts is downloaded",
+			artifacts: []*github.Artifact{
+				testArtifact(123, 2*time.Hour), testArtifact(456, time.Hour), testArtifact(789, 3*time.Hour),
+			},
+			expectedArtifactID:    456,
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "directory part of the JSON file path is ignored",
+			jsonFilePath:          "/tmp/state.json",
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "directory part of the file inside the zip is ignored",
+			zipFilename:           "path/to/state.json",
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "JSON file missing from the zip is not retried",
+			jsonFilePath:          "missing.json",
+			expectedError:         `json file "missing.json" not found inside artifact zip`,
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "JSON not matching the target type is not retried",
+			zipJSON:               `{"version":"one"}`,
+			expectedError:         `decode json "state.json": json: cannot unmarshal string into Go struct field testState.version of type int`,
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "zip that does not open is not retried",
+			zipData:               []byte("not a zip"),
+			expectedError:         "open zip: zip: not a valid zip file",
+			expectedListCalls:     1,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+		},
+		{
+			name:                  "no artifact found is not retried",
+			artifacts:             []*github.Artifact{},
+			expectedError:         `no artifacts found with name "test-artifact"`,
+			expectNoArtifactFound: true,
+			expectedListCalls:     1,
+		},
+		{
 			name:                  "artifact list server error then success",
 			listResults:           []githubCallResult{serverError},
 			expectedListCalls:     2,
 			expectedDownloadCalls: 1,
 			expectedZipDownloads:  1,
 			expectedWaits:         []time.Duration{2 * time.Second},
-			expectedRetryLog:      "artifact list attempt 1 failed, retrying in 2s: failed to list artifacts: 500 Internal Server Error\n",
+			expectedRetryLog:      "artifact list attempt 1 failed, retrying in 2s: failed to list artifacts: server error status=500 Internal Server Error\n",
+		},
+		{
+			name:                  "artifact list body cut off after a 200 then success",
+			listResults:           []githubCallResult{{status: 200, err: context.DeadlineExceeded}},
+			expectedListCalls:     2,
+			expectedDownloadCalls: 1,
+			expectedZipDownloads:  1,
+			expectedWaits:         []time.Duration{2 * time.Second},
 		},
 		{
 			name:              "artifact list without a response fails after 3 attempts",
 			listResults:       []githubCallResult{noResponse, noResponse, noResponse, noResponse},
-			expectError:       true,
+			expectedError:     "failed to list artifacts: connection reset",
 			expectedListCalls: 3,
 			expectedWaits:     []time.Duration{2 * time.Second, 5 * time.Second},
 			expectedRetryLog:  "artifact list attempt 2 failed, retrying in 5s: failed to list artifacts: connection reset",
 		},
 		{
 			name:              "artifact list client error just below the server errors is not retried",
-			listResults:       []githubCallResult{{status: 499, err: errors.New("499")}},
-			expectError:       true,
+			listResults:       []githubCallResult{{status: 499, err: errors.New("client closed request")}},
+			expectedError:     "failed to list artifacts: client closed request status=499",
 			expectedListCalls: 1,
 		},
 		{
 			name:              "artifact list rate limit 403 is not retried",
 			listResults:       []githubCallResult{{status: 403, err: errors.New("API rate limit exceeded")}},
-			expectError:       true,
+			expectedError:     "failed to list artifacts: API rate limit exceeded status=403 Forbidden",
 			expectedListCalls: 1,
 		},
 		{
 			name:              "artifact list 429 is not retried",
-			listResults:       []githubCallResult{{status: 429, err: errors.New("Too Many Requests")}},
-			expectError:       true,
-			expectedListCalls: 1,
-		},
-		{
-			name:              "no artifact found is not retried",
-			noArtifacts:       true,
-			expectError:       true,
+			listResults:       []githubCallResult{{status: 429, err: errors.New("too many requests")}},
+			expectedError:     "failed to list artifacts: too many requests status=429 Too Many Requests",
 			expectedListCalls: 1,
 		},
 		{
@@ -576,7 +314,7 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 			expectedDownloadCalls: 2,
 			expectedZipDownloads:  1,
 			expectedWaits:         []time.Duration{2 * time.Second},
-			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: get artifact download URL: 500 Internal Server Error",
+			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: get artifact download URL: server error\n",
 		},
 		{
 			name:                  "download URL without a response then success",
@@ -589,7 +327,7 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 		{
 			name:                  "download URL for an expired artifact is not retried",
 			downloadResults:       []githubCallResult{{status: 410, err: errors.New("unexpected status code: 410 Gone")}},
-			expectError:           true,
+			expectedError:         "get artifact download URL: unexpected status code: 410 Gone",
 			expectedListCalls:     1,
 			expectedDownloadCalls: 1,
 		},
@@ -600,7 +338,7 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 			expectedDownloadCalls: 2,
 			expectedZipDownloads:  2,
 			expectedWaits:         []time.Duration{2 * time.Second},
-			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: download artifact zip: connection reset",
+			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: download artifact zip: connection reset\n",
 		},
 		{
 			name:                  "zip download server error then success",
@@ -609,6 +347,7 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 			expectedDownloadCalls: 2,
 			expectedZipDownloads:  2,
 			expectedWaits:         []time.Duration{2 * time.Second},
+			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: unexpected status code 500 when downloading artifact\n",
 		},
 		{
 			name:                  "zip download failing to read the body then success",
@@ -617,11 +356,12 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 			expectedDownloadCalls: 2,
 			expectedZipDownloads:  2,
 			expectedWaits:         []time.Duration{2 * time.Second},
+			expectedRetryLog:      "artifact download attempt 1 failed, retrying in 2s: read artifact zip: unexpected EOF\n",
 		},
 		{
 			name:                  "zip download server errors fail after 3 attempts",
 			zipResults:            []zipDownloadResult{{status: 503}, {status: 503}, {status: 503}, {status: 503}},
-			expectError:           true,
+			expectedError:         "unexpected status code 503 when downloading artifact",
 			expectedListCalls:     1,
 			expectedDownloadCalls: 3,
 			expectedZipDownloads:  3,
@@ -630,15 +370,7 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 		{
 			name:                  "zip download client error just below the server errors is not retried",
 			zipResults:            []zipDownloadResult{{status: 499}},
-			expectError:           true,
-			expectedListCalls:     1,
-			expectedDownloadCalls: 1,
-			expectedZipDownloads:  1,
-		},
-		{
-			name:                  "zip that does not open is not retried",
-			zipData:               []byte("not a zip"),
-			expectError:           true,
+			expectedError:         "unexpected status code 499 when downloading artifact",
 			expectedListCalls:     1,
 			expectedDownloadCalls: 1,
 			expectedZipDownloads:  1,
@@ -647,27 +379,34 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := withoutRetryWaits(t)
-			logOutput := captureLog(t)
+			recorder := skipAndRecordRetryWaits(t)
+			logOutput := captureLogOutput(t)
+			artifacts := tt.artifacts
+			if artifacts == nil {
+				artifacts = []*github.Artifact{testArtifact(123, time.Hour)}
+			}
 			actions := &scriptedActionsService{
 				listResults:     tt.listResults,
 				downloadResults: tt.downloadResults,
-				artifacts:       testArtifacts(tt.noArtifacts),
+				artifacts:       artifacts,
 			}
-			zipClient := &scriptedZipClient{t: t, results: tt.zipResults, zipData: tt.zipData}
-			if tt.zipData == nil {
-				zipClient.zipData = stateZip(t, testState{Version: 7, Message: "loaded"})
+			zipData := tt.zipData
+			if zipData == nil {
+				zipData = testZip(t, cmp.Or(tt.zipFilename, "state.json"), cmp.Or(tt.zipJSON, loadedStateJSON))
 			}
+			zipClient := &scriptedZipClient{t: t, results: tt.zipResults, zipData: zipData}
 
 			var loaded testState
 			err := NewClient(zipClient, actions, nil).FetchLatestArtifactByName(
-				context.Background(), "test-owner", "test-repo", "test-artifact", "state.json", &loaded,
+				context.Background(), "test-owner", "test-repo", "test-artifact",
+				cmp.Or(tt.jsonFilePath, "state.json"), &loaded,
 			)
 
-			if tt.expectError != (err != nil) {
-				t.Fatalf("expected an error: %v, got %v", tt.expectError, err)
+			assertEqualStrings(t, "error", errorText(err), tt.expectedError)
+			if errors.Is(err, ErrNoArtifactFound) != tt.expectNoArtifactFound {
+				t.Errorf("expected errors.Is(err, ErrNoArtifactFound) to be %v, got %v", tt.expectNoArtifactFound, err)
 			}
-			if !tt.expectError && loaded.Version != 7 {
+			if tt.expectedError == "" && loaded != (testState{Version: 7, Message: "loaded"}) {
 				t.Errorf("expected the state to load, got %+v", loaded)
 			}
 			if actions.listCalls != tt.expectedListCalls {
@@ -675,6 +414,12 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 			}
 			if actions.downloadCalls != tt.expectedDownloadCalls {
 				t.Errorf("expected %d download URL calls, got %d", tt.expectedDownloadCalls, actions.downloadCalls)
+			}
+			expectedArtifactID := cmp.Or(tt.expectedArtifactID, 123)
+			for _, artifactID := range actions.downloadedArtifactIDs {
+				if artifactID != expectedArtifactID {
+					t.Errorf("expected artifact %d to be downloaded, got %d", expectedArtifactID, artifactID)
+				}
 			}
 			if len(zipClient.requestedURLs) != tt.expectedZipDownloads {
 				t.Errorf("expected %d zip downloads, got %d", tt.expectedZipDownloads, len(zipClient.requestedURLs))
@@ -692,6 +437,31 @@ func TestFetchLatestArtifactByNameRetriesTransientFailures(t *testing.T) {
 	}
 }
 
+func TestFetchLatestArtifactByNameGivesEachCallA15sAttemptDeadline(t *testing.T) {
+	actions := &scriptedActionsService{artifacts: []*github.Artifact{testArtifact(123, time.Hour)}}
+	zipClient := &scriptedZipClient{t: t, zipData: testZip(t, "state.json", loadedStateJSON)}
+
+	started := time.Now()
+	var loaded testState
+	err := NewClient(zipClient, actions, nil).FetchLatestArtifactByName(
+		context.Background(), "test-owner", "test-repo", "test-artifact", "state.json", &loaded,
+	)
+	finished := time.Now()
+
+	if err != nil {
+		t.Fatalf("expected the state to load, got %v", err)
+	}
+	deadlines := slices.Concat(actions.listCallDeadlines, actions.downloadCallDeadlines, zipClient.requestDeadlines)
+	if len(deadlines) != 3 {
+		t.Fatalf("expected one list, one download URL and one zip call, got %d deadlines", len(deadlines))
+	}
+	for index, deadline := range deadlines {
+		if deadline.Before(started.Add(15*time.Second)) || deadline.After(finished.Add(15*time.Second)) {
+			t.Errorf("call %d: expected a deadline 15s after its attempt started, got %v from %v", index+1, deadline.Sub(started), started)
+		}
+	}
+}
+
 func TestFetchLatestArtifactByNameRetriesAZipDownloadCutOffByItsDeadline(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -703,13 +473,13 @@ func TestFetchLatestArtifactByNameRetriesAZipDownloadCutOffByItsDeadline(t *test
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withoutRetryWaits(t)
+			skipAndRecordRetryWaits(t)
 			withAttemptTimeout(t, 20*time.Millisecond)
-			actions := &scriptedActionsService{artifacts: testArtifacts(false)}
+			actions := &scriptedActionsService{artifacts: []*github.Artifact{testArtifact(123, time.Hour)}}
 			zipClient := &scriptedZipClient{
 				t:       t,
 				results: tt.zipResults,
-				zipData: stateZip(t, testState{Version: 7, Message: "loaded"}),
+				zipData: testZip(t, "state.json", loadedStateJSON),
 			}
 
 			var loaded testState
@@ -720,30 +490,9 @@ func TestFetchLatestArtifactByNameRetriesAZipDownloadCutOffByItsDeadline(t *test
 			if err != nil || loaded.Version != 7 {
 				t.Fatalf("expected the second attempt to load the state, got %+v and %v", loaded, err)
 			}
-			if !slices.Equal(zipClient.requestHasDeadline, []bool{true, true}) {
-				t.Errorf("expected 2 zip requests, each carrying a deadline, got %v", zipClient.requestHasDeadline)
+			if len(zipClient.requestedURLs) != 2 {
+				t.Errorf("expected 2 zip requests, got %d", len(zipClient.requestedURLs))
 			}
 		})
 	}
-}
-
-func testArtifacts(none bool) []*github.Artifact {
-	if none {
-		return []*github.Artifact{}
-	}
-	return []*github.Artifact{{
-		ID:        github.Ptr(int64(123)),
-		Name:      github.Ptr("test-artifact"),
-		CreatedAt: &github.Timestamp{Time: time.Now()},
-	}}
-}
-
-func stateZip(t *testing.T, content testState) []byte {
-	t.Helper()
-	jsonContent, _ := json.Marshal(content)
-	zipData, err := createTestZip("state.json", jsonContent)
-	if err != nil {
-		t.Fatalf("failed to create test zip: %v", err)
-	}
-	return zipData
 }

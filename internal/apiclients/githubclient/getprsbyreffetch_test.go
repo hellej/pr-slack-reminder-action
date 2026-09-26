@@ -77,7 +77,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 
 // Unlike phase 2 under FindOpenPRs, an alias that carries no PR has nothing to fall back to.
 func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	tests := []struct {
 		name            string

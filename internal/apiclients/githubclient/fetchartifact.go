@@ -147,7 +147,13 @@ func (client *client) downloadArtifactZip(
 }
 
 // The status is read off the *Response, since DownloadArtifact reports a failed status as a
-// plain error. No *Response means no answer arrived at all.
+// plain error. go-github returns the 2xx *Response with the error when reading or decoding the
+// body fails, as when the attempt deadline cuts it off. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
 func isTransientGitHubFailure(resp *github.Response) bool {
-	return resp == nil || resp.Response == nil || resp.StatusCode >= http.StatusInternalServerError
+	gotNoResponse := resp == nil || resp.Response == nil
+	if gotNoResponse {
+		return true
+	}
+	bodyReadFailed := resp.StatusCode >= 200 && resp.StatusCode < 300
+	return bodyReadFailed || resp.StatusCode >= http.StatusInternalServerError
 }

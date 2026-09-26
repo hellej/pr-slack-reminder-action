@@ -175,7 +175,7 @@ func TestSearchMergedPRsLogsTruncatedRepository(t *testing.T) {
 }
 
 func TestSearchMergedPRsFailsOnAnyError(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 
 	tests := []struct {
 		name             string
@@ -427,7 +427,7 @@ func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
 
 // A reviewer query must not take down a canvas-enabled run.
 func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
-	withoutRetryWaits(t)
+	skipAndRecordRetryWaits(t)
 	logOutput := captureLogOutput(t)
 
 	testClient, _ := mergedFetchClient(

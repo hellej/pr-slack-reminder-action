@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// The wait before each retry. One more attempt than there are waits.
 var retryWaits = []time.Duration{2 * time.Second, 5 * time.Second}
 
 // Past GitHub's own 10s processing limit, so its 502 or 504 arrives first. See
@@ -32,14 +31,13 @@ type attemptResult[T any] struct {
 	transient bool
 }
 
-// Runs the attempt, each time under its own deadline, until it succeeds, fails permanently, runs
-// out of retries or the caller's ctx is done. The last attempt's error is returned.
 func retryTransientFailures[T any](
 	ctx context.Context, apiName string, runAttempt func(attemptCtx context.Context) attemptResult[T],
 ) (T, error) {
+	maxAttempts := len(retryWaits) + 1
 	for attemptNumber := 1; ; attemptNumber++ {
 		result := runAttemptWithDeadline(ctx, runAttempt)
-		if result.err == nil || !result.transient || attemptNumber > len(retryWaits) {
+		if result.err == nil || !result.transient || attemptNumber == maxAttempts {
 			return result.value, result.err
 		}
 		if ctx.Err() != nil {
