@@ -54,7 +54,7 @@ func Run(
 	}
 	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(githubClient, cfg, generatedAt)
 	if mergedPRsErr != nil {
-		log.Printf("Failed to fetch recently merged PRs: %v", mergedPRsErr)
+		logWarning(fmt.Sprintf("Failed to fetch recently merged PRs: %v", mergedPRsErr))
 	}
 
 	var messageErr, canvasErr, stateErr error
@@ -83,9 +83,9 @@ func Run(
 			slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt, lastWrittenCanvasMarkdownHash,
 		)
 	}
-	if canvasErr != nil {
-		canvasErr = fmt.Errorf("PR tracker canvas refresh failed: %w", canvasErr)
-	}
+	canvasErr = errors.Join(utilities.Map(splitJoinedError(canvasErr), func(part error) error {
+		return fmt.Errorf("PR tracker canvas refresh failed: %w", part)
+	})...)
 	if stateToSave != nil {
 		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
@@ -145,8 +145,12 @@ func markPreviousMessageStale(
 		cfg.StateArtifactName,
 		cfg.StateFilePath,
 	)
+	if errors.Is(err, githubclient.ErrNoArtifactFound) {
+		log.Printf("Not marking the previous message stale, there is no previous state: %v", err)
+		return nil
+	}
 	if err != nil {
-		log.Printf("Not marking the previous message stale, its state did not load: %v", err)
+		logWarning(fmt.Sprintf("Not marking the previous message stale, its state did not load: %v", err))
 		return nil
 	}
 	lastWrittenMessage := previousState.LastWrittenMessage
@@ -173,7 +177,7 @@ func markPreviousMessageStale(
 		lastWrittenMessage.SummaryText,
 	)
 	if errors.Is(err, slackclient.ErrMessageNotEditable) {
-		log.Printf("Not marking the previous message stale: %v", err)
+		logWarning(fmt.Sprintf("Not marking the previous message stale: %v", err))
 		return nil
 	}
 	if err != nil {
@@ -214,7 +218,7 @@ func runUpdateMode(
 		githubClient, cfg, loadedState.PullRequests, openPRs.PRs, mergedPRs,
 	)
 	if trackedPRsErr != nil {
-		log.Printf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr)
+		logWarning(fmt.Sprintf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr))
 	}
 
 	content := messagecontent.GetContent(
@@ -237,7 +241,7 @@ func runUpdateMode(
 			loadedState.MessageRef.ChannelID,
 			loadedState.MessageRef.MessageTS,
 		); err != nil {
-			log.Printf("Warning: failed to delete message: %v", err)
+			logWarning(fmt.Sprintf("Keeping the Slack message with nothing left to show, its delete failed: %v", err))
 		}
 		return loadedState, nil
 	}

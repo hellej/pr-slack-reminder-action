@@ -702,9 +702,18 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The repository-level list returns HTTP 200 with `total_count` 0, never a 404
 - So a missing artifact is detectable only by the empty list
 
+## A public repository's artifacts list and download without `actions: read` [2026-09-26]
+
+- Source: PR Reminder run 36233796342 (job 108381774519, PR #68). With `actions: read` removed
+  from the job's `permissions`, leaving `contents: read` and `pull-requests: read`, the
+  `GITHUB_TOKEN` listed 12 state artifacts and downloaded the newest
+- So removing the permission cannot fake a failed state load on this repository. An invalid
+  `github-token-for-state` does: run 36233911019 got `401 Bad credentials` on the list
+
 ## A step can list and download an artifact uploaded earlier in the same, still running workflow run [2026-09-26]
 
 - Source: Build run 36234329142 (job 108383254033, PR #69)
 - The e2e post step's state was uploaded by `actions/upload-artifact` v7.0.1. The update step, two steps later, logged `Found 1 artifacts with name "pr-slack-reminder-e2e-grouped-canvas-state"` and downloaded ID 10903097879, created 2 seconds earlier
 - The next upload's `overwrite: true` logged `Artifact … (ID: 10903097879) deleted`, so the download was this run's artifact, not an earlier run's
-- The e2e GitHub App token downloads artifacts too, not only lists them
+- The e2e GitHub App token downloads them too. On this public repository that says nothing about
+  `actions: read`. See § A public repository's artifacts list and download without `actions: read`
