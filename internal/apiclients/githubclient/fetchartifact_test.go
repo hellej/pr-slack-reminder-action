@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,19 +90,20 @@ func createTestZip(filename string, content []byte) ([]byte, error) {
 
 func TestFetchLatestArtifactByName(t *testing.T) {
 	tests := []struct {
-		name          string
-		artifactName  string
-		jsonFilePath  string
-		artifacts     []*github.Artifact
-		zipFilename   string
-		zipContent    testState
-		listError     error
-		downloadError error
-		httpError     error
-		httpStatus    int
-		expectedData  testState
-		expectError   bool
-		errorContains string
+		name                  string
+		artifactName          string
+		jsonFilePath          string
+		artifacts             []*github.Artifact
+		zipFilename           string
+		zipContent            testState
+		listError             error
+		downloadError         error
+		httpError             error
+		httpStatus            int
+		expectedData          testState
+		expectError           bool
+		errorContains         string
+		expectNoArtifactFound bool
 	}{
 		{
 			name:         "successful fetch with exact filename match",
@@ -177,18 +179,19 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name:          "no artifacts found",
-			artifactName:  "missing-artifact",
-			jsonFilePath:  "state.json",
-			artifacts:     []*github.Artifact{},
-			expectError:   true,
-			errorContains: "no artifacts found with name",
+			name:                  "no artifacts found",
+			artifactName:          "missing-artifact",
+			jsonFilePath:          "state.json",
+			artifacts:             []*github.Artifact{},
+			expectError:           true,
+			errorContains:         "no artifacts found with name \"missing-artifact\"",
+			expectNoArtifactFound: true,
 		},
 		{
 			name:          "list artifacts error",
 			artifactName:  "test-artifact",
 			jsonFilePath:  "state.json",
-			listError:     fmt.Errorf("API error"),
+			listError:     fmt.Errorf("403 Forbidden"),
 			expectError:   true,
 			errorContains: "failed to list artifacts",
 		},
@@ -312,6 +315,9 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 				}
 				if tt.errorContains != "" && !contains(err.Error(), tt.errorContains) {
 					t.Errorf("Expected error containing %q, got %q", tt.errorContains, err.Error())
+				}
+				if errors.Is(err, githubclient.ErrNoArtifactFound) != tt.expectNoArtifactFound {
+					t.Errorf("Expected errors.Is(err, ErrNoArtifactFound) to be %v, got %q", tt.expectNoArtifactFound, err)
 				}
 				return
 			}

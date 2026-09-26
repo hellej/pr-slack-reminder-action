@@ -701,3 +701,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `Found 0 artifacts with name "pr-slack-reminder-e2e-…-state"` using the e2e GitHub App token
 - The repository-level list returns HTTP 200 with `total_count` 0, never a 404
 - So a missing artifact is detectable only by the empty list
+
+## A public repository's artifacts list and download without `actions: read` [2026-09-26]
+
+- Source: PR Reminder run 36233796342 (job 108381774519, PR #68). With `actions: read` removed
+  from the job's `permissions`, leaving `contents: read` and `pull-requests: read`, the
+  `GITHUB_TOKEN` listed 12 state artifacts and downloaded the newest
+- So removing the permission cannot fake a failed state load on this repository. An invalid
+  `github-token-for-state` does: run 36233911019 got `401 Bad credentials` on the list
