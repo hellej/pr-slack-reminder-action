@@ -40,8 +40,8 @@ They become the plan's first section.
 
 ## The Facts File
 
-[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) follows AGENTS.md
-§ Third-party Facts. Reading that section is mandatory.
+[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) follows
+AGENTS.md § Third-party Facts. Reading that section is mandatory.
 
 - Check it before fanning out. An entry answers a question, or narrows it to "confirm this
   still holds at the version `go.mod` pins now"
@@ -63,13 +63,13 @@ Don't fan out what one grep answers.
 
 ## Draft
 
-Write the plan file per the plan skill's Structure.
+Write the plan file per the `plan` skill § Structure.
 
-Cite every third-party claim in the plan itself, at the point that depends on it, per that
-skill's read sequence. The critic takes a cited claim as settled, so citing is what keeps
+Cite every third-party claim in the plan itself, at the point that depends on it, per the
+`plan` skill § Mandatory Pre-Plan Read Sequence. The critic takes a cited claim as settled, so citing is what keeps
 rounds cheap.
 
-Before spawning the critic, re-read the draft against the plan skill's Structure and Style.
+Before spawning the critic, re-read the draft against the `plan` skill § Structure and § Style.
 
 ## Rounds
 

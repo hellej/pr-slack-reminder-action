@@ -63,14 +63,21 @@ check_package_specs() {
 	fi
 }
 
+hash_comment_files() {
+	echo Makefile action.yml
+	find .github -name '*.yml'
+	find githooks -type f
+	find . -name '*.sh' -not -path './.git/*'
+}
+
 check_references() {
 	local findings
-	if ! findings=$({ prose_files; find internal cmd -name '*.go'; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
+	if ! findings=$({ prose_files; find internal cmd .github -name '*.go'; hash_comment_files; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
 		report "Reference check failed to run:" "$findings"
 		return
 	fi
 	if [ -n "$findings" ]; then
-		report "Broken reference, see AGENTS.md § Development Commands:" "$findings"
+		report "Broken reference, see AGENTS.md § References:" "$findings"
 	fi
 }
 

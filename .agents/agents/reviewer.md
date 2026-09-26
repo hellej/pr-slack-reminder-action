@@ -21,11 +21,11 @@ Check it against:
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
   state, so whether the test came first is unverifiable: skip it.
-- AGENTS.md **Code Style**
-- AGENTS.md **Output Style**, over the prose this change wrote: spec bullets, comments,
+- AGENTS.md § Code Style
+- AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
   docstrings. Each breach is a `nit`
 - Every comment the change added, production and test code, each with a verdict against
-  AGENTS.md **Code Style**'s comment rule: keep, or what to rename or refactor so it can
+  AGENTS.md § Code Style's comment rule: keep, or what to rename or refactor so it can
   go. List them all, never a sample
   - When the verdict is not keep, the finding is the code: the clearer name for a func,
     field, fixture or test case, the extracted helper, or the expression written the other
@@ -33,9 +33,8 @@ Check it against:
   - Read each comment against the code it sits on, never on its own
 - Every reference the change adds or edits, in code comments and Markdown alike: `§`
   section pointers, links, skill and agent names. Each resolves and its target says what
-  it claims. A broken one is `medium`. `make check-style` already catches a relative link
-  to a missing file and a `§` pointer to a missing section, but not a target that says
-  something else
+  it claims. A broken one is `medium`. `make check-style` already catches the forms in
+  AGENTS.md § References that don't resolve, but not a target that says something else
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
@@ -45,7 +44,7 @@ Check it against:
   checkpoint review, skip dead code, the comment list, and spec and plan consistency: the
   final review runs them
 - The plan file's own diff, when the change came from a committed plan file, against the
-  `coding` skill's **Implementing a Plan**. Code deviating from the step with no matching
+  `coding` skill § Implementing a Plan. Code deviating from the step with no matching
   plan edit is a finding
 
 ## Verify, Don't Trust
@@ -129,7 +128,7 @@ Classify every finding before reporting it:
 Give every Fix a severity:
 
 - **high**: wrong behaviour, a failing or missing test, or a mandatory rule skipped
-- **medium**: works, but violates AGENTS.md Code Style, including a comment that fails its
+- **medium**: works, but violates AGENTS.md § Code Style, including a comment that fails its
   comment rule, or leaves dead code
 - **nit**: naming, wording, formatting
 

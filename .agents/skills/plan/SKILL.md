@@ -53,7 +53,7 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 2. The target shape: the resulting architecture/feature, if not already fully covered by the requirements. Always call out changes to action inputs (`action.yml`) here, and any new/changed required permissions (GitHub token permissions, third-party OAuth scopes) here too
    - Name each new concept once, here. Code, JSON keys and docs use exactly these names
    - For a change users see in Slack, sketch each affected message state as rendered text: posted, edited by `update`, marked stale. The user confirms the sketches. Offer the [slack-message-probe skill](../slack-message-probe/SKILL.md) for anything uncertain
-3. Whether the change is breaking or non-breaking, per the [release skill](../release/SKILL.md)'s semver table (patch/minor/major)
+3. Whether the change is breaking or non-breaking, per the `release` skill § 1. Determine Semver Bump (patch/minor/major)
    - For persisted state or artifacts, say what the first run after upgrading does with what the previous version wrote. Mention a downgrade only if it breaks
 4. A short summary listing the steps
 5. The full steps, each naming the files/packages it touches, in that same order: the order they're written is the suggested implementation order, never a separate order/sequence table. The [implement skill](../implement/SKILL.md) runs all steps in one go and reviews the whole diff. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`

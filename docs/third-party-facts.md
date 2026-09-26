@@ -770,3 +770,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Not read: `AGENTS.local.md`, `AGENTS.override.md`, anything under `.agents/`
 - Not read before v2.1.277, with the built-in `agents-md` plugin disabled, or in some first sessions after upgrading from v2.1.276 or earlier
 - `InstructionsLoaded` hooks don't fire for it
+
+## GitHub builds a heading's anchor by lowercasing it, dropping punctuation and turning spaces into hyphens [2026-09-26]
+
+- Source: [github-slugger](https://github.com/Flet/github-slugger) `index.js`, the library GitHub-style Markdown tools use to match GitHub's anchors
+- `slug()` lowercases, removes the characters its `regex.js` lists (punctuation and symbols, emoji included), then replaces each space with `-`
+- A repeated slug gets `-1`, then `-2`: the first copy keeps the bare slug
+- Unverified: that github.com renders every heading exactly this way. The README's own anchor links, such as `#-github-token-setup` for a heading opening with an emoji, resolve under it
+- `.github/scripts/checkreferences` approximates `regex.js` as "keep letters, digits, `-` and `_`"

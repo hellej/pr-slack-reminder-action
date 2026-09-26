@@ -82,6 +82,21 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
 - ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
 
+## References
+
+Write a reference in one of these forms. `make check-style` checks each one resolves (`.github/scripts/checkreferences/`):
+
+- Section: `<file>.md § <Heading>`, or `` the `<name>` skill § <Heading> `` or `` the `<name>` agent § <Heading> ``
+  - Name the file right before the `§`. A later pointer on the same line reuses it: `AGENTS.md § Git and § Testing`
+  - `§ <Heading>` with no file before it points into the file holding it
+  - The text after `§` starts with a heading or a bold label of that file, such as a Code Style rule
+  - A facts file entry: its full heading, date left out
+- Repository path: backticked, from the repository root, e.g. `internal/state/`
+- Skill or agent: its backticked name followed by `skill` or `agent`
+- Link: relative, optionally with a `#heading` anchor
+- Checked in Markdown, Go comments, and `#` comments in YAML, Makefile and shell files
+  - A link or `§` pointer inside a code span or code block is an example, not checked
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
@@ -164,7 +179,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
-- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a relative link in those Markdown files to a missing file, a `<file>.md § <section>` pointer in them or in a Go comment whose section is no heading or bold text of that file (`.github/scripts/checkreferences/`), a map not named `<value>By<Key>`, or a package missing its spec
+- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
 - `go run .github/scripts/check_inputs.go`: validate action.yml and config.go constants are in sync

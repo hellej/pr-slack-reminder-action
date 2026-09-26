@@ -31,7 +31,7 @@ Write one. The rest of this skill reads a plan.
 
 - Draft the task to `.local/implement-<slug>.md`, already gitignored
 - Give it what this skill reads: brief motivation, what to change, the acceptance criteria, what it must not do, and the test cases
-- Verify its claims against the tree before showing it, per Acceptance Criteria below
+- Verify its claims against the tree before showing it, per § Acceptance Criteria below
 - Confirm it with the user before round 1
 - If drafting turns up a design decision, stop and hand back to the [plan skill](../plan/SKILL.md)
 
@@ -111,7 +111,7 @@ The size of the fix decides what follows, not whether to make it.
   `SendMessage`
 - A fresh spawn starts cold. The implementer re-derives the plan and often redoes work.
   The reviewer re-raises findings it already got fixed
-- One exception, an agent that cannot resume at all. See Interruptions
+- One exception, an agent that cannot resume at all. See § Interruptions
 
 ## Interruptions
 
