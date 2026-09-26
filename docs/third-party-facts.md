@@ -726,3 +726,38 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Reported working: an `allow` entry per tool module with `dependency-type: "all"`
   - An `allow` list replaces the default for its whole update entry, so the tools module needs an entry of its own
 - Unverified: whether `dependency-type: "all"` with no `dependency-name` covers them too
+
+## `go-github` v78 never retries a 5xx or network error, and sets no HTTP timeout [2026-09-26]
+
+- Source: `go-github/v78@v78.0.0/github/github.go` in the module cache: `bareDo`, `NewClient`
+- `bareDo` sends once and returns on error, with no loop
+  - Its only retry is opt-in, once, after a primary rate limit resets: the ctx key `SleepUntilPrimaryRateLimitResetWhenRateLimited`
+- `NewClient(nil)` builds a bare `&http.Client{}`, so a request has no deadline beyond its ctx
+- A failed request returns the `*Response` whenever one arrived, and a nil `*Response` on a network error
+  - When the ctx is done, `bareDo` returns `ctx.Err()` itself, unwrapped
+- A non-2xx status is a `*ErrorResponse`, its status on `Response.StatusCode` and on the returned `*Response`
+
+## `go-github` v78 reports rate limits only as a 403, and short-circuits a request while one lasts [2026-09-26]
+
+- Source: `go-github/v78@v78.0.0/github/github.go`: `CheckResponse`, `checkRateLimitBeforeDo`, `checkSecondaryRateLimitBeforeDo`
+- A 403 with `x-ratelimit-remaining: 0` is a `*RateLimitError`; a 403 naming the secondary or abuse limit is an `*AbuseRateLimitError`
+- While a known limit lasts, the next call returns that error with a synthetic 403 `*Response` and sends nothing
+- No code handles 429: it arrives as a plain `*ErrorResponse`
+
+## `go-github` v78 `DownloadArtifact` returns a plain error on a non-302, with the `*Response` [2026-09-26]
+
+- Source: `go-github/v78@v78.0.0/github/actions_artifacts.go`: `DownloadArtifact`, `downloadArtifactWithoutRateLimit`
+- Unless `RateLimitRedirectionalEndpoints` is set, it calls the transport once, skipping `CheckResponse` and the rate-limit short-circuit
+  - A 302 returns the `Location` URL
+  - Any other status returns `fmt.Errorf("unexpected status code: …")` and the `*Response`, so the status is read off the `*Response`, not the error
+  - A network error returns a nil `*Response`
+- The request carries the ctx
+- The redirect URL expires after 1 minute, and an expired artifact answers `410 Gone` ([Download an artifact](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact))
+
+## GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL [2026-09-26]
+
+- Source: [GraphQL rate and query limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api) § Timeouts, [Troubleshooting the REST API](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api)
+- GraphQL answers `502` or `504`. A GraphQL timeout also costs extra primary rate-limit points for the next hour
+- REST answers a "Server Error"; the status code is not documented
+- GitHub reserves the right to change the window
+- Neither page gives backoff advice for a 5xx or a timeout: only "simplify your request or try your request later". The REST best-practices page's backoff rules cover rate limits only
