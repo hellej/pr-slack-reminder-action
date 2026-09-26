@@ -1079,21 +1079,21 @@ func TestPostModeMarksThePreviousMessageStale(t *testing.T) {
 	if result.runErr != nil {
 		t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 	}
-	markingEdit := result.mockSlackAPI.UpdatedMessage
-	if markingEdit.ChannelID != "C12345678" || markingEdit.Timestamp != "1788253200.000100" {
+	markAsStaleEdit := result.mockSlackAPI.UpdatedMessage
+	if markAsStaleEdit.ChannelID != "C12345678" || markAsStaleEdit.Timestamp != "1788253200.000100" {
 		t.Errorf(
 			"Expected the edit on C12345678 at 1788253200.000100, got %s at %s",
-			markingEdit.ChannelID, markingEdit.Timestamp,
+			markAsStaleEdit.ChannelID, markAsStaleEdit.Timestamp,
 		)
 	}
-	if markingEdit.Text != "3 open PRs are waiting for attention 👀" {
-		t.Errorf("Expected the stored summary text, got %q", markingEdit.Text)
+	if markAsStaleEdit.Text != "3 open PRs are waiting for attention 👀" {
+		t.Errorf("Expected the stored summary text, got %q", markAsStaleEdit.Text)
 	}
 	// The snapshots normalise the staleness warning's time, so only this pins that time to the
 	// stored GeneratedAt, not the clock
 	storedTimeInStalenessWarning := "!date^1788253200^{date_pretty} at {time}|Sep 1 09:00 UTC"
-	if strings.Count(string(markingEdit.BlocksAsSent), storedTimeInStalenessWarning) != 1 {
-		t.Errorf("Expected the staleness warning alone to show %s, got\n%s", storedTimeInStalenessWarning, markingEdit.BlocksAsSent)
+	if strings.Count(string(markAsStaleEdit.BlocksAsSent), storedTimeInStalenessWarning) != 1 {
+		t.Errorf("Expected the staleness warning alone to show %s, got\n%s", storedTimeInStalenessWarning, markAsStaleEdit.BlocksAsSent)
 	}
 	assertNewPostStateSaved(t, result.stateFilePath)
 	assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
@@ -1112,7 +1112,7 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 			t.Fatalf("Expected Run to fail with the send error, got %v", result.runErr)
 		}
 		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
-			t.Errorf("Expected no marking edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			t.Errorf("Expected no mark-as-stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
 		}
 	})
 
@@ -1129,7 +1129,7 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 			t.Fatalf("Expected nothing sent, got %+v", result.mockSlackAPI.SentMessage)
 		}
 		if result.mockSlackAPI.UpdatedMessage.ChannelID != "" {
-			t.Errorf("Expected no marking edit, got %+v", result.mockSlackAPI.UpdatedMessage)
+			t.Errorf("Expected no mark-as-stale edit, got %+v", result.mockSlackAPI.UpdatedMessage)
 		}
 	})
 }
@@ -1186,8 +1186,8 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 			if result.runErr != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", result.runErr)
 			}
-			if markingEdit := result.mockSlackAPI.UpdatedMessage; markingEdit.ChannelID != "" {
-				t.Errorf("Expected no marking edit, got one on %s at %s", markingEdit.ChannelID, markingEdit.Timestamp)
+			if markAsStaleEdit := result.mockSlackAPI.UpdatedMessage; markAsStaleEdit.ChannelID != "" {
+				t.Errorf("Expected no mark-as-stale edit, got one on %s at %s", markAsStaleEdit.ChannelID, markAsStaleEdit.Timestamp)
 			}
 			assertNewPostStateSaved(t, result.stateFilePath)
 			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
@@ -1195,7 +1195,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	}
 }
 
-func TestPostModeFailsTheRunOnAMarkingEditErrorButSavesTheNewState(t *testing.T) {
+func TestPostModeFailsTheRunOnAMarkAsStaleEditErrorButSavesTheNewState(t *testing.T) {
 	previousState := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks := previousStateInThisChannelEditedByAnUpdateRun()
 	previousStateWithUnbuildableBlocks.LastSentMessage.Blocks = []byte(

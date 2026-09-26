@@ -456,15 +456,15 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 			}
 			mockSlackAPI := runSnapshotScenario(t, scenario, &previousState, "1234567899.000200")
 
-			markingEdit := mockSlackAPI.UpdatedMessage
-			if markingEdit.ChannelID != "C12345678" || markingEdit.Timestamp != "1234567890.123456" {
+			markAsStaleEdit := mockSlackAPI.UpdatedMessage
+			if markAsStaleEdit.ChannelID != "C12345678" || markAsStaleEdit.Timestamp != "1234567890.123456" {
 				t.Fatalf(
-					"Expected the marking edit on the first post's message, C12345678 at 1234567890.123456, got %s at %s",
-					markingEdit.ChannelID, markingEdit.Timestamp,
+					"Expected the mark-as-stale edit on the first post's message, C12345678 at 1234567890.123456, got %s at %s",
+					markAsStaleEdit.ChannelID, markAsStaleEdit.Timestamp,
 				)
 			}
 			var indentedMarkedMessageBlocks bytes.Buffer
-			if err := json.Indent(&indentedMarkedMessageBlocks, markingEdit.BlocksAsSent, "", "  "); err != nil {
+			if err := json.Indent(&indentedMarkedMessageBlocks, markAsStaleEdit.BlocksAsSent, "", "  "); err != nil {
 				t.Fatalf("Failed to indent the marked message blocks: %v", err)
 			}
 			assertBlocksMatchSnapshot(t, indentedMarkedMessageBlocks.Bytes())

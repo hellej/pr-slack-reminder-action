@@ -193,8 +193,8 @@ marked stale. Link the README's workflow example.
     responses, the previous one stored by `NewPostState`, so they compare like for like
   - Builds the message marked stale and edits it with `slackClient.UpdateMessage`, on the previous
     state's channel ID and timestamp, with the stored summary text
-  - Does not pass the marking edit to `sentMessageHandler`: the debug file and snapshots record the
-    new message only
+  - Does not pass the mark-as-stale edit to `sentMessageHandler`: the debug file and snapshots
+    record the new message only
 - `slackclient.UpdateMessage` wraps Slack's `message_not_found`, `cant_update_message` and
   `edit_window_closed` in one sentinel, `ErrMessageNotEditable`, with `%w`
   ([chat.update](https://docs.slack.dev/reference/methods/chat.update) errors)
@@ -204,22 +204,22 @@ marked stale. Link the README's workflow example.
     response, its `Err` the error code (`slack-go@v0.29.0/misc.go`, `SlackResponse.Err`)
   - The mapping is exported as `slackclient.WrapUpdateMessageError`, and
     `mockslackclient.UpdateMessage` calls it, so the mock cannot drift from the real client
-- Any other error from the marking edit, a `BuildMessageMarkedStale` error included, joins post
-  mode's returned error. Post still returns the new state, so it is saved
-- The mock's `UpdatedMessage` also records `BlocksAsSent`, so a snapshot pins the marking edit
+- Any other error from the mark-as-stale edit, a `BuildMessageMarkedStale` error included, joins
+  post mode's returned error. Post still returns the new state, so it is saved
+- The mock's `UpdatedMessage` also records `BlocksAsSent`, so a snapshot pins the mark-as-stale edit
 - `snapshot_test.go`'s `TestSnapshotsPreviousMessageMarkedStale` chains two real posts of the
   "every section under load" and grouped post-mode scenarios: the second post loads the state the
   first one saved and marks its message stale. Its `BlocksAsSent`, indented, are the snapshot, so
   the layout and the content blocks as stored are pinned at the boundary
-  - A third case runs an update run between the two posts, so the marking edit drops the
+  - A third case runs an update run between the two posts, so the mark-as-stale edit drops the
     update-time footer that update gave the message
   - The mock's `PostMessageTimestamp` option gives the second post its own message timestamp
   - The snapshot normalises the staleness warning's time like the update-time footer's, so the
-    marking edit's integration test pins it to the stored `GeneratedAt`
+    mark-as-stale edit's integration test pins it to the stored `GeneratedAt`
 - A `slackclient` unit test through the fake `SlackAPI` pins one not-editable code mapping to
-  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the marking edit's channel,
-  timestamp, summary text and stored time, each skip path, the failing edit, and no marking edit
-  when the send fails or there is nothing to send
+  `ErrMessageNotEditable`. Integration tests in `main_test.go` cover the mark-as-stale edit's
+  channel, timestamp, summary text and stored time, each skip path, the failing edit, and no
+  mark-as-stale edit when the send fails or there is nothing to send
 - Update `run.spec.md` and `slackclient.spec.md`
 - Done also means a live check: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post
   -f build-first=true`, run twice:
@@ -227,7 +227,7 @@ marked stale. Link the README's workflow example.
     `⚠️ Stale, updated Today at <time>`, not the raw `<!date…>` text or the `UTC` fallback, and
     has no footer
   - Again with an update run between the two posts: the update gives the first message the
-    `Live, updated <time>` footer, and the second post's marking drops it
+    `Live, updated <time>` footer, and the second post's mark-as-stale edit drops it
   - Re-opened the next day, the staleness warning reads `Yesterday at <time>`
 
 ### 4. Docs, example workflow and the release note

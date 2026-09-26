@@ -14,7 +14,7 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
   - Skips with a log line when the previous state does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
   - Any other failure joins the run's error. The new state is still saved
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
-  - The marking edit never reaches the sent-blocks record, which holds the new message only
+  - The mark-as-stale edit never reaches the sent-blocks record, which holds the new message only
 - Update mode loads the previous state, re-resolves each tracked PR ref the run's own fetches didn't already resolve, builds the message from the live open fetch plus the resolved tracked and merged PRs, and edits the existing message. It deletes the message only when there is nothing left to show and both the merged and residue fetches succeeded; a fetch failure keeps the message standing instead
 - Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `CreatedAt`, the previous message's post time
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
