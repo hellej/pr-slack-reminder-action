@@ -26,16 +26,17 @@ type graphqlTransport interface {
 }
 
 type httpGraphQLTransport struct {
+	endpoint   string
 	token      string
 	httpClient *http.Client
 }
 
 func newHTTPGraphQLTransport(token string) httpGraphQLTransport {
-	return httpGraphQLTransport{token: token, httpClient: &http.Client{}}
+	return httpGraphQLTransport{endpoint: graphqlEndpoint, token: token, httpClient: &http.Client{}}
 }
 
 func (t httpGraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawMessage, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, graphqlEndpoint, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, t.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return 0, nil, err
 	}

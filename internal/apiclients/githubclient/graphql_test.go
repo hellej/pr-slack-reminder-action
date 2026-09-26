@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -315,6 +318,51 @@ func TestGraphQLDoFailsOnMalformedAliasedData(t *testing.T) {
 				t.Fatalf("expected a decode error, got %v", err)
 			}
 		})
+	}
+}
+
+func TestHTTPGraphQLTransportPostsAuthenticatedJSON(t *testing.T) {
+	var receivedRequest *http.Request
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRequest = r
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"message":"Server Error"}`))
+	}))
+	defer server.Close()
+	transport := newHTTPGraphQLTransport("test-token")
+	transport.endpoint = server.URL
+
+	status, responseBody, err := transport.Post(context.Background(), []byte(`{"query":"query{}"}`))
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != http.StatusBadGateway || string(responseBody) != `{"message":"Server Error"}` {
+		t.Errorf("got status %d and body %s, expected the server's 502 response", status, responseBody)
+	}
+	if receivedRequest.Method != http.MethodPost || string(receivedBody) != `{"query":"query{}"}` {
+		t.Errorf("server received %s %s, expected the posted query", receivedRequest.Method, receivedBody)
+	}
+	expectedValueByHeader := map[string]string{
+		"Authorization": "Bearer test-token",
+		"Content-Type":  "application/json",
+		"User-Agent":    graphqlUserAgent,
+	}
+	for header, expected := range expectedValueByHeader {
+		assertEqualStrings(t, header+" header", receivedRequest.Header.Get(header), expected)
+	}
+}
+
+func TestHTTPGraphQLTransportFailsWhenTheServerIsUnreachable(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	transport := newHTTPGraphQLTransport("test-token")
+	transport.endpoint = server.URL
+	server.Close()
+
+	if _, _, err := transport.Post(context.Background(), []byte(`{}`)); err == nil {
+		t.Error("expected an error, got nil")
 	}
 }
 

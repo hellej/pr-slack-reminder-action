@@ -211,6 +211,16 @@ func TestSaveFailures(t *testing.T) {
 			expectedError: "failed to create directory",
 		},
 		{
+			name: "state with malformed sent blocks",
+			save: func(filePath string) error {
+				stateWithMalformedBlocks := createTestState()
+				stateWithMalformedBlocks.LastWrittenMessage.Blocks = json.RawMessage(`[{"type":`)
+				return Save(filePath, stateWithMalformedBlocks)
+			},
+			filePath:      func(t *testing.T) string { return filepath.Join(t.TempDir(), "state.json") },
+			expectedError: "failed to marshal state",
+		},
+		{
 			name:          "state file path is a directory",
 			save:          saveState,
 			filePath:      func(t *testing.T) string { return t.TempDir() },

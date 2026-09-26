@@ -2,6 +2,7 @@ package githubclient
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"sort"
 
@@ -72,28 +72,15 @@ func (client *client) FetchLatestArtifactByName(
 		return fmt.Errorf("unexpected status code %d when downloading artifact", httpResp.StatusCode)
 	}
 
-	tmpFile, err := os.CreateTemp("", "artifact-*.zip")
+	zipBytes, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer func() {
-		tmpFile.Close()
-		_ = os.Remove(tmpPath)
-	}()
-
-	if _, err := io.Copy(tmpFile, httpResp.Body); err != nil {
-		return fmt.Errorf("write zip to temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
+		return fmt.Errorf("read artifact zip: %w", err)
 	}
 
-	zr, err := zip.OpenReader(tmpPath)
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
 	if err != nil {
 		return fmt.Errorf("open zip: %w", err)
 	}
-	defer zr.Close()
 
 	found := false
 	for _, f := range zr.File {

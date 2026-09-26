@@ -1,28 +1,15 @@
 package utilities
 
-import (
-	"iter"
-	"slices"
-)
+import "slices"
 
 func Filter[T any](items []T, filter func(e T) bool) []T {
-	return slices.Collect(filterToIter(items, filter))
-}
-
-func filterToIter[T any](items []T, filter func(e T) bool) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for _, item := range items {
-
-			if !filter(item) {
-				continue
-			}
-
-			if !yield(item) {
-				return
-			}
-
+	var kept []T
+	for _, item := range items {
+		if filter(item) {
+			kept = append(kept, item)
 		}
 	}
+	return kept
 }
 
 func Find[T any](items []T, predicate func(e T) bool) (T, bool) {
@@ -35,66 +22,33 @@ func Find[T any](items []T, predicate func(e T) bool) (T, bool) {
 }
 
 func Map[T any, V any](items []T, mapper func(T) V) []V {
-	return slices.Collect(mapToIter(items, mapper))
-}
-
-func mapToIter[T any, V any](items []T, mapper func(T) V) iter.Seq[V] {
-	return func(yield func(V) bool) {
-		for _, item := range items {
-			if !yield(mapper(item)) {
-				return
-			}
-		}
+	var mapped []V
+	for _, item := range items {
+		mapped = append(mapped, mapper(item))
 	}
+	return mapped
 }
 
 // exits early on error (and returns it)
 func MapWithError[T any, V any](items []T, mapper func(T) (V, error)) ([]V, error) {
-	var result []V
-	var firstError error
-
-	for mapped, err := range mapWithErrorToIter(items, mapper) {
+	var mappedBeforeError []V
+	for _, item := range items {
+		mappedItem, err := mapper(item)
 		if err != nil {
-			firstError = err
-			break
+			return mappedBeforeError, err
 		}
-		result = append(result, mapped)
+		mappedBeforeError = append(mappedBeforeError, mappedItem)
 	}
-
-	return result, firstError
-}
-
-// exits early on error (and returns it)
-func mapWithErrorToIter[T any, V any](items []T, mapper func(T) (V, error)) iter.Seq2[V, error] {
-	return func(yield func(V, error) bool) {
-		for _, item := range items {
-			mapped, err := mapper(item)
-			if !yield(mapped, err) {
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
-	}
+	return mappedBeforeError, nil
 }
 
 // FlatMap flattens a slice of slices into a single slice, preserving order.
 func FlatMap[T any](items [][]T) []T {
-	return slices.Collect(flatMapToIter(items))
-}
-
-// flatMapToIter flattens a slice of slices into an iterator that yields each element.
-func flatMapToIter[T any](items [][]T) iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for _, slice := range items {
-			for _, item := range slice {
-				if !yield(item) {
-					return
-				}
-			}
-		}
+	var flattened []T
+	for _, slice := range items {
+		flattened = append(flattened, slice...)
 	}
+	return flattened
 }
 
 // Intersperse returns the items with the separator placed between each adjacent pair.

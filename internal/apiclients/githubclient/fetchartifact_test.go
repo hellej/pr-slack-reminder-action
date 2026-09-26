@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/google/go-github/v78/github"
@@ -55,19 +56,21 @@ func (m *mockActionsServiceWithArtifacts) DownloadArtifact(
 }
 
 type mockHTTPClientWithZip struct {
-	zipData    []byte
-	statusCode int
-	err        error
+	zipData       []byte
+	statusCode    int
+	err           error
+	bodyReadError error
 }
 
 func (m *mockHTTPClientWithZip) Get(url string) (*http.Response, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return &http.Response{
-		StatusCode: m.statusCode,
-		Body:       io.NopCloser(bytes.NewReader(m.zipData)),
-	}, nil
+	var body io.Reader = bytes.NewReader(m.zipData)
+	if m.bodyReadError != nil {
+		body = iotest.ErrReader(m.bodyReadError)
+	}
+	return &http.Response{StatusCode: m.statusCode, Body: io.NopCloser(body)}, nil
 }
 
 func createTestZip(filename string, content []byte) ([]byte, error) {
@@ -103,6 +106,7 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 		listError             error
 		downloadError         error
 		httpError             error
+		bodyReadError         error
 		httpStatus            int
 		expectedData          testState
 		expectError           bool
@@ -264,6 +268,22 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			errorContains: "not found inside artifact zip",
 		},
 		{
+			name:         "download interrupted while reading the zip",
+			artifactName: "test-artifact",
+			jsonFilePath: "state.json",
+			artifacts: []*github.Artifact{
+				{
+					ID:        github.Ptr(int64(123)),
+					Name:      github.Ptr("test-artifact"),
+					CreatedAt: &github.Timestamp{Time: time.Now()},
+				},
+			},
+			bodyReadError: errors.New("connection reset"),
+			httpStatus:    200,
+			expectError:   true,
+			errorContains: "read artifact zip: connection reset",
+		},
+		{
 			name:         "downloaded file is not a zip",
 			artifactName: "test-artifact",
 			jsonFilePath: "state.json",
@@ -315,9 +335,10 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			}
 
 			mockHTTPClient := &mockHTTPClientWithZip{
-				zipData:    zipData,
-				statusCode: tt.httpStatus,
-				err:        tt.httpError,
+				zipData:       zipData,
+				statusCode:    tt.httpStatus,
+				err:           tt.httpError,
+				bodyReadError: tt.bodyReadError,
 			}
 
 			downloadURL, _ := url.Parse("https://example.com/download")
