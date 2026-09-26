@@ -48,7 +48,6 @@ jobs:
         uses: ./
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-token-for-state: invalid-token-for-plan-009-live-check
           slack-bot-token: ${{ secrets.DEV_SLACK_TOKEN }}
           run-mode: ${{ (github.event_name == 'schedule' || inputs.run-mode == 'post') && 'post' || 'update' }}
           slack-channel-name: github

@@ -128,10 +128,12 @@ persisted data changes, so upgrading needs nothing.
 - Integration tests in `main_test.go` capture the log and pin each warning line, that it shows
   once in the log, and none for a missing artifact or the other expected skips
 - Update `run.spec.md`
-- Done also means a live check on the implementation branch: temporarily remove `actions: read`
-  from the `reminder` job's `permissions` in `pr-reminder.yml`, dispatch with `run-mode=post` and
-  `build-first=true`. The run page shows the state load warning and the run stays green. Restore
-  the permission before merge
+- Done also means a live check on the implementation branch: temporarily pass an invalid
+  `github-token-for-state` in `pr-reminder.yml`, dispatch with `run-mode=post` and
+  `build-first=true`. The run page shows the state load warning and the run stays green. Revert
+  before merge. Removing `actions: read` does not work here: see docs/third-party-facts.md
+  § A public repository's artifacts list and download without `actions: read`
+  - Done: run 36233911019 showed the warning for a 401 on the artifact list, and stayed green
 
 ## Consequences
 
