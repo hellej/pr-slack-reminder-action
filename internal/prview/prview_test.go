@@ -57,9 +57,10 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
 	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
 	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
+	prWithUnknownCreationTime := testPR(4, time.Time{}, now.Add(-1*time.Hour))
 
 	prViews := prview.BuildPRViews(
-		[]githubclient.PR{pr1, pr3, pr2},
+		[]githubclient.PR{pr1, pr3, pr2, prWithUnknownCreationTime},
 		config.ContentInputs{OldPRThresholdHours: 35},
 	)
 
@@ -67,7 +68,7 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 		return pr.IsOldPR
 	}
 
-	want := []bool{false, false, true}
+	want := []bool{false, false, true, true}
 	got := utilities.Map(prViews, isOld)
 
 	if !slices.Equal(got, want) {

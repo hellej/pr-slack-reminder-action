@@ -333,11 +333,6 @@ func findRecentlyMergedPRs(
 // This is useful in both dry-run mode of the action (TODO) and in integration tests.
 func getSentMessageHandler(config config.Config) func(slackclient.SentMessageInfo) error {
 	return func(sentMessageInfo slackclient.SentMessageInfo) error {
-		if err := state.SaveSentSlackBlocksToFile(
-			config.SentSlackBlocksFilePath, sentMessageInfo.BlocksAsSent,
-		); err != nil {
-			return err
-		}
-		return nil
+		return state.SaveSentSlackBlocksToFile(config.SentSlackBlocksFilePath, sentMessageInfo.BlocksAsSent)
 	}
 }
