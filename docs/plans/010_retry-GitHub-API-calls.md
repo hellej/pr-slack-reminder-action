@@ -11,7 +11,7 @@ status: draft
 - A retry that recovers leaves a log line only, no annotation
 - The work lands on its own branch and PR from `main`
 
-Serves § **Purpose**: the daily `post` is the one notification the team plans around. Today two GraphQL 5xx in a row, or one hang, lose it for the day, and one failed state load costs an `update` its edit. Seen in practice: GraphQL 5xx responses and timeouts. Sized against § **Reference Deployment**: one `post` and a handful of `update` runs a day, each making a few GitHub calls, so waiting a few seconds on a failure costs nothing the team sees.
+Serves AGENTS.md § Purpose: the daily `post` is the one notification the team plans around. Today two GraphQL 5xx in a row, or one hang, lose it for the day, and one failed state load costs an `update` its edit. Seen in practice: GraphQL 5xx responses and timeouts. Sized against AGENTS.md § Reference Deployment: one `post` and a handful of `update` runs a day, each making a few GitHub calls, so waiting a few seconds on a failure costs nothing the team sees.
 
 ### Non-goals
 
@@ -89,7 +89,7 @@ Serves § **Purpose**: the daily `post` is the one notification the team plans a
 
 - During a real outage a run takes longer to fail: ~1 minute per failing call, against seconds today
   - `pr-reminder.yml`'s concurrency group queues runs rather than cancelling them, so a slow failing run delays the next `update`
-- A GraphQL request GitHub ends at its 10s limit is retried unchanged, and may time out again. Each such timeout costs extra rate-limit points (docs/third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL)
+- A GraphQL request GitHub ends at its 10s limit is retried unchanged, and may time out again. Each such timeout costs extra rate-limit points. See docs/third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL
 
 ### Neutral
 
@@ -99,6 +99,6 @@ Serves § **Purpose**: the daily `post` is the one notification the team plans a
 
 ### One 15s attempt deadline
 
-- GitHub ends a request after 10s of processing with a 502 or 504 (docs/third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL). A client deadline past 10s lets that server answer arrive, and the margin covers network time
+- GitHub ends a request after 10s of processing with a 502 or 504. A client deadline past 10s lets that server answer arrive, and the margin covers network time. See docs/third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL
 - Today's 10s batch deadline can cut off a request GitHub would still have answered, and today's 30s listing deadline only waits on the network past GitHub's own 10s
 - The state load's calls are small, so the same value fits them
