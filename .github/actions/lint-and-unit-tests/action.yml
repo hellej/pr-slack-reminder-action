@@ -20,6 +20,10 @@ runs:
       shell: bash
       run: make check-vet
 
+    - name: Check style
+      shell: bash
+      run: make check-style
+
     - name: Run unit tests with coverage
       shell: bash
       run: make test-with-coverage

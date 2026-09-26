@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
-	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -95,10 +94,10 @@ func selectMergedPRsToShow(
 	messagePostedAt time.Time,
 ) []prview.PR {
 	trackedMergedPRs := utilities.Filter(trackedPRs, prview.PR.IsMerged)
-	isTrackedByPRRef := getIsTrackedByPRRefMap(trackedMergedPRs)
+	trackedMergedPRRefs := utilities.Map(trackedMergedPRs, prview.PR.GetPullRequestRef)
 	untrackedMergedPRs := utilities.Filter(
 		sortByMergeTimeNewestFirst(recentlyMergedPRs),
-		func(pr prview.PR) bool { return !isTrackedByPRRef[pr.GetPullRequestRef()] },
+		func(pr prview.PR) bool { return !slices.Contains(trackedMergedPRRefs, pr.GetPullRequestRef()) },
 	)
 	isMergedSincePost := func(pr prview.PR) bool {
 		return !messagePostedAt.IsZero() && pr.GetMergedAt() != nil && pr.GetMergedAt().After(messagePostedAt)
@@ -115,14 +114,6 @@ func selectMergedPRsToShow(
 
 func sortByMergeTimeNewestFirst(prs []prview.PR) []prview.PR {
 	return prview.SortPRsNewestFirst(prs, func(pr prview.PR) *time.Time { return pr.GetMergedAt() })
-}
-
-func getIsTrackedByPRRefMap(trackedPRs []prview.PR) map[models.PullRequestRef]bool {
-	isTrackedByPRRef := make(map[models.PullRequestRef]bool, len(trackedPRs))
-	for _, pr := range trackedPRs {
-		isTrackedByPRRef[pr.GetPullRequestRef()] = true
-	}
-	return isTrackedByPRRef
 }
 
 func prsWhoseNextActionIs(

@@ -345,3 +345,31 @@ func TestFlatMapToIter(t *testing.T) {
 		t.Errorf("FlatMapToIter() collected = %v, expected %v", result, expected)
 	}
 }
+
+func TestIntersperse(t *testing.T) {
+	tests := []struct {
+		name      string
+		items     []string
+		separator string
+		expected  []string
+	}{
+		{name: "empty slice", items: []string{}, separator: ", ", expected: []string{}},
+		{name: "one item", items: []string{"a"}, separator: ", ", expected: []string{"a"}},
+		{name: "two items", items: []string{"a", "b"}, separator: ", ", expected: []string{"a", ", ", "b"}},
+		{
+			name:      "three items",
+			items:     []string{"a", "b", "c"},
+			separator: " / ",
+			expected:  []string{"a", " / ", "b", " / ", "c"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Intersperse(tt.items, tt.separator)
+			if !slices.Equal(result, tt.expected) {
+				t.Errorf("Intersperse() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}

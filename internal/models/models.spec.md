@@ -10,4 +10,4 @@ Shared value types (`Repository`, `PullRequestRef`) used across the pipeline.
 
 ## Doesn't Do
 
-- `ParseRepository` doesn't validate owner/name against GitHub's actual naming rules (allowed characters, length) — only checks for a single `/` and non-empty parts
+- `ParseRepository` doesn't validate owner/name against GitHub's actual naming rules (allowed characters, length): only checks for a single `/` and non-empty parts

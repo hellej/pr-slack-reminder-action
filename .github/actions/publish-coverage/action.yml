@@ -13,10 +13,6 @@ runs:
       with:
         go-version-file: go.mod
         
-    - name: Install goveralls
-      shell: bash
-      run: go install github.com/mattn/goveralls@v0.0.12
-    
     - name: Publish coverage to Coveralls
       shell: bash
       env:

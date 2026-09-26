@@ -135,7 +135,7 @@ func GetConfig() (Config, error) {
 		return models.ParseRepository(repoPath)
 	})
 	if err != nil {
-		return Config{}, fmt.Errorf("invalid repositories input: %v", err)
+		return Config{}, fmt.Errorf("invalid repositories input: %w", err)
 	}
 
 	config := Config{
@@ -209,12 +209,12 @@ func (c Config) validateRepositoryNames() error {
 }
 
 func validateDuplicateRepositories(repositories []models.Repository) error {
-	repositoryPaths := make(map[string]bool, len(repositories))
+	isSeenByRepositoryPath := make(map[string]bool, len(repositories))
 	for _, repo := range repositories {
-		if repositoryPaths[repo.GetPath()] {
+		if isSeenByRepositoryPath[repo.GetPath()] {
 			return fmt.Errorf("duplicate repository '%s' found in github-repositories", repo.GetPath())
 		}
-		repositoryPaths[repo.GetPath()] = true
+		isSeenByRepositoryPath[repo.GetPath()] = true
 	}
 	return nil
 }

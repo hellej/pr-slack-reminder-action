@@ -58,7 +58,7 @@ This runs `trigger-release-workflow.sh`, which:
 2. Shows the latest tag and commits since then
 3. Triggers the `release.yml` GitHub Actions workflow
 
-The workflow handles everything remotely: unit tests → build → e2e tests → `make release-tag` → `make draft-release` → Slack notification. Do **not** run build or test locally — the workflow does this.
+The workflow handles everything remotely: unit tests → build → e2e tests → `make release-tag` → `make draft-release` → Slack notification. Do **not** run build or test locally: the workflow does this.
 
 ### 3. Wait for Workflow Completion
 

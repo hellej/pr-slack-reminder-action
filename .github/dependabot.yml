@@ -18,3 +18,20 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # Go records a tool module as // indirect, which version updates skip by default.
+  # Keep this list in sync with the tool block of tools/go.mod.
+  # See docs/third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed
+  - package-ecosystem: "gomod"
+    directory: "/tools"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-name: "golang.org/x/tools"
+        dependency-type: "all"
+      - dependency-name: "golang.org/x/vuln"
+        dependency-type: "all"
+      - dependency-name: "github.com/mattn/goveralls"
+        dependency-type: "all"
+    groups:
+      dev-tools:
+        patterns: ["*"]

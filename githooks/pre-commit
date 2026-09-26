@@ -1,2 +1,4 @@
 #!/bin/sh
-make check-fmt check-vet
+set -e
+make check-fmt check-vet check-style
+go run .github/scripts/check_inputs.go

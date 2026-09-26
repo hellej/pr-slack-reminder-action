@@ -5,6 +5,8 @@ COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
 SNAPSHOT_PACKAGES=./cmd/pr-slack-reminder ./internal/canvasbuilder
 SNAPSHOT_DIRS=cmd/pr-slack-reminder/testdata internal/canvasbuilder/testdata
 SEMVER =
+# Dev tools are pinned in tools/go.mod, kept apart from the action binary's go.mod
+GO_TOOL=go tool -modfile=tools/go.mod
 
 
 test:
@@ -24,7 +26,7 @@ check-vet:
 
 check-dead-code:
 	@set -e; \
-	findings=$$(go run golang.org/x/tools/cmd/deadcode@latest ./cmd/...); \
+	findings=$$($(GO_TOOL) deadcode ./cmd/...); \
 	if [ -n "$$findings" ]; then \
 		echo "unreachable functions:"; \
 		echo "$$findings"; \
@@ -32,9 +34,12 @@ check-dead-code:
 	fi
 
 check-vulnerabilities:
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	$(GO_TOOL) govulncheck ./...
 
-lint: check-fmt check-vet check-dead-code check-vulnerabilities
+check-style:
+	./.github/scripts/check-style.sh
+
+lint: check-fmt check-vet check-dead-code check-vulnerabilities check-style
 
 install-hooks:
 	git config core.hooksPath githooks
@@ -53,7 +58,7 @@ test-with-coverage: clean-test-cache
 	go tool cover -func=coverage.out
 
 publish-code-coverage:
-	goveralls -coverprofile=coverage.out -service=github
+	$(GO_TOOL) goveralls -coverprofile=coverage.out -service=github
 
 run:
 	env \
