@@ -107,6 +107,7 @@ Write a reference in one of these forms. `make check-style` checks each one reso
 
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source, plus any related package's spec needed to understand how a change fits
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
+- So does `.github/scripts/checkreferences/`: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
   - A rough edge you knowingly leave, because the fix would need significant complexity for a rare case, goes in the spec's **Oddities** section
