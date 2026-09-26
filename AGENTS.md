@@ -86,6 +86,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 Write a reference in one of these forms. `make check-style` checks each one resolves (`.github/scripts/checkreferences/`):
 
+- Docs read on GitHub, such as `README.md`, link with anchors. Agent files, specs and code comments use `§`
 - Section: `<file>.md § <Heading>`, or `` the `<name>` skill § <Heading> `` or `` the `<name>` agent § <Heading> ``
   - Name the file right before the `§`. A later pointer on the same line reuses it: `AGENTS.md § Git and § Testing`
   - `§ <Heading>` with no file before it points into the file holding it. A code comment always names the file
