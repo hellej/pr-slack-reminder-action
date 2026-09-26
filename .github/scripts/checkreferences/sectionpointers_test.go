@@ -156,7 +156,8 @@ func TestBrokenSectionPointers(t *testing.T) {
 		"See § Local and § Nowhere\n"+
 		"The `plan` skill § Structure and § Style\n"+
 		"The `nope` skill § Structure\n"+
-		"[AGENTS.md](../../AGENTS.md) § Git2")
+		"[AGENTS.md](../../AGENTS.md) § Git2\n"+
+		"[AGENTS.md](../../AGENTS.md) § `nope` heading")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
 	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
@@ -176,6 +177,7 @@ func TestBrokenSectionPointers(t *testing.T) {
 		skill + ":8: § Style: no heading or bold text starting it in " + planSkill,
 		skill + ":9: § Structure: target file .agents/skills/nope/SKILL.md not found",
 		skill + ":10: § Git2: no heading or bold text starting it in " + agentsFile,
+		skill + ":11: § `nope` heading: no heading or bold text starting it in " + agentsFile,
 		goSource + ":1: § Oddities: no heading or bold text starting it in " + pkgSpec,
 		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
 		dependabotConfig + ":1: § Gitt: no heading or bold text starting it in " + agentsFile,

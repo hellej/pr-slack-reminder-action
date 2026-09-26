@@ -51,15 +51,12 @@ func main() {
 	}
 	readmeInputs := readmeInputNames(string(readme))
 
-	hasMismatch := false
-	for _, isMismatched := range []bool{
+	hasMismatch := slices.Contains([]bool{
 		reportMissing("defined in action.yml but have no Input constant in internal/config/config.go", actionInputs, configInputConstants),
-		reportMissing("Input constants in internal/config/config.go but not defined in action.yml", configInputConstants, actionInputs),
+		reportMissing("defined as Input constants in internal/config/config.go but not in action.yml", configInputConstants, actionInputs),
 		reportMissing("defined in action.yml but missing from the README inputs table", actionInputs, readmeInputs),
 		reportMissing("listed in the README inputs table but not defined in action.yml", readmeInputs, actionInputs),
-	} {
-		hasMismatch = hasMismatch || isMismatched
-	}
+	}, true)
 
 	if hasMismatch {
 		os.Exit(1)
