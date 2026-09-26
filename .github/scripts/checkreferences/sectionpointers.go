@@ -5,16 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 type sectionPointer struct {
 	line int
 	// Empty when the pointer names no file: it points into the file holding it.
 	writtenTargetFile string
-	// Runs on past the section name, which has no end marker. Lines of a wrapped pointer are joined by "\n".
+	// Lines of a wrapped pointer are joined by "\n". See checkreferences.spec.md § Oddities
 	text string
 }
 
@@ -82,34 +85,26 @@ func shortened(pointerText string) string {
 
 // A written name is relative to the file holding it, as a link is, or else to the repository root, as `AGENTS.md` usually is.
 func resolveTargetFile(holdingPath, writtenTargetFile, repoRoot string) (string, bool) {
-	for _, candidate := range []string{
+	return utilities.Find([]string{
 		filepath.Join(filepath.Dir(holdingPath), writtenTargetFile),
 		filepath.Join(repoRoot, writtenTargetFile),
-	} {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, true
-		}
-	}
-	return "", false
+	}, func(candidate string) bool {
+		_, err := os.Stat(candidate)
+		return err == nil
+	})
 }
 
-// The section name has no end marker, so the text must start with a label and end it on a word boundary: `§ Gitt` doesn't match `Git`.
+// `§ Gitt` doesn't match `Git`. See checkreferences.spec.md § Oddities
 func startsWithAnyLabel(pointerText string, labels []string) bool {
 	text := whitespaceRun.ReplaceAllString(pointerText, " ")
-	for _, label := range labels {
+	return slices.ContainsFunc(labels, func(label string) bool {
 		rest, hasPrefix := strings.CutPrefix(text, label)
-		if !hasPrefix {
-			continue
-		}
 		next, _ := utf8.DecodeRuneInString(rest)
-		if rest == "" || !(unicode.IsLetter(next) || unicode.IsDigit(next)) {
-			return true
-		}
-	}
-	return false
+		return hasPrefix && (rest == "" || !(unicode.IsLetter(next) || unicode.IsDigit(next)))
+	})
 }
 
-// Facts file headings end in their date, which pointers leave out.
+// Facts file headings end in their date, which pointers leave out. See checkreferences.spec.md § Behaviour
 func sectionLabels(markdown string) []string {
 	var labels []string
 	for _, line := range linesOutsideCodeBlocks(markdown) {
@@ -124,7 +119,7 @@ func sectionLabels(markdown string) []string {
 	return labels
 }
 
-// Skips pointers in code blocks and code spans, which are examples, and pointers into external pages or inside link text.
+// See checkreferences.spec.md § Doesn't Do
 func sectionPointers(content string, style commentStyle) []sectionPointer {
 	lines := proseLines(content, style)
 	var pointers []sectionPointer
@@ -140,13 +135,12 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 				target = previousTarget
 			}
 			previousTarget = target
-			if target.isUncheckable {
+			if target.isIntoExternalPageOrLinkText {
 				continue
 			}
-			writtenTargetFile := target.writtenFile
 			pointers = append(pointers, sectionPointer{
 				line:              i + 1,
-				writtenTargetFile: writtenTargetFile,
+				writtenTargetFile: target.writtenTargetFile,
 				text:              pointerText(line[signIndex+len(sectionSign):], lines[i+1:]),
 			})
 		}
@@ -167,33 +161,30 @@ func sectionSignIndexes(line string) []int {
 }
 
 type pointerTarget struct {
-	// Empty for the file holding the pointer.
-	writtenFile string
-	// A pointer into an external page, or one inside link text.
-	isUncheckable bool
+	writtenTargetFile            string
+	isIntoExternalPageOrLinkText bool
 }
 
-// A link's target, a bare `.md` name, or a backticked skill or agent, with only spaces, backticks or bold markers before the sign.
-// A file named further back is part of the sentence, not the pointer.
+// See checkreferences.spec.md § Oddities
 func fileNamedRightBefore(lineBeforeSign string) (pointerTarget, bool) {
 	if isInsideLinkText(lineBeforeSign) {
-		return pointerTarget{isUncheckable: true}, true
+		return pointerTarget{isIntoExternalPageOrLinkText: true}, true
 	}
 	var nearest pointerTarget
 	nearestEnd := -1
 	for _, match := range markdownLink.FindAllStringSubmatchIndex(lineBeforeSign, -1) {
 		path, _, isRelative := splitRelativeLink(lineBeforeSign[match[2]:match[3]])
-		nearest, nearestEnd = pointerTarget{writtenFile: path, isUncheckable: !isRelative}, match[1]
+		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative}, match[1]
 	}
 	for _, match := range bareMarkdownFile.FindAllStringIndex(lineBeforeSign, -1) {
 		if match[1] > nearestEnd {
-			nearest, nearestEnd = pointerTarget{writtenFile: lineBeforeSign[match[0]:match[1]]}, match[1]
+			nearest, nearestEnd = pointerTarget{writtenTargetFile: lineBeforeSign[match[0]:match[1]]}, match[1]
 		}
 	}
 	for _, match := range backtickedSkillOrAgent.FindAllStringSubmatchIndex(lineBeforeSign, -1) {
 		if match[1] > nearestEnd {
 			name, kind := lineBeforeSign[match[2]:match[3]], lineBeforeSign[match[4]:match[5]]
-			nearest, nearestEnd = pointerTarget{writtenFile: skillOrAgentFile(name, kind)}, match[1]
+			nearest, nearestEnd = pointerTarget{writtenTargetFile: skillOrAgentFile(name, kind)}, match[1]
 		}
 	}
 	isRightBefore := nearestEnd >= 0 && strings.TrimRight(lineBeforeSign[nearestEnd:], " `*") == ""
@@ -213,7 +204,6 @@ func isInsideLinkText(lineBeforeSign string) bool {
 	return openBracket > strings.LastIndex(lineBeforeSign, "]")
 }
 
-// Joins the rest of the pointer's line with the lines after it, up to a blank line.
 func pointerText(restOfLine string, linesAfter []string) string {
 	parts := []string{strings.TrimSpace(restOfLine)}
 	for _, line := range linesAfter {

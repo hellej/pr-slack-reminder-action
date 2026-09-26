@@ -28,6 +28,19 @@ func TestSectionPointers(t *testing.T) {
 			},
 		},
 		{
+			name:    "backticks or bold between the file and the sign still name it",
+			content: "Read `AGENTS.md` § Git\n\nThen **AGENTS.md** § Testing",
+			wantPointers: []sectionPointer{
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Git"},
+				{line: 3, writtenTargetFile: "AGENTS.md", text: "Testing"},
+			},
+		},
+		{
+			name:         "a code span closes only at a backtick run of its own length",
+			content:      "`` a`b § c `` and ` a ``` b § c `",
+			wantPointers: nil,
+		},
+		{
 			name:         "a link's target wins over its text",
 			content:      "See [run.spec.md](cmd/run.spec.md#x) § Behaviour",
 			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour"}},
@@ -142,7 +155,8 @@ func TestBrokenSectionPointers(t *testing.T) {
 		"## Local\n"+
 		"See § Local and § Nowhere\n"+
 		"The `plan` skill § Structure and § Style\n"+
-		"The `nope` skill § Structure")
+		"The `nope` skill § Structure\n"+
+		"[AGENTS.md](../../AGENTS.md) § Git2")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
 	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
@@ -161,6 +175,7 @@ func TestBrokenSectionPointers(t *testing.T) {
 		skill + ":7: § Nowhere: no heading or bold text starting it in " + skill,
 		skill + ":8: § Style: no heading or bold text starting it in " + planSkill,
 		skill + ":9: § Structure: target file .agents/skills/nope/SKILL.md not found",
+		skill + ":10: § Git2: no heading or bold text starting it in " + agentsFile,
 		goSource + ":1: § Oddities: no heading or bold text starting it in " + pkgSpec,
 		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
 		dependabotConfig + ":1: § Gitt: no heading or bold text starting it in " + agentsFile,

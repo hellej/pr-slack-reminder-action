@@ -25,7 +25,7 @@ func TestMissingMakeTargets(t *testing.T) {
 
 	got := missingMakeTargets(markdown, markdownProse, isTargetByName)
 
-	want := []nameMention{{line: 1, name: "check-vett", kind: "make target"}, {line: 2, name: "testt", kind: "make target"}}
+	want := []makeTargetMention{{line: 1, target: "check-vett"}, {line: 2, target: "testt"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}

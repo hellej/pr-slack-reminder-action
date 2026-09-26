@@ -21,7 +21,7 @@ var (
 func brokenRepoPaths(paths []string, r repo) ([]string, error) {
 	var broken []string
 	for _, path := range paths {
-		// It quotes paths from third-party docs, such as Claude Code's .claude/CLAUDE.md.
+		// It quotes paths from third-party docs. See checkreferences.spec.md § Doesn't Do
 		if filepath.Base(path) == "third-party-facts.md" {
 			continue
 		}

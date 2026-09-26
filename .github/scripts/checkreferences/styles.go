@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -30,7 +31,7 @@ func pathsWithStyle(paths []string, style commentStyle) []string {
 	return utilities.Filter(paths, func(path string) bool { return commentStyleOf(path) == style })
 }
 
-// Keeps line numbers: a line that is not prose becomes empty. Code comments count from full-line comments only.
+// Keeps line numbers: a line that is not prose becomes empty.
 func proseLines(content string, style commentStyle) []string {
 	switch style {
 	case slashComments:
@@ -125,15 +126,9 @@ func closingRun(line string, from int, fence string) (int, bool) {
 }
 
 func isInsideCodeSpan(index int, spans []codeSpan) bool {
-	for _, span := range spans {
-		if index >= span.start && index < span.end {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(spans, func(span codeSpan) bool { return index >= span.start && index < span.end })
 }
 
-// Blanks code spans with spaces, keeping every other character at its index.
 func withoutCodeSpans(line string) string {
 	blanked := []byte(line)
 	for _, span := range codeSpans(line) {

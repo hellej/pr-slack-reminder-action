@@ -6,12 +6,14 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,63 +51,28 @@ func main() {
 	}
 	readmeInputs := readmeInputNames(string(readme))
 
-	var errorsFound bool
-
-	var missingInConfig []string
-	for inputName := range actionInputs {
-		if _, exists := configInputConstants[inputName]; !exists {
-			missingInConfig = append(missingInConfig, inputName)
-		}
-	}
-	if len(missingInConfig) > 0 {
-		sort.Strings(missingInConfig)
-		fmt.Println("Error: The following inputs are defined in action.yml but their corresponding string constants were not found or correctly defined in internal/config/config.go:")
-		for _, name := range missingInConfig {
-			fmt.Printf("  - %s\n", name)
-		}
-		errorsFound = true
+	hasMismatch := false
+	for _, isMismatched := range []bool{
+		reportMissing("defined in action.yml but have no Input constant in internal/config/config.go", actionInputs, configInputConstants),
+		reportMissing("Input constants in internal/config/config.go but not defined in action.yml", configInputConstants, actionInputs),
+		reportMissing("defined in action.yml but missing from the README inputs table", actionInputs, readmeInputs),
+		reportMissing("listed in the README inputs table but not defined in action.yml", readmeInputs, actionInputs),
+	} {
+		hasMismatch = hasMismatch || isMismatched
 	}
 
-	var missingInActionYML []string
-	for constValue := range configInputConstants {
-		if _, exists := actionInputs[constValue]; !exists {
-			missingInActionYML = append(missingInActionYML, constValue)
-		}
-	}
-	if len(missingInActionYML) > 0 {
-		sort.Strings(missingInActionYML)
-		fmt.Println("Error: The following input string constants from internal/config/config.go are not defined as inputs in action.yml:")
-		for _, val := range missingInActionYML {
-			fmt.Printf("  - %s\n", val)
-		}
-		errorsFound = true
-	}
-
-	if reportMissing("defined in action.yml but missing from the README inputs table", actionInputs, readmeInputs) {
-		errorsFound = true
-	}
-	if reportMissing("listed in the README inputs table but not defined in action.yml", readmeInputs, actionInputs) {
-		errorsFound = true
-	}
-
-	if errorsFound {
+	if hasMismatch {
 		os.Exit(1)
 	}
 
 	fmt.Println("Input consistency check passed: action.yml, internal/config/config.go and the README inputs table are aligned.")
 }
 
-func reportMissing(problem string, names, isPresentByName map[string]bool) bool {
-	var missing []string
-	for name := range names {
-		if !isPresentByName[name] {
-			missing = append(missing, name)
-		}
-	}
+func reportMissing(problem string, isExpectedByName, isPresentByName map[string]bool) bool {
+	missing := utilities.Filter(slices.Sorted(maps.Keys(isExpectedByName)), func(name string) bool { return !isPresentByName[name] })
 	if len(missing) == 0 {
 		return false
 	}
-	sort.Strings(missing)
 	fmt.Printf("Error: The following inputs are %s:\n", problem)
 	for _, name := range missing {
 		fmt.Printf("  - %s\n", name)
@@ -118,7 +85,6 @@ var (
 	readmeInputRow       = regexp.MustCompile("^\\|\\s*`([a-z0-9-]+)`\\s*\\|")
 )
 
-// Reads the first cell of each table row under the `## ... Inputs` heading, up to the next `## ` heading.
 func readmeInputNames(readme string) map[string]bool {
 	isInputByName := map[string]bool{}
 	isInInputsSection := false

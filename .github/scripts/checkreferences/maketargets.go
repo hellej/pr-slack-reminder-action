@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+type makeTargetMention struct {
+	line   int
+	target string
+}
+
 var (
 	// A rule line: targets, then a colon that doesn't start `:=`. Recipes start with a tab, special targets with a dot.
 	makefileRule   = regexp.MustCompile(`^([A-Za-z0-9_-][A-Za-z0-9_. -]*?)[ \t]*:([^=]|$)`)
@@ -44,15 +49,15 @@ func brokenMakeTargets(paths []string, isTargetByName map[string]bool) ([]string
 			return nil, fmt.Errorf("reading %s: %w", path, err)
 		}
 		for _, mention := range missingMakeTargets(string(content), commentStyleOf(path), isTargetByName) {
-			broken = append(broken, fmt.Sprintf("%s:%d: `make %s`: no such Makefile target", path, mention.line, mention.name))
+			broken = append(broken, fmt.Sprintf("%s:%d: `make %s`: no such Makefile target", path, mention.line, mention.target))
 		}
 	}
 	return broken, nil
 }
 
 // Reads backticked `make <target>...` commands, skipping flags and VAR=value arguments.
-func missingMakeTargets(content string, style commentStyle, isTargetByName map[string]bool) []nameMention {
-	var missing []nameMention
+func missingMakeTargets(content string, style commentStyle, isTargetByName map[string]bool) []makeTargetMention {
+	var missing []makeTargetMention
 	for i, line := range proseLines(content, style) {
 		for _, span := range codeSpans(line) {
 			words := strings.Fields(span.content)
@@ -61,7 +66,7 @@ func missingMakeTargets(content string, style commentStyle, isTargetByName map[s
 			}
 			for _, word := range words[1:] {
 				if makeTargetName.MatchString(word) && !isTargetByName[word] {
-					missing = append(missing, nameMention{line: i + 1, name: word, kind: "make target"})
+					missing = append(missing, makeTargetMention{line: i + 1, target: word})
 				}
 			}
 		}

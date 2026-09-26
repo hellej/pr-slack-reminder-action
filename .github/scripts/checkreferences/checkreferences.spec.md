@@ -6,7 +6,7 @@
   - Prints one line per broken reference: `<path>:<line>: <reference>: <problem>`
   - Exits 0 either way: `check-style.sh` fails on any output. Exits 2 when it can't run, such as on a file it can't read
 - Section pointers, preferred in agent files, specs and code comments:
-  - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label starting "Testing"
+  - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing"
   - `AGENTS.md § Git and § Testing`: the second pointer reuses the file
   - `` the `plan` skill § Structure ``: looks in `.agents/skills/plan/SKILL.md`. `` the `reviewer` agent § … `` looks in `.agents/agents/reviewer.md`
   - `§ Oddities` alone: a heading of the file holding it. In a code comment this fails, since a comment must name its file
@@ -46,9 +46,12 @@
 - A section name has no end marker, so a label that starts the text is enough:
   - `§ Git Hooks` passes against a `## Git` heading
   - `§ Purpose` passes against a bold "Purpose" anywhere in the file
-- The file must come right before the `§`, with only spaces, backticks or `**` between:
+- A pointer's file comes from right before its `§`, with only spaces, backticks or `**` between:
   - `checks docs/facts.md files (see § References)` points into its own file
   - A file named at the end of the line before doesn't count
+- A `§` with no file right before it reuses the file of the previous pointer on its line, however far back:
+  - `AGENTS.md § Git. Then this file's § Local` looks for "Local" in `AGENTS.md`
+  - After a skipped pointer into an external page, it is skipped too
 - Reads `Makefile` rule lines by pattern: a target made through a variable or an `include` is missed
 - Anchors approximate GitHub's rule as "keep letters, digits, `-` and `_`"
 - A code span wrapping onto the next line isn't recognised as one

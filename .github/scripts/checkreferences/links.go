@@ -71,7 +71,6 @@ func checkLink(holdingPath string, link linkTarget) (string, error) {
 	return "", nil
 }
 
-// Skips code blocks and code spans: a link there is an example, not a link.
 func relativeLinkTargets(markdown string) []linkTarget {
 	var targets []linkTarget
 	for i, line := range linesOutsideCodeBlocks(markdown) {
