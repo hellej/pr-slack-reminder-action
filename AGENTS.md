@@ -164,7 +164,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - `make check-vet`: run `go vet ./...`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
-- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a map not named `<value>By<Key>`, or a package missing its spec
+- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a relative link in those Markdown files to a missing file (`.github/scripts/checklinks/`), a map not named `<value>By<Key>`, or a package missing its spec
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
 - `go run .github/scripts/check_inputs.go`: validate action.yml and config.go constants are in sync

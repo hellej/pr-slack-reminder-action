@@ -1,4 +1,4 @@
-TEST=go test -race ./...
+TEST=go test -race ./... ./.github/scripts/checklinks
 GO_BUILD=go build -ldflags="-s -w"
 MAIN_GO=./cmd/pr-slack-reminder
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
@@ -22,7 +22,7 @@ check-fmt:
 	fi
 
 check-vet:
-	go vet ./...
+	go vet ./... ./.github/scripts/checklinks
 
 check-dead-code:
 	@set -e; \

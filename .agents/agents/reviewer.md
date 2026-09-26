@@ -31,6 +31,10 @@ Check it against:
     field, fixture or test case, the extracted helper, or the expression written the other
     way round
   - Read each comment against the code it sits on, never on its own
+- Every reference the change adds or edits, in code comments and Markdown alike: `§`
+  section pointers, links, skill and agent names. Each resolves and its target says what
+  it claims. A broken one is `medium`. `make check-style` already catches a relative link
+  to a missing file
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
