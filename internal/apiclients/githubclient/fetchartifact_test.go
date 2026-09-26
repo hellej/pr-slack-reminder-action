@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/google/go-github/v78/github"
@@ -35,7 +36,9 @@ func (m *mockActionsServiceWithArtifacts) ListArtifacts(
 	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
 ) (*github.ArtifactList, *github.Response, error) {
 	if m.listError != nil {
-		return nil, &github.Response{Response: &http.Response{StatusCode: 500}}, m.listError
+		return nil, &github.Response{
+			Response: &http.Response{StatusCode: 500, Status: "500 Internal Server Error"},
+		}, m.listError
 	}
 	return &github.ArtifactList{
 		TotalCount: github.Ptr(int64(len(m.artifacts))),
@@ -53,19 +56,21 @@ func (m *mockActionsServiceWithArtifacts) DownloadArtifact(
 }
 
 type mockHTTPClientWithZip struct {
-	zipData    []byte
-	statusCode int
-	err        error
+	zipData       []byte
+	statusCode    int
+	err           error
+	bodyReadError error
 }
 
 func (m *mockHTTPClientWithZip) Get(url string) (*http.Response, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return &http.Response{
-		StatusCode: m.statusCode,
-		Body:       io.NopCloser(bytes.NewReader(m.zipData)),
-	}, nil
+	var body io.Reader = bytes.NewReader(m.zipData)
+	if m.bodyReadError != nil {
+		body = iotest.ErrReader(m.bodyReadError)
+	}
+	return &http.Response{StatusCode: m.statusCode, Body: io.NopCloser(body)}, nil
 }
 
 func createTestZip(filename string, content []byte) ([]byte, error) {
@@ -96,9 +101,12 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 		artifacts             []*github.Artifact
 		zipFilename           string
 		zipContent            testState
+		zipJSON               string // replaces zipContent, for JSON that testState can't marshal to
+		zipData               []byte // replaces the whole zip, when zipFilename is empty
 		listError             error
 		downloadError         error
 		httpError             error
+		bodyReadError         error
 		httpStatus            int
 		expectedData          testState
 		expectError           bool
@@ -193,7 +201,7 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			jsonFilePath:  "state.json",
 			listError:     fmt.Errorf("403 Forbidden"),
 			expectError:   true,
-			errorContains: "failed to list artifacts",
+			errorContains: "failed to list artifacts: 403 Forbidden status=500 Internal Server Error",
 		},
 		{
 			name:         "download artifact error",
@@ -259,28 +267,78 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			expectError:   true,
 			errorContains: "not found inside artifact zip",
 		},
+		{
+			name:         "download interrupted while reading the zip",
+			artifactName: "test-artifact",
+			jsonFilePath: "state.json",
+			artifacts: []*github.Artifact{
+				{
+					ID:        github.Ptr(int64(123)),
+					Name:      github.Ptr("test-artifact"),
+					CreatedAt: &github.Timestamp{Time: time.Now()},
+				},
+			},
+			bodyReadError: errors.New("connection reset"),
+			httpStatus:    200,
+			expectError:   true,
+			errorContains: "read artifact zip: connection reset",
+		},
+		{
+			name:         "downloaded file is not a zip",
+			artifactName: "test-artifact",
+			jsonFilePath: "state.json",
+			artifacts: []*github.Artifact{
+				{
+					ID:        github.Ptr(int64(123)),
+					Name:      github.Ptr("test-artifact"),
+					CreatedAt: &github.Timestamp{Time: time.Now()},
+				},
+			},
+			zipData:       []byte("not a zip"),
+			httpStatus:    200,
+			expectError:   true,
+			errorContains: "open zip",
+		},
+		{
+			name:         "JSON file does not match the target type",
+			artifactName: "test-artifact",
+			jsonFilePath: "state.json",
+			artifacts: []*github.Artifact{
+				{
+					ID:        github.Ptr(int64(123)),
+					Name:      github.Ptr("test-artifact"),
+					CreatedAt: &github.Timestamp{Time: time.Now()},
+				},
+			},
+			zipFilename:   "state.json",
+			zipJSON:       `{"version":"one"}`,
+			httpStatus:    200,
+			expectError:   true,
+			errorContains: `decode json "state.json"`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var zipData []byte
+			zipData := tt.zipData
 			var err error
 
-			if tt.zipFilename != "" && !tt.expectError {
-				jsonContent, _ := json.Marshal(tt.zipContent)
+			if tt.zipFilename != "" {
+				jsonContent := []byte(tt.zipJSON)
+				if tt.zipJSON == "" {
+					jsonContent, _ = json.Marshal(tt.zipContent)
+				}
 				zipData, err = createTestZip(tt.zipFilename, jsonContent)
 				if err != nil {
 					t.Fatalf("Failed to create test zip: %v", err)
 				}
-			} else if tt.zipFilename != "" && tt.httpStatus == 200 {
-				jsonContent, _ := json.Marshal(tt.zipContent)
-				zipData, _ = createTestZip(tt.zipFilename, jsonContent)
 			}
 
 			mockHTTPClient := &mockHTTPClientWithZip{
-				zipData:    zipData,
-				statusCode: tt.httpStatus,
-				err:        tt.httpError,
+				zipData:       zipData,
+				statusCode:    tt.httpStatus,
+				err:           tt.httpError,
+				bodyReadError: tt.bodyReadError,
 			}
 
 			downloadURL, _ := url.Parse("https://example.com/download")

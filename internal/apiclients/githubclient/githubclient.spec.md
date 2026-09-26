@@ -60,6 +60,6 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Snooze detection reads raw timeline comments, not the bot-filtered set used for reviewer/commenter extraction, so a bot-authored comment can still trigger a snooze
 - A snooze comment must be exactly the command, matched against the untrimmed body, so surrounding text, a second line, a trailing space or a trailing newline all stop the match
 - A `/snooze ... for 0 days` comment matches and "succeeds" (expiration = comment creation time), but is already in the past so has no effect
-- Snooze day counts above 365 are silently capped to 365 rather than rejected
+- Snooze day counts above 365 are silently capped to 365 rather than rejected, also counts too large for an `int`
 - `UpdatedAt` overstates freshness as an activity time: a comment or a label change moves it without a push. It bounds the last push from above, so a PR is never wrongly dropped as inactive
 - The JSON file inside the artifact zip is matched by base name, so the directory part of the given path is ignored

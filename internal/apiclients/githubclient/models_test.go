@@ -9,6 +9,7 @@ import (
 func TestPullRequestGetters(t *testing.T) {
 	createdAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2026, 5, 2, 9, 30, 0, 0, time.UTC)
+	mergedAt := time.Date(2026, 5, 3, 15, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name     string
@@ -35,6 +36,7 @@ func TestPullRequestGetters(t *testing.T) {
 				UpdatedAt: updatedAt,
 				State:     "closed",
 				Merged:    true,
+				MergedAt:  &mergedAt,
 				Draft:     true,
 			},
 			expected: PullRequest{
@@ -45,6 +47,7 @@ func TestPullRequestGetters(t *testing.T) {
 				UpdatedAt: updatedAt,
 				State:     "closed",
 				Merged:    true,
+				MergedAt:  &mergedAt,
 				Draft:     true,
 			},
 		},
@@ -72,6 +75,9 @@ func TestPullRequestGetters(t *testing.T) {
 			}
 			if got := tt.pr.GetMerged(); got != tt.expected.Merged {
 				t.Errorf("GetMerged() = %t, expected %t", got, tt.expected.Merged)
+			}
+			if got := tt.pr.GetMergedAt(); got != tt.expected.MergedAt {
+				t.Errorf("GetMergedAt() = %v, expected %v", got, tt.expected.MergedAt)
 			}
 			if got := tt.pr.GetDraft(); got != tt.expected.Draft {
 				t.Errorf("GetDraft() = %t, expected %t", got, tt.expected.Draft)

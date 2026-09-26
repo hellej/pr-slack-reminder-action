@@ -200,6 +200,14 @@ func TestSearchMergedPRsFailsOnAnyError(t *testing.T) {
 				"EXCESSIVE_PAGINATION Requesting 200 records exceeds the first 100 limit",
 		},
 		{
+			name:   "error nested under a search alias",
+			status: 200,
+			responseBody: `{"data":{"s0":{"nodes":null},"s1":{"nodes":[]}},"errors":[{"type":"FORBIDDEN",` +
+				`"path":["s0","nodes"],"message":"Resource not accessible by integration"}]}`,
+			expectedErrorMsg: "error fetching merged pull requests: field error on [s0 nodes]: " +
+				"FORBIDDEN Resource not accessible by integration",
+		},
+		{
 			name:             "alias missing from the data",
 			status:           200,
 			responseBody:     searchResponseJSON(map[string]int{"s0": 0}, map[string][]string{"s0": {}}),
