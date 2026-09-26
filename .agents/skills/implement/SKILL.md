@@ -18,7 +18,7 @@ findings.
 - Review mid-way only at a step the plan marks `(checkpoint)`. That review skips the whole-diff checks: dead code, the comment list, spec and plan consistency
 - The final review covers the whole diff against the base branch, with every check
 - Confirm the planned scope of the run with the user before starting
-- Branch per AGENTS.md § Git, unless the plan says otherwise. If it is silent and the user
+- Branch per AGENTS.md § Git, a mandatory read, unless the plan says otherwise. If it is silent and the user
   has not said, ask it with that same confirmation, never once the work is under way
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the change

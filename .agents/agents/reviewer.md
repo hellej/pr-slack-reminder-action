@@ -27,8 +27,9 @@ Check it against:
 - Every comment the change added, production and test code, each with a verdict against
   AGENTS.md **Code Style**'s comment rule: keep, or what to rename or refactor so it can
   go. List them all, never a sample
-  - The finding is the code: the clearer name for a func, field, fixture or test case, the
-    extracted helper, or the expression written the other way round
+  - When the verdict is not keep, the finding is the code: the clearer name for a func,
+    field, fixture or test case, the extracted helper, or the expression written the other
+    way round
   - Read each comment against the code it sits on, never on its own
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers

@@ -9,9 +9,9 @@ argument-hint: "Optional: what you're about to plan"
 Before drafting an implementation plan, read the following. Each read is mandatory:
 
 - **AGENTS.md § Package Specs**, then every touched package's `<package>.spec.md` in full
-- **AGENTS.md § Third-party Facts**
+- **AGENTS.md § Purpose, § Reference Deployment, § Testing and § Third-party Facts**
 - **Code**: only the parts still unclear after reading the specs
-- **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page at the point in the plan that depends on it. Never assume or guess
+- **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page, or cite the facts entry or its source, at the point in the plan that depends on it. Never assume or guess
 - **Other runs of the action**: when a change makes a run mode read or write something new (state, artifacts, messages), list every workflow and composite action that runs it (`.github/workflows/`, `.github/actions/`) and what each reads and writes
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
 
