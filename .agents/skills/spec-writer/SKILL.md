@@ -56,13 +56,13 @@ Omit a heading's body and the heading itself if it has no genuine content. Never
 
 ## Rules
 
-- Read [AGENTS.md](../../../AGENTS.md) § Output Style and apply it to every bullet
+- Read [AGENTS.md](../../../AGENTS.md) § Output Style in full, a mandatory read, and apply it to every bullet
 - Describe current state only: never proposed changes, TODOs, or "should" statements
 - Business logic over implementation: describe what the package's public interface does for a caller, not internal data flow, private helper names, or which library/pattern it's built with. Implementation detail is fair game only in Oddities, and only when it's needed to explain a surprising externally-visible effect
-- Don't restate what's already in the root `AGENTS.md` (pipeline order, architecture). Link there (`[AGENTS.md](../../AGENTS.md)`) instead
+- Don't restate what's already in the root `AGENTS.md` (pipeline order, architecture). Link there instead, e.g. `[AGENTS.md](../../AGENTS.md)` from `internal/<pkg>/`
 - Describe what the package offers, not how other packages call it
 - Don't restate a concern owned by another package's spec: reference that package by path instead of duplicating
-- Any link to `AGENTS.md` or another spec file must be a relative path (e.g. `[internal/state](../../state/state.spec.md)`), not absolute or bare, so it stays clickable when the file is viewed on GitHub
+- Any link to `AGENTS.md` or another spec file must be a relative path (e.g. `[internal/state](../state/state.spec.md)` from `internal/<pkg>/`), not absolute or bare, so it stays clickable when the file is viewed on GitHub
 - Base every bullet on the actual source in the directory, not on the package name or prior assumptions
 
 ## Maintenance

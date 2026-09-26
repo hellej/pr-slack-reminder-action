@@ -82,16 +82,34 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
 - ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
 
+## References
+
+Write a reference in one of these forms. `make check-style` checks each one resolves (`.github/scripts/checkreferences/`):
+
+- Section: `<file>.md § <Heading>`, or `` the `<name>` skill § <Heading> `` or `` the `<name>` agent § <Heading> ``
+  - Name the file right before the `§`. A later pointer on the same line reuses it: `AGENTS.md § Git and § Testing`
+  - `§ <Heading>` with no file before it points into the file holding it. A code comment always names the file
+  - The text after `§` starts with a heading or a bold label of that file, such as a Code Style rule
+  - A facts file entry: its full heading, date left out
+- Repository path: backticked, from the repository root, e.g. `internal/state/`
+- Skill or agent: its backticked name followed by `skill` or `agent`, or a list: `` the `plan` and `writing` skills ``
+  - A skill's or agent's frontmatter `name:` matches its folder or file name
+- Make target: backticked, e.g. `make check-style`
+- Link: relative, optionally with a `#heading` anchor
+- Checked in Markdown, Go comments, and `#` comments in YAML, Makefile and shell files. Skill and agent names in Markdown only
+  - A link or `§` pointer inside a code span or code block is an example, not checked
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
 
 ## Package Specs
 
-- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source
+- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source, plus any related package's spec needed to understand how a change fits
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
+  - A rough edge you knowingly leave, because the fix would need significant complexity for a rare case, goes in the spec's **Oddities** section
 - `make check-style` fails when a package directory has no spec file
 - A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`): safe to proceed if the change was a pure refactor
 
@@ -100,6 +118,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - [docs/third-party-facts.md](docs/third-party-facts.md) records what past work confirmed about external APIs and libraries, each entry with its source
 - Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
 - Add to it whenever you confirm such a fact, or rule an approach out
+  - File only what outlives the task: a method's shape, a scope, a limit. Dead ends above all: nothing else records them
 - Plans and code may cite an entry by its heading, e.g. `See docs/third-party-facts.md § <heading>`, or the source it names
 
 ## Third-party Tools
@@ -125,7 +144,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
   - Name a UI element by what it shows: `updateTimeFooter`, not `liveFooter`. Don't put an adjective before a noun it doesn't describe: the edit marking a message stale is a `markAsStaleEdit`, not a `staleEdit`
   - Short-lived names may be short: receivers, loop variables, a value used within a few lines. Maps still follow `<value>By<key>`
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
-  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// Kept for the next post's mark-as-stale edit. See state.spec.md § Oddities`
+  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// An artifact saved before this field decodes an empty hash. See state.spec.md § Oddities`
 - **Declarative slice transformations:** Prefer `./internal/utilities` (`Map`, `Filter`, `Find` etc), `slices` and `maps` over manual `for` loops and index management when transforming data. Extend `utilities` when no helper fits. A plain loop is fine where a helper reads worse, such as one building several values at once.
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
@@ -134,7 +153,9 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Testing
 
-- **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor
+- **Always use TDD**: write failing tests first, implement minimal code to pass, then refactor. No exceptions for small changes
+  - Run the new test and confirm it fails for the expected reason before implementing
+  - When a snapshot or golden file already covers the change's visible effect, that file is the test. Change the code, read the failing diff to confirm it is what you meant, then re-record. Add a separate assertion only for a mutant that fails it but passes the goldens
 - Use table-driven tests for functions with multiple input scenarios
 - Coverage counts across the whole suite, not per package
   - Snapshot anything a user sees in Slack or on the canvas, whenever feasible
@@ -142,6 +163,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
   - Add a package test only for what neither reaches cheaply, such as limits and error mapping
   - Don't repeat a case a broader test already pins, so internals stay free to refactor
 - Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
+  - An expectation derived from the value under test asserts nothing. Pin the value literally, and feed the boundary itself
 - Check for existing helpers in `testhelpers/` before creating new ones
 - `cmd/pr-slack-reminder/main_test.go`: integration tests using full pipeline with mocks
 - `testhelpers/confighelpers.go`: `TestConfig` struct and `SetTestEnvironment()` for consistent test setup
@@ -149,20 +171,20 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Development Commands
 
-- `make test`: run all tests
+- `make test`: run all tests, including `.github/scripts/`
 - `make test-with-coverage`: run tests with coverage report (clears cache first)
 - `make update-test-snapshots`: re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
 - `make run`: run locally (requires env vars, see Makefile for the pattern)
 - `make build`: build linux binaries
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
 - `make check-fmt`: fail if any file needs `gofmt`
-- `make check-vet`: run `go vet ./...`
+- `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
-- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a map not named `<value>By<Key>`, or a package missing its spec
+- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
-- `go run .github/scripts/check_inputs.go`: validate action.yml and config.go constants are in sync
+- `go run .github/scripts/check_inputs.go`: validate action.yml, config.go constants and the README inputs table are in sync
 - Go LSP (gopls), when available, is reachable via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
 
 ## Architecture
@@ -216,7 +238,8 @@ Shared by all:
 
 - `action.yml` inputs must match constants in `internal/config/config.go`
 - `testhelpers/confighelpers.go` mirrors real config parsing
-- `.github/scripts/check_inputs.go` validates action.yml and config constants stay in sync
+- `README.md`'s inputs table lists every `action.yml` input, and only those
+- `.github/scripts/check_inputs.go` validates all three stay in sync
 
 ## Adding New Inputs
 

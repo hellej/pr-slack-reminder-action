@@ -6,11 +6,12 @@ argument-hint: "Optional: what you're about to plan"
 
 # Mandatory Pre-Plan Read Sequence
 
-Before drafting an implementation plan, read:
+Before drafting an implementation plan, read the following. Each read is mandatory:
 
-- **Package Specs**: every touched package's `<package>.spec.md` in full, plus any related package's spec needed to understand how the change fits
+- **AGENTS.md § Package Specs**, then every touched package's `<package>.spec.md` in full
+- **AGENTS.md § Purpose, § Reference Deployment, § Testing and § Third-party Facts**
 - **Code**: only the parts still unclear after reading the specs
-- **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page at the point in the plan that depends on it. Never assume or guess. Read [`docs/third-party-facts.md`](../../../docs/third-party-facts.md) first: it may already name the source. Cite that entry or its source
+- **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page, or cite the facts entry or its source, at the point in the plan that depends on it. Never assume or guess
 - **Other runs of the action**: when a change makes a run mode read or write something new (state, artifacts, messages), list every workflow and composite action that runs it (`.github/workflows/`, `.github/actions/`) and what each reads and writes
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
 
@@ -25,7 +26,7 @@ Before drafting an implementation plan, read:
 
 ## Style
 
-- Apply the [writing skill](../writing/SKILL.md)'s language style: plain words, short bullets, no filler, concise
+- Apply AGENTS.md § Output Style. Reading it in full is mandatory
 - A plan instructs, it doesn't argue for itself
 - Justify a choice in one sentence, only where the other choice is reasonable. If it needs more,
   it goes in Justification and the step links to it
@@ -52,14 +53,14 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 2. The target shape: the resulting architecture/feature, if not already fully covered by the requirements. Always call out changes to action inputs (`action.yml`) here, and any new/changed required permissions (GitHub token permissions, third-party OAuth scopes) here too
    - Name each new concept once, here. Code, JSON keys and docs use exactly these names
    - For a change users see in Slack, sketch each affected message state as rendered text: posted, edited by `update`, marked stale. The user confirms the sketches. Offer the [slack-message-probe skill](../slack-message-probe/SKILL.md) for anything uncertain
-3. Whether the change is breaking or non-breaking, per the [release skill](../release/SKILL.md)'s semver table (patch/minor/major)
+3. Whether the change is breaking or non-breaking, per the `release` skill § 1. Determine Semver Bump (patch/minor/major)
    - For persisted state or artifacts, say what the first run after upgrading does with what the previous version wrote. Mention a downgrade only if it breaks
 4. A short summary listing the steps
 5. The full steps, each naming the files/packages it touches, in that same order: the order they're written is the suggested implementation order, never a separate order/sequence table. The [implement skill](../implement/SKILL.md) runs all steps in one go and reviews the whole diff. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`
    - Order by dependency. A step calling an external API the repo hasn't used goes early, before the code built on it
    - Mark a step `(checkpoint)` only when the rest builds on it and it earns its own review, such as that external API step
    - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
-   - Don't plan tests as their own step, unless the feature is complex enough to need its own test-suite shape/refactor planned up front. Writing tests is a natural, inherent part of implementing each step (see the [coding skill](../coding/SKILL.md)'s TDD steps)
+   - Don't plan tests as their own step, unless the feature is complex enough to need its own test-suite shape/refactor planned up front. Writing tests is a natural, inherent part of implementing each step (see AGENTS.md § Testing)
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
    - A live check names the exact dispatch or edit that sets it up. Check the workflow can actually take it
 6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing

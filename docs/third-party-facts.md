@@ -761,3 +761,20 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - REST answers a "Server Error"; the status code is not documented
 - GitHub reserves the right to change the window
 - Neither page gives backoff advice for a 5xx or a timeout: only "simplify your request or try your request later". The REST best-practices page's backoff rules cover rate limits only
+
+## Claude Code reads `AGENTS.md` natively when no `CLAUDE.md` exists, from v2.1.277 [2026-09-26]
+
+- Source: [Claude Code docs, How Claude remembers your project § AGENTS.md](https://code.claude.com/docs/en/memory#agents-md)
+- A `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` in the working directory or above it makes Claude read those instead of `AGENTS.md`
+- `@path` imports inside `AGENTS.md` expand, and subagents load it as they would a `CLAUDE.md`
+- Not read: `AGENTS.local.md`, `AGENTS.override.md`, anything under `.agents/`
+- Not read before v2.1.277, with the built-in `agents-md` plugin disabled, or in some first sessions after upgrading from v2.1.276 or earlier
+- `InstructionsLoaded` hooks don't fire for it
+
+## GitHub builds a heading's anchor by lowercasing it, dropping punctuation and turning spaces into hyphens [2026-09-26]
+
+- Source: [github-slugger](https://github.com/Flet/github-slugger) `index.js`, the library GitHub-style Markdown tools use to match GitHub's anchors
+- `slug()` lowercases, removes the characters its `regex.js` lists (punctuation and symbols, emoji included), then replaces each space with `-`
+- A repeated slug gets `-1`, then `-2`: the first copy keeps the bare slug
+- Unverified: that github.com renders every heading exactly this way. The README's own anchor links, such as `#-github-token-setup` for a heading opening with an emoji, resolve under it
+- `.github/scripts/checkreferences` approximates `regex.js` as "keep letters, digits, `-` and `_`"

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -41,6 +42,13 @@ func main() {
 		log.Fatalf("Error getting input constants from %s: %v", configFile, err)
 	}
 
+	readmeFile := filepath.Join(workspaceDir, "README.md")
+	readme, err := os.ReadFile(readmeFile)
+	if err != nil {
+		log.Fatalf("Error reading %s: %v", readmeFile, err)
+	}
+	readmeInputs := readmeInputNames(string(readme))
+
 	var errorsFound bool
 
 	var missingInConfig []string
@@ -73,11 +81,57 @@ func main() {
 		errorsFound = true
 	}
 
+	if reportMissing("defined in action.yml but missing from the README inputs table", actionInputs, readmeInputs) {
+		errorsFound = true
+	}
+	if reportMissing("listed in the README inputs table but not defined in action.yml", readmeInputs, actionInputs) {
+		errorsFound = true
+	}
+
 	if errorsFound {
 		os.Exit(1)
 	}
 
-	fmt.Println("Input consistency check passed: action.yml and internal/config/config.go are aligned.")
+	fmt.Println("Input consistency check passed: action.yml, internal/config/config.go and the README inputs table are aligned.")
+}
+
+func reportMissing(problem string, names, isPresentByName map[string]bool) bool {
+	var missing []string
+	for name := range names {
+		if !isPresentByName[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return false
+	}
+	sort.Strings(missing)
+	fmt.Printf("Error: The following inputs are %s:\n", problem)
+	for _, name := range missing {
+		fmt.Printf("  - %s\n", name)
+	}
+	return true
+}
+
+var (
+	readmeSectionHeading = regexp.MustCompile(`^## `)
+	readmeInputRow       = regexp.MustCompile("^\\|\\s*`([a-z0-9-]+)`\\s*\\|")
+)
+
+// Reads the first cell of each table row under the `## ... Inputs` heading, up to the next `## ` heading.
+func readmeInputNames(readme string) map[string]bool {
+	isInputByName := map[string]bool{}
+	isInInputsSection := false
+	for _, line := range strings.Split(readme, "\n") {
+		if readmeSectionHeading.MatchString(line) {
+			isInInputsSection = strings.HasSuffix(strings.TrimSpace(line), "Inputs")
+			continue
+		}
+		if match := readmeInputRow.FindStringSubmatch(line); isInInputsSection && match != nil {
+			isInputByName[match[1]] = true
+		}
+	}
+	return isInputByName
 }
 
 func getActionInputs(filePath string) (map[string]bool, error) {
