@@ -726,3 +726,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Reported working: an `allow` entry per tool module with `dependency-type: "all"`
   - An `allow` list replaces the default for its whole update entry, so the tools module needs an entry of its own
 - Unverified: whether `dependency-type: "all"` with no `dependency-name` covers them too
+
+## Claude Code reads `AGENTS.md` natively when no `CLAUDE.md` exists, from v2.1.277 [2026-09-26]
+
+- Source: [Claude Code docs, How Claude remembers your project § AGENTS.md](https://code.claude.com/docs/en/memory#agents-md)
+- A `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` in the working directory or above it makes Claude read those instead of `AGENTS.md`
+- `@path` imports inside `AGENTS.md` expand, and subagents load it as they would a `CLAUDE.md`
+- Not read: `AGENTS.local.md`, `AGENTS.override.md`, anything under `.agents/`
+- Not read before v2.1.277, with the built-in `agents-md` plugin disabled, or in some first sessions after upgrading from v2.1.276 or earlier
+- `InstructionsLoaded` hooks don't fire for it
