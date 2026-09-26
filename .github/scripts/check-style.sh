@@ -63,19 +63,19 @@ check_package_specs() {
 	fi
 }
 
-check_links() {
+check_references() {
 	local findings
-	if ! findings=$(prose_files | xargs go run ./.github/scripts/checklinks 2>&1); then
-		report "Link check failed to run:" "$findings"
+	if ! findings=$({ prose_files; find internal cmd -name '*.go'; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
+		report "Reference check failed to run:" "$findings"
 		return
 	fi
 	if [ -n "$findings" ]; then
-		report "Relative link to a missing file:" "$findings"
+		report "Broken reference, see AGENTS.md § Development Commands:" "$findings"
 	fi
 }
 
 check_dashes
-check_links
+check_references
 check_map_names
 check_package_specs
 

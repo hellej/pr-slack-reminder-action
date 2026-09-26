@@ -34,7 +34,8 @@ Check it against:
 - Every reference the change adds or edits, in code comments and Markdown alike: `§`
   section pointers, links, skill and agent names. Each resolves and its target says what
   it claims. A broken one is `medium`. `make check-style` already catches a relative link
-  to a missing file
+  to a missing file and a `§` pointer to a missing section, but not a target that says
+  something else
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
