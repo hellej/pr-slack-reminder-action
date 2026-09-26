@@ -43,7 +43,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 	return stalenessWarningTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
-var stateTimestampField = regexp.MustCompile(`"(createdAt|generatedAt)": "[^"]*"`)
+var stateTimestampField = regexp.MustCompile(`"(messagePostedAt|generatedAt)": "[^"]*"`)
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
 

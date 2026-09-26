@@ -66,6 +66,11 @@ notify.
 
 Minor. No input or config change, and a setup without state keeps working and marks nothing.
 
+- An upgrade reads the previous release's state through the old `createdAt` and `slackMessage`
+  keys
+- A downgrade to an older release can't read the new keys: its update runs fail until it posts
+  again
+
 The release notes carry a `## Migration Guide (optional)` section: workflows uploading the state
 artifact with `retention-days: 1` should raise it to 4, or the previous message is sometimes not
 marked stale. Link the README's workflow example.
@@ -132,11 +137,16 @@ marked stale. Link the README's workflow example.
     `make check-dead-code`. Nothing reads the field until Step 3
 - `CurrentSchemaVersion` stays 1, as it did for `LastWrittenCanvasMarkdownHash`. Nothing checks
   the version
+- `MessagePostedAt` and `MessageRef` save under new keys, `messagePostedAt` and `messageRef`,
+  instead of `createdAt` and `slackMessage`
+  - `State.UnmarshalJSON` falls back to the old key when the new one is absent or empty, so an
+    upgrade reads state an older release saved. A state package test pins the fallback, and that the new keys win when both are present
+  - The fallback is temporary: a later release reads only the new keys
 - `snapshot_test.go` pins the field: it snapshots the state file each post, update and
   marking scenario saves, as `<test>-<scenario>.state.json`: the exact JSON, keys included,
   since the next run reads it, possibly under a newer action version
-  - `createdAt` and `generatedAt` are normalised like the footer timestamps, except a zero time,
-    which means the field was never set
+  - `messagePostedAt` and `generatedAt` are normalised like the footer timestamps, except a zero
+    time, which means the field was never set
   - An update case that deletes the message saves back a loaded state without the field, so
     `omitempty` shows in its snapshot
 - Integration tests in `main_test.go` pin what the snapshots can't: `generatedAt` stamped during

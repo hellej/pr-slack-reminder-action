@@ -333,3 +333,46 @@ func TestPRToPullRequestRef(t *testing.T) {
 		t.Errorf("Expected Name to be 'test-repo', got %s", ref.Repository.Name)
 	}
 }
+
+func TestStateDecodesTheLegacyMessageKeysWhenTheNewOnesAreAbsent(t *testing.T) {
+	tests := []struct {
+		name                    string
+		stateJSON               string
+		expectedMessagePostedAt time.Time
+		expectedMessageRef      SlackRef
+	}{
+		{
+			name: "legacy keys only",
+			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"}}`,
+			expectedMessagePostedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+			expectedMessageRef:      SlackRef{ChannelID: "C-LEGACY", MessageTS: "1788253200.000100"},
+		},
+		{
+			name: "new keys win over legacy ones",
+			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"},` +
+				`"messagePostedAt":"2026-09-02T09:00:00Z",` +
+				`"messageRef":{"channelId":"C-NEW","messageTs":"1788339600.000200"}}`,
+			expectedMessagePostedAt: time.Date(2026, 9, 2, 9, 0, 0, 0, time.UTC),
+			expectedMessageRef:      SlackRef{ChannelID: "C-NEW", MessageTS: "1788339600.000200"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var decoded State
+			if err := json.Unmarshal([]byte(tt.stateJSON), &decoded); err != nil {
+				t.Fatalf("Unmarshal failed: %v", err)
+			}
+			if !decoded.MessagePostedAt.Equal(tt.expectedMessagePostedAt) {
+				t.Errorf("MessagePostedAt: got %v, want %v", decoded.MessagePostedAt, tt.expectedMessagePostedAt)
+			}
+			if decoded.MessageRef != tt.expectedMessageRef {
+				t.Errorf("MessageRef: got %+v, want %+v", decoded.MessageRef, tt.expectedMessageRef)
+			}
+			if decoded.SchemaVersion != 1 {
+				t.Errorf("SchemaVersion: got %d, want 1", decoded.SchemaVersion)
+			}
+		})
+	}
+}

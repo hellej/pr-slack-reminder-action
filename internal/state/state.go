@@ -20,11 +20,32 @@ const CurrentSchemaVersion = 1
 
 type State struct {
 	SchemaVersion                 int                     `json:"schemaVersion"`
-	MessagePostedAt               time.Time               `json:"createdAt"`
-	MessageRef                    SlackRef                `json:"slackMessage"`
+	MessagePostedAt               time.Time               `json:"messagePostedAt"`
+	MessageRef                    SlackRef                `json:"messageRef"`
 	PullRequests                  []models.PullRequestRef `json:"pullRequests"`
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
+}
+
+// Falls back to the keys older releases wrote. See state.spec.md § Oddities.
+func (s *State) UnmarshalJSON(data []byte) error {
+	type stateWithDefaultDecoding State
+	var decoded struct {
+		stateWithDefaultDecoding
+		LegacyMessagePostedAt time.Time `json:"createdAt"`
+		LegacyMessageRef      SlackRef  `json:"slackMessage"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*s = State(decoded.stateWithDefaultDecoding)
+	if s.MessagePostedAt.IsZero() {
+		s.MessagePostedAt = decoded.LegacyMessagePostedAt
+	}
+	if s.MessageRef == (SlackRef{}) {
+		s.MessageRef = decoded.LegacyMessageRef
+	}
+	return nil
 }
 
 // See state.spec.md.

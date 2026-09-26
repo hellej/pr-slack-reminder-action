@@ -24,5 +24,5 @@ Persists and reloads the "post" run's PR set, Slack message reference and last w
 - `LastWrittenMessage` was added the same way. An artifact saved before it decodes an empty `LastWrittenMessage`, and an empty one saves and loads back empty
 - `LastWrittenMessage` is the only state an update run rewrites besides the canvas hash. The PR set, `MessageRef` and `MessagePostedAt` stay the post run's
 - `Save()` indents the stored blocks with the rest of the file, so they load back with the same JSON but not the same bytes as sent
-- `MessagePostedAt` and `MessageRef` save under their older JSON keys, `createdAt` and `slackMessage`: renaming a key would break reading older state files
+- `MessagePostedAt` and `MessageRef` save as `messagePostedAt` and `messageRef`. Loading still reads the keys older releases wrote, `createdAt` and `slackMessage`, when the new key is absent or empty. A later release drops that fallback
 - A PR ref's repository saves as `"Owner"` and `"Name"`, capitalised: `models.Repository` has no JSON tags. The state snapshots in `cmd/pr-slack-reminder` pin these keys, and renaming those Go fields would break reading older state files

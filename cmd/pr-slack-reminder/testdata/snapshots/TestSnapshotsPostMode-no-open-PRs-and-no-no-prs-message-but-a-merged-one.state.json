@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "createdAt": "1970-01-01T00:00:00Z",
-  "slackMessage": {
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
     "channelId": "C12345678",
     "messageTs": "1234567890.123456"
   },
