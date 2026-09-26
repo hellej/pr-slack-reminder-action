@@ -1,10 +1,16 @@
 package testhelpers
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"math/rand"
 	"os"
+	"strings"
+	"testing"
 	"time"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func AsPointer[T any](v T) *T {
@@ -40,4 +46,25 @@ func LoadJSONFromFile[T any](filePath string, target *T) error {
 	}
 
 	return nil
+}
+
+// CaptureLog sends the standard logger's output to the returned buffer, with main's flags, until
+// the test ends.
+func CaptureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	originalOutput, originalFlags := log.Writer(), log.Flags()
+	t.Cleanup(func() {
+		log.SetOutput(originalOutput)
+		log.SetFlags(originalFlags)
+	})
+	var logOutput bytes.Buffer
+	log.SetOutput(&logOutput)
+	log.SetFlags(0)
+	return &logOutput
+}
+
+func LogLinesStartingWith(logOutput *bytes.Buffer, prefix string) []string {
+	return utilities.Filter(strings.Split(logOutput.String(), "\n"), func(line string) bool {
+		return strings.HasPrefix(line, prefix)
+	})
 }

@@ -39,8 +39,8 @@ a few annotations, and only when something went wrong.
   name for workflow commands
   ([Workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)).
   Log lines and annotations then share one ordered stream
-- New `logWarning(message)` and `logError(message)` in `cmd/pr-slack-reminder` write one
-  annotation line each through `log`:
+- New `logWarning(message)` and `logError(err)` in `cmd/pr-slack-reminder` write annotation
+  lines through `log`:
 
   ```
   ::warning title=PR Slack Reminder::Not marking the previous message stale, its state did not load: failed to list artifacts: … 403 Forbidden
@@ -54,6 +54,15 @@ a few annotations, and only when something went wrong.
     newline would show as a space on the run page, running the parts together. See
     docs/third-party-facts.md § An escaped newline is a line break in the job log and the API,
     but a space on the run's summary page
+  - It splits an error only when its text is its parts' texts on separate lines, as
+    `errors.Join` builds it. `fmt.Errorf` with several `%w` also has `Unwrap() []error`, such as
+    slackclient's not-editable update error, and splitting it would drop its own text
+  - The canvas error can be a join of the write failure and the merged fetch failure. One
+    `fmt.Errorf("PR tracker canvas refresh failed: %w", …)` around it has `Unwrap() error`, so
+    `logError` would never split it. `Run` prefixes each part of the canvas error with
+    `PR tracker canvas refresh failed: ` instead and keeps them a join, splitting them with the
+    helper `logError` uses. A single canvas error still reads
+    `PR tracker canvas refresh failed: <err>`
   - The message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`, so a part with a newline stays
     one annotation. See docs/third-party-facts.md § A workflow command's message escapes `%`, CR
     and LF as `%25`, `%0D` and `%0A`
@@ -88,7 +97,12 @@ persisted data changes, so upgrading needs nothing.
 - `main.go`: `log.SetOutput(os.Stdout)`; a failing `Run` goes through `logError` and exits 1, in
   place of `log.Fatalf`
 - New file `cmd/pr-slack-reminder/annotations.go` with `logWarning` and `logError`
-- Tests pin the escaping, the line format, and one line per part of a nested join
+- `run.go`: `Run` prefixes each part of the canvas error, as the Target shape says
+- New `testhelpers.CaptureLog` and `testhelpers.LogLinesStartingWith` capture the `log` output in
+  tests, restoring its output and flags after
+- Tests in `annotations_test.go` pin the escaping, the line format, one line per part of a
+  nested join, nil parts skipped, one line for a `fmt.Errorf` with two `%w`, and one prefixed
+  line per failed canvas part
 - Update `run.spec.md`
 
 ### 2. Tell a missing state artifact apart from a failed load
@@ -107,8 +121,12 @@ persisted data changes, so upgrading needs nothing.
     a plain log line; and `ErrMessageNotEditable`
   - `Run`: the recently merged PR fetch failure
   - `runUpdateMode`: the tracked PR fetch failure, and a failed delete
-- Integration tests in `main_test.go` capture the log and pin one warning per case, and none for
-  a missing artifact
+- `markPreviousMessageStale` logs a missing artifact as `Not marking the previous message stale,
+  there is no previous state: …`
+- The delete warning reads `Keeping the Slack message with nothing left to show, its delete
+  failed: …`, in place of the log line `Warning: failed to delete message: …`
+- Integration tests in `main_test.go` capture the log and pin each warning line, that it shows
+  once in the log, and none for a missing artifact or the other expected skips
 - Update `run.spec.md`
 - Done also means a live check on the implementation branch: temporarily remove `actions: read`
   from the `reminder` job's `permissions` in `pr-reminder.yml`, dispatch with `run-mode=post` and

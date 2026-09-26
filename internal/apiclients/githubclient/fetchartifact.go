@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,10 @@ import (
 
 	"github.com/google/go-github/v78/github"
 )
+
+// GitHub answers a name no artifact has with an empty list, not an error. See
+// docs/third-party-facts.md § GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches
+var ErrNoArtifactFound = errors.New("no artifacts found")
 
 // FetchLatestArtifactByName downloads the most recent GitHub Actions artifact by name,
 // extracts a JSON file from the zip archive, and unmarshals it into the provided struct.
@@ -39,7 +44,7 @@ func (client *client) FetchLatestArtifactByName(
 
 	artifacts := res.Artifacts
 	if len(artifacts) == 0 {
-		return fmt.Errorf("no artifacts found with name %q", artifactName)
+		return fmt.Errorf("%w with name %q", ErrNoArtifactFound, artifactName)
 	}
 	sort.Slice(artifacts, func(i, j int) bool {
 		return artifacts[i].GetCreatedAt().Time.After(artifacts[j].GetCreatedAt().Time)

@@ -1011,6 +1011,7 @@ type postOverPreviousStateOptions struct {
 
 type postOverPreviousStateResult struct {
 	runErr                  error
+	logOutput               *bytes.Buffer
 	mockSlackAPI            *mockslackclient.MockSlackAPI
 	stateFilePath           string
 	sentSlackBlocksFilePath string
@@ -1018,6 +1019,7 @@ type postOverPreviousStateResult struct {
 
 func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOptions) postOverPreviousStateResult {
 	t.Helper()
+	logOutput := testhelpers.CaptureLog(t)
 	overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
@@ -1042,9 +1044,36 @@ func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOpt
 
 	return postOverPreviousStateResult{
 		runErr:                  runErr,
+		logOutput:               logOutput,
 		mockSlackAPI:            mockSlackAPI,
 		stateFilePath:           overrides[config.EnvStateFilePath].(string),
 		sentSlackBlocksFilePath: sentSlackBlocksFilePath,
+	}
+}
+
+const warningAnnotationPrefix = "::warning title=PR Slack Reminder::"
+
+func assertWarningAnnotations(t *testing.T, logOutput *bytes.Buffer, expectedWarningLines []string) {
+	t.Helper()
+	warningLines := testhelpers.LogLinesStartingWith(logOutput, "::warning")
+	if !slices.Equal(warningLines, expectedWarningLines) {
+		t.Errorf("Expected the warning annotations\n%s\ngot\n%s",
+			strings.Join(expectedWarningLines, "\n"), strings.Join(warningLines, "\n"))
+	}
+	for _, warningLine := range expectedWarningLines {
+		assertWarnedErrorIsLoggedOnlyInItsWarning(t, logOutput, warningLine)
+	}
+	if errorLines := testhelpers.LogLinesStartingWith(logOutput, "::error"); len(errorLines) > 0 {
+		t.Errorf("Expected no error annotations, got\n%s", strings.Join(errorLines, "\n"))
+	}
+}
+
+func assertWarnedErrorIsLoggedOnlyInItsWarning(t *testing.T, logOutput *bytes.Buffer, warningLine string) {
+	t.Helper()
+	message := strings.TrimPrefix(warningLine, warningAnnotationPrefix)
+	_, warnedErrorText, _ := strings.Cut(message, ": ")
+	if count := strings.Count(logOutput.String(), warnedErrorText); count != 1 {
+		t.Errorf("Expected %q once in the log, got it %d times:\n%s", warnedErrorText, count, logOutput)
 	}
 }
 
@@ -1141,20 +1170,30 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	previousStateOfASetupInAnotherChannel.MessageRef.ChannelID = "C0OTHERCHANNEL"
 
 	testCases := []struct {
-		name    string
-		options postOverPreviousStateOptions
+		name                string
+		options             postOverPreviousStateOptions
+		expectedWarningLine string
+		expectedSkipLine    string
 	}{
 		{
-			name:    "the previous state does not load",
-			options: postOverPreviousStateOptions{listArtifactsError: errors.New("artifact listing error")},
+			name:             "there is no previous state",
+			options:          postOverPreviousStateOptions{},
+			expectedSkipLine: `Not marking the previous message stale, there is no previous state: no artifacts found with name "pr-slack-reminder-state"`,
 		},
 		{
-			name:    "the previous message is in another channel",
-			options: postOverPreviousStateOptions{previousState: &previousStateOfASetupInAnotherChannel},
+			name:                "the previous state does not load",
+			options:             postOverPreviousStateOptions{listArtifactsError: errors.New("403 Forbidden")},
+			expectedWarningLine: warningAnnotationPrefix + "Not marking the previous message stale, its state did not load: failed to list artifacts: 403 Forbidden",
 		},
 		{
-			name:    "the previous state predates the last written message",
-			options: postOverPreviousStateOptions{previousState: &previousStateWithoutLastWrittenMessage},
+			name:             "the previous message is in another channel",
+			options:          postOverPreviousStateOptions{previousState: &previousStateOfASetupInAnotherChannel},
+			expectedSkipLine: "Not marking the previous message stale, it is in channel C0OTHERCHANNEL, not in C12345678 where this run posted",
+		},
+		{
+			name:             "the previous state predates the last written message",
+			options:          postOverPreviousStateOptions{previousState: &previousStateWithoutLastWrittenMessage},
+			expectedSkipLine: "Not marking the previous message stale, its state records no sent message",
 		},
 		{
 			name: "message_not_found",
@@ -1162,6 +1201,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 				previousState:      &previousState,
 				updateMessageError: slack.SlackErrorResponse{Err: "message_not_found"},
 			},
+			expectedWarningLine: warningAnnotationPrefix + "Not marking the previous message stale: failed to update Slack message: message cannot be edited: message_not_found",
 		},
 		{
 			name: "cant_update_message",
@@ -1169,6 +1209,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 				previousState:      &previousState,
 				updateMessageError: slack.SlackErrorResponse{Err: "cant_update_message"},
 			},
+			expectedWarningLine: warningAnnotationPrefix + "Not marking the previous message stale: failed to update Slack message: message cannot be edited: cant_update_message",
 		},
 		{
 			name: "edit_window_closed",
@@ -1176,6 +1217,7 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 				previousState:      &previousState,
 				updateMessageError: slack.SlackErrorResponse{Err: "edit_window_closed"},
 			},
+			expectedWarningLine: warningAnnotationPrefix + "Not marking the previous message stale: failed to update Slack message: message cannot be edited: edit_window_closed",
 		},
 	}
 
@@ -1191,6 +1233,15 @@ func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 			}
 			assertNewPostStateSaved(t, result.stateFilePath)
 			assertSentBlocksRecordTheNewMessageOnly(t, result.sentSlackBlocksFilePath)
+			if tc.expectedWarningLine == "" {
+				assertWarningAnnotations(t, result.logOutput, nil)
+				skipLines := testhelpers.LogLinesStartingWith(result.logOutput, tc.expectedSkipLine)
+				if len(skipLines) != 1 || skipLines[0] != tc.expectedSkipLine {
+					t.Errorf("Expected the plain log line %q once, got %q", tc.expectedSkipLine, skipLines)
+				}
+				return
+			}
+			assertWarningAnnotations(t, result.logOutput, []string{tc.expectedWarningLine})
 		})
 	}
 }
@@ -1377,6 +1428,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 		expectedErrorMsg      string
 		expectedPRItemTexts   []string
 		expectMessageDeleted  bool
+		expectedWarningLines  []string
 	}{
 		{
 			name:   "unset required inputs",
@@ -1455,6 +1507,9 @@ func TestScenariosUpdateMode(t *testing.T) {
 			},
 			deleteMessageError:   errors.New("slack delete failed"),
 			expectMessageDeleted: true,
+			expectedWarningLines: []string{
+				warningAnnotationPrefix + "Keeping the Slack message with nothing left to show, its delete failed: failed to delete Slack message: slack delete failed",
+			},
 		},
 		{
 			name:   "update mode with message_not_found error exits gracefully",
@@ -1704,11 +1759,15 @@ func TestScenariosUpdateMode(t *testing.T) {
 				}),
 			},
 			mergedPRsSearchError: errors.New("merged PR search failed"),
+			expectedWarningLines: []string{
+				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 500: unexpected response: {"message":"merged PR search failed"}`,
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logOutput := testhelpers.CaptureLog(t)
 			testhelpers.SetTestEnvironment(t, tc.config, tc.configOverrides)
 
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
@@ -1729,6 +1788,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 
 			err := main.Run(getGitHubClient, getSlackClient)
 
+			assertWarningAnnotations(t, logOutput, tc.expectedWarningLines)
 			if tc.expectedErrorMsg == "" && err != nil {
 				t.Errorf("Expected no error, got: %v", err)
 			}
@@ -2043,7 +2103,11 @@ func TestUpdateModeShowsEveryPRMergedSinceThePost(t *testing.T) {
 	}
 }
 
+const trackedPRFetchFailedWarningLine = warningAnnotationPrefix +
+	"Failed to fetch the tracked PRs the run's own fetches left unresolved: error fetching pull request test-org/test-repo/2: pull request error on alias p0: tracked PR fetch failed"
+
 func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
+	logOutput := testhelpers.CaptureLog(t)
 	setUpdateModeEnvironment(t)
 	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{2}})
 
@@ -2068,10 +2132,12 @@ func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
 	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Open PR not in state") {
 		t.Error("Expected the message to be edited with the open PRs the run did fetch")
 	}
+	assertWarningAnnotations(t, logOutput, []string{trackedPRFetchFailedWarningLine})
 }
 
 // Without the residue, an empty message is a fetch outage as much as an empty day.
 func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft(t *testing.T) {
+	logOutput := testhelpers.CaptureLog(t)
 	setUpdateModeEnvironment(t)
 	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{2}})
 
@@ -2089,5 +2155,47 @@ func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft
 	}
 	if mockSlackAPI.DeletedMessage.ChannelID != "" {
 		t.Error("Expected the message to be kept, but DeleteMessage was called")
+	}
+	assertWarningAnnotations(t, logOutput, []string{trackedPRFetchFailedWarningLine})
+}
+
+func TestPostModeWarnsWhenTheRecentlyMergedPRFetchFails(t *testing.T) {
+	testCases := []struct {
+		name           string
+		canvasLink     string
+		expectRunError bool
+	}{
+		{name: "the canvas is off"},
+		{
+			name:           "the canvas is on, so the run fails too",
+			canvasLink:     testCanvasLink,
+			expectRunError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logOutput := testhelpers.CaptureLog(t)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+				config.InputPRTrackerCanvasLink: tc.canvasLink,
+			})
+
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs: []*github.PullRequest{
+						getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+					},
+					MergedPRsSearchError: errors.New("search failed"),
+				}),
+				mockslackclient.MakeSlackClientGetter(mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})),
+			)
+
+			if (err != nil) != tc.expectRunError {
+				t.Fatalf("Expected a run error: %v, got %v", tc.expectRunError, err)
+			}
+			assertWarningAnnotations(t, logOutput, []string{
+				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 500: unexpected response: {"message":"search failed"}`,
+			})
+		})
 	}
 }
