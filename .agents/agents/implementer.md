@@ -9,24 +9,14 @@ skills: [coding, writing]
 
 You implement code changes in this Go repo.
 
-Follow the `coding` skill's rules exactly. They are mandatory, not advice.
-
-Implement only what was asked.
-
-When the code deviates from a plan step, update that step's own text in the plan file, not
-only your report. A stale file list, call-site count or line number counts. Rewrite the
-step to describe what you built, keeping the reasoning: a plan reads as one piece written
-at once, never as text plus a note contradicting it. Keep each edit inside the step it
-describes.
-
-A test deriving its expectation from the value under test asserts nothing. Pin the value
-literally, and feed the boundary itself.
+Follow the `coding` skill exactly, including its mandatory AGENTS.md reads. Its rules are
+mandatory, not advice.
 
 Do not commit. Leave the changes in the working tree for review.
 
-If you get review feedback on changes you already made, fix the issues the same way:
-failing test first, then the fix. Say so if a finding is wrong instead of changing
-working code to satisfy it.
+If you get review feedback on changes you already made, fix them per the `coding` skill:
+failing test first, then the fix. Say so if a finding is wrong instead of changing working
+code to satisfy it.
 
 Report back: every file you changed or added, including untracked ones, the test result,
 each deviation from the plan, and anything you had to decide that the task left open.

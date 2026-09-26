@@ -26,8 +26,8 @@ Ask the user what no amount of reading can supply:
 
 - The problem, and who has it
 - What is out of scope
-- Whether the work lands on `main` or on a feature branch and a PR. AGENTS.md defaults to
-  `main`, so ask whenever the request leaves it open, and record the answer in the plan
+- Whether the work lands on `main` or on a feature branch and a PR. AGENTS.md § Git, a
+  mandatory read, defaults to `main`, so ask whenever the request leaves it open, and record the answer in the plan
 - Constraints already settled: input names, "no new inputs", must land before another plan
 - Where the plan file goes: `.local/plans/` (gitignored) or `docs/plans/` (committed)
 
@@ -40,15 +40,12 @@ They become the plan's first section.
 
 ## The Facts File
 
-[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) holds what past plans
-confirmed about APIs outside this repo.
+[`docs/third-party-facts.md`](../../../docs/third-party-facts.md) follows
+AGENTS.md § Third-party Facts. Reading that section is mandatory.
 
-- Grep its `##` headings before fanning out. An entry answers a question, or narrows it to
-  "confirm this still holds at the version `go.mod` pins now"
+- Check it before fanning out. An entry answers a question, or narrows it to "confirm this
+  still holds at the version `go.mod` pins now"
 - You write it, as you write the plan. Sub-agents report a fact and its source
-- File what outlives the plan: a method's shape, a scope, a limit, an approach the API
-  cannot support
-- Dead ends above all. Nothing else records them
 
 ## Research Fan-out
 
@@ -66,13 +63,13 @@ Don't fan out what one grep answers.
 
 ## Draft
 
-Write the plan file per the plan skill's Structure.
+Write the plan file per the `plan` skill § Structure.
 
-Cite every third-party claim in the plan itself, at the point that depends on it, per that
-skill's read sequence. The critic takes a cited claim as settled, so citing is what keeps
+Cite every third-party claim in the plan itself, at the point that depends on it, per the
+`plan` skill § Mandatory Pre-Plan Read Sequence. The critic takes a cited claim as settled, so citing is what keeps
 rounds cheap.
 
-Before spawning the critic, re-read the draft against the plan skill's Structure and Style.
+Before spawning the critic, re-read the draft against the `plan` skill § Structure and § Style.
 
 ## Rounds
 

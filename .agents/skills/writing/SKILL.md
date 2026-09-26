@@ -6,7 +6,7 @@ argument-hint: "Optional: what you're about to write"
 
 # Mandatory Output Style
 
-Read `AGENTS.md` § Output Style now and apply it. The rules and before/after examples live there so the two copies can't drift apart.
+Read `AGENTS.md` § Output Style now, in full, and apply it. The read is mandatory. The rules and before/after examples live there.
 
 Then re-read what you just wrote and cut every line those examples would reject.
 

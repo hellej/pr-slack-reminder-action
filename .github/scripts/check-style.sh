@@ -15,21 +15,22 @@ non_test_go_files() {
 	find internal cmd -name '*.go' ! -name '*_test.go'
 }
 
+prose_files() {
+	{
+		echo AGENTS.md README.md docs/third-party-facts.md
+		find .agents -name '*.md'
+		# .claude/agents is a symlink to .agents/agents in this repo, already covered above.
+		[ -L .claude/agents ] || find .claude/agents -name '*.md'
+		# docs/plans/ is left out: plans are historical records.
+		find . -name '*.spec.md' -not -path './docs/plans/*' | sed 's|^\./||'
+	} | tr ' ' '\n' | sort -u
+}
+
 check_dashes() {
-	local prose_files findings
-	# docs/plans/ is left out: plans are historical records.
-	prose_files=$(
-		{
-			echo AGENTS.md README.md docs/third-party-facts.md
-			find .agents -name '*.md'
-			# .claude/agents is a symlink to .agents/agents in this repo, already covered above.
-			[ -L .claude/agents ] || find .claude/agents -name '*.md'
-			find . -name '*.spec.md' -not -path './docs/plans/*' | sed 's|^\./||'
-		} | tr ' ' '\n' | sort -u
-	)
+	local findings
 	findings=$(
 		{
-			echo "$prose_files" | xargs grep -nE '(^| )(—|–)( |$)'
+			prose_files | xargs grep -nE '(^| )(—|–)( |$)'
 			non_test_go_files | xargs grep -nE '//(.* )?(—|–)( |$)'
 		} 2>/dev/null
 	)
@@ -62,7 +63,26 @@ check_package_specs() {
 	fi
 }
 
+hash_comment_files() {
+	echo Makefile action.yml
+	find .github -name '*.yml'
+	find githooks -type f
+	find . -name '*.sh' -not -path './.git/*'
+}
+
+check_references() {
+	local findings
+	if ! findings=$({ prose_files; git ls-files --cached --others --exclude-standard '*.go'; hash_comment_files; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
+		report "Reference check failed to run:" "$findings"
+		return
+	fi
+	if [ -n "$findings" ]; then
+		report "Broken reference, see AGENTS.md § References:" "$findings"
+	fi
+}
+
 check_dashes
+check_references
 check_map_names
 check_package_specs
 

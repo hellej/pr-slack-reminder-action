@@ -38,8 +38,8 @@ that would build it is written.
 
    The script reads `INPUT_SLACK_BOT_TOKEN` from `.envrc`, prints `ok` and `ts`, and records the
    channel ID and ts in `<payload>.sent`.
-5. Report the `ts` and let the user look. Checking the rendered message in Slack is the user's
-   half, per the verification split.
+5. Report the `ts` and let the user look. You send the message; the user checks how it
+   renders in Slack.
 6. Iterate: edit the payload, then edit the same message in place:
 
    ```
