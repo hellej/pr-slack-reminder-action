@@ -638,3 +638,42 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `githubclient.FetchLatestArtifactByName` reads page 1 only, so past 100 artifacts it relies on
   that undocumented order
 - Expired artifacts stay listed, with `expired: true`, and cannot be downloaded
+
+## `::warning::` and `::error::` annotations cap at 10 per type per step and 4096 characters each [2026-09-26]
+
+- Source: [Workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands);
+  [REST: check runs](https://docs.github.com/en/rest/checks/runs); `actions/runner@15231be`
+  `src/Runner.Worker/ExecutionContext.cs` (`_maxCountPerIssueType = 10`,
+  `_maxIssueMessageLength = 4096`)
+- Syntax: `::warning file={name},line={line},endLine={endLine},title={title}::{message}`, every
+  parameter optional, so `::warning::message` works. Command and parameter names are case
+  insensitive
+- Each shows in the job log and as an annotation on the run's summary page
+- "GitHub Actions are limited to 10 warning annotations and 10 error annotations per step."
+  Past that, the line still prints to the log, without an annotation
+- The runner truncates a message past 4096 characters. No docs page states this length
+
+## A workflow command's message escapes `%`, CR and LF as `%25`, `%0D` and `%0A` [2026-09-26]
+
+- Source: `actions/toolkit@a7911ca` `packages/core/src/command.ts` (`escapeData`,
+  `escapeProperty`); `actions/runner@15231be` `src/Runner.Common/ActionCommand.cs`
+  (`UnescapeData`), `src/Runner.Sdk/ProcessInvoker.cs`. The workflow commands docs page never
+  mentions escaping
+- `escapeData` replaces `%` first, then `\r` and `\n`. Properties such as `title` also map `:` to
+  `%3A` and `,` to `%2C`
+- The runner reads output one line at a time, so an unescaped multiline message annotates its
+  first line only, and the rest prints as plain log lines
+- The runner restores real newlines from the escaped form. Unverified: whether the annotation UI
+  shows them as line breaks
+
+## The runner parses workflow commands from stderr as well as stdout, but only at a line's start [2026-09-26]
+
+- Source: `actions/runner@15231be` `src/Runner.Worker/Handlers/NodeScriptActionHandler.cs`
+  (one command-parsing `OutputManager` each for stdout and stderr),
+  `src/Runner.Common/ActionCommand.cs` `TryParseV2`
+- The docs only say commands go "to the runner over `stdout`". Stderr parsing is runner
+  behaviour, not a documented contract
+- `TryParseV2` trims leading whitespace, then requires the line to start with `::`. Any prefix,
+  such as a `log` timestamp, turns the command into plain text
+- A child process run with `stdio: 'inherit'` by a node action writes straight to the streams
+  the runner reads
