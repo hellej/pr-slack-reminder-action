@@ -84,7 +84,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## References
 
-- Agent files, specs, code comments: `AGENTS.md § Testing`, `AGENTS.md § Git and § Testing`, `` the `plan` skill § Structure ``, `` the `coding` skill ``, `` `internal/state/` ``, `` `make test` ``
+- Agent files, specs, code comments, e.g.: `AGENTS.md § Testing`, `AGENTS.md § Git and § Testing`, `` the `plan` skill § Structure ``, `` the `coding` skill ``, `` `internal/state/` ``, `` `make test` ``
 - Facts file: `See docs/third-party-facts.md § <full heading, date left out>`
 - Docs read on GitHub, such as `README.md`: `[tips](#-tips)`
 - `make check-style` checks these. What it skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
