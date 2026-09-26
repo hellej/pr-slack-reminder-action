@@ -44,18 +44,24 @@ a few annotations, and only when something went wrong.
 
   ```
   ::warning title=PR Slack Reminder::Not marking the previous message stale, its state did not load: failed to list artifacts: … 403 Forbidden
-  ::error title=PR Slack Reminder::failed to update Slack message: …%0APR tracker canvas refresh failed: …
+  ::error title=PR Slack Reminder::failed to update Slack message: …
+  ::error title=PR Slack Reminder::PR tracker canvas refresh failed: …
   ```
 
   - The title matches the action's `name:` in `action.yml`
-  - The message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`, so a multiline `errors.Join`
-    error stays one annotation. See docs/third-party-facts.md § A workflow command's message
-    escapes `%`, CR and LF as `%25`, `%0D` and `%0A`
+  - `logError` writes one annotation per part of an `errors.Join` error, found through
+    `Unwrap() []error` recursively, since the canvas error can itself be a join. An escaped
+    newline would show as a space on the run page, running the parts together. See
+    docs/third-party-facts.md § An escaped newline is a line break in the job log and the API,
+    but a space on the run's summary page
+  - The message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`, so a part with a newline stays
+    one annotation. See docs/third-party-facts.md § A workflow command's message escapes `%`, CR
+    and LF as `%25`, `%0D` and `%0A`
   - Each line replaces the log line it stands for. The runner prints it in the log as
     `##[warning]…` or `##[error]…`
 - GitHub caps annotations at 10 warnings and 10 errors per step, and truncates a message past
   4096 characters. See docs/third-party-facts.md § `::warning::` and `::error::` annotations cap
-  at 10 per type per step and 4096 characters each. A run emits at most ~5 warnings and 1 error
+  at 10 per type per step and 4096 characters each. A run emits at most ~5 warnings and 4 errors
 - New sentinel `githubclient.ErrNoArtifactFound`, so `post` can tell a missing state from a failed
   load. A missing artifact shows only as an empty list: see docs/third-party-facts.md § GitHub's
   "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches
@@ -82,7 +88,7 @@ persisted data changes, so upgrading needs nothing.
 - `main.go`: `log.SetOutput(os.Stdout)`; a failing `Run` goes through `logError` and exits 1, in
   place of `log.Fatalf`
 - New file `cmd/pr-slack-reminder/annotations.go` with `logWarning` and `logError`
-- Tests pin the escaping and line format
+- Tests pin the escaping, the line format, and one line per part of a nested join
 - Update `run.spec.md`
 
 ### 2. Tell a missing state artifact apart from a failed load
@@ -123,7 +129,6 @@ None
 
 ### Caveats
 
-- Unverified: whether the annotation UI shows an escaped newline as a line break
 - If a workspace's message edit window applies to bot edits and is shorter than the time between
   posts, every `post` warns about the not-editable previous message. Unverified whether such
   windows apply to bots: see docs/third-party-facts.md § `chat.update` errors: `message_not_found`,

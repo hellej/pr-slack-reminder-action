@@ -663,8 +663,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `%3A` and `,` to `%2C`
 - The runner reads output one line at a time, so an unescaped multiline message annotates its
   first line only, and the rest prints as plain log lines
-- The runner restores real newlines from the escaped form. Unverified: whether the annotation UI
-  shows them as line breaks
+- The runner restores real newlines from the escaped form. See § An escaped newline is a line
+  break in the job log and the API, but a space on the run's summary page
 
 ## The runner parses workflow commands from stderr as well as stdout, but only at a line's start [2026-09-26]
 
@@ -677,6 +677,23 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   such as a `log` timestamp, turns the command into plain text
 - A child process run with `stdio: 'inherit'` by a node action writes straight to the streams
   the runner reads
+- A `run` step parses stderr commands too, and annotates them (probe run 36231600149)
+
+## An escaped newline is a line break in the job log and the API, but a space on the run's summary page [2026-09-26]
+
+- Source: probe run 36231600149 (job 108375674818), `echo` lines from a `run` step on a temp
+  branch; its annotations read via `GET /repos/{owner}/{repo}/check-runs/{job_id}/annotations`
+  and the summary page's DOM
+- `%0A` in a message:
+  - Job log: real line breaks. Only the first line carries the `##[error]` prefix
+  - API: `\n` kept in `message`
+  - Summary page: the `annotation-message` element has `white-space: normal`, so the lines
+    run together with spaces. `%0D` shows the same way
+- `%25` shows as `%` everywhere
+- The summary page shows `title` as the annotation's heading. Without `title`, the heading is the
+  job name
+- Stdout and stderr are not ordered against each other: a stderr command written after a stdout
+  line printed before it in the log
 
 ## GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches [2026-09-26]
 
