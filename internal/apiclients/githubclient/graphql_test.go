@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -55,17 +58,18 @@ func TestGraphQLDo(t *testing.T) {
 	withoutRetryDelay(t)
 
 	tests := []struct {
-		name                string
-		status              int
-		responseBody        string
-		aliases             []string
-		expectedAttempts    int
-		expectedErrorClass  string
-		expectedErrorAlias  string
-		expectedErrorType   string
-		expectedErrorCode   string
-		expectedFieldErrors []fieldError
-		expectedData        testResponseData
+		name                 string
+		status               int
+		responseBody         string
+		aliases              []string
+		expectedAttempts     int
+		expectedErrorClass   string
+		expectedErrorAlias   string
+		expectedErrorType    string
+		expectedErrorCode    string
+		expectedErrorMessage string
+		expectedFieldErrors  []fieldError
+		expectedData         testResponseData
 	}{
 		{
 			name:             "data is decoded when there are no errors",
@@ -169,13 +173,14 @@ func TestGraphQLDo(t *testing.T) {
 			expectedData: testResponseData{P0: &testAliasData{Number: 42}},
 		},
 		{
-			name:               "error without a path is a query error",
-			status:             200,
-			responseBody:       `{"data":null,"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`,
-			aliases:            []string{"r0"},
-			expectedAttempts:   1,
-			expectedErrorClass: "query",
-			expectedErrorType:  "RATE_LIMITED",
+			name:                 "error without a path is a query error",
+			status:               200,
+			responseBody:         `{"data":null,"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`,
+			aliases:              []string{"r0"},
+			expectedAttempts:     1,
+			expectedErrorClass:   "query",
+			expectedErrorType:    "RATE_LIMITED",
+			expectedErrorMessage: "query error: RATE_LIMITED API rate limit exceeded",
 		},
 		{
 			name:   "error rooted at query is a query error",
@@ -183,10 +188,11 @@ func TestGraphQLDo(t *testing.T) {
 			responseBody: `{"errors":[{"path":["query","repository","notAField"],` +
 				`"extensions":{"code":"undefinedField"},` +
 				`"message":"Field 'notAField' doesn't exist on type 'Repository'"}]}`,
-			aliases:            []string{"r0"},
-			expectedAttempts:   1,
-			expectedErrorClass: "query",
-			expectedErrorCode:  "undefinedField",
+			aliases:              []string{"r0"},
+			expectedAttempts:     1,
+			expectedErrorClass:   "query",
+			expectedErrorCode:    "undefinedField",
+			expectedErrorMessage: "query error: undefinedField Field 'notAField' doesn't exist on type 'Repository'",
 		},
 		{
 			name:   "error rooted at an unknown alias is a query error",
@@ -277,6 +283,9 @@ func TestGraphQLDo(t *testing.T) {
 
 			assertErrorClass(t, err, tt.expectedErrorClass, tt.expectedErrorAlias, tt.expectedErrorType, tt.expectedErrorCode)
 			assertFieldErrors(t, fieldErrors, tt.expectedFieldErrors)
+			if tt.expectedErrorMessage != "" {
+				assertEqualStrings(t, "error message", err.Error(), tt.expectedErrorMessage)
+			}
 
 			if transport.calls != tt.expectedAttempts {
 				t.Errorf("expected %d attempts, got %d", tt.expectedAttempts, transport.calls)
@@ -284,6 +293,76 @@ func TestGraphQLDo(t *testing.T) {
 			assertAliasData(t, "r0", data.R0, tt.expectedData.R0)
 			assertAliasData(t, "p0", data.P0, tt.expectedData.P0)
 		})
+	}
+}
+
+func TestGraphQLDoFailsOnMalformedAliasedData(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{name: "data is not an object", data: `[]`},
+		{name: "rate limit is not an object", data: `{"rateLimit":"exhausted"}`},
+		{name: "alias node is not an object", data: `{"r0":7}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &recordingTransport{status: 200, responseBody: `{"data":` + tt.data + `}`}
+			client := graphqlClient{transport: transport}
+
+			var data aliasedData[testAliasData]
+			_, err := client.Do(context.Background(), "query{}", nil, []string{"r0"}, &data)
+
+			if err == nil || !strings.HasPrefix(err.Error(), "error decoding GraphQL response data") {
+				t.Fatalf("expected a decode error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestHTTPGraphQLTransportPostsAuthenticatedJSON(t *testing.T) {
+	var receivedRequest *http.Request
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRequest = r
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"message":"Server Error"}`))
+	}))
+	defer server.Close()
+	transport := newHTTPGraphQLTransport("test-token")
+	transport.endpoint = server.URL
+
+	status, responseBody, err := transport.Post(context.Background(), []byte(`{"query":"query{}"}`))
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != http.StatusBadGateway || string(responseBody) != `{"message":"Server Error"}` {
+		t.Errorf("got status %d and body %s, expected the server's 502 response", status, responseBody)
+	}
+	if receivedRequest.Method != http.MethodPost || string(receivedBody) != `{"query":"query{}"}` {
+		t.Errorf("server received %s %s, expected the posted query", receivedRequest.Method, receivedBody)
+	}
+	expectedValueByHeader := map[string]string{
+		"Authorization": "Bearer test-token",
+		"Content-Type":  "application/json",
+		"User-Agent":    graphqlUserAgent,
+	}
+	for header, expected := range expectedValueByHeader {
+		assertEqualStrings(t, header+" header", receivedRequest.Header.Get(header), expected)
+	}
+}
+
+func TestHTTPGraphQLTransportFailsWhenTheServerIsUnreachable(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	transport := newHTTPGraphQLTransport("test-token")
+	transport.endpoint = server.URL
+	server.Close()
+
+	if _, _, err := transport.Post(context.Background(), []byte(`{}`)); err == nil {
+		t.Error("expected an error, got nil")
 	}
 }
 

@@ -29,18 +29,14 @@ func LoadFromFile(filePath string) (*State, error) {
 	return &state, nil
 }
 
-func setupReadOnlyDir(t *testing.T) string {
+// A regular file as a parent fails MkdirAll, also for root.
+func pathBelowARegularFile(t *testing.T) string {
 	t.Helper()
-	if os.Getuid() == 0 {
-		t.Skip("Test requires non-root user to fail file write")
+	regularFile := filepath.Join(t.TempDir(), "regular-file")
+	if err := os.WriteFile(regularFile, nil, 0644); err != nil {
+		t.Fatalf("Failed to create regular file: %v", err)
 	}
-
-	tempDir := t.TempDir()
-	readOnlyDir := filepath.Join(tempDir, "readonly")
-	if err := os.Mkdir(readOnlyDir, 0555); err != nil {
-		t.Fatalf("Failed to create read-only directory: %v", err)
-	}
-	return readOnlyDir
+	return filepath.Join(regularFile, "nested", "file.json")
 }
 
 func createTestState() State {
@@ -136,22 +132,29 @@ func TestLoadFileNotFound(t *testing.T) {
 }
 
 func TestLoadInvalidJSON(t *testing.T) {
-	tempDir := t.TempDir()
-	invalidJSONPath := filepath.Join(tempDir, "invalid.json")
-
-	err := os.WriteFile(invalidJSONPath, []byte("{ invalid json content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create invalid JSON file: %v", err)
+	var syntaxError *json.SyntaxError
+	var typeError *json.UnmarshalTypeError
+	tests := []struct {
+		name          string
+		content       string
+		expectedError any
+	}{
+		{name: "malformed JSON", content: "{ invalid json content", expectedError: &syntaxError},
+		{name: "field of the wrong type", content: `{"pullRequests": "not a list"}`, expectedError: &typeError},
 	}
 
-	_, err = LoadFromFile(invalidJSONPath)
-	if err == nil {
-		t.Fatal("Expected error when loading invalid JSON, got nil")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			invalidJSONPath := filepath.Join(t.TempDir(), "invalid.json")
+			if err := os.WriteFile(invalidJSONPath, []byte(tt.content), 0644); err != nil {
+				t.Fatalf("Failed to create invalid JSON file: %v", err)
+			}
 
-	var jsonErr *json.SyntaxError
-	if !errors.As(err, &jsonErr) {
-		t.Errorf("Expected JSON syntax error, got: %v", err)
+			_, err := LoadFromFile(invalidJSONPath)
+			if !errors.As(err, tt.expectedError) {
+				t.Errorf("Expected error of type %T, got: %v", tt.expectedError, err)
+			}
+		})
 	}
 }
 
@@ -184,63 +187,63 @@ func TestSaveSentSlackBlocksToFileInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSaveDirectoryCreationFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	statePath := filepath.Join(readOnlyDir, "nested", "state.json")
-	state := createTestState()
-
-	err := Save(statePath, state)
-	if err == nil {
-		t.Fatal("Expected error when creating directory in read-only parent, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to create directory") {
-		t.Errorf("Expected directory creation error, got: %v", err)
-	}
-}
-
-func TestSaveSentSlackBlocksToFileDirectoryCreationFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	filePath := filepath.Join(readOnlyDir, "nested", "blocks.json")
+func TestSaveFailures(t *testing.T) {
 	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
+	saveState := func(filePath string) error { return Save(filePath, createTestState()) }
+	saveSentBlocks := func(filePath string) error { return SaveSentSlackBlocksToFile(filePath, slackBlocksJSON) }
 
-	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
-	if err == nil {
-		t.Fatal("Expected error when creating directory in read-only parent, got nil")
+	tests := []struct {
+		name          string
+		save          func(filePath string) error
+		filePath      func(t *testing.T) string
+		expectedError string
+	}{
+		{
+			name:          "state directory cannot be created",
+			save:          saveState,
+			filePath:      pathBelowARegularFile,
+			expectedError: "failed to create directory",
+		},
+		{
+			name:          "sent blocks directory cannot be created",
+			save:          saveSentBlocks,
+			filePath:      pathBelowARegularFile,
+			expectedError: "failed to create directory",
+		},
+		{
+			name: "state with malformed sent blocks",
+			save: func(filePath string) error {
+				stateWithMalformedBlocks := createTestState()
+				stateWithMalformedBlocks.LastWrittenMessage.Blocks = json.RawMessage(`[{"type":`)
+				return Save(filePath, stateWithMalformedBlocks)
+			},
+			filePath:      func(t *testing.T) string { return filepath.Join(t.TempDir(), "state.json") },
+			expectedError: "failed to marshal state",
+		},
+		{
+			name:          "state file path is a directory",
+			save:          saveState,
+			filePath:      func(t *testing.T) string { return t.TempDir() },
+			expectedError: "failed to write state file",
+		},
+		{
+			name:          "sent blocks file path is a directory",
+			save:          saveSentBlocks,
+			filePath:      func(t *testing.T) string { return t.TempDir() },
+			expectedError: "failed to write sent blocks file",
+		},
 	}
 
-	if !strings.Contains(err.Error(), "failed to create directory") {
-		t.Errorf("Expected directory creation error, got: %v", err)
-	}
-}
-
-func TestSaveFileWriteFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	statePath := filepath.Join(readOnlyDir, "state.json")
-	state := createTestState()
-
-	err := Save(statePath, state)
-	if err == nil {
-		t.Fatal("Expected error when writing to read-only directory, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to write state file") {
-		t.Errorf("Expected file write error, got: %v", err)
-	}
-}
-
-func TestSaveSentSlackBlocksToFileFileWriteFailure(t *testing.T) {
-	readOnlyDir := setupReadOnlyDir(t)
-	filePath := filepath.Join(readOnlyDir, "blocks.json")
-	slackBlocksJSON := json.RawMessage(`[{"type":"rich_text","block_id":"test"}]`)
-
-	err := SaveSentSlackBlocksToFile(filePath, slackBlocksJSON)
-	if err == nil {
-		t.Fatal("Expected error when writing to read-only directory, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "failed to write sent blocks file") {
-		t.Errorf("Expected file write error, got: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.save(tt.filePath(t))
+			if err == nil {
+				t.Fatal("Expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error containing %q, got: %v", tt.expectedError, err)
+			}
+		})
 	}
 }
 

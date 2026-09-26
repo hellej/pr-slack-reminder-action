@@ -18,10 +18,8 @@ func parseSnoozeComment(body string, createdAt time.Time) *time.Time {
 	}
 
 	days, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return nil
-	}
-	if days > maxSnoozeDays {
+	isBeyondIntRange := err != nil
+	if isBeyondIntRange || days > maxSnoozeDays {
 		days = maxSnoozeDays
 	}
 

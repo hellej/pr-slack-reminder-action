@@ -165,43 +165,6 @@ func TestMapWithError_EmptySlice(t *testing.T) {
 	}
 }
 
-func TestMapWithErrorToIter(t *testing.T) {
-	items := []string{"1", "invalid", "3"}
-	mapper := func(s string) (int, error) {
-		return strconv.Atoi(s)
-	}
-
-	var results []int
-	var errors []error
-
-	for value, err := range mapWithErrorToIter(items, mapper) {
-		results = append(results, value)
-		errors = append(errors, err)
-
-		// Iterator stops at first error by design
-		if err != nil {
-			break
-		}
-	}
-
-	expectedResults := []int{1, 0} // 0 is zero value for int when error occurs
-	if !slices.Equal(results, expectedResults) {
-		t.Errorf("MapWithErrorToIter() values = %v, expected %v", results, expectedResults)
-	}
-
-	if len(errors) != 2 {
-		t.Errorf("MapWithErrorToIter() should have yielded 2 items, got %d", len(errors))
-	}
-
-	if errors[0] != nil {
-		t.Errorf("First error should be nil, got %v", errors[0])
-	}
-
-	if errors[1] == nil {
-		t.Error("Second error should not be nil")
-	}
-}
-
 func TestUniqueFunc(t *testing.T) {
 	type Person struct {
 		Name string
@@ -336,16 +299,6 @@ func TestFlatMapWithStrings(t *testing.T) {
 	}
 }
 
-func TestFlatMapToIter(t *testing.T) {
-	items := [][]int{{1, 2}, {3, 4}, {5}}
-	expected := []int{1, 2, 3, 4, 5}
-
-	result := slices.Collect(flatMapToIter(items))
-	if !slices.Equal(result, expected) {
-		t.Errorf("FlatMapToIter() collected = %v, expected %v", result, expected)
-	}
-}
-
 func TestIntersperse(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -371,5 +324,22 @@ func TestIntersperse(t *testing.T) {
 				t.Errorf("Intersperse() = %q, expected %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+// See utilities.spec.md § Oddities.
+func TestSliceHelpersReturnNilWhenThereIsNothingToReturn(t *testing.T) {
+	mappedWithError, _ := MapWithError([]string{}, strconv.Atoi)
+	resultByHelper := map[string][]int{
+		"Filter":       Filter([]int{1}, func(int) bool { return false }),
+		"Map":          Map([]string{}, func(string) int { return 0 }),
+		"MapWithError": mappedWithError,
+		"FlatMap":      FlatMap([][]int{{}}),
+		"UniqueFunc":   UniqueFunc([]int{}, func(a, b int) bool { return a == b }),
+	}
+	for helper, result := range resultByHelper {
+		if result != nil {
+			t.Errorf("%s returned %#v, expected nil", helper, result)
+		}
 	}
 }

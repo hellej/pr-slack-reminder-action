@@ -82,10 +82,7 @@ func getPRsError(err error, referenceByAlias map[string]models.PullRequestRef) e
 	if !errors.As(err, &prError) {
 		return fmt.Errorf("error fetching pull requests: %w", err)
 	}
-	reference, isKnownAlias := referenceByAlias[prError.alias]
-	if !isKnownAlias {
-		return fmt.Errorf("error fetching pull requests: %w", err)
-	}
+	reference := referenceByAlias[prError.alias]
 	if prError.errorType == notFoundErrorType {
 		return pullRequestNotFoundError(reference)
 	}

@@ -3,6 +3,7 @@ package githubclient
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -75,26 +76,67 @@ func TestBuildGetPRsQuery(t *testing.T) {
 }
 
 // Unlike phase 2 under FindOpenPRs, an alias that carries no PR has nothing to fall back to.
-func TestGetPRsByRefFailsOnNullPullRequestWithoutError(t *testing.T) {
+func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
 	withoutRetryDelay(t)
 
-	transport := &fakeEnrichTransport{
-		fixtureByNumber: map[int]enrichFixture{2: {nullPullRequest: true}},
+	tests := []struct {
+		name            string
+		fixture         enrichFixture
+		expectedMessage string
+	}{
+		{
+			name:            "null pull request without an error",
+			fixture:         enrichFixture{nullPullRequest: true},
+			expectedMessage: "error fetching pull request owner-one/repo-one/2: no pull request returned",
+		},
+		{
+			name: "error scoped to the repository",
+			fixture: enrichFixture{
+				errorType:    "NOT_FOUND",
+				errorMessage: "Could not resolve to a Repository",
+			},
+			expectedMessage: "error fetching pull requests: repository error on alias p1: " +
+				"NOT_FOUND Could not resolve to a Repository",
+		},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{2: tt.fixture}}
+			testClient := &client{graphql: graphqlClient{transport: transport}}
+
+			references := []models.PullRequestRef{
+				{Repository: testRepositories[0], Number: 1},
+				{Repository: testRepositories[0], Number: 2},
+			}
+			prs, err := testClient.getPRsByRef(context.Background(), references)
+
+			if err == nil {
+				t.Fatalf("expected error %q, got %d PRs", tt.expectedMessage, len(prs))
+			}
+			if !strings.Contains(err.Error(), tt.expectedMessage) {
+				t.Errorf("error = %q, expected it to contain %q", err.Error(), tt.expectedMessage)
+			}
+		})
+	}
+}
+
+// See githubclient.spec.md § Oddities.
+func TestGetPRsFetchesOnlyTheFirstMaxPRsToFetchRefs(t *testing.T) {
+	transport := &fakeEnrichTransport{}
 	testClient := &client{graphql: graphqlClient{transport: transport}}
 
-	references := []models.PullRequestRef{
-		{Repository: testRepositories[0], Number: 1},
-		{Repository: testRepositories[0], Number: 2},
+	references := make([]models.PullRequestRef, MaxPRsToFetch+1)
+	for index := range references {
+		references[index] = models.PullRequestRef{Repository: testRepositories[0], Number: index + 1}
 	}
-	prs, err := testClient.getPRsByRef(context.Background(), references)
+	if _, err := testClient.GetPRs(context.Background(), references, noTestFilters); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	expectedMessage := "error fetching pull request owner-one/repo-one/2: no pull request returned"
-	if err == nil {
-		t.Fatalf("expected error %q, got %d PRs", expectedMessage, len(prs))
-	}
-	if !strings.Contains(err.Error(), expectedMessage) {
-		t.Errorf("error = %q, expected it to contain %q", err.Error(), expectedMessage)
+	requestedNumbers := slices.Sorted(slices.Values(slices.Concat(transport.requestedNumbers...)))
+	if !reflect.DeepEqual(requestedNumbers, numbersUpTo(MaxPRsToFetch)) {
+		t.Errorf("requested PR numbers = %v, expected 1 to %d", requestedNumbers, MaxPRsToFetch)
 	}
 }
 

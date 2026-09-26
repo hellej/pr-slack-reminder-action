@@ -19,14 +19,15 @@ func TestGetAuthenticatedClient(t *testing.T) {
 
 func TestGetChannelIDByName(t *testing.T) {
 	tests := []struct {
-		name                 string
-		channelName          string
-		publicChannels       []slack.Channel
-		privateChannels      []slack.Channel
-		publicChannelsError  error
-		privateChannelsError error
-		expectedChannelID    string
-		expectedError        string
+		name                   string
+		channelName            string
+		publicChannels         []slack.Channel
+		publicChannelsNextPage []slack.Channel
+		privateChannels        []slack.Channel
+		publicChannelsError    error
+		privateChannelsError   error
+		expectedChannelID      string
+		expectedError          string
 	}{
 		{
 			name:        "finds channel in public channels",
@@ -93,15 +94,36 @@ func TestGetChannelIDByName(t *testing.T) {
 			privateChannelsError: errors.New("missing_scope: groups:read"),
 			expectedError:        "missing_scope: groups:read (unable to fetch private channels, channel not found from public channels, check channel name, token and permissions or use channel ID input instead)",
 		},
+		{
+			name:                "fails when private succeeds but public fails and channel not found",
+			channelName:         "public-only",
+			publicChannelsError: errors.New("missing_scope: channels:read"),
+			privateChannels: []slack.Channel{
+				{GroupConversation: slack.GroupConversation{Name: "other-channel", Conversation: slack.Conversation{ID: "C11111"}}},
+			},
+			expectedError: "missing_scope: channels:read (unable to fetch public channels, channel not found from private channels, check channel name, token and permissions or use channel ID input instead)",
+		},
+		{
+			name:        "finds channel on a later page of public channels",
+			channelName: "general",
+			publicChannels: []slack.Channel{
+				{GroupConversation: slack.GroupConversation{Name: "other-public", Conversation: slack.Conversation{ID: "C11111"}}},
+			},
+			publicChannelsNextPage: []slack.Channel{
+				{GroupConversation: slack.GroupConversation{Name: "general", Conversation: slack.Conversation{ID: "C12345"}}},
+			},
+			expectedChannelID: "C12345",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockAPI := &mockSlackAPI{
-				publicChannels:       tt.publicChannels,
-				privateChannels:      tt.privateChannels,
-				publicChannelsError:  tt.publicChannelsError,
-				privateChannelsError: tt.privateChannelsError,
+				publicChannels:         tt.publicChannels,
+				publicChannelsNextPage: tt.publicChannelsNextPage,
+				privateChannels:        tt.privateChannels,
+				publicChannelsError:    tt.publicChannelsError,
+				privateChannelsError:   tt.privateChannelsError,
 			}
 			client := slackclient.NewClient(mockAPI)
 
@@ -130,15 +152,19 @@ func TestGetChannelIDByName(t *testing.T) {
 	}
 }
 
+const publicChannelsNextPageCursor = "next-page"
+
 type mockSlackAPI struct {
-	publicChannels       []slack.Channel
-	privateChannels      []slack.Channel
-	publicChannelsError  error
-	privateChannelsError error
-	deleteMessageError   error
-	editCanvasError      error
-	editCanvasParams     []slack.EditCanvasParams
-	updateMessageError   error
+	publicChannels         []slack.Channel
+	publicChannelsNextPage []slack.Channel
+	privateChannels        []slack.Channel
+	publicChannelsError    error
+	privateChannelsError   error
+	postMessageError       error
+	deleteMessageError     error
+	editCanvasError        error
+	editCanvasParams       []slack.EditCanvasParams
+	updateMessageError     error
 }
 
 func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error) {
@@ -147,6 +173,12 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 		case "public_channel":
 			if m.publicChannelsError != nil {
 				return nil, "", m.publicChannelsError
+			}
+			if params.Cursor == publicChannelsNextPageCursor {
+				return m.publicChannelsNextPage, "", nil
+			}
+			if m.publicChannelsNextPage != nil {
+				return m.publicChannels, publicChannelsNextPageCursor, nil
 			}
 			return m.publicChannels, "", nil
 		case "private_channel":
@@ -161,6 +193,9 @@ func (m *mockSlackAPI) GetConversations(params *slack.GetConversationsParameters
 }
 
 func (m *mockSlackAPI) PostMessage(channelID string, _ ...slack.MsgOption) (string, string, error) {
+	if m.postMessageError != nil {
+		return "", "", m.postMessageError
+	}
 	return "timestamp", channelID, nil
 }
 
@@ -185,11 +220,12 @@ func (m *mockSlackAPI) DeleteMessage(channelID string, timestamp string) (string
 
 func TestSendMessage(t *testing.T) {
 	tests := []struct {
-		name          string
-		channelID     string
-		summaryText   string
-		blocksCount   int
-		expectedError string
+		name             string
+		channelID        string
+		summaryText      string
+		blocksCount      int
+		postMessageError error
+		expectedError    string
 	}{
 		{
 			name:        "successful message send",
@@ -204,11 +240,19 @@ func TestSendMessage(t *testing.T) {
 			blocksCount:   55,
 			expectedError: "message has too many blocks for Slack API (limit: 50, was: 55)",
 		},
+		{
+			name:             "Slack API rejects the message",
+			channelID:        "C12345",
+			summaryText:      "Test summary",
+			blocksCount:      5,
+			postMessageError: errors.New("channel_not_found"),
+			expectedError:    "failed to send Slack message: channel_not_found",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockAPI := &mockSlackAPI{}
+			mockAPI := &mockSlackAPI{postMessageError: tt.postMessageError}
 			client := slackclient.NewClient(mockAPI)
 
 			blocks := make([]slack.Block, tt.blocksCount)
