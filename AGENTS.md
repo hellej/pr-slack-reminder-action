@@ -89,7 +89,7 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 ## Package Specs
 
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source
-- `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go` and `canvas.go`
+- `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
 - `make check-style` fails when a package directory has no spec file
@@ -170,6 +170,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder, marks the previ
 8. **Canvas Content** (`internal/canvascontent/`): structures open, draft and merged PRs into the PR tracker canvas sections
 9. **Canvas Builder** (`internal/canvasbuilder/`): renders the canvas content as markdown
 10. **Canvas Refresh** (`cmd/pr-slack-reminder/canvas.go`): writes the markdown to the canvas when configured, skipping the write when it is unchanged since the last run
+11. **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings and the run's errors as annotations on the run page
 
 Shared by the stages:
 
@@ -186,7 +187,8 @@ Shared by the stages:
 
 ### Error Handling
 
-- Only `main.go` exits (`log.Fatalf`). Packages return errors
+- Only `main.go` exits: it writes one `::error` annotation per part of the run's error, then exits 1. Packages return errors
+- Problems that don't fail the run are `::warning` annotations instead of plain log lines. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md) § Behaviour for both
 - Independent side effects fail independently: a failed message send doesn't skip the canvas refresh or vice versa, and a failed mark-as-stale edit doesn't stop state being saved. Their errors are joined into the run's error. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md)
 - Filters validate mutual exclusivity (e.g., can't use both `authors` and `ignored-authors`)
 
