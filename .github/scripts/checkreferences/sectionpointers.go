@@ -50,6 +50,9 @@ func brokenSectionPointers(paths []string, r repo) ([]string, error) {
 
 func checkSectionPointer(holdingPath string, pointer sectionPointer, r repo) (string, error) {
 	location := fmt.Sprintf("%s:%d: %s %s", holdingPath, pointer.line, sectionSign, shortened(pointer.text))
+	if pointer.writtenTargetFile == "" && commentStyleOf(holdingPath) != markdownProse {
+		return location + ": a code comment has no headings, name the target file", nil
+	}
 	targetPath := holdingPath
 	if pointer.writtenTargetFile != "" {
 		var isFound bool
@@ -122,7 +125,6 @@ func sectionLabels(markdown string) []string {
 }
 
 // Skips pointers in code blocks and code spans, which are examples, and pointers into external pages or inside link text.
-// In a code comment, skips a pointer naming no file.
 func sectionPointers(content string, style commentStyle) []sectionPointer {
 	lines := proseLines(content, style)
 	var pointers []sectionPointer
@@ -130,7 +132,7 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 		spans := codeSpans(line)
 		var previousTarget pointerTarget
 		for _, signIndex := range sectionSignIndexes(line) {
-			if style == markdownProse && isInsideCodeSpan(signIndex, spans) {
+			if isInsideCodeSpan(signIndex, spans) {
 				continue
 			}
 			target, isNamed := fileNamedRightBefore(line[:signIndex])
@@ -138,7 +140,7 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 				target = previousTarget
 			}
 			previousTarget = target
-			if target.isUncheckable || (style != markdownProse && target.writtenFile == "") {
+			if target.isUncheckable {
 				continue
 			}
 			writtenTargetFile := target.writtenFile

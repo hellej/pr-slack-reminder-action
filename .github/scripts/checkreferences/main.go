@@ -13,12 +13,18 @@ func main() {
 	if err != nil {
 		exitWithError(err)
 	}
+	isMakeTargetByName, err := loadMakeTargets(".")
+	if err != nil {
+		exitWithError(err)
+	}
 	var findings []string
 	for _, check := range []func() ([]string, error){
 		func() ([]string, error) { return brokenLinks(paths) },
 		func() ([]string, error) { return brokenSectionPointers(paths, r) },
 		func() ([]string, error) { return brokenRepoPaths(paths, r) },
 		func() ([]string, error) { return brokenSkillAndAgentNames(paths, r) },
+		func() ([]string, error) { return brokenFrontmatterNames(paths) },
+		func() ([]string, error) { return brokenMakeTargets(paths, isMakeTargetByName) },
 	} {
 		checkFindings, err := check()
 		if err != nil {

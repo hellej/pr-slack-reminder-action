@@ -20,25 +20,25 @@ var (
 
 func brokenRepoPaths(paths []string, r repo) ([]string, error) {
 	var broken []string
-	for _, markdownPath := range pathsWithStyle(paths, markdownProse) {
-		// It quotes paths from third-party docs, such as Claude Code's `.claude/CLAUDE.md`.
-		if filepath.Base(markdownPath) == "third-party-facts.md" {
+	for _, path := range paths {
+		// It quotes paths from third-party docs, such as Claude Code's .claude/CLAUDE.md.
+		if filepath.Base(path) == "third-party-facts.md" {
 			continue
 		}
-		content, err := os.ReadFile(markdownPath)
+		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
+			return nil, fmt.Errorf("reading %s: %w", path, err)
 		}
-		for _, mention := range missingRepoPaths(string(content), r) {
-			broken = append(broken, fmt.Sprintf("%s:%d: `%s`: not in the repository", markdownPath, mention.line, mention.writtenPath))
+		for _, mention := range missingRepoPaths(string(content), commentStyleOf(path), r) {
+			broken = append(broken, fmt.Sprintf("%s:%d: `%s`: not in the repository", path, mention.line, mention.writtenPath))
 		}
 	}
 	return broken, nil
 }
 
-func missingRepoPaths(markdown string, r repo) []repoPathMention {
+func missingRepoPaths(content string, style commentStyle, r repo) []repoPathMention {
 	var missing []repoPathMention
-	for i, line := range linesOutsideCodeBlocks(markdown) {
+	for i, line := range proseLines(content, style) {
 		for _, span := range codeSpans(line) {
 			path, isRepoPath := repoPathIn(span.content, r)
 			if isRepoPath && !r.isListed(path) {

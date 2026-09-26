@@ -88,13 +88,15 @@ Write a reference in one of these forms. `make check-style` checks each one reso
 
 - Section: `<file>.md § <Heading>`, or `` the `<name>` skill § <Heading> `` or `` the `<name>` agent § <Heading> ``
   - Name the file right before the `§`. A later pointer on the same line reuses it: `AGENTS.md § Git and § Testing`
-  - `§ <Heading>` with no file before it points into the file holding it
+  - `§ <Heading>` with no file before it points into the file holding it. A code comment always names the file
   - The text after `§` starts with a heading or a bold label of that file, such as a Code Style rule
   - A facts file entry: its full heading, date left out
 - Repository path: backticked, from the repository root, e.g. `internal/state/`
-- Skill or agent: its backticked name followed by `skill` or `agent`
+- Skill or agent: its backticked name followed by `skill` or `agent`, or a list: `` the `plan` and `writing` skills ``
+  - A skill's or agent's frontmatter `name:` matches its folder or file name
+- Make target: backticked, e.g. `make check-style`
 - Link: relative, optionally with a `#heading` anchor
-- Checked in Markdown, Go comments, and `#` comments in YAML, Makefile and shell files
+- Checked in Markdown, Go comments, and `#` comments in YAML, Makefile and shell files. Skill and agent names in Markdown only
   - A link or `§` pointer inside a code span or code block is an example, not checked
 
 ## Releasing
@@ -182,7 +184,7 @@ Write a reference in one of these forms. `make check-style` checks each one reso
 - `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
-- `go run .github/scripts/check_inputs.go`: validate action.yml and config.go constants are in sync
+- `go run .github/scripts/check_inputs.go`: validate action.yml, config.go constants and the README inputs table are in sync
 - Go LSP (gopls), when available, is reachable via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
 
 ## Architecture
@@ -236,7 +238,8 @@ Shared by all:
 
 - `action.yml` inputs must match constants in `internal/config/config.go`
 - `testhelpers/confighelpers.go` mirrors real config parsing
-- `.github/scripts/check_inputs.go` validates action.yml and config constants stay in sync
+- `README.md`'s inputs table lists every `action.yml` input, and only those
+- `.github/scripts/check_inputs.go` validates all three stay in sync
 
 ## Adding New Inputs
 

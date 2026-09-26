@@ -77,10 +77,16 @@ func TestSectionPointers(t *testing.T) {
 			wantPointers: []sectionPointer{{line: 2, writtenTargetFile: "state.spec.md", text: "Doesn't\nDo, for more"}},
 		},
 		{
-			name:         "Go: a pointer naming no file is skipped",
-			content:      "// See § Oddities",
+			name:         "Go: a pointer in a code span is an example",
+			content:      "// so `§ Gitt` doesn't match `Git`",
 			style:        slashComments,
 			wantPointers: nil,
+		},
+		{
+			name:         "Go: a pointer naming no file is kept, to be reported",
+			content:      "// See § Oddities",
+			style:        slashComments,
+			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "", text: "Oddities"}},
 		},
 		{
 			name:         "YAML, Makefile and shell: full-line # comments only",
@@ -138,7 +144,7 @@ func TestBrokenSectionPointers(t *testing.T) {
 		"The `plan` skill § Structure and § Style\n"+
 		"The `nope` skill § Structure")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
-	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\npackage pkg")
+	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
 	writeFile(t, pkgSpec, "## Behaviour")
 	dependabotConfig := filepath.Join(root, ".github", "dependabot.yml")
@@ -156,6 +162,7 @@ func TestBrokenSectionPointers(t *testing.T) {
 		skill + ":8: § Style: no heading or bold text starting it in " + planSkill,
 		skill + ":9: § Structure: target file .agents/skills/nope/SKILL.md not found",
 		goSource + ":1: § Oddities: no heading or bold text starting it in " + pkgSpec,
+		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
 		dependabotConfig + ":1: § Gitt: no heading or bold text starting it in " + agentsFile,
 	}
 	if !slices.Equal(got, want) {

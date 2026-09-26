@@ -15,11 +15,27 @@ func TestMissingRepoPaths(t *testing.T) {
 		"```\n`internal/gone/`\n```\n" +
 		"`` `internal/gone/` is an example `` and ``internal/lost/``"
 
-	got := missingRepoPaths(markdown, r)
+	got := missingRepoPaths(markdown, markdownProse, r)
 
 	want := []repoPathMention{{line: 2, writtenPath: "internal/gone/"}, {line: 2, writtenPath: ".github/scripts/old.sh"}, {line: 7, writtenPath: "internal/lost/"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestMissingRepoPathsInCodeComments(t *testing.T) {
+	r := newRepo("", []string{"internal/state/state.go"})
+	goSource := "// Reads `internal/state/` and `internal/gone/`\nx := \"`internal/lost/`\""
+	shellScript := "# Runs `internal/gone.sh`\necho `internal/lost.sh`"
+
+	gotGo := missingRepoPaths(goSource, slashComments, r)
+	gotShell := missingRepoPaths(shellScript, hashComments, r)
+
+	if want := []repoPathMention{{line: 1, writtenPath: "internal/gone/"}}; !slices.Equal(gotGo, want) {
+		t.Errorf("Go: got %v, want %v", gotGo, want)
+	}
+	if want := []repoPathMention{{line: 1, writtenPath: "internal/gone.sh"}}; !slices.Equal(gotShell, want) {
+		t.Errorf("shell: got %v, want %v", gotShell, want)
 	}
 }
 

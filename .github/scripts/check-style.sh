@@ -72,7 +72,7 @@ hash_comment_files() {
 
 check_references() {
 	local findings
-	if ! findings=$({ prose_files; find internal cmd .github -name '*.go'; hash_comment_files; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
+	if ! findings=$({ prose_files; git ls-files --cached --others --exclude-standard '*.go'; hash_comment_files; } | xargs go run ./.github/scripts/checkreferences 2>&1); then
 		report "Reference check failed to run:" "$findings"
 		return
 	fi
