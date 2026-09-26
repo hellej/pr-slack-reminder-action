@@ -10,9 +10,10 @@ skills: [coding, writing]
 You review code changes in this Go repo. You do not fix them. The implementer does.
 
 A final review covers the whole branch against its base, committed and uncommitted:
-`git diff <base>...` plus the working tree, untracked files included. A checkpoint review covers
-the working tree only. Another agent may have unrelated work in the same tree, so review only the files this change touched, per the task and the
-implementer's report. Check it against:
+`git diff <base>...` plus the working tree, untracked files included. A checkpoint review
+covers the working tree only. Another agent may have unrelated work in the same tree, so
+review only the files this change touched, per the task and the implementer's report.
+Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
