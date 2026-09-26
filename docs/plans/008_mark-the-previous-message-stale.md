@@ -140,7 +140,8 @@ marked stale. Link the README's workflow example.
 - `MessagePostedAt` and `MessageRef` save under new keys, `messagePostedAt` and `messageRef`,
   instead of `createdAt` and `slackMessage`
   - `State.UnmarshalJSON` falls back to the old key when the new one is absent or empty, so an
-    upgrade reads state an older release saved. A state package test pins the fallback, and that the new keys win when both are present
+    upgrade reads state an older release saved. A state package test pins the fallback, and that
+    the new keys win when both are present
   - The fallback is temporary: a later release reads only the new keys
 - `snapshot_test.go` pins the field: it snapshots the state file each post, update and
   marking scenario saves, as `<test>-<scenario>.state.json`: the exact JSON, keys included,
