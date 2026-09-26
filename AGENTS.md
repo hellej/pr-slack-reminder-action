@@ -84,10 +84,10 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## References
 
-- Docs read on GitHub, such as `README.md`, link with anchors. Agent files, specs and code comments use `§`: `AGENTS.md § Testing`, `` the `plan` skill § Structure ``
-- Name the file right before the `§`. A code comment always names it. Cite a facts file entry by its full heading, date left out
-- Backtick repository paths from the root, skill and agent names followed by `skill` or `agent`, and make targets
-- `make check-style` checks them. Examples of what it checks and skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
+- Agent files, specs, code comments: `AGENTS.md § Testing`, `AGENTS.md § Git and § Testing`, `` the `plan` skill § Structure ``, `` the `coding` skill ``, `` `internal/state/` ``, `` `make test` ``
+- Facts file: `See docs/third-party-facts.md § <full heading, date left out>`
+- Docs read on GitHub, such as `README.md`: `[tips](#-tips)`
+- `make check-style` checks these. What it skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
 
 ## Releasing
 
