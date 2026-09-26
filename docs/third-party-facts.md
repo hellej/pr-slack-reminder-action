@@ -677,3 +677,10 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   such as a `log` timestamp, turns the command into plain text
 - A child process run with `stdio: 'inherit'` by a node action writes straight to the streams
   the runner reads
+
+## GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches [2026-09-26]
+
+- Source: Build run 36230375245 (job 108372278091, PR #67). Each e2e step logged
+  `Found 0 artifacts with name "pr-slack-reminder-e2e-…-state"` using the e2e GitHub App token
+- The repository-level list returns HTTP 200 with `total_count` 0, never a 404
+- So a missing artifact is detectable only by the empty list
