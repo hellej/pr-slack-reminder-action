@@ -65,7 +65,7 @@ Serves § **Purpose**: the daily `post` is the one notification the team plans a
 - `fetchartifact.go`: the two retried units from the target shape run through the step 1 loop
   - A go-github failure is transient when its `*Response` is nil or its status is 5xx. Read the status off the `*Response`, not the error, since `DownloadArtifact` returns a plain error
   - The zip download is transient on a network error, a 5xx, or a failed body read
-  - The download unit reads the whole body into the temp file inside the attempt, so the deadline covers the body read
+  - The download unit reads the whole body inside the attempt, so the deadline covers the body read
 - `HTTPClient` changes from `Get(url)` to `Do(*http.Request)`, so the zip download carries the attempt ctx. `*http.Client` satisfies it, so the `httpClient` wrapper goes
   - The ~3 mocks implementing `Get` follow, in `testhelpers/mockgithubclient` and the `githubclient` tests
 - Tests: which state-load failures are transient, and that a failed zip download fetches a fresh download URL
