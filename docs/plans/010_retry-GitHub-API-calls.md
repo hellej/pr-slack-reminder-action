@@ -66,7 +66,8 @@ Serves AGENTS.md § Purpose: the daily `post` is the one notification the team p
 
 - `fetchartifact.go`: the two retried units from the target shape run through the step 1 loop
   - A go-github failure is transient when its `*Response` is nil, or its status is 5xx or 2xx. Read the status off the `*Response`, not the error, since `DownloadArtifact` returns a plain error
-    - A 2xx with an error is a body read or decode that failed, as when the attempt deadline cuts off the body. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
+    - On the list call, a 2xx with an error is a body read or decode that failed, as when the attempt deadline cuts off the body. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
+    - On `DownloadArtifact`, it is a 2xx where a 302 was expected. Retrying it is harmless
   - The zip download is transient on a network error, a 5xx, or a failed body read
   - The download unit reads the whole body inside the attempt, so the deadline covers the body read
 - `HTTPClient` changes from `Get(url)` to `Do(*http.Request)`, so the zip download carries the attempt ctx. `*http.Client` satisfies it, so the `httpClient` wrapper goes

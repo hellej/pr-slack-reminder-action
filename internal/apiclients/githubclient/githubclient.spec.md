@@ -29,7 +29,8 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - A PR with an active `/snooze [pr-reminder] for N (day|days|d)` comment (case-insensitive; most recent matching comment wins) is excluded from `FindOpenPRs` results until the snooze expires. `GetPRs` and `FindRecentlyMergedPRs` keep such a PR and only record the expiry on it: a snooze suppresses a request for attention, and the merged rows those two serve ask for nothing
 - `FetchLatestArtifactByName` downloads the newest GitHub Actions artifact matching a given name and decodes a named JSON file from it into a caller-supplied target, used by [internal/state](../../state/state.spec.md) to load prior-run state
   - It retries the artifact listing and the download separately. Each download attempt gets a fresh download URL, which expires after a minute, then reads the whole zip under that attempt's deadline
-  - A failed body read is transient too: on the zip, and on an artifact call answering 2xx with an error, which go-github returns when the read or decode of a 2xx body fails
+  - A failed body read is transient too: on the zip, and on the listing, where go-github returns the 2xx `*Response` with the error when the read or decode of the body fails
+  - A 2xx answer to the download URL call, where a 302 was expected, is retried as well
 
 ## Doesn't Do
 

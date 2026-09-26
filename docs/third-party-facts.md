@@ -757,7 +757,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails [2026-09-26]
 
 - Source: `go-github/v78@v78.0.0/github/github.go`: `Client.Do`, which decodes the body after `BareDo` succeeds and returns `resp, decErr`
-  - Also seen live: an httptest server sending headers then hanging gave `ListArtifacts` a `context deadline exceeded` error with a `200 OK` `*Response`
+  - Reproduced against a local httptest server, not GitHub: a server sending headers then hanging gave `ListArtifacts` a `context deadline exceeded` error with a `200 OK` `*Response`
 - So a 2xx status alone does not mean the call succeeded, nor that its failure was permanent
 
 ## GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL [2026-09-26]
