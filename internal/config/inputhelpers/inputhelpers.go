@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func inputNameAsEnv(name string) string {
@@ -93,19 +95,15 @@ func GetInputList(name string) []string {
 	if strings.Contains(val, ";") {
 		separator = ";" // for more convenient local testing
 	}
-	lines := strings.Split(val, separator)
-	for i, line := range lines {
-		lines[i] = strings.TrimSpace(line)
-	}
-	return lines
+	return utilities.Map(strings.Split(val, separator), strings.TrimSpace)
 }
 
 func GetInputMapping(inputName string) (map[string]string, error) {
 	name := inputNameAsEnv(inputName)
-	mapping := make(map[string]string)
+	valueByKey := make(map[string]string)
 	val := os.Getenv(name)
 	if val == "" {
-		return mapping, nil
+		return valueByKey, nil
 	}
 	separator := "\n"
 	if strings.Contains(val, ";") {
@@ -127,8 +125,8 @@ func GetInputMapping(inputName string) (map[string]string, error) {
 		if key == "" || value == "" {
 			return nil, fmt.Errorf("invalid mapping key or value for %s: '%s'", inputName, line)
 		}
-		mapping[key] = value
+		valueByKey[key] = value
 	}
 
-	return mapping, nil
+	return valueByKey, nil
 }

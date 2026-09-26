@@ -322,13 +322,23 @@ func TestFindOneOrNoPRs(t *testing.T) {
 			expectedCommenterLogins: []string{"issue-commenter", "another-issue-commenter"},
 		},
 		{
-			name: "PR with title containing ignored-term should be filtered out",
+			name: "PRs with titles containing any ignored-term should be filtered out",
 			mockPRs: []*github.PullRequest{
 				{
 					Number:  github.Ptr(132),
 					Title:   github.Ptr("Release v1.0 (beta)"),
 					Draft:   github.Ptr(false),
 					HTMLURL: github.Ptr("https://github.com/owner/repo/pull/132"),
+					User: &github.User{
+						Login: github.Ptr("author"),
+						Name:  github.Ptr("PR Author"),
+					},
+				},
+				{
+					Number:  github.Ptr(134),
+					Title:   github.Ptr("Weekly Automated Update"),
+					Draft:   github.Ptr(false),
+					HTMLURL: github.Ptr("https://github.com/owner/repo/pull/134"),
 					User: &github.User{
 						Login: github.Ptr("author"),
 						Name:  github.Ptr("PR Author"),

@@ -46,7 +46,7 @@ The dev canvas is on `pr-reminders-test`, the same dev channel `slack-message-pr
 Its ID (`F0BMEPVR1DL`) is hardcoded in `replace.sh`, found via the "Run with canvas link" step of
 `.github/actions/e2e-tests/action.yml` (`slack-channel-name-1`, which defaults to
 `pr-reminders-test`). That same canvas gets rewritten by every `build`/`e2e` CI run, so a probe
-left in it doesn't survive long — screenshot before the next CI run lands.
+left in it doesn't survive long. Screenshot before the next CI run lands.
 
 Never point this at the team's real canvas: a canvas write there replaces the whole thing, wiping
 whatever the team was using it for.

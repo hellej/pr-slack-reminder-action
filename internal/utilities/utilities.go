@@ -97,6 +97,18 @@ func flatMapToIter[T any](items [][]T) iter.Seq[T] {
 	}
 }
 
+// Intersperse returns the items with the separator placed between each adjacent pair.
+func Intersperse[T any](items []T, separator T) []T {
+	result := make([]T, 0, max(0, 2*len(items)-1))
+	for index, item := range items {
+		if index > 0 {
+			result = append(result, separator)
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
 // UniqueFunc returns a new slice with duplicate elements removed, using a custom equality function.
 // For non-comparable types or custom equality logic.
 func UniqueFunc[T any](items []T, equal func(T, T) bool) []T {

@@ -27,7 +27,7 @@ const (
 	mergedPRsHeading        = "🚀 Recently merged"
 )
 
-// Slack rejects a message of more than 50 blocks. Grouped by repository, a section spends
+// Slack rejects a message of more than 50 blocks. When grouped by repository, a section spends
 // 2 × repositories of them: one block per repository, one spacing block between each pair, and
 // the section heading.
 const maximumBlocksInSlackMessage = 50

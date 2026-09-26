@@ -14,12 +14,12 @@ Persists and reloads the "post" run's PR set, Slack message reference and last w
 
 ## Doesn't Do
 
-- No migration path between schema versions, and nothing checks the version on load — a mismatch goes unnoticed
+- No migration path between schema versions, and nothing checks the version on load: a mismatch goes unnoticed
 - Doesn't rotate or clean up old state/blocks files; each run overwrites in place
 
 ## Oddities
 
-- `SaveSentSlackBlocksToFile`'s output is never loaded back by this codebase — it exists as a side-channel debug artifact only
+- `SaveSentSlackBlocksToFile`'s output is never loaded back by this codebase. It exists as a side-channel debug artifact only
 - `LastWrittenCanvasMarkdownHash` (JSON key `canvasContentHash`) was added without bumping `CurrentSchemaVersion`. An artifact saved before it decodes an empty hash, which reads as "write the canvas"
 - `LastWrittenMessage` was added the same way. An artifact saved before it decodes an empty `LastWrittenMessage`, and an empty one saves and loads back empty
 - `LastWrittenMessage` is the only state an update run rewrites besides the canvas hash. The PR set, `MessageRef` and `MessagePostedAt` stay the post run's

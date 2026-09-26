@@ -8,11 +8,10 @@ import (
 )
 
 func includePR(pr *PullRequest, filters config.Filters) bool {
-	title := pr.GetTitle()
-	for _, ignoredTerm := range filters.IgnoredTerms {
-		if strings.Contains(title, ignoredTerm) {
-			return false
-		}
+	if slices.ContainsFunc(filters.IgnoredTerms, func(ignoredTerm string) bool {
+		return strings.Contains(pr.GetTitle(), ignoredTerm)
+	}) {
+		return false
 	}
 
 	if len(filters.IgnoredLabels) > 0 {

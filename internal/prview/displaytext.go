@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 // Renders a duration as days, hours or minutes depending on its magnitude, rounded to whole
@@ -85,14 +87,7 @@ func GetReviewersTextSegments(approvers, commenters []Collaborator) []string {
 	return append(segments, ")")
 }
 
-// Names separated by ", " segments.
 func nameSegments(collaborators []Collaborator) []string {
-	var segments []string
-	for idx, collaborator := range collaborators {
-		if idx > 0 {
-			segments = append(segments, ", ")
-		}
-		segments = append(segments, collaborator.GetGitHubName())
-	}
-	return segments
+	names := utilities.Map(collaborators, Collaborator.GetGitHubName)
+	return utilities.Intersperse(names, ", ")
 }

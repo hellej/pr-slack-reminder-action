@@ -88,11 +88,12 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 ## Package Specs
 
-- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities — read it before reading the package's source
+- Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go` and `canvas.go`
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
-- A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`) — safe to proceed if the change was a pure refactor
+- `make check-style` fails when a package directory has no spec file
+- A `git commit` with staged `internal/**/*.go` or `cmd/pr-slack-reminder/**/*.go` changes but no staged spec update triggers a non-blocking reminder (`.claude/hooks/check-spec-sync.sh`): safe to proceed if the change was a pure refactor
 
 ## Third-party Facts
 
@@ -133,37 +134,47 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
   - Don't repeat a case a broader test already pins, so internals stay free to refactor
 - Pick fixture values a wrong implementation would get wrong: `len(prs) == MaxDraftPRsToFetch` passes whatever that constant becomes, and input already in the expected order can't tell "kept" from "sorted". Reusing test-owned input in an assertion is fine
 - Check for existing helpers in `testhelpers/` before creating new ones
-- `cmd/pr-slack-reminder/main_test.go` — integration tests using full pipeline with mocks
-- `testhelpers/confighelpers.go` — `TestConfig` struct and `SetTestEnvironment()` for consistent test setup
-- `testhelpers/mockgithubclient/` and `testhelpers/mockslackclient/` — injectable mock dependencies
+- `cmd/pr-slack-reminder/main_test.go`: integration tests using full pipeline with mocks
+- `testhelpers/confighelpers.go`: `TestConfig` struct and `SetTestEnvironment()` for consistent test setup
+- `testhelpers/mockgithubclient/` and `testhelpers/mockslackclient/`: injectable mock dependencies
 
 ## Development Commands
 
-- `make test` — run all tests
-- `make test-with-coverage` — run tests with coverage report (clears cache first)
-- `make update-test-snapshots` — re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
-- `make run` — run locally (requires env vars, see Makefile for the pattern)
-- `make build` — build linux binaries
-- `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` — try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
-- `make check-fmt` — fail if any file needs `gofmt`
-- `make check-vet` — run `go vet ./...`
-- `make check-dead-code` — fail if `deadcode` finds an unreachable function under `./cmd/...`
-- `make check-vulnerabilities` — run `govulncheck ./...`
-- `make install-hooks` — point git at `githooks/`, a pre-commit hook running `check-fmt` and `check-vet`. One-time opt-in per clone
-- `go run .github/scripts/check_inputs.go` — validate action.yml and config.go constants are in sync
-- Go LSP (gopls) is available via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
+- `make test`: run all tests
+- `make test-with-coverage`: run tests with coverage report (clears cache first)
+- `make update-test-snapshots`: re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
+- `make run`: run locally (requires env vars, see Makefile for the pattern)
+- `make build`: build linux binaries
+- `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
+- `make check-fmt`: fail if any file needs `gofmt`
+- `make check-vet`: run `go vet ./...`
+- `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
+- `make check-vulnerabilities`: run `govulncheck ./...`
+- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a map not named `<value>By<Key>`, or a package missing its spec
+- `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
+- Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
+- `go run .github/scripts/check_inputs.go`: validate action.yml and config.go constants are in sync
+- Go LSP (gopls), when available, is reachable via the LSP tool. Leverage it for finding real references or definitions of a Go symbol, especially short or common names, since grep also matches comments and strings
 
 ## Architecture
 
 Two run modes (`run-mode` input): **post** sends a new reminder, marks the previous one stale, and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
-1. **Config** (`internal/config/`) — parses GitHub Action inputs via `INPUT_` prefix env vars
-2. **GitHub Client** (`internal/apiclients/githubclient/`) — fetches PR data and reviews, applies filtering
-3. **PR View** (`internal/prview/`) — enriches PRs with Slack user mappings and display metadata
-4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
-5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
-6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages
-7. **State** (`internal/state/`) — persists PR refs, the Slack message ref and the last written message after `post`; loaded from a GitHub Actions artifact in both modes
+1. **Config** (`internal/config/`): parses GitHub Action inputs via `INPUT_` prefix env vars
+2. **GitHub Client** (`internal/apiclients/githubclient/`): fetches PR data and reviews, applies filtering
+3. **PR View** (`internal/prview/`): enriches PRs with Slack user mappings and display metadata
+4. **Message Content** (`internal/messagecontent/`): structures data for messaging
+5. **Message Builder** (`internal/messagebuilder/`): constructs Slack Block Kit messages
+6. **Slack Client** (`internal/apiclients/slackclient/`): sends, updates, or deletes messages
+7. **State** (`internal/state/`): persists PR refs, the Slack message ref and the last written message after `post`; loaded from a GitHub Actions artifact in both modes
+8. **Canvas Content** (`internal/canvascontent/`): structures open, draft and merged PRs into the PR tracker canvas sections
+9. **Canvas Builder** (`internal/canvasbuilder/`): renders the canvas content as markdown
+10. **Canvas Refresh** (`cmd/pr-slack-reminder/canvas.go`): writes the markdown to the canvas when configured, skipping the write when it is unchanged since the last run
+
+Shared by the stages:
+
+- **Models** (`internal/models/`): value types `Repository` and `PullRequestRef`
+- **Utilities** (`internal/utilities/`): generic slice helpers used in place of manual loops
 
 ## Key Patterns
 
@@ -175,6 +186,8 @@ Two run modes (`run-mode` input): **post** sends a new reminder, marks the previ
 
 ### Error Handling
 
+- Only `main.go` exits (`log.Fatalf`). Packages return errors
+- Independent side effects fail independently: a failed message send doesn't skip the canvas refresh or vice versa, and a failed mark-as-stale edit doesn't stop state being saved. Their errors are joined into the run's error. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md)
 - Filters validate mutual exclusivity (e.g., can't use both `authors` and `ignored-authors`)
 
 ## File Relationships
