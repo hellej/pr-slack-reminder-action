@@ -93,7 +93,7 @@ runs:
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
 
-    - name: Run with filters and canvas link
+    - name: 'Run with filters and canvas link: post'
       uses: ./
       with:
         github-token: ${{ steps.app-token.outputs.token }}
@@ -115,14 +115,14 @@ runs:
           hellej/pr-slack-reminder-test-repo-2: {}
         pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BSUKTNB3J
 
-    - name: Upload state of run with filters and canvas link
+    - name: 'Run with filters and canvas link: upload post state'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
       with:
         name: pr-slack-reminder-e2e-grouped-canvas-state
         path: pr-slack-reminder-state.json
         retention-days: 1
 
-    - name: Update run with filters and canvas link
+    - name: 'Run with filters and canvas link: update'
       uses: ./
       with:
         run-mode: update
@@ -144,3 +144,11 @@ runs:
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
         pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BSUKTNB3J
+
+    - name: 'Run with filters and canvas link: upload update state'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      with:
+        name: pr-slack-reminder-e2e-grouped-canvas-state
+        path: pr-slack-reminder-state.json
+        retention-days: 1
+        overwrite: true
