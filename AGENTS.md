@@ -169,19 +169,29 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 Two run modes (`run-mode` input): **post** sends a new reminder, marks the previous one stale, and saves state; **update** lists the PRs open right now, re-fetches the state's PRs for the merged section, and edits or deletes the existing message.
 
+Shared input, in order:
+
 1. **Config** (`internal/config/`): parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`): fetches PR data and reviews, applies filtering
 3. **PR View** (`internal/prview/`): enriches PRs with Slack user mappings and display metadata
-4. **Message Content** (`internal/messagecontent/`): structures data for messaging
-5. **Message Builder** (`internal/messagebuilder/`): constructs Slack Block Kit messages
-6. **Slack Client** (`internal/apiclients/slackclient/`): sends, updates, or deletes messages
-7. **State** (`internal/state/`): persists PR refs, the Slack message ref and the last written message after `post`; loaded from a GitHub Actions artifact in both modes
-8. **Canvas Content** (`internal/canvascontent/`): structures open, draft and merged PRs into the PR tracker canvas sections
-9. **Canvas Builder** (`internal/canvasbuilder/`): renders the canvas content as markdown
-10. **Canvas Refresh** (`cmd/pr-slack-reminder/canvas.go`): writes the markdown to the canvas when configured, skipping the write when it is unchanged since the last run
-11. **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings and the run's errors as annotations on the run page
 
-Shared by the stages:
+Then two tracks, the message first. A failure in one doesn't skip the other:
+
+- Message track:
+  1. **Message Content** (`internal/messagecontent/`): structures data for messaging
+  2. **Message Builder** (`internal/messagebuilder/`): constructs Slack Block Kit messages
+  3. **Slack Client** (`internal/apiclients/slackclient/`): sends, updates, or deletes messages
+- Canvas track:
+  1. **Canvas Content** (`internal/canvascontent/`): structures open, draft and merged PRs into the PR tracker canvas sections
+  2. **Canvas Builder** (`internal/canvasbuilder/`): renders the canvas content as markdown
+  3. **Canvas Refresh** (`cmd/pr-slack-reminder/canvas.go`): writes the markdown to the canvas when configured, skipping the write when it is unchanged since the last run
+
+Around the run:
+
+- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: after sending, to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message and the canvas markdown hash
+- **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings as they happen and the run's errors at exit, as annotations on the run page
+
+Shared by all:
 
 - **Models** (`internal/models/`): value types `Repository` and `PullRequestRef`
 - **Utilities** (`internal/utilities/`): generic slice helpers used in place of manual loops
