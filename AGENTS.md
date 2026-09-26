@@ -229,7 +229,7 @@ Shared by all:
 
 - `action.yml` inputs must match constants in `internal/config/config.go`
 - `testhelpers/confighelpers.go` mirrors real config parsing
-- `README.md`'s inputs table lists every `action.yml` input, and only those
+- `README.md`'s inputs table lists every `action.yml` input
 - `.github/scripts/check_inputs.go` validates all three stay in sync
 
 ## Adding New Inputs
