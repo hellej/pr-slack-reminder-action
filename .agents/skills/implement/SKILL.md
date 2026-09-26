@@ -22,6 +22,8 @@ findings.
   ask it with that same confirmation, never once the work is under way
 - `git status` before round 1. Name any unrelated work to both agents as off-limits: do
   not stage it, revert it, or fold it into the change
+- Fetch the base branch before round 1 and note how far behind the working branch is. If
+  behind, bring the base in first, so the plan's claims and the review run against current code
 
 ## No Plan File
 
