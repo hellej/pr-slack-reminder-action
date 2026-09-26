@@ -28,7 +28,7 @@ func Run(
 ) error {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		return fmt.Errorf("configuration error: %v", err)
+		return fmt.Errorf("configuration error: %w", err)
 	}
 	cfg.Print()
 	githubClient := getGitHubClient(cfg.GithubToken, cfg.GithubTokenForState)
@@ -38,7 +38,7 @@ func Run(
 		log.Println("Slack channel ID is not set, resolving it by name")
 		channelID, err := slackClient.GetChannelIDByName(cfg.SlackChannelName)
 		if err != nil {
-			return fmt.Errorf("error getting channel ID by name: %v", err)
+			return fmt.Errorf("error getting channel ID by name: %w", err)
 		}
 		cfg.SlackChannelID = channelID
 	}

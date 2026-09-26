@@ -66,7 +66,7 @@ func GetInputInt(name string) (int, error) {
 	}
 	parsed, err := strconv.Atoi(val)
 	if err != nil {
-		return 0, fmt.Errorf("error parsing input %s as integer: %v", name, err)
+		return 0, fmt.Errorf("error parsing input %s as integer: %w", name, err)
 	}
 	return parsed, nil
 }
@@ -81,7 +81,7 @@ func GetInputBool(name string) (bool, error) {
 	}
 	parsed, err := strconv.ParseBool(val)
 	if err != nil {
-		return false, fmt.Errorf("error parsing input %s as boolean: %v", name, err)
+		return false, fmt.Errorf("error parsing input %s as boolean: %w", name, err)
 	}
 	return parsed, nil
 }

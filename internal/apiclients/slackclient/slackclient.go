@@ -129,7 +129,7 @@ func (c *client) SendMessage(
 		slack.MsgOptionText(summaryText, false),
 	)
 	if err != nil {
-		return SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %v", err)
+		return SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %w", err)
 	}
 	log.Printf("Sent message to Slack channel: %s", channelID)
 
@@ -187,7 +187,7 @@ func (c *client) DeleteMessage(channelID string, messageTS string) error {
 			log.Printf("Message already deleted or not found, ignoring error")
 			return nil
 		}
-		return fmt.Errorf("failed to delete Slack message: %v", err)
+		return fmt.Errorf("failed to delete Slack message: %w", err)
 	}
 	log.Printf("Deleted message from Slack channel: %s", channelID)
 	return nil

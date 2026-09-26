@@ -135,7 +135,7 @@ func GetConfig() (Config, error) {
 		return models.ParseRepository(repoPath)
 	})
 	if err != nil {
-		return Config{}, fmt.Errorf("invalid repositories input: %v", err)
+		return Config{}, fmt.Errorf("invalid repositories input: %w", err)
 	}
 
 	config := Config{

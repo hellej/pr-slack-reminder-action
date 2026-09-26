@@ -1,6 +1,8 @@
 package inputhelpers_test
 
 import (
+	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config/inputhelpers"
@@ -56,6 +58,9 @@ func TestReadInputIntInvalid(t *testing.T) {
 	if err.Error() != expectedError {
 		t.Errorf("Expected error %v, got '%v'", expectedError, err)
 	}
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Errorf("Expected error to wrap strconv.ErrSyntax, got %v", err)
+	}
 }
 
 func TestGetInputBool(t *testing.T) {
@@ -85,8 +90,8 @@ func TestGetInputBool(t *testing.T) {
 			result, err := inputhelpers.GetInputBool("test")
 
 			if tc.expectError {
-				if err == nil {
-					t.Errorf("Expected error, got nil")
+				if !errors.Is(err, strconv.ErrSyntax) {
+					t.Errorf("Expected error wrapping strconv.ErrSyntax, got %v", err)
 				}
 			} else {
 				if err != nil {

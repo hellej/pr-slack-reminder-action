@@ -56,11 +56,11 @@ func parseFilters(rawFilters string) (Filters, error) {
 	var filters Filters
 	err := dec.Decode(&filters)
 	if err != nil {
-		return Filters{}, fmt.Errorf("unable to parse filters from %v: %v", rawFilters, err)
+		return Filters{}, fmt.Errorf("unable to parse filters from %v: %w", rawFilters, err)
 	}
 	err = filters.validate()
 	if err != nil {
-		return Filters{}, fmt.Errorf("invalid filters: %v, error: %v", rawFilters, err)
+		return Filters{}, fmt.Errorf("invalid filters: %v, error: %w", rawFilters, err)
 	}
 
 	return filters, nil

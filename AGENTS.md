@@ -102,6 +102,14 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - Add to it whenever you confirm such a fact, or rule an approach out
 - Plans and code may cite an entry by its heading, e.g. `See docs/third-party-facts.md § <heading>`, or the source it names
 
+## Third-party Tools
+
+- Pin every third-party tool and action to an immutable reference. Never `@latest` or a moving tag
+  - GitHub Actions: the full commit SHA, with the version in a trailing comment
+  - Go dev tools: `tool` directives in `tools/go.mod`, a module apart from the action binary's `go.mod`. `tools/go.sum` hashes lock the versions
+  - Add one with `go get -modfile=tools/go.mod -tool <package>@<version>`, run it with `go tool -modfile=tools/go.mod <tool>` (`GO_TOOL` in the Makefile)
+- Dependabot updates the pins weekly
+
 ## Git
 
 - Never amend commits or force push
@@ -115,9 +123,10 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
 - **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
   - Name a UI element by what it shows: `updateTimeFooter`, not `liveFooter`. Don't put an adjective before a noun it doesn't describe: the edit marking a message stale is a `markAsStaleEdit`, not a `staleEdit`
+  - Short-lived names may be short: receivers, loop variables, a value used within a few lines. Maps still follow `<value>By<key>`
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
   - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// Kept for the next post's mark-as-stale edit. See state.spec.md § Oddities`
-- **Declarative slice transformations:** Avoid manual `for` loops and index management when transforming data. Always reuse or extend `./internal/utilities` (`Map`, `Filter`, `Find` etc).
+- **Declarative slice transformations:** Prefer `./internal/utilities` (`Map`, `Filter`, `Find` etc), `slices` and `maps` over manual `for` loops and index management when transforming data. Extend `utilities` when no helper fits. A plain loop is fine where a helper reads worse, such as one building several values at once.
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
 - **Keep exported type names exported:** Don't unexport a type just to shrink a package's API surface. Unexporting renames it, and lowercase type names read worse here. Funcs and consts are fine to unexport.
@@ -187,6 +196,7 @@ Shared by the stages:
 
 ### Error Handling
 
+- Wrap an underlying error with `%w`, never `%v`: `fmt.Errorf("sending message: %w", err)`
 - Only `main.go` exits: it writes one `::error` annotation per part of the run's error, then exits 1. Packages return errors
 - Problems that don't fail the run are `::warning` annotations instead of plain log lines. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md) § Behaviour for both
 - Independent side effects fail independently: a failed message send doesn't skip the canvas refresh or vice versa, and a failed mark-as-stale edit doesn't stop state being saved. Their errors are joined into the run's error. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md)
