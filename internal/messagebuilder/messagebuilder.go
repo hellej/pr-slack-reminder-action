@@ -36,7 +36,7 @@ const slotsForFooterOrStalenessWarning = 1
 
 const updateTimeFooterBlockID = "update_time_footer"
 
-func BuildMessage(content messagecontent.Content) (slack.Message, string) {
+func BuildMessageToPost(content messagecontent.Content) (slack.Message, string) {
 	return slack.NewBlockMessage(buildContentBlocks(content)...), content.SummaryText
 }
 
@@ -184,7 +184,7 @@ func isNotUpdateTimeFooter(sentBlock json.RawMessage) bool {
 	return identifiedBlock.BlockID != updateTimeFooterBlockID
 }
 
-// slack.BlockFromJSON keeps only the first block of an array. See docs/third-party-facts.md.
+// slack.BlockFromJSON keeps only the first block of an array (slack-go@v0.29.0/block_json.go).
 func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }

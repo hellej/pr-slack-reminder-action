@@ -20,15 +20,15 @@ const CurrentSchemaVersion = 1
 
 type State struct {
 	SchemaVersion                 int                     `json:"schemaVersion"`
-	CreatedAt                     time.Time               `json:"createdAt"`
-	SlackMessage                  SlackRef                `json:"slackMessage"`
+	MessagePostedAt               time.Time               `json:"createdAt"`
+	MessageRef                    SlackRef                `json:"slackMessage"`
 	PullRequests                  []models.PullRequestRef `json:"pullRequests"`
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
-	LastSentMessage               LastSentMessage         `json:"lastSentMessage"`
+	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 }
 
 // See state.spec.md.
-type LastSentMessage struct {
+type LastWrittenMessage struct {
 	// Without omitempty, nil blocks save as JSON null, which loads back as non-empty blocks
 	Blocks      json.RawMessage `json:"blocks,omitempty"`
 	SummaryText string          `json:"summaryText"`
@@ -75,7 +75,7 @@ func Load(
 }
 
 // NewPostState builds the state a "post" run leaves behind. The only place stamping
-// SchemaVersion and CreatedAt.
+// SchemaVersion and MessagePostedAt.
 func NewPostState(
 	prViews []prview.PR,
 	messageInfo slackclient.SentMessageInfo,
@@ -83,31 +83,31 @@ func NewPostState(
 	generatedAt time.Time,
 ) State {
 	return State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now(),
+		MessageRef: SlackRef{
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		PullRequests:    utilities.Map(prViews, PRToPullRequestRef),
-		LastSentMessage: newLastSentMessage(messageInfo, summaryText, generatedAt),
+		PullRequests:       utilities.Map(prViews, PRToPullRequestRef),
+		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
 	}
 }
 
-func WithLastSentMessage(
+func WithLastWrittenMessage(
 	loadedState State,
 	messageInfo slackclient.SentMessageInfo,
 	summaryText string,
 	generatedAt time.Time,
 ) State {
-	loadedState.LastSentMessage = newLastSentMessage(messageInfo, summaryText, generatedAt)
+	loadedState.LastWrittenMessage = newLastWrittenMessage(messageInfo, summaryText, generatedAt)
 	return loadedState
 }
 
-func newLastSentMessage(
+func newLastWrittenMessage(
 	messageInfo slackclient.SentMessageInfo, summaryText string, generatedAt time.Time,
-) LastSentMessage {
-	return LastSentMessage{
+) LastWrittenMessage {
+	return LastWrittenMessage{
 		Blocks:      messageInfo.BlocksAsSent,
 		SummaryText: summaryText,
 		GeneratedAt: generatedAt,

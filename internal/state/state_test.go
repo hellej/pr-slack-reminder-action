@@ -45,9 +45,9 @@ func setupReadOnlyDir(t *testing.T) string {
 
 func createTestState() State {
 	return State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -71,9 +71,9 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 	statePath := filepath.Join(tempDir, "state.json")
 
 	originalState := State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -98,16 +98,16 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, originalState.SchemaVersion)
 	}
 
-	if !loadedState.CreatedAt.Equal(originalState.CreatedAt) {
-		t.Errorf("CreatedAt mismatch: got %v, want %v", loadedState.CreatedAt, originalState.CreatedAt)
+	if !loadedState.MessagePostedAt.Equal(originalState.MessagePostedAt) {
+		t.Errorf("MessagePostedAt mismatch: got %v, want %v", loadedState.MessagePostedAt, originalState.MessagePostedAt)
 	}
 
-	if loadedState.SlackMessage.ChannelID != originalState.SlackMessage.ChannelID {
-		t.Errorf("SlackMessage.ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, originalState.SlackMessage.ChannelID)
+	if loadedState.MessageRef.ChannelID != originalState.MessageRef.ChannelID {
+		t.Errorf("MessageRef.ChannelID mismatch: got %s, want %s", loadedState.MessageRef.ChannelID, originalState.MessageRef.ChannelID)
 	}
 
-	if loadedState.SlackMessage.MessageTS != originalState.SlackMessage.MessageTS {
-		t.Errorf("SlackMessage.MessageTS mismatch: got %s, want %s", loadedState.SlackMessage.MessageTS, originalState.SlackMessage.MessageTS)
+	if loadedState.MessageRef.MessageTS != originalState.MessageRef.MessageTS {
+		t.Errorf("MessageRef.MessageTS mismatch: got %s, want %s", loadedState.MessageRef.MessageTS, originalState.MessageRef.MessageTS)
 	}
 
 	if len(loadedState.PullRequests) != len(originalState.PullRequests) {
@@ -268,9 +268,9 @@ func (m *mockStateArtifactFetcher) FetchLatestArtifactByName(
 
 func TestLoadSuccessful(t *testing.T) {
 	expectedState := &State{
-		SchemaVersion: CurrentSchemaVersion,
-		CreatedAt:     time.Now().UTC(),
-		SlackMessage: SlackRef{
+		SchemaVersion:   CurrentSchemaVersion,
+		MessagePostedAt: time.Now().UTC(),
+		MessageRef: SlackRef{
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
@@ -292,8 +292,8 @@ func TestLoadSuccessful(t *testing.T) {
 		t.Errorf("SchemaVersion mismatch: got %d, want %d", loadedState.SchemaVersion, expectedState.SchemaVersion)
 	}
 
-	if loadedState.SlackMessage.ChannelID != expectedState.SlackMessage.ChannelID {
-		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.SlackMessage.ChannelID, expectedState.SlackMessage.ChannelID)
+	if loadedState.MessageRef.ChannelID != expectedState.MessageRef.ChannelID {
+		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.MessageRef.ChannelID, expectedState.MessageRef.ChannelID)
 	}
 
 	if len(loadedState.PullRequests) != len(expectedState.PullRequests) {

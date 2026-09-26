@@ -163,7 +163,7 @@ Two run modes (`run-mode` input): **post** sends a new reminder, marks the previ
 4. **Message Content** (`internal/messagecontent/`) — structures data for messaging
 5. **Message Builder** (`internal/messagebuilder/`) — constructs Slack Block Kit messages
 6. **Slack Client** (`internal/apiclients/slackclient/`) — sends, updates, or deletes messages
-7. **State** (`internal/state/`) — persists PR refs, the Slack message ref and the last sent message after `post`; loaded from a GitHub Actions artifact in both modes
+7. **State** (`internal/state/`) — persists PR refs, the Slack message ref and the last written message after `post`; loaded from a GitHub Actions artifact in both modes
 
 ## Key Patterns
 

@@ -16,7 +16,7 @@ tracker canvas, and persists state. The two run modes and the pipeline order are
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
   - The mark-as-stale edit never reaches the sent-blocks record, which holds the new message only
 - Update mode loads the previous state, re-resolves each tracked PR ref the run's own fetches didn't already resolve, builds the message from the live open fetch plus the resolved tracked and merged PRs, and edits the existing message. It deletes the message only when there is nothing left to show and both the merged and residue fetches succeeded; a fetch failure keeps the message standing instead
-- Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `CreatedAt`, the previous message's post time
+- Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `MessagePostedAt`
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
 - State is saved carrying whichever canvas content hash is now current:

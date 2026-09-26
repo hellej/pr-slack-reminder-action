@@ -116,7 +116,7 @@ func runPostMode(
 		log.Println("No PRs found and no-prs-message is set to empty, exiting")
 		return nil, nil
 	}
-	message, summaryText := messagebuilder.BuildMessage(content)
+	message, summaryText := messagebuilder.BuildMessageToPost(content)
 
 	sentMessageInfo, err := slackClient.SendMessage(cfg.SlackChannelID, message, summaryText)
 	if err != nil {
@@ -149,28 +149,28 @@ func markPreviousMessageStale(
 		log.Printf("Not marking the previous message stale, its state did not load: %v", err)
 		return nil
 	}
-	lastSentMessage := previousState.LastSentMessage
-	if len(lastSentMessage.Blocks) == 0 {
+	lastWrittenMessage := previousState.LastWrittenMessage
+	if len(lastWrittenMessage.Blocks) == 0 {
 		log.Println("Not marking the previous message stale, its state records no sent message")
 		return nil
 	}
-	if previousState.SlackMessage.ChannelID != newMessageChannelID {
+	if previousState.MessageRef.ChannelID != newMessageChannelID {
 		log.Printf(
 			"Not marking the previous message stale, it is in channel %s, not in %s where this run posted",
-			previousState.SlackMessage.ChannelID, newMessageChannelID,
+			previousState.MessageRef.ChannelID, newMessageChannelID,
 		)
 		return nil
 	}
 
-	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(lastSentMessage.Blocks, lastSentMessage.GeneratedAt)
+	messageMarkedStale, err := messagebuilder.BuildMessageMarkedStale(lastWrittenMessage.Blocks, lastWrittenMessage.GeneratedAt)
 	if err != nil {
 		return fmt.Errorf("failed to mark the previous message stale: %w", err)
 	}
 	_, err = slackClient.UpdateMessage(
-		previousState.SlackMessage.ChannelID,
-		previousState.SlackMessage.MessageTS,
+		previousState.MessageRef.ChannelID,
+		previousState.MessageRef.MessageTS,
 		messageMarkedStale,
-		lastSentMessage.SummaryText,
+		lastWrittenMessage.SummaryText,
 	)
 	if errors.Is(err, slackclient.ErrMessageNotEditable) {
 		log.Printf("Not marking the previous message stale: %v", err)
@@ -221,7 +221,7 @@ func runUpdateMode(
 		buildNonDraftPRViews(openPRs, cfg),
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
-		loadedState.CreatedAt,
+		loadedState.MessagePostedAt,
 		generatedAt,
 		cfg.ContentInputs,
 	)
@@ -234,8 +234,8 @@ func runUpdateMode(
 		log.Println("Nothing left to show: no open PRs and no merged ones")
 		log.Println("Deleting Slack message as no-prs-message is set to empty")
 		if err := slackClient.DeleteMessage(
-			loadedState.SlackMessage.ChannelID,
-			loadedState.SlackMessage.MessageTS,
+			loadedState.MessageRef.ChannelID,
+			loadedState.MessageRef.MessageTS,
 		); err != nil {
 			log.Printf("Warning: failed to delete message: %v", err)
 		}
@@ -248,15 +248,15 @@ func runUpdateMode(
 	message, summaryText := messagebuilder.BuildMessageWithUpdateTimeFooter(content)
 
 	sentMessageInfo, err := slackClient.UpdateMessage(
-		loadedState.SlackMessage.ChannelID,
-		loadedState.SlackMessage.MessageTS,
+		loadedState.MessageRef.ChannelID,
+		loadedState.MessageRef.MessageTS,
 		message,
 		summaryText,
 	)
 	if err != nil {
 		return loadedState, err
 	}
-	editedState := state.WithLastSentMessage(*loadedState, sentMessageInfo, summaryText, generatedAt)
+	editedState := state.WithLastWrittenMessage(*loadedState, sentMessageInfo, summaryText, generatedAt)
 	return &editedState, sentMessageHandler(sentMessageInfo)
 }
 

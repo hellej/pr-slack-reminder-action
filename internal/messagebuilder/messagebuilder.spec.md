@@ -4,7 +4,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 
 ## Behaviour
 
-- `BuildMessage(content)` returns a message to post plus its summary text (used as Slack's plain-text fallback). It has no footer
+- `BuildMessageToPost(content)` returns a message to post plus its summary text (used as Slack's plain-text fallback). It has no footer
 - `BuildMessageWithUpdateTimeFooter(content)` returns the same message ending with an update-time footer, for an edit in place
 - The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
 - Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
@@ -29,7 +29,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 
 - Doesn't check any Slack limit other than block count, such as per-block text length or total payload size
 - `BuildMessageMarkedStale` never re-renders content: rows, ages and headings stay as last sent
-- `BuildMessageMarkedStale` applies no block cap. It relies on `BuildMessage` and `BuildMessageWithUpdateTimeFooter` having capped the stored content at 49 blocks
+- `BuildMessageMarkedStale` applies no block cap. It relies on `BuildMessageToPost` and `BuildMessageWithUpdateTimeFooter` having capped the stored content at 49 blocks
 
 ## Oddities
 

@@ -38,21 +38,21 @@ var stalenessWarningTimestamp = regexp.MustCompile(`!date\^\d+\^\{date_pretty\} 
 // Run stamps the update-time footer, and the staleness warning after it, with the real clock,
 // so a snapshot recorded a second ago would never match again. The rest of the message survives
 // a moving clock: the fixture ages come off this package's own `now`.
-func withFixedClockTimestamps(blocks []byte) []byte {
+func withFixedMessageTimestamps(blocks []byte) []byte {
 	blocks = updateTimeFooterTimestamp.ReplaceAll(blocks, []byte(`!date^0^{time}|00:00 UTC`))
 	return stalenessWarningTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
-var stateClockTimeField = regexp.MustCompile(`"(createdAt|generatedAt)": "[^"]*"`)
+var stateTimestampField = regexp.MustCompile(`"(createdAt|generatedAt)": "[^"]*"`)
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
 
-func withFixedStateClockTimes(stateJSON []byte) []byte {
-	return stateClockTimeField.ReplaceAllFunc(stateJSON, func(field []byte) []byte {
+func withFixedStateTimestamps(stateJSON []byte) []byte {
+	return stateTimestampField.ReplaceAllFunc(stateJSON, func(field []byte) []byte {
 		if bytes.HasSuffix(field, neverSetTimeJSON) {
 			return field
 		}
-		fieldName := stateClockTimeField.FindSubmatch(field)[1]
+		fieldName := stateTimestampField.FindSubmatch(field)[1]
 		return []byte(`"` + string(fieldName) + `": "1970-01-01T00:00:00Z"`)
 	})
 }
@@ -84,7 +84,7 @@ func assertSentBlocksMatchSnapshot(t *testing.T, sentSlackBlocksFilePath string)
 
 func assertBlocksMatchSnapshot(t *testing.T, sentBlocks []byte) {
 	t.Helper()
-	assertMatchesSnapshot(t, withFixedClockTimestamps(sentBlocks), getSnapshotFilePath(t, ".json"))
+	assertMatchesSnapshot(t, withFixedMessageTimestamps(sentBlocks), getSnapshotFilePath(t, ".json"))
 }
 
 // The saved state is read by the next run, possibly under a newer action version, so its exact
@@ -95,7 +95,7 @@ func assertSavedStateMatchesSnapshot(t *testing.T, stateFilePath string) {
 	if err != nil {
 		t.Fatalf("Failed to read the saved state from %s: %v", stateFilePath, err)
 	}
-	normalisedState := withFixedStateClockTimes(withFixedClockTimestamps(savedState))
+	normalisedState := withFixedStateTimestamps(withFixedMessageTimestamps(savedState))
 	assertMatchesSnapshot(t, normalisedState, getSnapshotFilePath(t, ".state.json"))
 }
 
@@ -594,7 +594,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			},
 		},
 		{
-			name:           "nothing left to show deletes a message saved before LastSentMessage existed",
+			name:           "nothing left to show deletes a message saved before LastWrittenMessage existed",
 			statePRNumbers: []int{91},
 			prByNumber: map[int]*github.PullRequest{
 				91: getTestPR(GetTestPROptions{

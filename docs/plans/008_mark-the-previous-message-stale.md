@@ -35,10 +35,10 @@ notify.
 
 ## Target shape
 
-- `state.State` gains `LastSentMessage`: the message's blocks as last sent, its summary text, and
+- `state.State` gains `LastWrittenMessage`: the message's blocks as last sent, its summary text, and
   the `generatedAt` its content was built at
   - `post` writes it with the new message, `update` rewrites it after each successful edit
-  - An artifact saved before this change decodes an empty `LastSentMessage`, so there is nothing
+  - An artifact saved before this change decodes an empty `LastWrittenMessage`, so there is nothing
     to mark
 - `post` sends its message without a footer. `update`'s edit ends with the update-time footer, a
   block with its own block ID, so the message marked stale can drop it. See Step 2
@@ -74,7 +74,7 @@ marked stale. Link the README's workflow example.
 
 - R1: Fix the sent-blocks record, which is empty in real runs
 - R2: Rename the mock's `MockStateForUpdateMode`
-- 1: Store the last sent message in state, written by both run modes
+- 1: Store the last written message in state, written by both run modes
 - 2: Build the message marked stale from stored blocks
 - 3: Mark the previous message stale in `post`
 - 4: Docs, example workflow and the release note
@@ -113,9 +113,9 @@ marked stale. Link the README's workflow example.
 - Post mode will read it too. Rename to `MockPreviousState` in `testhelpers/mockgithubclient`
   and its 18 call sites in `cmd/pr-slack-reminder`'s tests, no behaviour change
 
-### 1. Store the last sent message in state
+### 1. Store the last written message in state
 
-- New `state.LastSentMessage` struct, field `LastSentMessage` on `State`:
+- New `state.LastWrittenMessage` struct, field `LastWrittenMessage` on `State`:
   - `Blocks json.RawMessage`: the block array from `SentMessageInfo.BlocksAsSent`
   - `SummaryText string`
   - `GeneratedAt time.Time`: when the content was built, what an edit's update-time footer and
@@ -124,11 +124,11 @@ marked stale. Link the README's workflow example.
     bytes `null`, so a state update mode saves back unedited would no longer read as empty
 - `NewPostState` takes the summary text and `generatedAt` and fills it. `runPostMode` passes its
   own
-- New pure `WithLastSentMessage(state, sentMessageInfo, summaryText, generatedAt) State` for
+- New pure `WithLastWrittenMessage(state, sentMessageInfo, summaryText, generatedAt) State` for
   update mode, returning a copy
-- `runUpdateMode` returns `state.WithLastSentMessage(...)` after a successful edit. The delete and
-  keep branches, and a failed edit, return the loaded state unchanged
-  - Wired here rather than in Step 3, since an unused `WithLastSentMessage` fails
+- `runUpdateMode` returns `state.WithLastWrittenMessage(...)` after a successful edit. The delete
+  and keep branches, and a failed edit, return the loaded state unchanged
+  - Wired here rather than in Step 3, since an unused `WithLastWrittenMessage` fails
     `make check-dead-code`. Nothing reads the field until Step 3
 - `CurrentSchemaVersion` stays 1, as it did for `LastWrittenCanvasMarkdownHash`. Nothing checks
   the version
@@ -141,14 +141,14 @@ marked stale. Link the README's workflow example.
     `omitempty` shows in its snapshot
 - Integration tests in `main_test.go` pin what the snapshots can't: `generatedAt` stamped during
   the run, an edit's update-time footer showing it, that an edit keeps the loaded message ref, PRs
-  and `CreatedAt`, and the loaded message kept on update mode's early returns
+  and `MessagePostedAt`, and the loaded message kept on update mode's early returns
 - Update `state.spec.md`: the new field, its empty value in older artifacts, and the oddity that
   it is the only state update mode rewrites besides the canvas hash. Update `run.spec.md`: each
   mode saves the message it sent
 
 ### 2. Build the message marked stale from stored blocks
 
-- `messagebuilder.BuildMessage` builds the posted message without a footer. New
+- `messagebuilder.BuildMessageToPost` builds the posted message without a footer. New
   `BuildMessageWithUpdateTimeFooter` appends the update-time footer, a context block with block ID
   `update_time_footer`, for `runUpdateMode`'s edit. Two intent-named functions rather than a bool
   argument
@@ -186,7 +186,7 @@ marked stale. Link the README's workflow example.
   - Loads the previous state with `state.Load`, after the send, so a run that sends nothing
     downloads no artifact. This run's own state is uploaded after it ends, so either order reads
     the previous post's. A failure logs and skips
-  - Skips with a log line when `LastSentMessage.Blocks` is empty
+  - Skips with a log line when `LastWrittenMessage.Blocks` is empty
   - Skips with a log line naming both channels when the previous message is in another channel
     than the new one: two setups posting to different channels can share a state artifact name,
     and the previous message then belongs to the other setup. Both IDs come from Slack's send

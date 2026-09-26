@@ -114,7 +114,7 @@ func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack
 }
 
 func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
-	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:      "2 open PRs are waiting for attention 👀",
 		WaitingForReview: messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})}},
 		Merged: messagecontent.PRSection{
@@ -139,7 +139,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 
 func TestSectionHeadings(t *testing.T) {
 	onePR := messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "PR"})}}
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		ReadyToMerge:     onePR,
 		WaitingForAuthor: onePR,
 		WaitingForReview: onePR,
@@ -245,7 +245,7 @@ func groupedOverTwoRepositories() messagecontent.PRSection {
 }
 
 func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverTwoRepositories(),
 		GeneratedAt:         generatedAt,
@@ -276,7 +276,7 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 }
 
 func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
@@ -293,7 +293,7 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 }
 
 func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		ReadyToMerge: messagecontent.PRSection{
 			Groups: []messagecontent.PRsOfRepository{{
@@ -326,7 +326,7 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 }
 
 func TestOpenPRRow(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Open PR", slackUserID: "U12345678"})},
 		},
@@ -351,7 +351,7 @@ func TestOpenPRRow(t *testing.T) {
 }
 
 func TestOldPRWarningMarker(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Old PR", isOldPR: true})},
 		},
@@ -373,7 +373,7 @@ func TestOldPRWarningMarker(t *testing.T) {
 }
 
 func TestAuthorFallsBackToGitHubName(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		WaitingForReview: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})},
 		},
@@ -392,7 +392,7 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 
 func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 	mergedAt := time.Now().Add(-2 * time.Hour)
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		Merged: messagecontent.PRSection{
 			PRs: []prview.PR{testPR(testPROptions{
 				title: "Merged PR", mergedAt: &mergedAt, isOldPR: true, approvers: []string{"Dana Davis"},
@@ -427,7 +427,7 @@ func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 }
 
 func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		Merged:      messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
 		GeneratedAt: generatedAt,
 	})
@@ -439,7 +439,7 @@ func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
 }
 
 func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
-	message, summaryText := messagebuilder.BuildMessage(messagecontent.Content{
+	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
 		Merged:        messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
@@ -459,7 +459,7 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 }
 
 func TestMessageWithNothingToListIsTheNoOpenPRsLineAlone(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
 		GeneratedAt:   generatedAt,
@@ -525,7 +525,7 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 }
 
 func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
-	message, _ := messagebuilder.BuildMessage(messagecontent.Content{
+	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
 		GeneratedAt:         generatedAt,
