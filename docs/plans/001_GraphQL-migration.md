@@ -1,7 +1,7 @@
 # GraphQL migration
 
-date: 2026-08-15
-status: done
+date: 2026-09-27
+status: implemented
 
 Move `githubclient`'s PR fetching from GitHub's REST API to its GraphQL API. The artifact path stays on REST.
 

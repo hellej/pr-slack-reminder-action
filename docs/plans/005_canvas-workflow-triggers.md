@@ -1,7 +1,7 @@
 # Canvas workflow triggers
 
-date: 2026-09-06
-status: draft
+date: 2026-09-27
+status: implemented
 
 ## Goals
 

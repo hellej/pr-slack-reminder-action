@@ -1,7 +1,7 @@
 # PR tracker canvas
 
-date: 2026-08-19
-status: draft
+date: 2026-09-27
+status: implemented
 
 The "PR tracker canvas": a Slack canvas this action keeps updated with a live view of open + WIP PRs. Use this name in user-facing text (input description, README).
 

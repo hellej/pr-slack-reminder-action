@@ -1,7 +1,7 @@
 # Recently merged canvas section
 
-date: 2026-08-22
-status: draft
+date: 2026-09-27
+status: implemented
 
 Extends the PR tracker canvas from [002](002_PR-tracker-canvas.md) with a third section listing recently merged PRs. 002's "Room for a recently-closed section" is the starting point; this plan replaces it, including its `pullRequests(states: [CLOSED, MERGED])` sketch, which live checks showed does not work (see Step 1).
 

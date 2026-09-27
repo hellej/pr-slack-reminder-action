@@ -1,7 +1,7 @@
 # Mark the previous message stale
 
-date: 2026-09-24
-status: draft
+date: 2026-09-27
+status: implemented
 
 ## Goals
 

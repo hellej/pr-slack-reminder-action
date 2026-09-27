@@ -1,7 +1,7 @@
 # Message sections by next action
 
-date: 2026-09-19
-status: draft
+date: 2026-09-27
+status: implemented
 
 ## Goals
 
