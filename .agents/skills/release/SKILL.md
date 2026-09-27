@@ -77,6 +77,7 @@ gh run watch "$RUN_ID" --exit-status 2>&1 | tail -20
   GH_PAGER=cat gh run view "$RUN_ID" --log-failed
   ```
   Do not proceed with publishing.
+- If **Build** failed at `Commit built binary` with `! [rejected] main -> main (fetch first)`, someone pushed to `main` during the run. Nothing is tagged yet: `git pull --ff-only origin main`, then rerun step 2
 
 ### 4. Clean Up the Draft Release Notes
 
