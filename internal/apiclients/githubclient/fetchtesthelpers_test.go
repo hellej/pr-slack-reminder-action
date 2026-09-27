@@ -106,8 +106,12 @@ func postedPRNumbers(variables map[string]any) []int {
 func captureLogOutput(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var captured bytes.Buffer
-	original := log.Writer()
+	originalWriter, originalFlags := log.Writer(), log.Flags()
 	log.SetOutput(&captured)
-	t.Cleanup(func() { log.SetOutput(original) })
+	log.SetFlags(0)
+	t.Cleanup(func() {
+		log.SetOutput(originalWriter)
+		log.SetFlags(originalFlags)
+	})
 	return &captured
 }

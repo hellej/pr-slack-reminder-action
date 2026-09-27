@@ -343,9 +343,9 @@ func TestScenarios(t *testing.T) {
 		{
 			name:             "unable to fetch PRs",
 			config:           testhelpers.GetDefaultConfigMinimal(),
-			fetchPRsStatus:   500,
+			fetchPRsStatus:   403,
 			prServiceError:   errors.New("unable to fetch PRs"),
-			expectedErrorMsg: "error fetching pull requests: GraphQL request failed with status 500",
+			expectedErrorMsg: "error fetching pull requests: GraphQL request failed with status 403",
 		},
 		{
 			name:   "no Slack channel found",
@@ -1583,8 +1583,8 @@ func TestScenariosUpdateMode(t *testing.T) {
 				config.InputRunMode: config.RunModeUpdate,
 			},
 			mockState:             testhelpers.AsPointer(getTestState(GetTestStateOptions{PRNumbers: []int{1}})),
-			downloadArtifactError: errors.New("http client error"),
-			expectedErrorMsg:      "http client error",
+			downloadArtifactError: errors.New("artifact download URL error"),
+			expectedErrorMsg:      "get artifact download URL: artifact download URL error",
 		},
 		{
 			name:   "update mode fails when state artifact is not found",
@@ -1760,7 +1760,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 			},
 			mergedPRsSearchError: errors.New("merged PR search failed"),
 			expectedWarningLines: []string{
-				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 500: unexpected response: {"message":"merged PR search failed"}`,
+				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 403: unexpected response: {"message":"merged PR search failed"}`,
 			},
 		},
 	}
@@ -2194,7 +2194,7 @@ func TestPostModeWarnsWhenTheRecentlyMergedPRFetchFails(t *testing.T) {
 				t.Fatalf("Expected a run error: %v, got %v", tc.expectRunError, err)
 			}
 			assertWarningAnnotations(t, logOutput, []string{
-				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 500: unexpected response: {"message":"search failed"}`,
+				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 403: unexpected response: {"message":"search failed"}`,
 			})
 		})
 	}

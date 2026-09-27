@@ -51,11 +51,8 @@ func (c *client) getPRBatchByRef(
 ) ([]PR, error) {
 	query := buildPullRequestsQuery(references, fullPullRequestFragment)
 
-	callCtx, cancel := context.WithTimeout(ctx, reviewsFetchTimeout)
-	defer cancel()
-
 	var data aliasedData[pullRequestWrapperNode]
-	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
+	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
 	if err != nil {
 		return nil, getPRsError(err, query.referenceByAlias)
 	}

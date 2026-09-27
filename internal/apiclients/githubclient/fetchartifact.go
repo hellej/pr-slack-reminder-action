@@ -32,13 +32,11 @@ func (client *client) FetchLatestArtifactByName(
 		ListOptions: github.ListOptions{PerPage: 100},
 		Name:        &artifactName,
 	}
-	res, resp, err := client.actionsService.ListArtifacts(ctx, owner, repo, opts)
+	res, err := retryTransientFailures(ctx, "artifact list", func(attemptCtx context.Context) attemptResult[*github.ArtifactList] {
+		return client.listArtifacts(attemptCtx, owner, repo, opts)
+	})
 	if err != nil {
-		statusText := ""
-		if resp != nil && resp.Status != "" {
-			statusText = " status=" + resp.Status
-		}
-		return fmt.Errorf("failed to list artifacts: %w%s", err, statusText)
+		return err
 	}
 	log.Printf("Found %d artifacts with name %q", res.GetTotalCount(), artifactName)
 
@@ -57,24 +55,11 @@ func (client *client) FetchLatestArtifactByName(
 		artifactName, artifactID, latest.GetCreatedAt(),
 	)
 
-	downloadURL, _, err := client.actionsService.DownloadArtifact(ctx, owner, repo, artifactID, 1)
+	zipBytes, err := retryTransientFailures(ctx, "artifact download", func(attemptCtx context.Context) attemptResult[[]byte] {
+		return client.downloadArtifactZip(attemptCtx, owner, repo, artifactID)
+	})
 	if err != nil {
-		return fmt.Errorf("get artifact download URL: %w", err)
-	}
-
-	httpResp, err := client.http.Get(downloadURL.String())
-	if err != nil {
-		return fmt.Errorf("download artifact zip: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code %d when downloading artifact", httpResp.StatusCode)
-	}
-
-	zipBytes, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return fmt.Errorf("read artifact zip: %w", err)
+		return err
 	}
 
 	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
@@ -105,4 +90,71 @@ func (client *client) FetchLatestArtifactByName(
 	}
 
 	return nil
+}
+
+func (client *client) listArtifacts(
+	ctx context.Context, owner, repo string, opts *github.ListArtifactsOptions,
+) attemptResult[*github.ArtifactList] {
+	artifacts, resp, err := client.actionsService.ListArtifacts(ctx, owner, repo, opts)
+	if err != nil {
+		statusText := ""
+		if resp != nil && resp.Status != "" {
+			statusText = " status=" + resp.Status
+		}
+		return attemptResult[*github.ArtifactList]{
+			err:       fmt.Errorf("failed to list artifacts: %w%s", err, statusText),
+			transient: isTransientGitHubFailure(resp),
+		}
+	}
+	return attemptResult[*github.ArtifactList]{value: artifacts}
+}
+
+// Gets a fresh download URL, since one expires after a minute, and reads the whole zip under the
+// same ctx. See docs/third-party-facts.md § `go-github` v78 `DownloadArtifact` returns a plain error on a non-302, with the `*Response`
+func (client *client) downloadArtifactZip(
+	ctx context.Context, owner, repo string, artifactID int64,
+) attemptResult[[]byte] {
+	downloadURL, resp, err := client.actionsService.DownloadArtifact(ctx, owner, repo, artifactID, 1)
+	if err != nil {
+		return attemptResult[[]byte]{
+			err:       fmt.Errorf("get artifact download URL: %w", err),
+			transient: isTransientGitHubFailure(resp),
+		}
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL.String(), nil)
+	if err != nil {
+		return attemptResult[[]byte]{err: fmt.Errorf("build artifact zip request: %w", err)}
+	}
+	httpResp, err := client.http.Do(request)
+	if err != nil {
+		return attemptResult[[]byte]{err: fmt.Errorf("download artifact zip: %w", err), transient: true}
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != http.StatusOK {
+		return attemptResult[[]byte]{
+			err:       fmt.Errorf("unexpected status code %d when downloading artifact", httpResp.StatusCode),
+			transient: httpResp.StatusCode >= http.StatusInternalServerError,
+		}
+	}
+
+	zipBytes, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return attemptResult[[]byte]{err: fmt.Errorf("read artifact zip: %w", err), transient: true}
+	}
+	return attemptResult[[]byte]{value: zipBytes}
+}
+
+// The status is read off the *Response, since DownloadArtifact reports a failed status as a
+// plain error. A 2xx with an error is, on the list call, a body read or decode that failed, as
+// when the attempt deadline cuts it off. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
+// On DownloadArtifact it is a 2xx where a 302 was expected, retried as well.
+func isTransientGitHubFailure(resp *github.Response) bool {
+	gotNoResponse := resp == nil || resp.Response == nil
+	if gotNoResponse {
+		return true
+	}
+	answeredSuccessWithError := resp.StatusCode >= 200 && resp.StatusCode < 300
+	return answeredSuccessWithError || resp.StatusCode >= http.StatusInternalServerError
 }

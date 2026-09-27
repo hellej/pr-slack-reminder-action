@@ -76,7 +76,6 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			response: &http.Response{
 				StatusCode: 200,
 			},
-			err:               opts.DownloadArtifactError,
 			mockPreviousState: opts.MockPreviousState,
 		}
 		mockActionsService := &mockActionsService{
@@ -85,7 +84,8 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 					StatusCode: 200,
 				},
 			},
-			err:               opts.ListArtifactsError,
+			listErr:           opts.ListArtifactsError,
+			downloadErr:       opts.DownloadArtifactError,
 			mockPreviousState: opts.MockPreviousState,
 		}
 		return githubclient.NewClient(
@@ -94,12 +94,6 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			NewGraphQLTransport(opts),
 		)
 	}
-}
-
-type UnusedGraphQLTransport struct{}
-
-func (UnusedGraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawMessage, error) {
-	return 0, nil, errors.New("unexpected GraphQL request")
 }
 
 func NewReview(login, name, state string, userType ...string) *github.PullRequestReview {
@@ -245,7 +239,8 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 }
 
 // The merged PR search has its own failure knob: a canvas refresh fetches merged PRs and open
-// PRs separately, and only one of the two failing is the interesting case.
+// PRs separately, and only one of the two failing is the interesting case. It fails with a 403,
+// since githubclient waits seconds before retrying a 5xx.
 func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
 	if t.opts.Recording != nil {
 		t.opts.Recording.recordMergedPRFetch()
@@ -254,7 +249,7 @@ func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json
 		body, err := json.Marshal(
 			map[string]string{"message": t.opts.MergedPRsSearchError.Error()},
 		)
-		return http.StatusInternalServerError, body, err
+		return http.StatusForbidden, body, err
 	}
 
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
@@ -506,15 +501,17 @@ func postedPullRequestRefs(variables map[string]any) []pullRequestRef {
 
 type mockActionsService struct {
 	response          *github.Response
-	err               error
+	listErr           error
+	downloadErr       error
 	mockPreviousState *state.State
 }
 
 func (m *mockActionsService) ListArtifacts(
 	ctx context.Context, owner string, repo string, opts *github.ListArtifactsOptions,
 ) (*github.ArtifactList, *github.Response, error) {
-	if m.err != nil {
-		return nil, m.response, m.err
+	// A 403, not a 5xx or a 2xx: githubclient waits seconds before retrying either.
+	if m.listErr != nil {
+		return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusForbidden}}, m.listErr
 	}
 
 	artifacts := []*github.Artifact{}
@@ -535,8 +532,9 @@ func (m *mockActionsService) ListArtifacts(
 func (m *mockActionsService) DownloadArtifact(
 	ctx context.Context, owner, repo string, artifactID int64, maxRedirects int,
 ) (*url.URL, *github.Response, error) {
-	if m.err != nil {
-		return nil, m.response, m.err
+	// A 404, not a 5xx or a 2xx: githubclient waits seconds before retrying either.
+	if m.downloadErr != nil {
+		return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}, m.downloadErr
 	}
 	u, _ := url.Parse("https://example.com/mock-download-url")
 	return u, m.response, nil
@@ -544,16 +542,11 @@ func (m *mockActionsService) DownloadArtifact(
 
 type mockHTTPClient struct {
 	response          *http.Response
-	err               error
 	mockPreviousState *state.State
 }
 
-func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
-	if m.err != nil {
-		return m.response, m.err
-	}
-
-	if url == "https://example.com/mock-download-url" && m.mockPreviousState != nil {
+func (m *mockHTTPClient) Do(request *http.Request) (*http.Response, error) {
+	if request.URL.String() == "https://example.com/mock-download-url" && m.mockPreviousState != nil {
 		zipData, err := createMockArtifactZip(m.mockPreviousState)
 		if err != nil {
 			return nil, err
@@ -565,7 +558,7 @@ func (m *mockHTTPClient) Get(url string) (*http.Response, error) {
 		}, nil
 	}
 
-	return m.response, m.err
+	return m.response, nil
 }
 
 func createMockArtifactZip(mockState *state.State) ([]byte, error) {

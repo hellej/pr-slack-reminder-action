@@ -77,11 +77,8 @@ func (c *client) searchMergedPRs(
 ) ([]PRResult, error) {
 	query := buildMergedPRsSearchQuery(repositories, mergedSince)
 
-	callCtx, cancel := context.WithTimeout(ctx, pullRequestListTimeout)
-	defer cancel()
-
 	var data aliasedData[searchResultsNode]
-	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
+	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
 	if err != nil {
 		return nil, mergedPRsFetchError(err)
 	}

@@ -19,7 +19,8 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-const prFetchTimeout = 60 * time.Second
+// An open-PR fetch is a listing then one wave of enrichment batches, each call retried for up to 52s.
+const prFetchTimeout = 2 * time.Minute
 
 // See run.spec.md for this function's full behaviour.
 func Run(

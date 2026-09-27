@@ -65,11 +65,8 @@ func (c *client) listOpenPRs(
 ) ([]PRResult, error) {
 	query := buildListOpenPRsQuery(repositories)
 
-	callCtx, cancel := context.WithTimeout(ctx, pullRequestListTimeout)
-	defer cancel()
-
 	var data aliasedData[repositoryPullRequestsNode]
-	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
+	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
 	if err != nil {
 		return nil, listOpenPRsError(err, query.repositoryByAlias)
 	}
@@ -164,11 +161,8 @@ func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, err
 		utilities.Map(batch, pullRequestRefOfResult), enrichedPullRequestFragment,
 	)
 
-	callCtx, cancel := context.WithTimeout(ctx, reviewsFetchTimeout)
-	defer cancel()
-
 	var data aliasedData[pullRequestWrapperNode]
-	fieldErrors, err := c.graphql.Do(callCtx, query.text, query.variables, query.aliases, &data)
+	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
 	if err != nil && !failsOnlyOnePullRequest(err) {
 		return nil, enrichPRsWithReviewInfoError(err, query.repositoryByAlias)
 	}
