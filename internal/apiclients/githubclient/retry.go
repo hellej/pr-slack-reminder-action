@@ -34,21 +34,22 @@ type attemptResult[T any] struct {
 func retryTransientFailures[T any](
 	ctx context.Context, apiName string, runAttempt func(attemptCtx context.Context) attemptResult[T],
 ) (T, error) {
-	maxAttempts := len(retryWaits) + 1
-	for attemptNumber := 1; ; attemptNumber++ {
-		result := runAttemptWithDeadline(ctx, runAttempt)
-		if result.err == nil || !result.transient || attemptNumber == maxAttempts {
+	result := runAttemptWithDeadline(ctx, runAttempt)
+	for retryIndex, wait := range retryWaits {
+		if result.err == nil || !result.transient {
 			return result.value, result.err
 		}
 		if ctx.Err() != nil {
 			return result.value, fmt.Errorf("%w, not retried: %w", result.err, ctx.Err())
 		}
-		wait := retryWaits[attemptNumber-1]
-		log.Printf("%s attempt %d failed, retrying in %s: %v", apiName, attemptNumber, wait, result.err)
+		failedAttemptNumber := retryIndex + 1
+		log.Printf("%s attempt %d failed, retrying in %s: %v", apiName, failedAttemptNumber, wait, result.err)
 		if err := waitBeforeRetry(ctx, wait); err != nil {
 			return result.value, fmt.Errorf("%w, not retried: %w", result.err, err)
 		}
+		result = runAttemptWithDeadline(ctx, runAttempt)
 	}
+	return result.value, result.err
 }
 
 func runAttemptWithDeadline[T any](
