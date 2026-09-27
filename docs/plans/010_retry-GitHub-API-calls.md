@@ -1,7 +1,7 @@
 # Retry GitHub API calls
 
-date: 2026-09-26
-status: draft
+date: 2026-09-27
+status: implemented
 
 ## Goals
 

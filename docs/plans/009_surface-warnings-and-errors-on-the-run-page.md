@@ -1,7 +1,7 @@
 # Surface warnings and errors on the run page
 
-date: 2026-09-26
-status: draft
+date: 2026-09-27
+status: implemented
 
 ## Goals
 
