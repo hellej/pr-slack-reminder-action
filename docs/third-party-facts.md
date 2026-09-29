@@ -784,3 +784,29 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - A repeated slug gets `-1`, then `-2`: the first copy keeps the bare slug
 - Unverified: that github.com renders every heading exactly this way. The README's own anchor links, such as `#-github-token-setup` for a heading opening with an emoji, resolve under it
 - `.github/scripts/checkreferences` approximates `regex.js` as "keep letters, digits, `-` and `_`"
+
+## A submitted review removes its author from a PR's requested reviewers [2026-09-29]
+
+- Source: [REST review requests](https://docs.github.com/en/rest/pulls/review-requests), "Get all requested reviewers"
+- "Once a requested reviewer submits a review, they are no longer considered a requested reviewer"
+- The doc names no review state, so it covers `COMMENTED`, `APPROVED` and `CHANGES_REQUESTED` alike
+- A team request is removed once one member reviews, and the review is recorded under that user ([community discussion 16853](https://github.com/orgs/community/discussions/16853), [cli/cli#762](https://github.com/cli/cli/pull/762))
+- Unverified: that an implicit review from a single inline comment removes the request too
+- `requested_reviewers` needs Pull requests read ([fine-grained PAT permissions](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens))
+
+## Every GraphQL `Team` field needs `read:org`, and selecting one fails the whole query without it [2026-09-29]
+
+- Source: [cli/cli#812](https://github.com/cli/cli/issues/812); [superset#7788](https://github.com/superset-sh/superset/pull/7788/files)
+- The error: "The 'name' field requires one of the following scopes: ['read:org', 'read:discussion']"
+- `reviewRequests.nodes.requestedReviewer` is the union `Bot | EnterpriseTeam | Mannequin | Team | User`, nullable ([schema](https://raw.githubusercontent.com/github/docs/main/src/graphql/data/fpt/schema.docs.graphql))
+- Neither fix narrowed the selection: cli added the scope, superset moved to REST
+- Unverified: whether a selection with no `Team` field passes, and how `GITHUB_TOKEN` fares either way
+- Third party, unverified: a code-owner team request can come back as `requestedReviewer: null` with `asCodeOwner: true` ([notaharness/n10#231](https://github.com/notaharness/n10/pull/231))
+
+## GraphQL has no push time for a PR's commits: `Commit.pushedDate` is deprecated [2026-09-29]
+
+- Source: [schema](https://raw.githubusercontent.com/github/docs/main/src/graphql/data/fpt/schema.docs.graphql); [changelog.json](https://raw.githubusercontent.com/github/docs/main/src/graphql/data/fpt/changelog.json)
+- `pushedDate: DateTime @deprecated(reason: "`pushedDate` is no longer supported. Removal on 2023-07-01 UTC.")`, still in the schema text
+- `committedDate` and `authoredDate` are set by git, not by the push
+- `PullRequestCommit` carries no timestamp. `HeadRefForcePushedEvent.createdAt` dates force-pushes only
+- `PullRequestReview.commit` (nullable) against `PullRequest.headRefOid` shows the head moved since a review, not who moved it: a reviewer's push or "Update branch" moves it too
