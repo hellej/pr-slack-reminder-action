@@ -101,7 +101,8 @@ Files: `README.md`, `.github/workflows/pr-reminder.yml`
 
 - `README.md` § PR Tracker Canvas: "a review comment or a review thread its author hasn't answered" becomes "a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered"
 - Add `review_requested` to the `pull_request` `types:` in `pr-reminder.yml` and in the README's update-mode example
-  - Done when a re-request on a PR in this repository starts a `PR Reminder` run
+  - Live check: Dependabot authors PRs here and requests `hellej`, so the user, not being the author, can re-request themselves on an open Dependabot PR after reviewing it, as in the maintainer's re-request check. The trigger edit must be on `main` first: `pull_request` runs the workflow file of the PR's merge ref, so run it after the plan's PR merges
+  - Done when that re-request starts a `PR Reminder` run whose event is `pull_request` with activity `review_requested`
 
 ## Consequences
 
