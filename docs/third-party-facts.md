@@ -810,3 +810,18 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `committedDate` and `authoredDate` are set by git, not by the push
 - `PullRequestCommit` carries no timestamp. `HeadRefForcePushedEvent.createdAt` dates force-pushes only
 - `PullRequestReview.commit` (nullable) against `PullRequest.headRefOid` shows the head moved since a review, not who moved it: a reviewer's push or "Update branch" moves it too
+
+## Resolving a review thread triggers no GitHub Actions workflow [2026-09-29]
+
+- Source: [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), its source in `github/docs` `content/actions/reference/workflows-and-actions/events-that-trigger-workflows.md`
+- `pull_request_review_thread` exists as a webhook event but is not on the page, which has no occurrence of `review_thread`
+- `pull_request` lists `review_requested` and `review_request_removed` among its activity types
+
+## "Re-request review" puts a reviewer back into `reviewRequests`, and their earlier review stays [2026-09-29]
+
+- Source: live check by the maintainer on a team repository PR, 2026-09-29, with `gh api`
+- Before the click, REST `GET /pulls/{n}/requested_reviewers` listed `users: []`. After it, `users: ["hellej"]`
+- GraphQL `reviewRequests` then held `{"__typename":"User","login":"hellej"}`, and `reviews` still held that user's earlier `APPROVED` review
+- The click created a `review_requested` timeline event, `requested_reviewer: "hellej"`, so it fires the `pull_request: review_requested` trigger
+- The earlier review was `APPROVED` and the request was to oneself. Unverified whether either changes the result for a `CHANGES_REQUESTED` review by someone else
+- Not settled here: `GITHUB_TOKEN` against a `Team` node. The token used can read `Team.slug`
