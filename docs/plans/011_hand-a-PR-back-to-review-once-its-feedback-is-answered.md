@@ -34,7 +34,7 @@ Purpose: every PR stuck under its author's turn is one the team's reviewers neve
   - "Re-request review" puts the reviewer back into `reviewRequests`. See docs/third-party-facts.md § "Re-request review" puts a reviewer back into `reviewRequests`, and their earlier review stays
 - `GetNextAction` keeps its three ordered checks. Check 2 reads `HasOutstandingChangesRequest` in place of `HasNonApprovingReview`
 - The `pull_request` trigger gains `review_requested`, in `.github/workflows/pr-reminder.yml` and the README's update-mode example ([events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows))
-- No change to `action.yml` inputs. No new permission: `pull-requests: read` covers `requested_reviewers` in REST. GraphQL permissions stay undocumented, per docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
+- No change to `action.yml` inputs. No new permission: `pull-requests: read` covers `requested_reviewers` in REST, per docs/third-party-facts.md § A submitted review removes its author from a PR's requested reviewers. GraphQL permissions stay undocumented, per docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
 - Slack rendering is unchanged: the same three sections, only which PR lands where
 
 ## Breaking Change
@@ -45,7 +45,7 @@ Non-breaking. Patch: fixes issue #75, no input, state or rendering change.
 
 ## Summary
 
-1. (checkpoint) Select review requests and confirm the query passes under `GITHUB_TOKEN`
+1. (checkpoint) Select review requests, confirm the query passes under `GITHUB_TOKEN` and that a re-request after a changes request shows
 2. Derive `HasOutstandingChangesRequest` and bucket on it
 3. Re-word the bucketing docs and add the `review_requested` trigger
 
@@ -57,7 +57,6 @@ Package: `internal/apiclients/githubclient/`
 
 - Add the `reviewRequests` selection to `enrichedPullRequestSelection` and `fullPullRequestSelection`
 - Add `ReviewRequests connection[reviewRequestNode]` to `pullRequestNode`. `reviewRequestNode` holds `RequestedReviewer *authorNode`, whose `Login` and `Typename` tags already fit
-- Extend `TestPRWithReviewersDerivesFlagsFromDecodedJSON` with a `reviewRequests` key, so a mistagged `reviewRequests`, `requestedReviewer` or `login` fails once step 2 reads it
 - Live check, needed because no doc says whether a `Team` union member with no fields selected passes the scope check under `GITHUB_TOKEN`:
   - Pick a public PR with a pending team review request, visible under "Reviewers" on github.com
   - Commit a temporary step in `.github/workflows/pr-reminder.yml`, before "Send PR reminder": `gh api graphql` with `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`, running the exact new selection against that PR and printing the response
@@ -65,6 +64,10 @@ Package: `internal/apiclients/githubclient/`
   - Done when the response carries a `"__typename": "Team"` node and no errors. Then revert the step in a second commit
   - If the team comes back only as `null`, the check proved nothing: ask the user to run the same step in their own team's repository
   - If the query is rejected, stop and hand back: the target shape needs another source for review requests
+- Live check with the user, needed because the re-request was confirmed only on an `APPROVED` review to oneself:
+  - On a team PR where a colleague submitted `CHANGES_REQUESTED`, the user re-requests that colleague
+  - Done when `gh api repos/<owner>/<repo>/pulls/<n>/requested_reviewers` lists the colleague under `users`. Record the result in docs/third-party-facts.md § "Re-request review" puts a reviewer back into `reviewRequests`, and their earlier review stays
+  - If the colleague is missing, stop and hand back: the re-request signal does not hold
 
 ### Step 2: derive `HasOutstandingChangesRequest`
 
@@ -74,6 +77,7 @@ Packages: `internal/apiclients/githubclient/`, `internal/prview/`, `testhelpers/
   - `CHANGES_REQUESTED` only, not by the PR author
   - Its author's login is not among the requested `User` logins
   - Both sides compared through `collaboratorFromAuthorNode`, as the thread and author checks do
+- Extend `TestPRWithReviewersDerivesFlagsFromDecodedJSON` with a `reviewRequests` key, so a mistagged `reviewRequests`, `requestedReviewer` or `login` fails
 - Drop `isNonApprovingReviewState` and `commentedReviewState`. Nothing else reads them
 - Rename the `PR` field across ~7 files: `prview.GetNextAction`, its tests, and the test option structs in `messagecontent` and `canvascontent`. The field comment names the re-request
 - Tests: rework `TestPRWithReviewersDerivesNonApprovingReviews` into the new rule's table. Cases a wrong implementation gets wrong:
@@ -82,7 +86,7 @@ Packages: `internal/apiclients/githubclient/`, `internal/prview/`, `testhelpers/
   - Changes requested, a different user requested: true
   - Changes requested, a team or null reviewer requested: true
   - Changes requested, then approved by the same reviewer: true (the approval is check 1's to read)
-- Snapshots: PR 74 "A reviewer left a comment" and PR 65 carry a lone `COMMENTED` review, so they move from "💬 Waiting for author" to "👀 Waiting for review" across ~8 snapshot files. Retitle PR 74's fixture to what it now shows, and give "Waiting for author" a fixture with an outstanding changes request, so the section stays covered
+- Snapshots: PRs 74 and 65, both "A reviewer left a comment", carry a lone `COMMENTED` review, so they move from "💬 Waiting for author" to "👀 Waiting for review" across ~8 snapshot files. Retitle both to what they now show. PRs 73 and 62 keep "Waiting for author" covered with a changes request
 - `mockgithubclient`: `enrichedPullRequestNodeJSON` gains review requests per PR number, so a snapshot can pin a re-requested changes request sitting in "Waiting for review"
 - Update `githubclient.spec.md`:
   - Replace the `HasNonApprovingReview` bullet with the new rule, why `COMMENTED` is left to the threads, and that later reviews by the same user are not read
