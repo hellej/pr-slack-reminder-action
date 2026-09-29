@@ -1,7 +1,7 @@
 # Hand a PR back to review once its feedback is answered
 
 date: 2026-09-29
-status: draft
+status: implemented
 
 ## Requirements
 
@@ -77,7 +77,7 @@ Packages: `internal/apiclients/githubclient/`, `internal/prview/`, `testhelpers/
 - Replace `hasNonApprovingNonOwnReview` with a derivation over the submitted user reviews:
   - `CHANGES_REQUESTED` only, not by the PR author
   - Its author's login is not among the requested `User` logins
-  - Both sides compared through `collaboratorFromAuthorNode`, as the thread and author checks do
+  - Both sides compared through `collaboratorFromAuthorNode`, as the thread and author checks do. Logins only: the selection reads a name off a review's author but not off a requested reviewer, so whole collaborators never match
 - Extend `TestPRWithReviewersDerivesFlagsFromDecodedJSON` with a `reviewRequests` key, so a mistagged `reviewRequests`, `requestedReviewer` or `login` fails
 - Drop `isNonApprovingReviewState` and `commentedReviewState`. Nothing else reads them
 - Rename the `PR` field across ~7 files: `prview.GetNextAction`, its tests, and the test option structs in `messagecontent` and `canvascontent`. The field comment names the re-request
@@ -87,13 +87,17 @@ Packages: `internal/apiclients/githubclient/`, `internal/prview/`, `testhelpers/
   - Changes requested, a different user requested: true
   - Changes requested, a team or null reviewer requested: true
   - Changes requested, then approved by the same reviewer: true (the approval is check 1's to read)
-- Snapshots: PRs 74 and 65, both "A reviewer left a comment", carry a lone `COMMENTED` review, so they move from "💬 Waiting for author" to "👀 Waiting for review" across ~8 snapshot files. Retitle both to what they now show. PRs 73 and 62 keep "Waiting for author" covered with a changes request
-- `mockgithubclient`: `enrichedPullRequestNodeJSON` gains review requests per PR number, so a snapshot can pin a re-requested changes request sitting in "Waiting for review"
+  - Two reviewers requested changes, only one re-requested: true
+  - The PR author's own changes request, a bot's changes request: false
+  - Requested users carry no name, as the selection returns them, so a whole-collaborator comparison fails
+- Both query-text tests (`TestBuildGetPRsQuery`, `TestBuildEnrichPRsQuery`) require the `reviewRequests` selection and forbid `Team`. The mock hand-builds its JSON, so these are what pin the selection
+- Snapshots: PRs 74 and 65, both "A reviewer left a comment", carry a lone `COMMENTED` review, so they move from "💬 Waiting for author" to "👀 Waiting for review" across 8 snapshot files (4 messages, 4 saved states). Retitle both to what they now show. PRs 73 and 62 keep "Waiting for author" covered with a changes request
+- `mockgithubclient`: `RequestedReviewerLoginsByPRNumber` renders as `User` review requests in `enrichedPullRequestNodeJSON`. Update mode's "every section under load" snapshot gains PR 60, a changes request whose reviewer was re-requested, sitting in "Waiting for review"
 - Update `githubclient.spec.md`:
   - Replace the `HasNonApprovingReview` bullet with the new rule, why `COMMENTED` is left to the threads, and that later reviews by the same user are not read
   - Per PR, the first 100 review requests are read
   - § Doesn't Do: add `reviewRequests` to the two error-scope lists. In `GetPRs` a failed `reviewRequests` is only logged, so every changes request on that PR reads as outstanding
-  - Oddities: an author without write access cannot re-request ("Pull request authors can request reviews only if they are repository owners or collaborators with write access", [about pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)), so their changes request holds until approval or dismissal; a re-requested reviewer who then only comments is no longer requested, so their changes request counts again
+  - Oddities: an author without write access cannot re-request ("Pull request authors can request reviews only if they are repository owners or collaborators with write access", [about pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)), so their changes request stays outstanding until someone with write access, such as the reviewer, re-requests the review, or the review is dismissed; a re-requested reviewer who then only comments is no longer requested, so their changes request counts again
 - Update `prview.spec.md`: `GetNextAction` bullets name an outstanding changes request in place of "a non-approving review". Oddities: one reviewer's approval files a PR as ready to merge over another's outstanding changes request, next to the same-person case
 
 ### Step 3: README and the `review_requested` trigger
@@ -120,7 +124,7 @@ None
 
 - A `COMMENTED` review with only a summary body no longer hands the PR to its author
 - Pushing fixes without re-requesting leaves a changes request outstanding
-- An author without write access, such as a fork contributor, cannot re-request, so a changes request on their PR holds until approval or dismissal
+- An author without write access, such as a fork contributor, cannot re-request, so a changes request on their PR holds until someone with write access re-requests the review, a reviewer approves, or the review is dismissed
 - A team re-request never clears a member's changes request
 - Resolving a thread starts no run: no workflow event fires on it (docs/third-party-facts.md § Resolving a review thread triggers no GitHub Actions workflow). The PR moves on the next event or the 09:00 post
 - `review_requested` also fires on first-time requests, one extra `update` run each

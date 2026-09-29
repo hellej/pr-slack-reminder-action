@@ -23,10 +23,10 @@ type testPROptions struct {
 	updatedAt  time.Time
 	mergedAt   *time.Time
 	// The signals PR.GetNextAction reads.
-	approved           bool
-	conflicting        bool
-	threadWaiting      bool
-	nonApprovingReview bool
+	approved                  bool
+	conflicting               bool
+	threadWaiting             bool
+	outstandingChangesRequest bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -49,10 +49,10 @@ func testPR(options testPROptions) prview.PR {
 				UpdatedAt: options.updatedAt,
 				MergedAt:  options.mergedAt,
 			},
-			Repository:                repository,
-			Conflicting:               options.conflicting,
-			HasThreadWaitingForAuthor: options.threadWaiting,
-			HasNonApprovingReview:     options.nonApprovingReview,
+			Repository:                   repository,
+			Conflicting:                  options.conflicting,
+			HasThreadWaitingForAuthor:    options.threadWaiting,
+			HasOutstandingChangesRequest: options.outstandingChangesRequest,
 		},
 		Approvers: approvers,
 	}
@@ -111,7 +111,7 @@ func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 	prs := []prview.PR{
 		testPR(testPROptions{number: 1, approved: true}),
-		testPR(testPROptions{number: 2, nonApprovingReview: true}),
+		testPR(testPROptions{number: 2, outstandingChangesRequest: true}),
 		testPR(testPROptions{number: 3}),
 		testPR(testPROptions{number: 4, approved: true, conflicting: true}),
 		testPR(testPROptions{number: 5, threadWaiting: true}),

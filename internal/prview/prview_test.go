@@ -536,7 +536,7 @@ func nextActionPR(approverLogins []string, prFlags githubclient.PR) prview.PR {
 }
 
 // The checks are ordered, so each case that an earlier check claims has to stay claimed: a
-// commented-then-approved PR is ready to merge, and a conflict only ever demotes.
+// changes-requested-then-approved PR is ready to merge, and a conflict only ever demotes.
 func TestGetNextAction(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -570,7 +570,7 @@ func TestGetNextAction(t *testing.T) {
 		},
 		{
 			name:     "a reviewer requested changes",
-			prFlags:  githubclient.PR{HasNonApprovingReview: true},
+			prFlags:  githubclient.PR{HasOutstandingChangesRequest: true},
 			expected: prview.NextActionWaitingForAuthor,
 		},
 		{
@@ -590,17 +590,17 @@ func TestGetNextAction(t *testing.T) {
 			expected: prview.NextActionWaitingForReview,
 		},
 		{
-			// The reviewer commented and then approved, which leaves both signals set.
-			name:           "approved by the reviewer who commented",
+			// The reviewer requested changes and then approved, which leaves both signals set.
+			name:           "approved by the reviewer who requested changes",
 			approverLogins: []string{"dave"},
-			prFlags:        githubclient.PR{HasNonApprovingReview: true},
+			prFlags:        githubclient.PR{HasOutstandingChangesRequest: true},
 			expected:       prview.NextActionReadyToMerge,
 		},
 		{
-			name:           "approved, commented on, and a thread left unanswered",
+			name:           "approved, changes requested, and a thread left unanswered",
 			approverLogins: []string{"erin", "bob"},
 			prFlags: githubclient.PR{
-				HasNonApprovingReview: true, HasThreadWaitingForAuthor: true,
+				HasOutstandingChangesRequest: true, HasThreadWaitingForAuthor: true,
 			},
 			expected: prview.NextActionWaitingForAuthor,
 		},

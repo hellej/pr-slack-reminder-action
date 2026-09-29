@@ -35,6 +35,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
 		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
+		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {
@@ -43,7 +44,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 	}
 
 	forbiddenFragments := []string{
-		"pullRequests(", "commits", "headRefOid",
+		"pullRequests(", "Team", "commits", "headRefOid",
 		"owner-one", "owner-two", "repo-one", "repo-two", "111", "222",
 	}
 	for _, fragment := range forbiddenFragments {

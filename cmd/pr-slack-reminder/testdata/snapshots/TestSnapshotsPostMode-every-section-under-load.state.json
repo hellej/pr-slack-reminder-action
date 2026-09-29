@@ -238,51 +238,6 @@
                     "style": {}
                   }
                 ]
-              },
-              {
-                "type": "rich_text_section",
-                "elements": [
-                  {
-                    "type": "link",
-                    "url": "https://github.com/test-org/test-repo/pull/74",
-                    "text": "A reviewer left a comment",
-                    "style": {
-                      "bold": true
-                    }
-                  },
-                  {
-                    "type": "text",
-                    "text": " 5 hours ago",
-                    "style": {
-                      "italic": true
-                    }
-                  },
-                  {
-                    "type": "text",
-                    "text": " by ",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": "Dana Davis",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": " (💬 ",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": "Erin Evans",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": ")",
-                    "style": {}
-                  }
-                ]
               }
             ],
             "style": "bullet",
@@ -341,6 +296,51 @@
                   {
                     "type": "text",
                     "text": "Frank Foster",
+                    "style": {}
+                  }
+                ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/74",
+                    "text": "Commented on, still waiting for review",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 5 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Dana Davis",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " (💬 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Erin Evans",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ")",
                     "style": {}
                   }
                 ]

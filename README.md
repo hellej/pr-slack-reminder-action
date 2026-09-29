@@ -130,7 +130,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft, review_requested]
   pull_request_review:
     types: [submitted, dismissed]
   issue_comment:
@@ -200,7 +200,7 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 <img src="docs/examples/example_canvas.png" alt="Example PR tracker canvas" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
-Open PRs are split by whose turn it is: an approved PR with nothing outstanding is ready to merge (1); a PR carrying a review comment or a review thread its author hasn't answered, and an approved one that now conflicts, are waiting for the author (2); everything else is waiting for review (3).
+Open PRs are split by whose turn it is: an approved PR with nothing outstanding is ready to merge (1); a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, and an approved one that now conflicts, are waiting for the author (2); everything else is waiting for review (3).
 
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
