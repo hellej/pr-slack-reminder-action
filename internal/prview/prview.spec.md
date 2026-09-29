@@ -19,10 +19,10 @@ Enriches fetched PRs with display-ready metadata.
 - `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`
 - `LastActivityAt` returns `UpdatedAt` as a pointer, nil when it's zero, the nil convention `SortPRsNewestFirst` expects for unknown activity
-- `GetNextAction()` says what a PR needs next, as the first of three ordered checks that matches: approved with nothing outstanding is `NextActionReadyToMerge`; an approval, a non-approving review or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording
-- The checks being ordered is what settles the overlaps: a reviewer who commented and then approved leaves the PR ready to merge, since the approval is read before the comment
+- `GetNextAction()` says what a PR needs next, as the first of three ordered checks that matches: approved with nothing outstanding is `NextActionReadyToMerge`; an approval, an outstanding changes request or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording
+- The checks being ordered is what settles the overlaps: a reviewer who requested changes and then approved leaves the PR ready to merge, since the approval is read before the changes request
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
-- `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor` and `HasNonApprovingReview` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
+- `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor` and `HasOutstandingChangesRequest` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
 - `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
 
 ## Doesn't Do
@@ -33,6 +33,7 @@ Enriches fetched PRs with display-ready metadata.
 ## Oddities
 
 - `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
+- Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a missing/zero creation timestamp counts as old whenever a threshold is set, whatever the threshold value

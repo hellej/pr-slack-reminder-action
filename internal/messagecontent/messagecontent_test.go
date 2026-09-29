@@ -15,17 +15,15 @@ import (
 var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
-	number      int
-	owner       string
-	repository  string
-	createdAt   time.Time
-	mergedAt    *time.Time
-	approvers   []string
-	commenters  []string
-	conflicting bool
-	// A reviewer commented or requested changes, which is what puts an unapproved PR on the
-	// author.
-	hasNonApprovingReview bool
+	number                       int
+	owner                        string
+	repository                   string
+	createdAt                    time.Time
+	mergedAt                     *time.Time
+	approvers                    []string
+	commenters                   []string
+	conflicting                  bool
+	hasOutstandingChangesRequest bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -44,9 +42,9 @@ func testPR(options testPROptions) prview.PR {
 				MergedAt:  options.mergedAt,
 				Merged:    options.mergedAt != nil,
 			},
-			Repository:            repository,
-			Conflicting:           options.conflicting,
-			HasNonApprovingReview: options.hasNonApprovingReview,
+			Repository:                   repository,
+			Conflicting:                  options.conflicting,
+			HasOutstandingChangesRequest: options.hasOutstandingChangesRequest,
 		},
 		Approvers:  collaborators(options.approvers),
 		Commenters: collaborators(options.commenters),
@@ -81,7 +79,7 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 		testPR(testPROptions{number: 2, createdAt: generatedAt.Add(-9 * time.Hour), approvers: []string{"dana"}}),
 		testPR(testPROptions{
 			number: 3, createdAt: generatedAt.Add(-5 * time.Hour),
-			commenters: []string{"erin"}, hasNonApprovingReview: true,
+			commenters: []string{"erin"}, hasOutstandingChangesRequest: true,
 		}),
 		testPR(testPROptions{number: 4, createdAt: generatedAt.Add(-7 * time.Hour)}),
 		testPR(testPROptions{

@@ -286,7 +286,7 @@ func snapshotScenarios() []snapshotScenario {
 					AgeHours: 30,
 				}),
 				getTestPR(GetTestPROptions{
-					Number: 74, Title: "A reviewer left a comment", AuthorLogin: "dana",
+					Number: 74, Title: "Commented on, still waiting for review", AuthorLogin: "dana",
 					AuthorName: "Dana Davis", HTMLURL: "https://github.com/test-org/test-repo/pull/74",
 					AgeHours: 5,
 				}),
@@ -481,19 +481,25 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		prByNumber      map[int]*github.PullRequest
 		// The open-PR fetch is live, so it returns the state PRs that are still open, by number,
 		// and any PR opened since the message was posted.
-		openPRNumbers       []int
-		openPRsNotInState   []*github.PullRequest
-		mergedPRsFromSearch []*github.PullRequest
-		reviewsByPRNumber   map[int][]*github.PullRequestReview
-		deletesTheMessage   bool
+		openPRNumbers                     []int
+		openPRsNotInState                 []*github.PullRequest
+		mergedPRsFromSearch               []*github.PullRequest
+		reviewsByPRNumber                 map[int][]*github.PullRequestReview
+		requestedReviewerLoginsByPRNumber map[int][]string
+		deletesTheMessage                 bool
 	}{
 		{
 			name: "every section under load",
 			configOverrides: map[string]any{
 				config.InputOldPRThresholdHours: 48,
 			},
-			statePRNumbers: []int{61, 62, 63, 64, 65, 66, 67, 68},
+			statePRNumbers: []int{60, 61, 62, 63, 64, 65, 66, 67, 68},
 			prByNumber: map[int]*github.PullRequest{
+				60: getTestPR(GetTestPROptions{
+					Number: 60, Title: "Changes made, review re-requested", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/60",
+					AgeHours: 20, State: "open",
+				}),
 				61: getTestPR(GetTestPROptions{
 					Number: 61, Title: "Approved and ready to go", AuthorLogin: "alice",
 					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/61",
@@ -515,7 +521,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					AgeHours: 170, State: "open",
 				}),
 				65: getTestPR(GetTestPROptions{
-					Number: 65, Title: "A reviewer left a comment", AuthorLogin: "erin",
+					Number: 65, Title: "Commented on, still waiting for review", AuthorLogin: "erin",
 					AuthorName: "Erin Evans", HTMLURL: "https://github.com/test-org/test-repo/pull/65",
 					AgeHours: 6, State: "open",
 				}),
@@ -535,7 +541,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					AgeHours: 50, State: "closed", Merged: false,
 				}),
 			},
-			openPRNumbers: []int{61, 62, 63, 64, 65},
+			openPRNumbers: []int{60, 61, 62, 63, 64, 65},
 			openPRsNotInState: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
 					Number: 69, Title: "Opened after the message was posted", AuthorLogin: "grace",
@@ -552,10 +558,12 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			},
 			reviewsByPRNumber: map[int][]*github.PullRequestReview{
 				61: {mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED")},
+				60: {mockgithubclient.NewReview("frank", "Frank Foster", "CHANGES_REQUESTED")},
 				62: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
 				65: {mockgithubclient.NewReview("frank", "Frank Foster", "COMMENTED")},
 				66: {mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED")},
 			},
+			requestedReviewerLoginsByPRNumber: map[int][]string{60: {"frank"}},
 		},
 		{
 			name:           "one open PR and one merged PR",
@@ -616,11 +624,12 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 
 			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
-				PRsByNumber:       tc.prByNumber,
-				PRs:               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
-				MergedPRs:         tc.mergedPRsFromSearch,
-				ReviewsByPRNumber: tc.reviewsByPRNumber,
-				MockPreviousState: &mockState,
+				PRsByNumber:                       tc.prByNumber,
+				PRs:                               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
+				MergedPRs:                         tc.mergedPRsFromSearch,
+				ReviewsByPRNumber:                 tc.reviewsByPRNumber,
+				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
+				MockPreviousState:                 &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 

@@ -128,7 +128,8 @@ func openPullRequestFromNode(node pullRequestNode) *PullRequest {
 const enrichedPullRequestSelection = `  number mergeable
   reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }
   comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
-  reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }`
+  reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }
+  reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }`
 
 var enrichedPullRequestFragment = newPullRequestFragment("enrichedPr", enrichedPullRequestSelection)
 

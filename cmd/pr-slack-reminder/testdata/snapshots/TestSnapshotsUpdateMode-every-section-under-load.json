@@ -130,51 +130,6 @@
                 "style": {}
               }
             ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/65",
-                "text": "A reviewer left a comment",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 6 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Erin Evans",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (💬 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Frank Foster",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
           }
         ],
         "style": "bullet",
@@ -233,6 +188,96 @@
               {
                 "type": "text",
                 "text": "Dana Davis",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/60",
+                "text": "Changes made, review re-requested",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 20 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Grace Green",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/65",
+                "text": "Commented on, still waiting for review",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 6 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
                 "style": {}
               }
             ]

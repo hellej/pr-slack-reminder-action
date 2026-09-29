@@ -25,10 +25,7 @@ const (
 
 const approvedReviewState = "APPROVED"
 
-const (
-	commentedReviewState        = "COMMENTED"
-	changesRequestedReviewState = "CHANGES_REQUESTED"
-)
+const changesRequestedReviewState = "CHANGES_REQUESTED"
 
 const conflictingMergeableState = "CONFLICTING"
 
@@ -62,6 +59,11 @@ type reviewThreadNode struct {
 	Comments   connection[commentNode] `json:"comments"`
 }
 
+// A requestedReviewer can be null. See githubclient.spec.md § Behaviour
+type reviewRequestNode struct {
+	RequestedReviewer *authorNode `json:"requestedReviewer"`
+}
+
 type connection[T any] struct {
 	Nodes []T `json:"nodes"`
 }
@@ -81,8 +83,9 @@ type pullRequestNode struct {
 	Reviews   connection[reviewNode]  `json:"reviews"`
 	Comments  connection[commentNode] `json:"comments"`
 
-	Mergeable     string                       `json:"mergeable"`
-	ReviewThreads connection[reviewThreadNode] `json:"reviewThreads"`
+	Mergeable      string                        `json:"mergeable"`
+	ReviewThreads  connection[reviewThreadNode]  `json:"reviewThreads"`
+	ReviewRequests connection[reviewRequestNode] `json:"reviewRequests"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -172,8 +175,10 @@ func prWithReviewers(
 		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
 			node.ReviewThreads.Nodes, pullRequest.Author,
 		),
-		Conflicting:           node.Mergeable == conflictingMergeableState,
-		HasNonApprovingReview: hasNonApprovingNonOwnReview(submittedReviews, pullRequest.Author),
+		Conflicting: node.Mergeable == conflictingMergeableState,
+		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
+			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
+		),
 	}
 }
 
@@ -201,15 +206,17 @@ func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
 	return collaboratorFromAuthorNode(lastCommentAuthor).Login != prAuthor.Login
 }
 
-func hasNonApprovingNonOwnReview(submittedReviews []reviewNode, prAuthor Collaborator) bool {
+// Compares logins: the selection reads a name off a review's author, not off a requested reviewer.
+func hasOutstandingChangesRequest(
+	submittedReviews []reviewNode, reviewRequests []reviewRequestNode, prAuthor Collaborator,
+) bool {
+	requestedLogins := utilities.Map(reviewRequests, requestedReviewerLogin)
 	return slices.ContainsFunc(submittedReviews, func(review reviewNode) bool {
-		return isNonApprovingReviewState(review.State) &&
-			collaboratorFromAuthorNode(review.Author).Login != prAuthor.Login
+		reviewerLogin := reviewAuthor(review).Login
+		return review.State == changesRequestedReviewState &&
+			reviewerLogin != prAuthor.Login &&
+			!slices.Contains(requestedLogins, reviewerLogin)
 	})
-}
-
-func isNonApprovingReviewState(state string) bool {
-	return state == commentedReviewState || state == changesRequestedReviewState
 }
 
 func isSubmittedUserReview(review reviewNode) bool {
@@ -222,6 +229,10 @@ func isApprovingReviewNode(review reviewNode) bool {
 
 func reviewAuthor(review reviewNode) Collaborator {
 	return collaboratorFromAuthorNode(review.Author)
+}
+
+func requestedReviewerLogin(request reviewRequestNode) string {
+	return collaboratorFromAuthorNode(request.RequestedReviewer).Login
 }
 
 func hasValidCommentAuthor(comment commentNode) bool {

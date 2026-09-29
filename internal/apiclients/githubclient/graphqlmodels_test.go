@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func decodeAuthorNode(t *testing.T, authorJSON string) *authorNode {
@@ -339,12 +340,31 @@ func TestPRWithReviewersDerivesConflicting(t *testing.T) {
 	}
 }
 
-func TestPRWithReviewersDerivesNonApprovingReviews(t *testing.T) {
+func reviewRequestsOf(requestedReviewers ...*authorNode) connection[reviewRequestNode] {
+	return connection[reviewRequestNode]{
+		Nodes: utilities.Map(requestedReviewers, func(reviewer *authorNode) reviewRequestNode {
+			return reviewRequestNode{RequestedReviewer: reviewer}
+		}),
+	}
+}
+
+// The selection reads no name off a requested user, unlike off a review's author.
+func requestedUserNode(login string) *authorNode {
+	return &authorNode{Login: login, Typename: userTypename}
+}
+
+// The selection reads no field off a Team, so a team request decodes to a typename alone.
+func teamReviewerNode() *authorNode {
+	return &authorNode{Typename: "Team"}
+}
+
+func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 	tests := []struct {
-		name     string
-		author   *authorNode
-		reviews  []reviewNode
-		expected bool
+		name               string
+		author             *authorNode
+		reviews            []reviewNode
+		requestedReviewers []*authorNode
+		expected           bool
 	}{
 		{
 			name:    "no reviews at all",
@@ -352,15 +372,61 @@ func TestPRWithReviewersDerivesNonApprovingReviews(t *testing.T) {
 			reviews: nil,
 		},
 		{
-			name:     "a reviewer commented",
-			author:   userAuthorNode("alice"),
-			reviews:  []reviewNode{{State: "COMMENTED", Author: userAuthorNode("bob")}},
-			expected: true,
+			name:    "a reviewer commented, which leaves the PR to the thread rule",
+			author:  userAuthorNode("alice"),
+			reviews: []reviewNode{{State: "COMMENTED", Author: userAuthorNode("bob")}},
 		},
 		{
 			name:     "a reviewer requested changes",
 			author:   userAuthorNode("alice"),
 			reviews:  []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
+			expected: true,
+		},
+		{
+			name:               "the author re-requested the reviewer who requested changes",
+			author:             userAuthorNode("alice"),
+			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
+			requestedReviewers: []*authorNode{requestedUserNode("carol")},
+		},
+		{
+			name:               "a different user is requested",
+			author:             userAuthorNode("alice"),
+			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
+			requestedReviewers: []*authorNode{requestedUserNode("bob")},
+			expected:           true,
+		},
+		{
+			name:               "a team is requested",
+			author:             userAuthorNode("alice"),
+			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
+			requestedReviewers: []*authorNode{teamReviewerNode()},
+			expected:           true,
+		},
+		{
+			name:               "a requested reviewer GitHub reports as null",
+			author:             userAuthorNode("alice"),
+			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
+			requestedReviewers: []*authorNode{nil},
+			expected:           true,
+		},
+		{
+			name:   "only one of two reviewers who requested changes is re-requested",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				{State: "CHANGES_REQUESTED", Author: userAuthorNode("bob")},
+				{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")},
+			},
+			requestedReviewers: []*authorNode{requestedUserNode("bob")},
+			expected:           true,
+		},
+		{
+			// The approval is GetNextAction's to read, ahead of this flag.
+			name:   "the reviewer requested changes and then approved",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")},
+				{State: "APPROVED", Author: userAuthorNode("carol")},
+			},
 			expected: true,
 		},
 		{
@@ -375,37 +441,20 @@ func TestPRWithReviewersDerivesNonApprovingReviews(t *testing.T) {
 			reviews: []reviewNode{{State: "DISMISSED", Author: userAuthorNode("dave")}},
 		},
 		{
-			name:    "a reviewer has an unsubmitted review",
+			name:    "the author requested changes on their own PR",
 			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "PENDING", Author: userAuthorNode("erin")}},
+			reviews: []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("alice")}},
 		},
 		{
-			// A bare inline comment on one's own diff arrives as a COMMENTED review.
-			name:    "the author commented on their own diff",
+			// A review bot is not a person asking for changes.
+			name:    "a bot requested changes",
 			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "COMMENTED", Author: userAuthorNode("alice")}},
+			reviews: []reviewNode{{State: "CHANGES_REQUESTED", Author: botAuthorNode("linter")}},
 		},
 		{
-			// Same comparison as the thread cases: both sides carry the [bot] suffix or
-			// neither does.
-			name:    "a bot commented on its own PR",
-			author:  botAuthorNode("dependabot"),
-			reviews: []reviewNode{{State: "COMMENTED", Author: botAuthorNode("dependabot")}},
-		},
-		{
-			// A review bot is not a person asking for changes, so it leaves the PR in the
-			// review queue rather than handing it back to the author.
-			name:    "a bot commented on someone else's PR",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "COMMENTED", Author: botAuthorNode("linter")}},
-		},
-		{
-			name:   "one reviewer approved and another commented",
-			author: userAuthorNode("alice"),
-			reviews: []reviewNode{
-				{State: "APPROVED", Author: userAuthorNode("bob")},
-				{State: "COMMENTED", Author: userAuthorNode("carol")},
-			},
+			name:     "a reviewer requested changes on a bot's PR",
+			author:   botAuthorNode("dependabot"),
+			reviews:  []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
 			expected: true,
 		},
 	}
@@ -413,12 +462,14 @@ func TestPRWithReviewersDerivesNonApprovingReviews(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := prWithReviewersOfNode(tt.author, pullRequestNode{
-				Reviews: connection[reviewNode]{Nodes: tt.reviews},
+				Reviews:        connection[reviewNode]{Nodes: tt.reviews},
+				ReviewRequests: reviewRequestsOf(tt.requestedReviewers...),
 			})
 
-			if pr.HasNonApprovingReview != tt.expected {
+			if pr.HasOutstandingChangesRequest != tt.expected {
 				t.Errorf(
-					"HasNonApprovingReview = %t, expected %t", pr.HasNonApprovingReview, tt.expected,
+					"HasOutstandingChangesRequest = %t, expected %t",
+					pr.HasOutstandingChangesRequest, tt.expected,
 				)
 			}
 		})
@@ -434,24 +485,52 @@ func TestPRWithReviewersLeavesFlagsUnsetForAnUnenrichedPR(t *testing.T) {
 		pullRequestNode{},
 	)
 
-	if pr.HasThreadWaitingForAuthor || pr.Conflicting || pr.HasNonApprovingReview {
+	if pr.HasThreadWaitingForAuthor || pr.Conflicting || pr.HasOutstandingChangesRequest {
 		t.Errorf(
-			"expected all three flags unset, got threads: %t, conflicting: %t, non-approving: %t",
-			pr.HasThreadWaitingForAuthor, pr.Conflicting, pr.HasNonApprovingReview,
+			"expected all three flags unset, got threads: %t, conflicting: %t, changes request: %t",
+			pr.HasThreadWaitingForAuthor, pr.Conflicting, pr.HasOutstandingChangesRequest,
 		)
 	}
 }
 
-// The three unit tests above build nodes in Go, which cannot see a JSON tag. A mistagged
-// mergeable, reviewThreads or isResolved decodes to its zero value and fails silently: no
-// error, and every flag it feeds reads as nobody's turn.
+// The unit tests above build nodes in Go, which cannot see a JSON tag. A mistagged field
+// decodes to its zero value without an error.
 func TestPRWithReviewersDerivesFlagsFromDecodedJSON(t *testing.T) {
 	tests := []struct {
-		name               string
-		nodeJSON           string
-		expectedConflicts  bool
-		expectedUnresolved bool
+		name                              string
+		nodeJSON                          string
+		expectedConflicts                 bool
+		expectedUnresolved                bool
+		expectedOutstandingChangesRequest bool
 	}{
+		{
+			// Losing reviewRequests, requestedReviewer or login leaves carol unrequested, so
+			// her changes request reads as outstanding.
+			name: "PR whose author re-requested the reviewer who requested changes",
+			nodeJSON: `{
+				"author":{"login":"alice","__typename":"User","name":"Alice"},
+				"reviews":{"nodes":[
+					{"state":"CHANGES_REQUESTED","author":{"login":"carol","__typename":"User","name":"Carol"}}
+				]},
+				"reviewRequests":{"nodes":[
+					{"requestedReviewer":{"__typename":"User","login":"carol"}}
+				]}
+			}`,
+		},
+		{
+			// Keeps the case above from passing on reviews that never decoded.
+			name: "PR with a changes request whose reviewer is not requested",
+			nodeJSON: `{
+				"author":{"login":"alice","__typename":"User","name":"Alice"},
+				"reviews":{"nodes":[
+					{"state":"CHANGES_REQUESTED","author":{"login":"carol","__typename":"User","name":"Carol"}}
+				]},
+				"reviewRequests":{"nodes":[
+					{"requestedReviewer":{"__typename":"User","login":"bob"}}
+				]}
+			}`,
+			expectedOutstandingChangesRequest: true,
+		},
 		{
 			name: "conflicting PR with one resolved and one unresolved thread",
 			nodeJSON: `{
@@ -515,6 +594,12 @@ func TestPRWithReviewersDerivesFlagsFromDecodedJSON(t *testing.T) {
 				t.Errorf(
 					"HasThreadWaitingForAuthor = %t, expected %t",
 					pr.HasThreadWaitingForAuthor, tt.expectedUnresolved,
+				)
+			}
+			if pr.HasOutstandingChangesRequest != tt.expectedOutstandingChangesRequest {
+				t.Errorf(
+					"HasOutstandingChangesRequest = %t, expected %t",
+					pr.HasOutstandingChangesRequest, tt.expectedOutstandingChangesRequest,
 				)
 			}
 		})

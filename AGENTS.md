@@ -168,6 +168,8 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 - `make run`: run locally (requires env vars, see Makefile for the pattern)
 - `make build`: build linux binaries
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
+- The Build workflow's "Smoke/E2E test" step (`.github/actions/e2e-tests/`): runs each PR's own build against the real GitHub API and the dev Slack channels, in post and update mode. Its job log shows a query or Slack call working live
+  - It uses a GitHub App token, not `GITHUB_TOKEN`. Fork PRs skip it
 - `make check-fmt`: fail if any file needs `gofmt`
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`

@@ -63,6 +63,8 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
    - Don't plan tests as their own step, unless the feature is complex enough to need its own test-suite shape/refactor planned up front. Writing tests is a natural, inherent part of implementing each step (see AGENTS.md § Testing)
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
    - A live check names the exact dispatch or edit that sets it up. Check the workflow can actually take it
+   - Before planning a live check, see whether the Build workflow's E2E runs already cover it (AGENTS.md § Development Commands). Plan one only for what they miss, such as `GITHUB_TOKEN`
+     - When a check needs a situation the E2E setup lacks, such as a PR in a given review state, ask the user whether they can add it to the test repositories or the E2E inputs. The E2E runs then cover it on every PR
 6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing
    - **Negative** is for effects that leave the repo worse off than not implementing the plan at all
    - **Caveats** is for the costs of a change that is still worth making: a limit it doesn't lift, a rough edge it leaves, a thing it makes harder. Don't put these under **Negative**

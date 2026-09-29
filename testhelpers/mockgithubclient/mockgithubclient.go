@@ -23,22 +23,23 @@ import (
 )
 
 type MockGitHubClientOptions struct {
-	PRsByNumber                map[int]*github.PullRequest
-	ErrByPRNumber              map[int]error
-	PRs                        []*github.PullRequest
-	PRsByRepo                  map[string][]*github.PullRequest
-	MergedPRs                  []*github.PullRequest
-	MergedPRsByRepo            map[string][]*github.PullRequest
-	MergedPRsSearchError       error // fails the merged PR search only
-	ListPRsResponseStatus      int
-	ReviewsByPRNumber          map[int][]*github.PullRequestReview
-	TimelineCommentsByPRNumber map[int][]*github.IssueComment
-	PRServiceError             error
-	IssueServiceError          error
-	MockPreviousState          *state.State
-	ListArtifactsError         error
-	DownloadArtifactError      error
-	Recording                  *FetchRecording
+	PRsByNumber                       map[int]*github.PullRequest
+	ErrByPRNumber                     map[int]error
+	PRs                               []*github.PullRequest
+	PRsByRepo                         map[string][]*github.PullRequest
+	MergedPRs                         []*github.PullRequest
+	MergedPRsByRepo                   map[string][]*github.PullRequest
+	MergedPRsSearchError              error // fails the merged PR search only
+	ListPRsResponseStatus             int
+	ReviewsByPRNumber                 map[int][]*github.PullRequestReview
+	TimelineCommentsByPRNumber        map[int][]*github.IssueComment
+	RequestedReviewerLoginsByPRNumber map[int][]string
+	PRServiceError                    error
+	IssueServiceError                 error
+	MockPreviousState                 *state.State
+	ListArtifactsError                error
+	DownloadArtifactError             error
+	Recording                         *FetchRecording
 }
 
 // Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
@@ -311,6 +312,9 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["labels"] = labelsJSON(pr)
 	node["reviews"] = connectionJSON(utilities.Map(t.opts.ReviewsByPRNumber[number], reviewNodeJSON))
 	node["comments"] = t.commentsJSON(number)
+	node["reviewRequests"] = connectionJSON(
+		utilities.Map(t.opts.RequestedReviewerLoginsByPRNumber[number], reviewRequestNodeJSON),
+	)
 	return node
 }
 
@@ -383,6 +387,12 @@ func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
 	return map[string]any{
 		"state":  review.GetState(),
 		"author": authorNodeJSON(review.GetUser()),
+	}
+}
+
+func reviewRequestNodeJSON(requestedUserLogin string) map[string]any {
+	return map[string]any{
+		"requestedReviewer": map[string]any{"__typename": "User", "login": requestedUserLogin},
 	}
 }
 

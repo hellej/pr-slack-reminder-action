@@ -97,7 +97,8 @@ type PR struct {
 	// thread with no comments, or one whose last commenter GitHub no longer reports, counts too.
 	HasThreadWaitingForAuthor bool
 	Conflicting               bool // cannot be merged as it stands
-	HasNonApprovingReview     bool // a reviewer commented or requested changes
+	// A changes request by someone other than the author, whose reviewer is not requested again.
+	HasOutstandingChangesRequest bool
 }
 
 type PRResult struct {

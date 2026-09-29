@@ -48,9 +48,9 @@ const (
 )
 
 // Returns the next action of the first check that matches, so an earlier check wins every
-// overlap: a reviewer who commented and then approved leaves the PR ready to merge. A conflict
-// keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while an
-// unreviewed one stays in the review queue (conflicts should not block review).
+// overlap: a reviewer who requested changes and then approved leaves the PR ready to merge. A
+// conflict keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while
+// an unreviewed one stays in the review queue (conflicts should not block review).
 func (pr PR) GetNextAction() PRNextAction {
 	// defensive nil check, should not happen
 	if pr.PR == nil {
@@ -61,7 +61,7 @@ func (pr PR) GetNextAction() PRNextAction {
 	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
 		return NextActionReadyToMerge
 	}
-	if isApproved || pr.HasNonApprovingReview || pr.HasThreadWaitingForAuthor {
+	if isApproved || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
 		return NextActionWaitingForAuthor
 	}
 	return NextActionWaitingForReview
