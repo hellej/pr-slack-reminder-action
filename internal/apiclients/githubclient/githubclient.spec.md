@@ -12,7 +12,11 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - `OpenPRsResult` carries `OpenPRsCapped` and `DraftPRsCapped`, each true only when that bucket was trimmed to its cap
 - Each returned PR carries `ApprovedByUsers` (users with an approving review) and `CommentedByUsers` (reviewers/commenters who didn't approve, excluding the PR author); both are deduped by login and exclude bot accounts
 - Each returned PR also carries three flags saying how close it is to a merge, read off the same enrichment request: `Conflicting` (`mergeable` is `CONFLICTING`; `UNKNOWN` is GitHub still computing it and reads as not conflicting), `HasThreadWaitingForAuthor` and `HasOutstandingChangesRequest`
-- `HasThreadWaitingForAuthor` is true when a thread is unresolved and its last comment is neither the PR author's nor a bot's, so the thread is waiting on the author rather than on a reviewer: the author replying hands the thread back to the reviewer, an author's note on their own diff never blocks, and a review bot's thread would otherwise hand every new PR back to its author before a person had looked. An unresolved thread with no comments, or one whose last commenter GitHub no longer reports, counts as blocking
+- `HasThreadWaitingForAuthor` is true when an unresolved thread is waiting on the PR author. The thread's last commenter decides, not who started it:
+  - The PR author: not waiting. Their reply hands the thread back to the reviewer, and a note on their own diff never blocks
+  - A bot: not waiting. A review bot's thread would otherwise hand every new PR back to its author before a person had looked
+  - Anyone else, such as a reviewer replying to the author's note: waiting
+  - No comment, or a commenter GitHub no longer reports: waiting
 - `HasOutstandingChangesRequest` is true when the PR carries an outstanding changes request: a submitted `CHANGES_REQUESTED` review by a user other than the PR author, whose author is not among the PR's requested `User` reviewers. GitHub removes a reviewer's request when they submit, so a pending request after the review means someone re-requested them. See docs/third-party-facts.md § A submitted review removes its author from a PR's requested reviewers
   - `DISMISSED` doesn't count, having been withdrawn, and neither does a bot's review, on the same reasoning as the threads: a review bot is not a person asking for changes
   - `COMMENTED` never counts: a comment review asks for nothing beyond its threads, which `HasThreadWaitingForAuthor` reads
@@ -57,6 +61,8 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - A GraphQL response carries HTTP 200 with an errors array; an error is scoped by its path to the whole query, a repository, a `pullRequest`, or a field below one, and when several arrive the most severe wins (query over repository over pull request)
 - A PR left without reviewer info by a failed enrichment is also left without its snooze, so a snoozed PR reappears in the reminder
 - A PR with over 100 review threads is judged on the first 100, so an unresolved thread past that is missed and the PR can read as nobody's turn
+- A bot replying last in a person's thread hands the thread back to the reviewer, as the PR author replying would
+- On a bot-authored PR, such as Dependabot's, a thread waiting for the author stays waiting until someone resolves it, since the author never replies
 - A review a person posts through a bot integration counts for neither flag, so real feedback delivered by a bot leaves the PR looking untouched
 - A bot is an account GitHub types as `Bot`, which means a GitHub App. A CI or service account posting under a user login is a person to both flags, so its review comments do put a PR under its author's turn
 - A PR left without reviewer info by a failed enrichment gets `Conflicting`, `HasThreadWaitingForAuthor` and `HasOutstandingChangesRequest` all false, the same values a PR nobody has touched has
