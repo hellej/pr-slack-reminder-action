@@ -17,6 +17,7 @@ Source: [issue #75](https://github.com/hellej/pr-slack-reminder-action/issues/75
   - Pushing new commits as a hand-back signal
   - Team review requests as a hand-back signal
   - Any change to how approvals, conflicts or bots are read
+- No new token permission or OAuth scope, `read:org` included
 - Work lands on branch `claude/dreamy-faraday-o4sr2z`, then a PR
 
 Purpose: every PR stuck under its author's turn is one the team's reviewers never pick up. In the reference deployment (0 to 8 open PRs, bot comments on every commit, Dependabot PRs driven by a human reviewer) one stuck PR is a large share of the queue.
