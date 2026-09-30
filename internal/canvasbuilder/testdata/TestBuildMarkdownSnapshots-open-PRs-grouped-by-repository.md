@@ -8,13 +8,13 @@
 
 - **[Bump the Slack SDK](https://github.com/test-org/repo-two/pull/2)** _30 minutes ago_ by Bob Brown
 
-## 🔧 WIP
-
-- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
-
 ## 🚀 Merged
 
 _No merged PRs_
+
+## 🔧 WIP
+
+- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
 ​
 

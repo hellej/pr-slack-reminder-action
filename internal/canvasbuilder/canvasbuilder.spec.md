@@ -4,9 +4,9 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 
 ## Behaviour
 
-- `BuildMarkdown(content)` renders the open PRs as three sections, `## ✅ Ready to merge`, then `## 💬 Waiting for author`, then `## 👀 Waiting for review`, then `## 🔧 WIP`, then `## 🚀 Merged`, each with its own list
-- An open section with no PRs renders nothing at all, heading included, so a reader scanning the headings sees only the buckets asking something of them. `## 🔧 WIP` and `## 🚀 Merged` always render
-- All three open sections empty renders one `## Open` heading with `_No open PRs_`, the zero state the canvas had before the open split: a canvas opening at `## 🔧 WIP` would read as a broken render
+- `BuildMarkdown(content)` renders five sections, each with its own list: the open PRs split into `## 👀 Waiting for review`, `## 💬 Waiting for author` and `## ✅ Ready to merge`, then `## 🚀 Merged`, then `## 🔧 WIP`. The most urgent ask leads. Drafts are the least actionable, so they come last
+- An open section with no PRs renders nothing at all, heading included, so a reader scanning the headings sees only the buckets asking something of them. `## 🚀 Merged` and `## 🔧 WIP` always render
+- All three open sections empty renders one `## Open` heading with `_No open PRs_` in their place, the zero state the canvas had before the open split: a canvas opening at `## 🚀 Merged` would read as a broken render
 - `## Open` is the one heading without an emoji: it stands for all three open buckets, so no single emoji fits it
 - Any section can render grouped: its PRs then get one `###` sub-heading per repository, the repository name without its owner, linking to `models.Repository.GetPullsURL()`. The section heading above them already scopes the rows, so it is not repeated. Each section reads its own grouped slice, so all of them group together, off the one `Content.GroupedByRepository` flag. Nothing dedupes a repository across sections, so one repository can carry a `###` heading under each
 - The three open sections share one row renderer, one empty-state line and one heading level: only the heading text and the PR list differ. A PR's bucket is `canvascontent`'s to decide

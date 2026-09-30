@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	readyToMergeHeading      = "## ✅ Ready to merge"
-	waitingForAuthorHeading  = "## 💬 Waiting for author"
 	waitingForReviewHeading  = "## 👀 Waiting for review"
+	waitingForAuthorHeading  = "## 💬 Waiting for author"
+	readyToMergeHeading      = "## ✅ Ready to merge"
 	openPRsHeading           = "## Open"
-	wipPRsHeading            = "## 🔧 WIP"
 	mergedPRsHeading         = "## 🚀 Merged"
+	wipPRsHeading            = "## 🔧 WIP"
 	noOpenPRsText            = "_No open PRs_"
 	noWIPPRsText             = "_No work in progress_"
 	noMergedPRsText          = "_No merged PRs_"
@@ -30,20 +30,20 @@ const (
 func BuildMarkdown(content canvascontent.Content) string {
 	blocks := renderOpenSections(content)
 	blocks = append(blocks, renderSectionBlocks(section{
-		heading:             wipPRsHeading,
-		prs:                 content.WIP.PRs,
-		groups:              content.WIP.Groups,
-		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderWIPPRRow,
-		emptyText:           noWIPPRsText,
-	})...)
-	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             mergedPRsHeading,
 		prs:                 content.Merged.PRs,
 		groups:              content.Merged.Groups,
 		groupedByRepository: content.GroupedByRepository,
 		renderRow:           renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),
+	})...)
+	blocks = append(blocks, renderSectionBlocks(section{
+		heading:             wipPRsHeading,
+		prs:                 content.WIP.PRs,
+		groups:              content.WIP.Groups,
+		groupedByRepository: content.GroupedByRepository,
+		renderRow:           renderWIPPRRow,
+		emptyText:           noWIPPRsText,
 	})...)
 	// A blank block collapses to no space in Slack's canvas renderer: a non-breaking space
 	// forces the line to render, giving room above the divider.
@@ -55,9 +55,9 @@ func BuildMarkdown(content canvascontent.Content) string {
 // All three buckets empty falls back to the single "Open" heading with "No open PRs" text.
 func renderOpenSections(content canvascontent.Content) []string {
 	nextActionSections := []section{
-		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
-		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
 		openSection(waitingForReviewHeading, content.WaitingForReview, content.GroupedByRepository),
+		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
+		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
 	}
 
 	blocks := utilities.FlatMap(utilities.Map(nextActionSections, renderSectionBlocks))

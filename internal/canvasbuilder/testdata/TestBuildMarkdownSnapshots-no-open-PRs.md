@@ -2,13 +2,13 @@
 
 _No open PRs_
 
-## 🔧 WIP
-
-- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
-
 ## 🚀 Merged
 
 _No merged PRs_
+
+## 🔧 WIP
+
+- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
 ​
 
