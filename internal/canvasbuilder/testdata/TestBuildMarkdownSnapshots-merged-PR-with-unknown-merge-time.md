@@ -2,13 +2,13 @@
 
 _No open PRs_
 
-## 🔧 WIP
-
-_No work in progress_
-
 ## 🚀 Merged
 
 - **[Restore the deleted branch](https://github.com/test-org/test-repo/pull/10)** by Carol Clark
+
+## 🔧 WIP
+
+_No work in progress_
 
 ​
 

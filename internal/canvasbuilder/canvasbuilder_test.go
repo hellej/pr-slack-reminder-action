@@ -482,7 +482,10 @@ func TestBuildMarkdownSectionHeadings(t *testing.T) {
 		number: 1, title: "Add pagination to the PR listing", authorName: "Alice Anderson",
 		age: hoursAge,
 	})}}
-	alwaysRenderedHeadings := []string{"## 🔧 WIP", "## 🚀 Merged"}
+	grouped := canvascontent.PRSection{
+		Groups: prview.GroupPRsByRepositoriesInGivenOrder(filled.PRs),
+	}
+	alwaysRenderedHeadings := []string{"## 🚀 Merged", "## 🔧 WIP"}
 
 	testCases := []struct {
 		name                 string
@@ -509,7 +512,7 @@ func TestBuildMarkdownSectionHeadings(t *testing.T) {
 			content: canvascontent.Content{
 				ReadyToMerge: filled, WaitingForReview: filled,
 			},
-			expectedOpenHeadings: []string{"## ✅ Ready to merge", "## 👀 Waiting for review"},
+			expectedOpenHeadings: []string{"## 👀 Waiting for review", "## ✅ Ready to merge"},
 		},
 		{
 			name: "every section filled",
@@ -518,11 +521,22 @@ func TestBuildMarkdownSectionHeadings(t *testing.T) {
 				WIP: filled, Merged: filled,
 			},
 			expectedOpenHeadings: []string{
-				"## ✅ Ready to merge", "## 💬 Waiting for author", "## 👀 Waiting for review",
+				"## 👀 Waiting for review", "## 💬 Waiting for author", "## ✅ Ready to merge",
 			},
 		},
 		{
-			// Nothing open at all keeps one heading, so the canvas does not open at ## 🔧 WIP.
+			name: "every section filled while grouping by repository",
+			content: canvascontent.Content{
+				ReadyToMerge: grouped, WaitingForAuthor: grouped, WaitingForReview: grouped,
+				WIP: grouped, Merged: grouped,
+				GroupedByRepository: true,
+			},
+			expectedOpenHeadings: []string{
+				"## 👀 Waiting for review", "## 💬 Waiting for author", "## ✅ Ready to merge",
+			},
+		},
+		{
+			// Nothing open at all keeps one heading, so the canvas does not open at ## 🚀 Merged.
 			name:                 "nothing open",
 			content:              canvascontent.Content{},
 			expectedOpenHeadings: []string{"## Open"},

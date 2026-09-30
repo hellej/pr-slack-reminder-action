@@ -2,13 +2,13 @@
 
 _No open PRs_
 
-## 🔧 WIP
-
-_No work in progress_
-
 ## 🚀 Merged
 
 _No merged PRs_
+
+## 🔧 WIP
+
+_No work in progress_
 
 ​
 

@@ -5,13 +5,13 @@
 - **[Pin the action digests](https://github.com/test-org/test-repo/pull/24)** _5 hours ago_ by Dana Davis (✅ Alice Anderson, Bob Brown / 💬 Carol Clark, Erin Evans)
 - **[Retry the artifact download](https://github.com/test-org/repo-two/pull/22)** _30 minutes ago_ by Bob Brown (✅ Dana Davis, Erin Evans)
 
-## 🔧 WIP
-
-- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
-
 ## 🚀 Merged
 
 _No merged PRs_
+
+## 🔧 WIP
+
+- **[Spike: replace mux with chi](https://github.com/test-org/test-repo/pull/3)** by Carol Clark `updated 5 hours ago`
 
 ​
 
