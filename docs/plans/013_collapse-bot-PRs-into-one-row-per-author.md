@@ -30,7 +30,7 @@ Purpose: the reference deployment has 0 to 8 open PRs, so a 5 PR batch can be mo
 - No token permission or OAuth scope change
 - `prview` owns the section model, shared by both content packages. Content packages fill it, builders render it as given:
   - `Row`: a sealed interface, implemented by `PR` and `CollapsedRow`. Builders type-switch on it
-  - `CollapsedRow{Author, PRs}`, with `GetAuthorLabel()`: the login without a trailing `[bot]`
+  - `CollapsedRow{AuthorLogin, PRs}`, with `GetAuthorLabel()`: the login without a trailing `[bot]`
   - `PRSection{Rows, Groups}` and `RepositoryRows{Repository, Rows}`, replacing `messagecontent.PRSection`, `messagecontent.PRsOfRepository` and `canvascontent.PRSection`. A section fills `Rows` or `Groups`, never both, as today
   - `RowsCollapsingAuthors(prs, collapsedPRAuthors) []Row`: every PR not collapsed, in the given order, then one `CollapsedRow` per author with at least `MinPRsToCollapse` (2) PRs, in `collapsedPRAuthors` order. Each `CollapsedRow` keeps the given order of its PRs
 - `prview.RepositoryPRs` and `GroupPRsByRepositoriesInGivenOrder` stay: content packages group PRs first, then turn each group's PRs into rows
@@ -115,10 +115,10 @@ Non-breaking: minor. A new optional input, and a layout change with no config ch
 
 ### 2: collapsing in `prview` and the content packages
 
-- `prview`: `CollapsedRow`, `GetAuthorLabel`, `MinPRsToCollapse` and `RowsCollapsingAuthors` per § Target Shape
-  - Package test for the rule: the 1 and 2 boundary, two authors in `collapsedPRAuthors` order, PRs of one author interleaved with others
+- `prview`: `CollapsedRow`, `GetAuthorLabel`, `MinPRsToCollapse` and `RowsCollapsingAuthors` per § Target Shape. A login listed twice in `collapsedPRAuthors` still gets one row
+  - Package test for the rule: the 1 and 2 boundary, two authors in `collapsedPRAuthors` order, PRs of one author interleaved with others, exact login match, a login listed twice
 - `messagecontent` and `canvascontent`: `newPRSection` builds each flat section, or each repository group, through `RowsCollapsingAuthors`
-  - `canvascontent_test.go` pins the canvas wiring: one flat and one grouped section collapse. The message wiring is pinned by step 3's snapshots, which run the whole pipeline
+  - `canvascontent_test.go` pins the canvas wiring: an open, the WIP and the merged section collapse flat, and an open section collapses per repository group. `testhelpers.DescribeRows` renders rows as strings for these tests and the `prview` one. The message wiring is pinned by step 3's snapshots, which run the whole pipeline
 - Update `prview.spec.md`, `messagecontent.spec.md` and `canvascontent.spec.md`
 
 ### 3: collapsed rows in both builders
@@ -129,6 +129,8 @@ Non-breaking: minor. A new optional input, and a layout change with no config ch
   - one section with exactly 1 Dependabot PR, which keeps its full row
   - the merged section with 2 Dependabot PRs
   - grouped: one repository with only Dependabot PRs
+  - a third scenario: no open PRs, no `no-prs-message`, and only 2 merged Dependabot PRs, so the message is sent for a section holding only a collapsed row
+  - the fixtures need `GetTestPROptions.AuthorType` for a `Bot` author and `snapshotScenario.mergedPRsByRepo`
 - New canvas goldens, flat and grouped, covering a collapsed row in an open, the merged and the WIP section, and a group holding only a collapsed row
 - Update `messagebuilder.spec.md` and `canvasbuilder.spec.md`
 
@@ -137,6 +139,7 @@ Live check, covering steps 1 to 3, checked by the user: the PR's E2E job runs th
 ### 4: README
 
 - One line under `## PR Tracker Canvas` and one under `### Example Output`: 2 or more PRs by one collapsed PR author in a section collapse into one row of linked numbers
+- `collapsed-pr-authors` joins the list of inputs that shape the canvas, under `### Good to know`
 - Done means `make check-style` passes
 
 ## Consequences

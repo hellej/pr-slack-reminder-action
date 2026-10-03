@@ -11,6 +11,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
 
@@ -116,9 +117,9 @@ func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack
 func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:      "2 open PRs are waiting for attention 👀",
-		WaitingForReview: messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})}},
-		Merged: messagecontent.PRSection{
-			PRs: []prview.PR{testPR(testPROptions{title: "Merged PR", mergedAt: &generatedAt})},
+		WaitingForReview: prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "Open PR"})}},
+		Merged: prview.PRSection{
+			Rows: []prview.Row{testPR(testPROptions{title: "Merged PR", mergedAt: &generatedAt})},
 		},
 		GeneratedAt: generatedAt,
 	})
@@ -138,7 +139,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 }
 
 func TestSectionHeadings(t *testing.T) {
-	onePR := messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "PR"})}}
+	onePR := prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "PR"})}}
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		ReadyToMerge:     onePR,
 		WaitingForAuthor: onePR,
@@ -227,18 +228,16 @@ func firstRowTitle(t *testing.T, block slack.Block) string {
 	return rowElements(t, elements[1], 0)[0].(*slack.RichTextSectionLinkElement).Text
 }
 
-func groupedOverTwoRepositories() messagecontent.PRSection {
-	return messagecontent.PRSection{
-		Groups: []messagecontent.PRsOfRepository{
+func groupedOverTwoRepositories() prview.PRSection {
+	return prview.PRSection{
+		Groups: []prview.RepositoryRows{
 			{
-				RepositoryName:     "repo-one",
-				RepositoryPullsURL: "https://github.com/owner-one/repo-one/pulls",
-				PRs:                []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
+				Repository: models.Repository{Owner: "owner-one", Name: "repo-one"},
+				Rows:       []prview.Row{testPR(testPROptions{title: "PR in repo one"})},
 			},
 			{
-				RepositoryName:     "repo-two",
-				RepositoryPullsURL: "https://github.com/owner-two/repo-two/pulls",
-				PRs:                []prview.PR{testPR(testPROptions{title: "PR in repo two"})},
+				Repository: models.Repository{Owner: "owner-two", Name: "repo-two"},
+				Rows:       []prview.Row{testPR(testPROptions{title: "PR in repo two"})},
 			},
 		},
 	}
@@ -278,10 +277,10 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
-		WaitingForReview: messagecontent.PRSection{
-			Groups: []messagecontent.PRsOfRepository{{
-				RepositoryName: "repo-one",
-				PRs:            []prview.PR{testPR(testPROptions{title: "PR in repo one"})},
+		WaitingForReview: prview.PRSection{
+			Groups: []prview.RepositoryRows{{
+				Repository: models.Repository{Owner: "test-org", Name: "repo-one"},
+				Rows:       []prview.Row{testPR(testPROptions{title: "PR in repo one"})},
 			}},
 		},
 		GeneratedAt: generatedAt,
@@ -295,11 +294,10 @@ func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
 func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
-		ReadyToMerge: messagecontent.PRSection{
-			Groups: []messagecontent.PRsOfRepository{{
-				RepositoryName:     "ready-repo",
-				RepositoryPullsURL: "https://github.com/ready-owner/ready-repo/pulls",
-				PRs:                []prview.PR{testPR(testPROptions{title: "Ready PR"})},
+		ReadyToMerge: prview.PRSection{
+			Groups: []prview.RepositoryRows{{
+				Repository: models.Repository{Owner: "ready-owner", Name: "ready-repo"},
+				Rows:       []prview.Row{testPR(testPROptions{title: "Ready PR"})},
 			}},
 		},
 		WaitingForReview: groupedOverTwoRepositories(),
@@ -327,8 +325,8 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 
 func TestOpenPRRow(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		WaitingForReview: messagecontent.PRSection{
-			PRs: []prview.PR{testPR(testPROptions{title: "Open PR", slackUserID: "U12345678"})},
+		WaitingForReview: prview.PRSection{
+			Rows: []prview.Row{testPR(testPROptions{title: "Open PR", slackUserID: "U12345678"})},
 		},
 		GeneratedAt: generatedAt,
 	})
@@ -352,8 +350,8 @@ func TestOpenPRRow(t *testing.T) {
 
 func TestOldPRWarningMarker(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		WaitingForReview: messagecontent.PRSection{
-			PRs: []prview.PR{testPR(testPROptions{title: "Old PR", isOldPR: true})},
+		WaitingForReview: prview.PRSection{
+			Rows: []prview.Row{testPR(testPROptions{title: "Old PR", isOldPR: true})},
 		},
 		GeneratedAt: generatedAt,
 	})
@@ -374,8 +372,8 @@ func TestOldPRWarningMarker(t *testing.T) {
 
 func TestAuthorFallsBackToGitHubName(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		WaitingForReview: messagecontent.PRSection{
-			PRs: []prview.PR{testPR(testPROptions{title: "Open PR"})},
+		WaitingForReview: prview.PRSection{
+			Rows: []prview.Row{testPR(testPROptions{title: "Open PR"})},
 		},
 		GeneratedAt: generatedAt,
 	})
@@ -393,8 +391,8 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 	mergedAt := time.Now().Add(-2 * time.Hour)
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		Merged: messagecontent.PRSection{
-			PRs: []prview.PR{testPR(testPROptions{
+		Merged: prview.PRSection{
+			Rows: []prview.Row{testPR(testPROptions{
 				title: "Merged PR", mergedAt: &mergedAt, isOldPR: true, approvers: []string{"Dana Davis"},
 			})},
 		},
@@ -428,7 +426,7 @@ func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 
 func TestMergedPRRowWithoutAMergeTimeDropsThatSegment(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		Merged:      messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
+		Merged:      prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "Merged PR"})}},
 		GeneratedAt: generatedAt,
 	})
 
@@ -442,7 +440,7 @@ func TestNoOpenPRsTextRendersAboveTheSections(t *testing.T) {
 	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		SummaryText:   "Nothing waiting for review 🎉",
 		NoOpenPRsText: "All caught up! 🎉",
-		Merged:        messagecontent.PRSection{PRs: []prview.PR{testPR(testPROptions{title: "Merged PR"})}},
+		Merged:        prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "Merged PR"})}},
 		GeneratedAt:   generatedAt,
 	})
 
@@ -486,15 +484,15 @@ func TestUpdateTimeFooterNamesTheRunTimestampInTheReadersOwnTimezone(t *testing.
 	}
 }
 
-func groupedOverRepositories(count int) messagecontent.PRSection {
-	groups := make([]messagecontent.PRsOfRepository, count)
+func groupedOverRepositories(count int) prview.PRSection {
+	groups := make([]prview.RepositoryRows, count)
 	for index := range groups {
-		groups[index] = messagecontent.PRsOfRepository{
-			RepositoryName: fmt.Sprintf("repo-%d", index+1),
-			PRs:            []prview.PR{testPR(testPROptions{title: fmt.Sprintf("PR in repo %d", index+1)})},
+		groups[index] = prview.RepositoryRows{
+			Repository: models.Repository{Owner: "test-org", Name: fmt.Sprintf("repo-%d", index+1)},
+			Rows:       []prview.Row{testPR(testPROptions{title: fmt.Sprintf("PR in repo %d", index+1)})},
 		}
 	}
-	return messagecontent.PRSection{Groups: groups}
+	return prview.PRSection{Groups: groups}
 }
 
 const repositoriesBuildingSixtyContentBlocks = 30

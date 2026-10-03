@@ -18,18 +18,12 @@ const MaxDraftPRInactivity = 60 * 24 * time.Hour
 // How many drafts without recent activity the WIP section shows.
 const MaxInactiveWIPPRs = 5
 
-// One canvas section's PRs, either as the flat list or as repository buckets.
-type PRSection struct {
-	PRs    []prview.PR
-	Groups []prview.RepositoryPRs
-}
-
 type Content struct {
-	ReadyToMerge         PRSection
-	WaitingForAuthor     PRSection
-	WaitingForReview     PRSection
-	WIP                  PRSection
-	Merged               PRSection
+	ReadyToMerge         prview.PRSection
+	WaitingForAuthor     prview.PRSection
+	WaitingForReview     prview.PRSection
+	WIP                  prview.PRSection
+	Merged               prview.PRSection
 	GroupedByRepository  bool
 	OpenPRsCapped        bool
 	WIPPRsCapped         bool
@@ -80,14 +74,13 @@ func GetContent(
 		len(sortedActiveDraftPRs)-len(wipPRs),
 	)
 
-	groupByRepository := contentInputs.GroupByRepository
 	return Content{
-		ReadyToMerge:         newPRSection(readyToMerge, groupByRepository),
-		WaitingForAuthor:     newPRSection(waitingForAuthor, groupByRepository),
-		WaitingForReview:     newPRSection(waitingForReview, groupByRepository),
-		WIP:                  newPRSection(wipPRs, groupByRepository),
-		Merged:               newPRSection(sortedMergedPRs, groupByRepository),
-		GroupedByRepository:  groupByRepository,
+		ReadyToMerge:         newPRSection(readyToMerge, contentInputs),
+		WaitingForAuthor:     newPRSection(waitingForAuthor, contentInputs),
+		WaitingForReview:     newPRSection(waitingForReview, contentInputs),
+		WIP:                  newPRSection(wipPRs, contentInputs),
+		Merged:               newPRSection(sortedMergedPRs, contentInputs),
+		GroupedByRepository:  contentInputs.GroupByRepository,
 		OpenPRsCapped:        options.OpenPRsCapped,
 		WIPPRsCapped:         options.WIPPRsCapped,
 		MergedPRsUnavailable: options.MergedPRsUnavailable,
@@ -104,11 +97,21 @@ func prsWhoseNextActionIs(
 	})
 }
 
-func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
-	if groupByRepository {
-		return PRSection{Groups: prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs)}
+func newPRSection(sortedPRs []prview.PR, contentInputs config.ContentInputs) prview.PRSection {
+	if !contentInputs.GroupByRepository {
+		return prview.PRSection{Rows: prview.RowsCollapsingAuthors(sortedPRs, contentInputs.CollapsedPRAuthors)}
 	}
-	return PRSection{PRs: sortedPRs}
+	return prview.PRSection{
+		Groups: utilities.Map(
+			prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs),
+			func(group prview.RepositoryPRs) prview.RepositoryRows {
+				return prview.RepositoryRows{
+					Repository: group.Repository,
+					Rows:       prview.RowsCollapsingAuthors(group.PRs, contentInputs.CollapsedPRAuthors),
+				}
+			},
+		),
+	}
 }
 
 func isActiveEnoughForCanvas(generatedAt time.Time) func(prview.PR) bool {

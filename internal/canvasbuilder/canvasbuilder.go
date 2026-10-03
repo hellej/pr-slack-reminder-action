@@ -31,18 +31,16 @@ func BuildMarkdown(content canvascontent.Content) string {
 	blocks := renderOpenSections(content)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             mergedPRsHeading,
-		prs:                 content.Merged.PRs,
-		groups:              content.Merged.Groups,
+		prSection:           content.Merged,
 		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderMergedPRRow,
+		renderPRRow:         renderMergedPRRow,
 		emptyText:           emptyMergedPRsText(content),
 	})...)
 	blocks = append(blocks, renderSectionBlocks(section{
 		heading:             wipPRsHeading,
-		prs:                 content.WIP.PRs,
-		groups:              content.WIP.Groups,
+		prSection:           content.WIP,
 		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderWIPPRRow,
+		renderPRRow:         renderWIPPRRow,
 		emptyText:           noWIPPRsText,
 	})...)
 	// A blank block collapses to no space in Slack's canvas renderer: a non-breaking space
@@ -67,78 +65,80 @@ func renderOpenSections(content canvascontent.Content) []string {
 	return renderSectionBlocks(section{
 		heading:             openPRsHeading,
 		groupedByRepository: content.GroupedByRepository,
-		renderRow:           renderOpenPRRow,
+		renderPRRow:         renderOpenPRRow,
 		emptyText:           noOpenPRsText,
 	})
 }
 
-func openSection(
-	heading string, prs canvascontent.PRSection, groupedByRepository bool,
-) section {
+func openSection(heading string, prSection prview.PRSection, groupedByRepository bool) section {
 	return section{
 		heading:             heading,
-		prs:                 prs.PRs,
-		groups:              prs.Groups,
+		prSection:           prSection,
 		groupedByRepository: groupedByRepository,
-		renderRow:           renderOpenPRRow,
+		renderPRRow:         renderOpenPRRow,
 		hideWhenEmpty:       true,
 	}
 }
 
-// One canvas section: its PRs as the flat list or as repository buckets.
 type section struct {
 	heading             string
-	prs                 []prview.PR
-	groups              []prview.RepositoryPRs
+	prSection           prview.PRSection
 	groupedByRepository bool
-	renderRow           func(prview.PR) string
+	renderPRRow         func(prview.PR) string
 	emptyText           string
 	// Drops the heading too, rather than showing it above emptyText.
 	hideWhenEmpty bool
-}
-
-func (section section) isEmpty() bool {
-	return len(section.prs) == 0 && len(section.groups) == 0
 }
 
 // Grouped PRs get one sub-heading block per repository, with no repeated section heading.
 // Grouping with nothing to show falls back to the same single line the flat section uses.
 func renderSectionBlocks(section section) []string {
 	// Nil rather than a blank block: strings.Join would keep an empty string as a gap.
-	if section.hideWhenEmpty && section.isEmpty() {
+	if section.hideWhenEmpty && !section.prSection.HasRows() {
 		return nil
 	}
-	if !section.groupedByRepository || len(section.groups) == 0 {
-		return []string{renderSection(section.heading, section.prs, section.renderRow, section.emptyText)}
+	if !section.groupedByRepository || len(section.prSection.Groups) == 0 {
+		return []string{renderSection(section.heading, section.prSection.Rows, section)}
 	}
 
 	return append(
 		[]string{section.heading},
-		utilities.Map(section.groups, func(group prview.RepositoryPRs) string {
+		utilities.Map(section.prSection.Groups, func(group prview.RepositoryRows) string {
 			return renderRepositoryGroup(group, section)
 		})...,
 	)
 }
 
-func renderRepositoryGroup(group prview.RepositoryPRs, section section) string {
+func renderRepositoryGroup(group prview.RepositoryRows, section section) string {
 	heading := fmt.Sprintf(
 		"### [%s](%s)", escapeMarkdown(group.Repository.Name), group.Repository.GetPullsURL(),
 	)
-	return renderSection(heading, group.PRs, section.renderRow, section.emptyText)
+	return renderSection(heading, group.Rows, section)
 }
 
-// An empty section shows the given line under its heading instead of rows.
-func renderSection(
-	heading string,
-	prs []prview.PR,
-	renderRow func(prview.PR) string,
-	emptyText string,
-) string {
-	if len(prs) == 0 {
-		return heading + "\n\n" + emptyText
+// An empty section shows its empty text under the heading instead of rows.
+func renderSection(heading string, rows []prview.Row, section section) string {
+	if len(rows) == 0 {
+		return heading + "\n\n" + section.emptyText
 	}
-	rows := utilities.Map(prs, func(pr prview.PR) string { return "- " + renderRow(pr) })
-	return heading + "\n\n" + strings.Join(rows, "\n")
+	renderedRows := utilities.Map(rows, func(row prview.Row) string { return "- " + renderRow(row, section) })
+	return heading + "\n\n" + strings.Join(renderedRows, "\n")
+}
+
+func renderRow(row prview.Row, section section) string {
+	switch row := row.(type) {
+	case prview.CollapsedRow:
+		return renderCollapsedRow(row)
+	default:
+		return section.renderPRRow(row.(prview.PR))
+	}
+}
+
+func renderCollapsedRow(row prview.CollapsedRow) string {
+	numberLinks := utilities.Map(row.PRs, func(pr prview.PR) string {
+		return fmt.Sprintf("[#%d](%s)", pr.GetNumber(), pr.GetHTMLURL())
+	})
+	return "🤖 " + escapeMarkdown(row.GetAuthorLabel()) + ": " + strings.Join(numberLinks, " ")
 }
 
 func renderOpenPRRow(pr prview.PR) string {

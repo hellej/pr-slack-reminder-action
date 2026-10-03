@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -132,12 +133,83 @@ type snapshotScenario struct {
 	prs                        []*github.PullRequest
 	prsByRepo                  map[string][]*github.PullRequest
 	mergedPRs                  []*github.PullRequest
+	mergedPRsByRepo            map[string][]*github.PullRequest
 	reviewsByPRNumber          map[int][]*github.PullRequestReview
 	timelineCommentsByPRNumber map[int][]*github.IssueComment
 }
 
+// Dependabot and Renovate PRs over two repositories, collapsing or not by section and group:
+//   - waiting for review, oldest first: a Renovate PR leads the Dependabot ones, though the
+//     collapsed PR authors list Dependabot first, and the Dependabot numbers run out of order
+//   - Dependabot has 1 PR in app and 2 in infra there, so only infra collapses when grouped
+//   - ready to merge holds 1 Dependabot PR, which keeps its full row
+//   - merged holds 2 Dependabot PRs in app, merged newest first as #98, #97
+func collapsedPRAuthorsScenario(name string, groupByRepository bool) snapshotScenario {
+	bot := func(number int, login, repository string, options GetTestPROptions) *github.PullRequest {
+		options.Number = number
+		options.Title = fmt.Sprintf("Bump dependency %d", number)
+		options.AuthorLogin = login
+		options.AuthorType = "Bot"
+		options.HTMLURL = fmt.Sprintf("https://github.com/test-org/%s/pull/%d", repository, number)
+		return getTestPR(options)
+	}
+	return snapshotScenario{
+		name: name,
+		configOverrides: map[string]any{
+			config.InputGithubRepositories: "test-org/app; test-org/infra",
+			config.InputGroupByRepository:  groupByRepository,
+			config.InputCollapsedPRAuthors: "dependabot[bot]; renovate[bot]",
+		},
+		prsByRepo: map[string][]*github.PullRequest{
+			"app": {
+				bot(88, "renovate", "app", GetTestPROptions{AgeHours: 100}),
+				bot(103, "dependabot", "app", GetTestPROptions{AgeHours: 90}),
+				getTestPR(GetTestPROptions{
+					Number: 12, Title: "Fix login redirect", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/app/pull/12",
+					AgeHours: 72,
+				}),
+				bot(90, "renovate", "app", GetTestPROptions{AgeHours: 40}),
+				bot(55, "dependabot", "app", GetTestPROptions{AgeHours: 50}),
+				getTestPR(GetTestPROptions{
+					Number: 14, Title: "Cache the session lookups", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/app/pull/14",
+					AgeHours: 20,
+				}),
+			},
+			"infra": {
+				bot(7, "dependabot", "infra", GetTestPROptions{AgeHours: 60}),
+				bot(6, "dependabot", "infra", GetTestPROptions{AgeHours: 30}),
+			},
+		},
+		mergedPRsByRepo: map[string][]*github.PullRequest{
+			"app": {
+				bot(97, "dependabot", "app", GetTestPROptions{
+					AgeHours: 30, State: "closed", Merged: true, MergedHoursAgo: 3,
+				}),
+				bot(98, "dependabot", "app", GetTestPROptions{
+					AgeHours: 30, State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+			},
+			"infra": {
+				getTestPR(GetTestPROptions{
+					Number: 20, Title: "Add canvas footer", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/infra/pull/20",
+					AgeHours: 30, State: "closed", Merged: true, MergedHoursAgo: 2,
+				}),
+			},
+		},
+		reviewsByPRNumber: map[int][]*github.PullRequestReview{
+			55: {mockgithubclient.NewReview("bob", "Bob Brown", "APPROVED")},
+			14: {mockgithubclient.NewReview("alice", "Alice Anderson", "APPROVED")},
+		},
+	}
+}
+
 func snapshotScenarios() []snapshotScenario {
 	return []snapshotScenario{
+		collapsedPRAuthorsScenario("collapsed PR authors", false),
+		collapsedPRAuthorsScenario("collapsed PR authors grouped by repository", true),
 		{
 			name: "grouped by repository over two repositories",
 			configOverrides: map[string]any{
@@ -368,6 +440,25 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
+			// The run sends only when a section has rows, so a collapsed row must count as one.
+			name: "only collapsed merged PRs, no open PRs and no no-prs-message",
+			configOverrides: map[string]any{
+				config.InputCollapsedPRAuthors: "dependabot[bot]",
+			},
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 95, Title: "Bump dependency 95", AuthorLogin: "dependabot", AuthorType: "Bot",
+					HTMLURL:  "https://github.com/test-org/test-repo/pull/95",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 2,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 96, Title: "Bump dependency 96", AuthorLogin: "dependabot", AuthorType: "Bot",
+					HTMLURL:  "https://github.com/test-org/test-repo/pull/96",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+			},
+		},
+		{
 			name: "no PRs message",
 			configOverrides: map[string]any{
 				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
@@ -387,6 +478,7 @@ func runSnapshotScenario(
 		PRs:                        scenario.prs,
 		PRsByRepo:                  scenario.prsByRepo,
 		MergedPRs:                  scenario.mergedPRs,
+		MergedPRsByRepo:            scenario.mergedPRsByRepo,
 		ReviewsByPRNumber:          scenario.reviewsByPRNumber,
 		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
 		MockPreviousState:          previousState,
