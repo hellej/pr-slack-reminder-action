@@ -825,3 +825,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The click created a `review_requested` timeline event, `requested_reviewer: "hellej"`, so it fires the `pull_request: review_requested` trigger
 - The earlier review was `APPROVED` and the request was to oneself. Unverified whether either changes the result for a `CHANGES_REQUESTED` review by someone else
 - Not settled here: `GITHUB_TOKEN` against a `Team` node. The token used can read `Team.slug`
+
+## `assistant.threads.setStatus` works with only `chat:write` and shows a grey line under a channel message [2026-10-03]
+
+- Source: probe in `pr-reminders-test`, 2026-10-03, `.local/message-payloads/027_assistant_status_parent_payload.json`. The token's `x-oauth-scopes` from `auth.test`: `chat:write,users:read,users:read.email,channels:read,groups:read,canvases:write`, no `assistant:write`
+- Body `{"channel_id", "thread_ts", "status"}`, `thread_ts` being an ordinary top-level bot message in a public channel, not an assistant thread. Returned `ok: true`
+- In the channel view it rendered directly under the parent message: the bot's avatar, then grey text
+- With `loading_messages: ["Counting PRs"]` also set, the line showed `Counting PRs`, not the `status` text
+- `status: ""` returned `ok: true`. Unverified: whether it cleared the line, and when the line expires on its own
+- Unverified: notifications, unread badges, and whether other channel members see the line
