@@ -188,9 +188,9 @@ Shared input, in order:
 
 1. **Config** (`internal/config/`): parses GitHub Action inputs via `INPUT_` prefix env vars
 2. **GitHub Client** (`internal/apiclients/githubclient/`): fetches PR data and reviews, applies filtering
-3. **PR View** (`internal/prview/`): enriches PRs with Slack user mappings and display metadata
+3. **PR View** (`internal/prview/`): enriches PRs with Slack user mappings and display metadata, and provides the models and helpers both tracks share, such as display texts and repository grouping
 
-Then two tracks, the message first. A failure in one doesn't skip the other:
+Then two tracks; channel message & canvas, the message first. A failure in one doesn't skip the other. In each, the content package decides which PR goes in which section, group and row, and in what order. The builder renders that as given, with no sorting, grouping or filtering:
 
 - Message track:
   1. **Message Content** (`internal/messagecontent/`): structures data for messaging
