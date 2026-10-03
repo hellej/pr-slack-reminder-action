@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 )
@@ -152,8 +153,17 @@ func logEnrichment(repository models.Repository, number int, node pullRequestNod
 		return
 	}
 	log.Printf(
-		"Found %d reviews, %d timeline comments and %d review threads for PR %v/%d, mergeable: %q",
+		"Found %d reviews, %d timeline comments and %d review threads for PR %v/%d, mergeable: %q, "+
+			"first ready for review: %s",
 		len(node.Reviews.Nodes), len(node.Comments.Nodes), len(node.ReviewThreads.Nodes),
-		repository, number, node.Mergeable,
+		repository, number, node.Mergeable, firstReadyForReviewLogText(node),
 	)
+}
+
+func firstReadyForReviewLogText(node pullRequestNode) string {
+	readyAt := firstReadyForReviewEventAt(node)
+	if readyAt == nil {
+		return "never"
+	}
+	return readyAt.Format(time.RFC3339)
 }
