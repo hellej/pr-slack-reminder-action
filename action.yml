@@ -68,6 +68,11 @@ inputs: {
     required: false,
     default: 'false',
   },
+  collapsed-pr-authors: {
+    description: 'Line break separated list of GitHub logins whose PRs collapse into one row of linked PR numbers per author, wherever 2 or more of them share a section. Set to "" to collapse nothing.',
+    required: false,
+    default: "dependabot[bot]\nrenovate[bot]",
+  },
   pr-tracker-canvas-link: {
     description: 'Link to a Slack canvas to keep updated with a live tracker of open, work-in-progress and recently merged PRs. Open the canvas in Slack → ⋮ → Copy link. Leave empty to disable (default).',
     required: false,

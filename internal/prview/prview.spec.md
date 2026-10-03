@@ -1,6 +1,6 @@
 # prview
 
-Enriches fetched PRs with display-ready metadata.
+Enriches fetched PRs with display-ready metadata, and owns the section model both content packages fill and both builders render.
 
 ## Behaviour
 
@@ -24,11 +24,20 @@ Enriches fetched PRs with display-ready metadata.
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
 - `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor` and `HasOutstandingChangesRequest` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
 - `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
+- `PRSection` is one section's rows: the flat `Rows`, or `Groups` of `RepositoryRows` (a `models.Repository` and its `Rows`). `HasRows` reports whether either holds anything
+- `Row` is a sealed interface, implemented by `PR` and `CollapsedRow` only, so a renderer's type switch covers every row kind
+- `CollapsedRow` holds the PRs of one author, `AuthorLogin`. `GetAuthorLabel()` is that login without a trailing `[bot]`; a `[bot]` anywhere else stays
+- `RowsCollapsingAuthors(prs, collapsedPRAuthors)` turns PRs into rows:
+  - an author in `collapsedPRAuthors` with at least `MinPRsToCollapse` (2) of the given PRs gets one `CollapsedRow`; a lone PR by such an author stays a `PR` row
+  - first every PR not collapsed, in the given order, then the collapsed rows, in `collapsedPRAuthors` order. Each collapsed row keeps the given order of its PRs
+  - logins match exactly, case included, and an author listed twice still gets one row
+  - it reads only the PRs it is given, so a caller collapsing per repository group gets a per group threshold
 
 ## Doesn't Do
 
 - Doesn't validate that mapped Slack user IDs are well-formed
 - Doesn't handle a creation time in the future: the age text goes negative, e.g. "-30 minutes"
+- `RowsCollapsingAuthors` doesn't skip an empty login: given `""`, it collapses PRs whose author GitHub no longer reports. [internal/config](../config/config.spec.md) drops empty items before they get here
 
 ## Oddities
 

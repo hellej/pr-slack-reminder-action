@@ -14,11 +14,12 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 - A zero `messagePostedAt` means no message is posted yet, so every untracked merge counts against the cap
 - A tracked PR is recognised by its `models.PullRequestRef`, from `prview.PR.GetPullRequestRef()` rather than through `state`
 - Closed-but-not-merged `trackedPRs` reach no section
-- Each section is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order. This package adds each bucket's repository name, without its owner, and its pulls page URL
-- `SummaryText`, Slack's plain-text fallback, reports the open PR count (singular phrasing for exactly 1), or is `"Nothing waiting for review 🎉"` when no open PR is listed. It is never empty
+- Each section is a `prview.PRSection`. It is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order
+- Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingAuthors` with `CollapsedPRAuthors`, so collapsing runs after every sort, cap and bucket. When grouped, the 2 PR threshold counts within one repository
+- `SummaryText`, Slack's plain-text fallback, reports the open PR count, collapsed PRs included, with singular phrasing for exactly 1, or is `"Nothing waiting for review 🎉"` when no open PR is listed. It is never empty
 - `NoOpenPRsText` carries the configured `no-prs-message`, set only when no open PR is listed
 - `GeneratedAt` carries the run timestamp through for the footer
-- `Content.HasPRs()` reports whether any of the four sections has a PR; `PRSection.HasPRs()` reports it for one
+- `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included
 
 ## Doesn't Do
 
@@ -27,5 +28,5 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 
 ## Oddities
 
-- A `PRSection` fills `PRs` or `Groups`, never both, so a reader has to know which by `Content.GroupedByRepository`
+- A section fills `Rows` or `Groups`, never both, so a reader has to know which by `Content.GroupedByRepository`
 - A merged PR with no merge timestamp sorts last among the merged rows, since an unknown time reads as unknown rather than old. It counts as merged before the post

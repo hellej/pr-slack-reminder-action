@@ -18,36 +18,20 @@ const MaxUntrackedPRsMergedBeforePost = 3
 
 const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
 
-// One message section's PRs, either as the flat list or as repository buckets.
-type PRSection struct {
-	PRs    []prview.PR
-	Groups []PRsOfRepository
-}
-
-func (section PRSection) HasPRs() bool {
-	return len(section.PRs) > 0 || len(section.Groups) > 0
-}
-
-type PRsOfRepository struct {
-	RepositoryName     string
-	RepositoryPullsURL string
-	PRs                []prview.PR
-}
-
 type Content struct {
 	SummaryText         string
-	ReadyToMerge        PRSection
-	WaitingForAuthor    PRSection
-	WaitingForReview    PRSection
-	Merged              PRSection
+	ReadyToMerge        prview.PRSection
+	WaitingForAuthor    prview.PRSection
+	WaitingForReview    prview.PRSection
+	Merged              prview.PRSection
 	NoOpenPRsText       string
 	GeneratedAt         time.Time
 	GroupedByRepository bool
 }
 
 func (c Content) HasPRs() bool {
-	return c.ReadyToMerge.HasPRs() || c.WaitingForAuthor.HasPRs() ||
-		c.WaitingForReview.HasPRs() || c.Merged.HasPRs()
+	return c.ReadyToMerge.HasRows() || c.WaitingForAuthor.HasRows() ||
+		c.WaitingForReview.HasRows() || c.Merged.HasRows()
 }
 
 // See messagecontent.spec.md for this function's full behaviour.
@@ -71,15 +55,14 @@ func GetContent(
 		len(readyToMerge), len(waitingForAuthor), len(waitingForReview), len(mergedPRs),
 	)
 
-	groupByRepository := contentInputs.GroupByRepository
 	content := Content{
 		SummaryText:         getSummaryText(len(sortedOpenPRs)),
-		ReadyToMerge:        newPRSection(readyToMerge, groupByRepository),
-		WaitingForAuthor:    newPRSection(waitingForAuthor, groupByRepository),
-		WaitingForReview:    newPRSection(waitingForReview, groupByRepository),
-		Merged:              newPRSection(mergedPRs, groupByRepository),
+		ReadyToMerge:        newPRSection(readyToMerge, contentInputs),
+		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
+		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
+		Merged:              newPRSection(mergedPRs, contentInputs),
 		GeneratedAt:         generatedAt,
-		GroupedByRepository: groupByRepository,
+		GroupedByRepository: contentInputs.GroupByRepository,
 	}
 	if len(sortedOpenPRs) == 0 {
 		content.NoOpenPRsText = contentInputs.NoPRsMessage
@@ -125,18 +108,17 @@ func prsWhoseNextActionIs(
 	})
 }
 
-func newPRSection(sortedPRs []prview.PR, groupByRepository bool) PRSection {
-	if !groupByRepository {
-		return PRSection{PRs: sortedPRs}
+func newPRSection(sortedPRs []prview.PR, contentInputs config.ContentInputs) prview.PRSection {
+	if !contentInputs.GroupByRepository {
+		return prview.PRSection{Rows: prview.RowsCollapsingAuthors(sortedPRs, contentInputs.CollapsedPRAuthors)}
 	}
-	return PRSection{
+	return prview.PRSection{
 		Groups: utilities.Map(
 			prview.GroupPRsByRepositoriesInGivenOrder(sortedPRs),
-			func(group prview.RepositoryPRs) PRsOfRepository {
-				return PRsOfRepository{
-					RepositoryName:     group.Repository.Name,
-					RepositoryPullsURL: group.Repository.GetPullsURL(),
-					PRs:                group.PRs,
+			func(group prview.RepositoryPRs) prview.RepositoryRows {
+				return prview.RepositoryRows{
+					Repository: group.Repository,
+					Rows:       prview.RowsCollapsingAuthors(group.PRs, contentInputs.CollapsedPRAuthors),
 				}
 			},
 		),

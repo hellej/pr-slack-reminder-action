@@ -38,6 +38,7 @@ type GetTestPROptions struct {
 	HTMLURL        string // left unset by default
 	AuthorLogin    string
 	AuthorName     string
+	AuthorType     string // "Bot" for a GitHub App; left unset, the author is a "User"
 	Labels         []string
 	AgeHours       float32
 	Draft          *bool  // nil means unset, github.Ptr(true) means draft, github.Ptr(false) means not draft
@@ -95,6 +96,7 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 		User: &github.User{
 			Login: &authorLogin,
 			Name:  &authorName,
+			Type:  &options.AuthorType,
 		},
 		Labels:    githubLabels,
 		CreatedAt: &github.Timestamp{Time: prTime},

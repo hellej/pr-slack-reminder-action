@@ -1,0 +1,319 @@
+[
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "✅ Ready to merge",
+      "emoji": true
+    },
+    "block_id": "heading_ready_to_merge",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_ready_to_merge",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/55",
+                "text": "Bump dependency 55",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 2 days ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "dependabot[bot]",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/14",
+                "text": "Cache the session lookups",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 20 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "👀 Waiting for review",
+      "emoji": true
+    },
+    "block_id": "heading_waiting_for_review",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/12",
+                "text": "Fix login redirect",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 3 days ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "🤖 dependabot: ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/103",
+                "text": "#103",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/infra/pull/7",
+                "text": "#7",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/infra/pull/6",
+                "text": "#6",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "🤖 renovate: ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/88",
+                "text": "#88",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/90",
+                "text": "#90",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "🚀 Recently merged",
+      "emoji": true
+    },
+    "block_id": "heading_merged",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_merged",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/infra/pull/20",
+                "text": "Add canvas footer",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " merged 2 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "🤖 dependabot: ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/98",
+                "text": "#98",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pull/97",
+                "text": "#97",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  }
+]
