@@ -834,3 +834,42 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - With `loading_messages: ["Counting PRs"]` also set, the line showed `Counting PRs`, not the `status` text
 - `status: ""` returned `ok: true`. Unverified: whether it cleared the line, and when the line expires on its own
 - Unverified: notifications, unread badges, and whether other channel members see the line
+
+## `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only [2026-10-03]
+
+- Source: [schema](https://docs.github.com/public/fpt/schema.docs.graphql) for the arguments; `gh api graphql` against public repositories for the rest, 2026-10-03
+- `PullRequest.timelineItems` takes `first`, `last`, `after`, `before`, `skip`, `since` and `itemTypes: [PullRequestTimelineItemsItemType!]`. `READY_FOR_REVIEW_EVENT` and `CONVERT_TO_DRAFT_EVENT` are values of that enum
+- No doc states the order. Measured oldest first:
+  - `microsoft/vscode#288294`, filtered on both draft event types: ready, convert, ready, convert, in time order
+  - On `microsoft/vscode#339433` and `#339384`, `first: 1` returned an earlier event than `last: 1`
+- No doc says the filter runs before paging. Measured: on `kubernetes/kubernetes#141745` (152 timeline items) and `#141020` (144), the ready event sits past the first 100 unfiltered items, and the filtered `first: 1` still returned it
+- `totalCount` ignores `itemTypes`: a filtered connection with no nodes still reported the unfiltered count. Read `nodes`, or `filteredCount`
+
+## GitHub records a `ReadyForReviewEvent` on each draft-to-ready switch, never when a PR is opened as non-draft [2026-10-03]
+
+- Source: `gh api graphql`, 2026-10-03. No doc states either way ([issue event types](https://docs.github.com/en/rest/using-the-rest-api/issue-event-types) only says "The pull request was marked as ready for review.")
+- `kubernetes/kubernetes#142646`, `#142645`, `#142642`, `#142638`: `isDraft: false`, no ready or convert events
+- `microsoft/vscode#288294` holds two ready events, and is `isDraft: true` now: a re-drafted PR keeps its earlier events
+- `ReadyForReviewEvent.createdAt` is `DateTime!`; its `actor` is nullable ([schema](https://docs.github.com/public/fpt/schema.docs.graphql))
+- Unverified: PRs from before drafts existed, and an `isDraft: false` PR that started as a draft but carries no event
+
+## A filtered `timelineItems(first: 1)` on 25 aliased PRs leaves the GraphQL cost at 1 [2026-10-03]
+
+- Source: [rate limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api); `gh api graphql` on `kubernetes/kubernetes`, 2026-10-03
+- By the formula: 25 PRs × `first: 1` is 25 requests, 0.25 points
+- Measured: 25 open PRs with `reviews`, `comments` and `reviewThreads` at `first: 100` cost 1, and adding the filtered connection kept it at 1
+- Unverified: the token permission. The REST timeline endpoint takes Issues read or Pull requests read ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)). See § No GitHub page documents the token permission for any GraphQL field
+
+## A message with `blocks` shows its top-level `text` only in notifications [2026-10-03]
+
+- Source: [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage) `text` argument; [chat.update](https://docs.slack.dev/reference/methods/chat.update); slack-go v0.29.0 `chat.go` `MsgOptionText`
+- `chat.update`: Slack renders `blocks` and uses `text` "only for notifications"
+- slack-go sets `text` through `MsgOptionText`, apart from `MsgOptionBlocks`
+- Unverified: which field feeds the channel list or unread preview, and whether a `chat.update` that changes `text` notifies anyone
+
+## GitHub App bot logins end in `[bot]`, and GraphQL drops the suffix [2026-10-03]
+
+- Source: `gh api 'users/dependabot[bot]'` and `gh api 'users/renovate[bot]'`, 2026-10-03; `gh api graphql` on `hellej/pr-slack-reminder-test-repo-1` PRs #31 and #32
+- REST returns `login: "dependabot[bot]"` and `login: "renovate[bot]"`, both `type: "Bot"`
+- GraphQL returns a Dependabot PR's author as `{"__typename": "Bot", "login": "dependabot"}`, no suffix. `githubclient` appends it (`collaboratorFromAuthorNode`)
+- `renovate[bot]` is Mend's hosted app. A self-hosted Renovate posts under whatever account runs it
