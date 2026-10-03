@@ -58,9 +58,13 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
 	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
 	prWithUnknownCreationTime := testPR(4, time.Time{}, now.Add(-1*time.Hour))
+	prWithUnknownCreationTimeMarkedReadyRecently := testPR(5, time.Time{}, now.Add(-1*time.Hour))
+	prWithUnknownCreationTimeMarkedReadyRecently.FirstReadyForReviewEventAt = timePointer(now.Add(-1 * time.Hour))
 
 	prViews := prview.BuildPRViews(
-		[]githubclient.PR{pr1, pr3, pr2, prWithUnknownCreationTime},
+		[]githubclient.PR{
+			pr1, pr3, pr2, prWithUnknownCreationTime, prWithUnknownCreationTimeMarkedReadyRecently,
+		},
 		config.ContentInputs{OldPRThresholdHours: 35},
 	)
 
@@ -68,7 +72,7 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 		return pr.IsOldPR
 	}
 
-	want := []bool{false, false, true, true}
+	want := []bool{false, false, true, true, false}
 	got := utilities.Map(prViews, isOld)
 
 	if !slices.Equal(got, want) {
@@ -93,11 +97,14 @@ func TestSortPRsOldestToNewest(t *testing.T) {
 	}
 }
 
-func TestSortPRsOldestToNewestBreaksCreatedAtTiesByUpdatedAt(t *testing.T) {
+// Creation order runs opposite to update order, so a tie-break on creation time fails.
+func TestSortPRsOldestToNewestBreaksReadyForReviewTiesByUpdatedAt(t *testing.T) {
 	now := time.Now()
-	sameCreatedAt := now.Add(-24 * time.Hour)
-	updatedLater := testPRView(1, sameCreatedAt, now.Add(-1*time.Hour))
-	updatedEarlier := testPRView(2, sameCreatedAt, now.Add(-2*time.Hour))
+	sameReadyForReviewAt := now.Add(-24 * time.Hour)
+	updatedLater := testPRView(1, now.Add(-48*time.Hour), now.Add(-1*time.Hour))
+	updatedLater.FirstReadyForReviewEventAt = &sameReadyForReviewAt
+	updatedEarlier := testPRView(2, now.Add(-30*time.Hour), now.Add(-2*time.Hour))
+	updatedEarlier.FirstReadyForReviewEventAt = &sameReadyForReviewAt
 
 	result := prview.SortPRsOldestToNewest(
 		[]prview.PR{updatedLater, updatedEarlier},

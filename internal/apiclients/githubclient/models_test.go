@@ -86,6 +86,44 @@ func TestPullRequestGetters(t *testing.T) {
 	}
 }
 
+func TestPRReadyForReviewAt(t *testing.T) {
+	createdAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	firstReadyForReviewEventAt := time.Date(2026, 5, 4, 8, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		pr       PR
+		expected time.Time
+	}{
+		{
+			name: "PR marked ready for review after it was created",
+			pr: PR{
+				PullRequest:                &PullRequest{CreatedAt: createdAt},
+				FirstReadyForReviewEventAt: &firstReadyForReviewEventAt,
+			},
+			expected: firstReadyForReviewEventAt,
+		},
+		{
+			name:     "PR with no ready-for-review event",
+			pr:       PR{PullRequest: &PullRequest{CreatedAt: createdAt}},
+			expected: createdAt,
+		},
+		{
+			name:     "nil pull request",
+			pr:       PR{},
+			expected: time.Time{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.pr.ReadyForReviewAt(); !got.Equal(tt.expected) {
+				t.Errorf("ReadyForReviewAt() = %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDeriveReviewers(t *testing.T) {
 	tests := []struct {
 		name                string

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v78/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
@@ -927,5 +928,39 @@ func TestMergedPRFetchFailureDoesNotFailACanvasDisabledRun(t *testing.T) {
 			"Expected the reminder message to be sent anyway, got %d PRs in it",
 			mockSlackAPI.SentMessage.Blocks.GetPRCount(),
 		)
+	}
+}
+
+// The canvas goldens set only CreatedAt, so they can't tell ready-for-review time from creation.
+func TestCanvasCountsOpenPRAgeFromTheReadyForReviewTime(t *testing.T) {
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+		config.InputOldPRThresholdHours: 12,
+	})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 1, Title: "Long-lived draft marked ready", AuthorLogin: "alice", AgeHours: 72,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 2, Title: "Never a draft", AuthorLogin: "bob", AgeHours: 48,
+				}),
+			},
+			FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{1: now.Add(-3 * time.Hour)},
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	markdown := mockSlackAPI.ReplacedCanvas.Markdown
+	assertCanvasContains(t, markdown, "Long-lived draft marked ready]", "_3 hours ago_", "🚨 `2 days old`")
+	assertCanvasDoesNotContain(t, markdown, "3 days")
+	if strings.Index(markdown, "Never a draft") > strings.Index(markdown, "Long-lived draft marked ready") {
+		t.Errorf("Expected the PR waiting longest for review first, got:\n%s", markdown)
 	}
 }

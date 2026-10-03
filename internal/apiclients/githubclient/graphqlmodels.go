@@ -64,6 +64,10 @@ type reviewRequestNode struct {
 	RequestedReviewer *authorNode `json:"requestedReviewer"`
 }
 
+type readyForReviewEventNode struct {
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type connection[T any] struct {
 	Nodes []T `json:"nodes"`
 }
@@ -86,6 +90,10 @@ type pullRequestNode struct {
 	Mergeable      string                        `json:"mergeable"`
 	ReviewThreads  connection[reviewThreadNode]  `json:"reviewThreads"`
 	ReviewRequests connection[reviewRequestNode] `json:"reviewRequests"`
+
+	// Holds the earliest event only, read with first: 1.
+	// See docs/third-party-facts.md § `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only
+	ReadyForReviewEvents connection[readyForReviewEventNode] `json:"timelineItems"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -179,7 +187,15 @@ func prWithReviewers(
 		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
 			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
 		),
+		FirstReadyForReviewEventAt: firstReadyForReviewEventAt(node),
 	}
+}
+
+func firstReadyForReviewEventAt(node pullRequestNode) *time.Time {
+	if len(node.ReadyForReviewEvents.Nodes) == 0 {
+		return nil
+	}
+	return &node.ReadyForReviewEvents.Nodes[0].CreatedAt
 }
 
 func hasThreadWaitingForPRAuthor(threads []reviewThreadNode, prAuthor Collaborator) bool {

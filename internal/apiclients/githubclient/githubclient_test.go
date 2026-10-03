@@ -894,3 +894,69 @@ func TestFindOpenPRsCarriesTheUpdateTimeThroughEnrichment(t *testing.T) {
 		t.Errorf("expected UpdatedAt %v, got %v", updatedAt, got)
 	}
 }
+
+func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
+	createdAt := time.Now().Add(-240 * time.Hour).UTC().Truncate(time.Second)
+	firstReadyForReviewEventAt := time.Now().Add(-48 * time.Hour).UTC().Truncate(time.Second)
+	repository := models.Repository{Owner: "o", Name: "repo"}
+
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{
+			makePRFixture(7, false, createdAt, createdAt),
+			makePRFixture(8, false, createdAt, createdAt),
+		},
+		FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{7: firstReadyForReviewEventAt},
+	})
+
+	fetches := []struct {
+		name  string
+		fetch func() ([]githubclient.PR, error)
+	}{
+		{
+			name: "FindOpenPRs",
+			fetch: func() ([]githubclient.PR, error) {
+				result, err := client.FindOpenPRs(
+					context.Background(), []models.Repository{repository}, noFilters,
+					githubclient.PRFetchOptions{},
+				)
+				return result.PRs, err
+			},
+		},
+		{
+			name: "GetPRs",
+			fetch: func() ([]githubclient.PR, error) {
+				return client.GetPRs(
+					context.Background(),
+					[]models.PullRequestRef{
+						{Repository: repository, Number: 7}, {Repository: repository, Number: 8},
+					},
+					noFilters,
+				)
+			},
+		},
+	}
+
+	for _, tt := range fetches {
+		t.Run(tt.name, func(t *testing.T) {
+			prs, err := tt.fetch()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			prByNumber := map[int]githubclient.PR{}
+			for _, pr := range prs {
+				prByNumber[pr.GetNumber()] = pr
+			}
+
+			markedReady := prByNumber[7].FirstReadyForReviewEventAt
+			if markedReady == nil || !markedReady.Equal(firstReadyForReviewEventAt) {
+				t.Errorf(
+					"PR 7 FirstReadyForReviewEventAt = %v, expected %v",
+					markedReady, firstReadyForReviewEventAt,
+				)
+			}
+			if neverMarkedReady := prByNumber[8].FirstReadyForReviewEventAt; neverMarkedReady != nil {
+				t.Errorf("PR 8 FirstReadyForReviewEventAt = %v, expected nil", *neverMarkedReady)
+			}
+		})
+	}
+}

@@ -36,6 +36,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
 		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
+		testReadyForReviewEventSelection,
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {

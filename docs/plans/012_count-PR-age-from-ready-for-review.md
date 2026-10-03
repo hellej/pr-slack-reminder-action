@@ -1,7 +1,7 @@
 # Count PR age from ready for review
 
 date: 2026-10-03
-status: draft
+status: implemented
 
 ## Requirements
 
@@ -32,7 +32,7 @@ Purpose: an age that counts draft time cries wolf, and a 🚨 that cries wolf tr
 - Display text is unchanged: "N days ago", or "N days old" with 🚨 past the threshold
 - `old-pr-threshold-hours` keeps its name and default. Its description in `action.yml` and README says the age counts from ready for review
 - No new action input or OAuth scope, and no permission beyond [Required Permissions](../../README.md#required-permissions), which already grants `pull-requests: read` and `issues: read`. The REST timeline endpoint takes either ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)); the GraphQL field's permission is undocumented, so Step 1's live check settles it
-- Query cost stays at 1 per 25-PR batch. See docs/third-party-facts.md § A filtered `timelineItems(first: 1)` on 25 aliased PRs leaves the GraphQL cost at 1
+- Query cost is unchanged: the enrichment query logged the same `rateLimit.cost`, about 1 per PR, with and without `timelineItems`. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
 - Rendered rows, for a PR created 10 days ago as a draft and marked ready 2 days ago, threshold 96 hours:
   - Before: `Add retries 🚨 10 days old by Alice`
   - After: `Add retries 2 days ago by Alice`
@@ -68,8 +68,10 @@ Non-breaking, minor: the age and 🚨 in every message and canvas change meaning
 ### Step 2: count age from it in `prview`
 
 - `prview`: `GetPRAgeText`, `isOlderThan` and `SortPRsOldestToNewest` read `ReadyForReviewAt()` instead of `GetCreatedAt()`. ~3 call sites, no new symbol
-- Existing fixtures set only `CreatedAt` and keep passing through the getter's fallback. No canvas golden changes
-- Snapshot tests in `cmd/pr-slack-reminder/main_test.go`: new case with a PR created past the threshold and marked ready inside it, plus a second PR whose creation and ready orders disagree. The message snapshot shows no 🚨 and the ready-time order
+- Existing fixtures set only `CreatedAt` and keep passing through the getter's fallback. No existing snapshot or canvas golden changes
+- Snapshot tests in `cmd/pr-slack-reminder/snapshot_test.go`: new case with a PR created past the threshold and marked ready inside it, plus a second PR whose creation and ready orders disagree. The message snapshot shows no 🚨 and the ready-time order
+- `cmd/pr-slack-reminder/canvas_test.go`: two PRs of the same shape on the canvas, asserting the age texts, the 🚨 and the row order. The canvas goldens can't tell the two times apart: `canvasbuilder`'s fixtures set only `CreatedAt`, and `IsOldPR` by hand
+- `prview_test.go`: two PRs tied on ready-for-review time but not on creation time still fall to the `UpdatedAt` tie-break, and the old-PR check's zero guard reads the ready-for-review time
 - `prview.spec.md`: age and old-PR flag read the ready-for-review time, in **Behaviour**, the **Doesn't Do** future-time entry and the zero-time oddity. New **Behaviour** entry for `SortPRsOldestToNewest`
 - `messagecontent.spec.md` and `canvascontent.spec.md`: "oldest" means by ready-for-review time
 

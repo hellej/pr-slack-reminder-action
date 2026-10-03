@@ -68,7 +68,7 @@ func (pr PR) GetNextAction() PRNextAction {
 }
 
 func (pr PR) GetPRAgeText() string {
-	return durationText(time.Since(pr.GetCreatedAt()))
+	return durationText(time.Since(pr.ReadyForReviewAt()))
 }
 
 func (pr PR) IsOpen() bool { return !pr.GetDraft() }
@@ -195,8 +195,8 @@ func SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR {
 
 func SortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
-		if !a.GetCreatedAt().Equal(b.GetCreatedAt()) {
-			return a.GetCreatedAt().Compare(b.GetCreatedAt())
+		if !a.ReadyForReviewAt().Equal(b.ReadyForReviewAt()) {
+			return a.ReadyForReviewAt().Compare(b.ReadyForReviewAt())
 		}
 		return a.GetUpdatedAt().Compare(b.GetUpdatedAt())
 	})
@@ -207,8 +207,8 @@ func isOlderThan(pr githubclient.PR, hours int) bool {
 	if hours == 0 {
 		return false
 	}
-	if pr.GetCreatedAt().IsZero() {
+	if pr.ReadyForReviewAt().IsZero() {
 		return true
 	}
-	return pr.GetCreatedAt().Before(time.Now().Add(-time.Duration(hours) * time.Hour))
+	return pr.ReadyForReviewAt().Before(time.Now().Add(-time.Duration(hours) * time.Hour))
 }

@@ -6,6 +6,7 @@ Enriches fetched PRs with display-ready metadata.
 
 - `BuildPRViews(prs, contentInputs)` returns PRs enriched for display, in the given order
 - Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
+- A PR's age counts from its ready-for-review time, `githubclient.PR.ReadyForReviewAt()`: its first switch from draft to ready, else its creation
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards
@@ -13,6 +14,7 @@ Enriches fetched PRs with display-ready metadata.
 - `IsActiveAsOf(asOf, threshold)` is true when `UpdatedAt` is within `threshold` of `asOf`, inclusive at the boundary. Callers give both, so a caller that can't read the clock passes `time.Now()` itself, and a canvas-generation timestamp stays reusable
 - `IsRecentlyUpdated` is `IsActiveAsOf(time.Now(), RecentActivityThreshold)`, for a caller that can read the wall clock directly. `RecentActivityThreshold` (24 hours) is exported so other packages bucket by the same boundary; it matches where `GetActivityText` flips from "updated" to "idle"
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
+- `SortPRsOldestToNewest(prs)` orders PRs by ready-for-review time, oldest first, a tie going to the earlier `UpdatedAt`. It sorts the given slice in place and returns it
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue; no reviewers yields no segments. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
 - `IsMerged` reports whether a PR was merged
@@ -28,7 +30,7 @@ Enriches fetched PRs with display-ready metadata.
 ## Doesn't Do
 
 - Doesn't validate that mapped Slack user IDs are well-formed
-- Doesn't handle a creation time in the future: the age text goes negative, e.g. "-30 minutes"
+- Doesn't handle a ready-for-review time in the future: the age text goes negative, e.g. "-30 minutes"
 
 ## Oddities
 
@@ -36,5 +38,5 @@ Enriches fetched PRs with display-ready metadata.
 - Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
-- A PR with a missing/zero creation timestamp counts as old whenever a threshold is set, whatever the threshold value
+- A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value
 - An old-PR threshold of 0 turns the check off instead of flagging every PR as old
