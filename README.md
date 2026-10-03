@@ -15,6 +15,12 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 </details>
 
+### What the times mean
+
+- Open PR, "3 days ago", or "5 days old" with 🚨 past `old-pr-threshold-hours`: time since the PR was first marked ready for review, or since it was opened if it was never a draft. A PR moved back to draft and marked ready again keeps its first time
+- WIP PR on the canvas, "updated 3 hours ago" or "idle 2 days": time since the PR's last update. "Idle" from a day onwards
+- Merged PR, "merged 2 days ago": time since the merge
+
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
@@ -178,7 +184,7 @@ jobs:
 | `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"ignored-authors": ["bot"]}`                                                                           |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`                                                                                      |
 | `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line: a run with no open PRs then still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
-| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
+| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 

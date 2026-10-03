@@ -22,7 +22,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - `COMMENTED` never counts: a comment review asks for nothing beyond its threads, which `HasThreadWaitingForAuthor` reads
   - Later reviews by the same user are not read, so a changes request followed by an approval still counts. The approval is the caller's to read, off `ApprovedByUsers`
   - A team request, or a requested reviewer GitHub reports as null, matches no review
-- Each returned PR carries `FirstReadyForReviewEventAt`, the time of its first switch from draft to ready for review, read off the earliest `ReadyForReviewEvent` in its timeline. Nil when there is none, which GitHub never records for a PR opened as non-draft. See docs/third-party-facts.md § GitHub records a `ReadyForReviewEvent` on each draft-to-ready switch, never when a PR is opened as non-draft
+- Each returned PR carries `FirstReadyForReviewEventAt`, the time of its first switch from draft to ready for review, read off the earliest `ReadyForReviewEvent` in its timeline. Nil when there is no such event. GitHub records none for a PR opened as non-draft. See docs/third-party-facts.md § GitHub records a `ReadyForReviewEvent` on each draft-to-ready switch, never when a PR is opened as non-draft
   - `PR.ReadyForReviewAt()` returns that time, else the creation time
 - The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
 - `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (6) the cap

@@ -99,7 +99,7 @@ type PR struct {
 	Conflicting               bool // cannot be merged as it stands
 	// A changes request by someone other than the author, whose reviewer is not requested again.
 	HasOutstandingChangesRequest bool
-	// Nil for a PR never switched from draft to ready, opened as non-draft included.
+	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
 	FirstReadyForReviewEventAt *time.Time
 }
 

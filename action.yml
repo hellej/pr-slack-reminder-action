@@ -59,7 +59,7 @@ inputs: {
     default: 'No open PRs - happy coding! 🎉',
   },
   old-pr-threshold-hours: {
-    description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text)',
+    description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft',
     required: false,
     default: '96',
   },
