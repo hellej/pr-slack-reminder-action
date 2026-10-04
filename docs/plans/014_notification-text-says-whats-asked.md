@@ -48,11 +48,17 @@ Sketches, with 2 PRs waiting for review, 1 ready to merge, 1 waiting for author:
 
 - `internal/messagecontent/`: `getSummaryText` takes the ready to merge, waiting for author and waiting for review counts from `GetContent`'s buckets
   - The `.state.json` goldens and `main_test.go` expectations are the test: they already hold all three buckets, review and merge alone, and review alone
-  - `TestGetContentSummaryAndNoOpenPRsText`: reword the existing cases, and add two: review and author but no merge, so an empty middle part is left out; merge and author but no review, so the noun moves to whichever part comes first
+  - `TestGetContentSummaryAndNoOpenPRsText` adds no case a golden already pins, beyond the reworded existing ones:
+    - The one open PR case, reworded to one waiting for review. The two open PRs case goes: the goldens pin plural counts
+    - Review and author but no merge, so an empty middle part is left out, with a singular first part and a plural later part
+    - Merge and author but no review, so the noun moves to whichever part comes first
+    - Only waiting for author
+    - The two no-open-PR cases, unchanged
 - `messagecontent.spec.md` § Behaviour: rewrite the `SummaryText` bullet
-- `cmd/pr-slack-reminder/main_test.go`: ~20 `expectedSummary` and saved-state expectations change to the new wording
-- Re-record the ~11 `.state.json` snapshots holding `summaryText` with `make update-test-snapshots`, reading the diff first
-- `internal/messagebuilder/` tests: reword the `SummaryText` fixture to the new wording, ~2 places
+- `cmd/pr-slack-reminder/main_test.go`: 14 `expectedSummary` and 1 saved-state expectation change to the new wording
+  - The 4 seeded old-wording summaries stay: they stand for a message an earlier run wrote, which the mark-as-stale edit keeps
+- Re-record the 15 `.state.json` snapshots holding `summaryText` with `make update-test-snapshots`, reading the diff first. Only their `summaryText` lines change
+- `internal/messagebuilder/` tests: reword the `SummaryText` fixture to the new wording, 2 places, matching its one PR waiting for review
 - No live check: the path from `SummaryText` to Slack's `text` is unchanged. The PR's E2E runs post and update with the new text
 
 ## Consequences

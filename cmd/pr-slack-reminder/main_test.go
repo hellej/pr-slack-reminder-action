@@ -379,14 +379,14 @@ func TestScenarios(t *testing.T) {
 			prs:               getTestPRs(GetTestPRsOptions{}).PRs,
 			issueServiceError: errors.New("error fetching timeline comments"),
 			expectedPRNumbers: getTestPRs(GetTestPRsOptions{}).PRNumbers,
-			expectedSummary:   "5 open PRs are waiting for attention 👀",
+			expectedSummary:   "5 PRs to review 👀",
 		},
 		{
 			name:              "minimal config with 5 PRs",
 			config:            testhelpers.GetDefaultConfigMinimal(),
 			prs:               getTestPRs(GetTestPRsOptions{}).PRs,
 			expectedPRNumbers: getTestPRs(GetTestPRsOptions{}).PRNumbers,
-			expectedSummary:   "5 open PRs are waiting for attention 👀",
+			expectedSummary:   "5 PRs to review 👀",
 		},
 		{
 			name:            "all PRs filtered out by labels (by inclusion)",
@@ -411,7 +411,7 @@ func TestScenarios(t *testing.T) {
 				getTestPR(GetTestPROptions{Number: 2, AuthorLogin: "bob", Title: "PR by Bob"}),
 			},
 			expectedPRNumbers: []int{2},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedSummary:   "1 PR to review 👀",
 		},
 		{
 			name:            "all PRs filtered out by users (by inclusion)",
@@ -436,7 +436,7 @@ func TestScenarios(t *testing.T) {
 				getTestPR(GetTestPROptions{Number: 3, Title: "Unset draft PR", AuthorLogin: "charlie", Draft: nil}),
 			},
 			expectedPRNumbers: []int{1, 3}, // draft PR should be excluded, nil should be included
-			expectedSummary:   "2 open PRs are waiting for attention 👀",
+			expectedSummary:   "2 PRs to review 👀",
 		},
 		{
 			name:   "all PRs filtered out when all are drafts",
@@ -463,7 +463,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{2},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedSummary:   "1 PR to review 👀",
 		},
 		{
 			name:   "PRs by user in one repo filtered by repository filter using full owner/repo reference",
@@ -481,7 +481,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{2},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedSummary:   "1 PR to review 👀",
 		},
 		{
 			name:   "PRs not filtered out from repo2 by overriding global filters with empty repository filters for repo2",
@@ -500,7 +500,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{2},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedSummary:   "1 PR to review 👀",
 		},
 		{
 			name:   "full config with 5 PRs including old PRs",
@@ -518,7 +518,7 @@ func TestScenarios(t *testing.T) {
 				"This PR is getting old and needs attention 🚨 1 day old by U3234567890",
 				"This is a big PR that no one dares to review 🚨 2 days old by Jim",
 			},
-			expectedSummary: "5 open PRs are waiting for attention 👀",
+			expectedSummary: "5 PRs to review 👀",
 		},
 		{
 			name:   "old PR highlighting with alarm emojis",
@@ -545,7 +545,7 @@ func TestScenarios(t *testing.T) {
 				"Recent PR 2 hours ago by Alice",
 				"Old PR needs attention 🚨 2 days old by Bob",
 			},
-			expectedSummary: "2 open PRs are waiting for attention 👀",
+			expectedSummary: "2 PRs to review 👀",
 		},
 		{
 			name:   "5 PRs of which some are approved and some are commented",
@@ -606,7 +606,7 @@ func TestScenarios(t *testing.T) {
 					mockgithubclient.NewReview("reviewer2", "", "APPROVED"), // duplicate approval by reviewer2 should be omitted
 				},
 			},
-			expectedSummary: "4 open PRs are waiting for attention 👀",
+			expectedSummary: "2 PRs to review, 2 to merge 👀",
 		},
 		{
 			name:   "group by repository with single repo",
@@ -619,7 +619,7 @@ func TestScenarios(t *testing.T) {
 				getTestPR(GetTestPROptions{Number: 2, Title: "PR 2", AuthorLogin: "bob"}),
 			},
 			expectedPRNumbers: []int{1, 2},
-			expectedSummary:   "2 open PRs are waiting for attention 👀",
+			expectedSummary:   "2 PRs to review 👀",
 			expectedHeadings:  []string{"test-repo"},
 		},
 		{
@@ -639,7 +639,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{1, 2, 3},
-			expectedSummary:   "3 open PRs are waiting for attention 👀",
+			expectedSummary:   "3 PRs to review 👀",
 			expectedHeadings:  []string{"repo1", "repo2"},
 		},
 		{
@@ -657,7 +657,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{1},
-			expectedSummary:   "1 open PR is waiting for attention 👀",
+			expectedSummary:   "1 PR to review 👀",
 			expectedPRItemTexts: []string{
 				"PR with bot and human reviewers 5 hours ago by Alice (💬 Human Reviewer)",
 			},
@@ -676,7 +676,7 @@ func TestScenarios(t *testing.T) {
 				},
 			},
 			expectedPRNumbers: []int{1, 3},
-			expectedSummary:   "2 open PRs are waiting for attention 👀",
+			expectedSummary:   "2 PRs to review 👀",
 		},
 	}
 
@@ -1086,7 +1086,7 @@ func assertNewPostStateSaved(t *testing.T, stateFilePath string) {
 	if savedState.MessageRef != expectedMessageRef {
 		t.Errorf("Expected the new message ref %+v, got %+v", expectedMessageRef, savedState.MessageRef)
 	}
-	if savedState.LastWrittenMessage.SummaryText != "1 open PR is waiting for attention 👀" {
+	if savedState.LastWrittenMessage.SummaryText != "1 PR to review 👀" {
 		t.Errorf("Expected the new message's summary text, got %q", savedState.LastWrittenMessage.SummaryText)
 	}
 }

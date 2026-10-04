@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
@@ -56,7 +57,7 @@ func GetContent(
 	)
 
 	content := Content{
-		SummaryText:         getSummaryText(len(sortedOpenPRs)),
+		SummaryText:         getSummaryText(len(waitingForReview), len(readyToMerge), len(waitingForAuthor)),
 		ReadyToMerge:        newPRSection(readyToMerge, contentInputs),
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
@@ -125,13 +126,31 @@ func newPRSection(sortedPRs []prview.PR, contentInputs config.ContentInputs) prv
 	}
 }
 
-func getSummaryText(openPRCount int) string {
-	switch openPRCount {
-	case 0:
+type summaryPart struct {
+	prCount    int
+	nextAction string
+}
+
+func getSummaryText(waitingForReviewCount, readyToMergeCount, waitingForAuthorCount int) string {
+	nonEmptyParts := utilities.Filter([]summaryPart{
+		{prCount: waitingForReviewCount, nextAction: "to review"},
+		{prCount: readyToMergeCount, nextAction: "to merge"},
+		{prCount: waitingForAuthorCount, nextAction: "waiting for author"},
+	}, func(part summaryPart) bool { return part.prCount > 0 })
+	if len(nonEmptyParts) == 0 {
 		return noOpenPRsSummaryText
-	case 1:
-		return "1 open PR is waiting for attention 👀"
-	default:
-		return fmt.Sprintf("%d open PRs are waiting for attention 👀", openPRCount)
 	}
+	first := nonEmptyParts[0]
+	firstPartText := fmt.Sprintf("%d %s %s", first.prCount, prNoun(first.prCount), first.nextAction)
+	laterPartTexts := utilities.Map(nonEmptyParts[1:], func(part summaryPart) string {
+		return fmt.Sprintf("%d %s", part.prCount, part.nextAction)
+	})
+	return strings.Join(slices.Concat([]string{firstPartText}, laterPartTexts), ", ") + " 👀"
+}
+
+func prNoun(prCount int) string {
+	if prCount == 1 {
+		return "PR"
+	}
+	return "PRs"
 }

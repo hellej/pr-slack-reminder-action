@@ -197,6 +197,18 @@ func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {
 	}
 }
 
+func waitingForReviewPR(number int) prview.PR {
+	return testPR(testPROptions{number: number})
+}
+
+func readyToMergePR(number int) prview.PR {
+	return testPR(testPROptions{number: number, approvers: []string{"dana"}})
+}
+
+func waitingForAuthorPR(number int) prview.PR {
+	return testPR(testPROptions{number: number, hasOutstandingChangesRequest: true})
+}
+
 func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 	testCases := []struct {
 		name              string
@@ -206,16 +218,26 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 		expectedNoOpenPRs string
 	}{
 		{
-			name:            "one open PR",
-			openPRs:         []prview.PR{testPR(testPROptions{number: 1})},
-			expectedSummary: "1 open PR is waiting for attention 👀",
+			name:            "one waiting for review",
+			openPRs:         []prview.PR{waitingForReviewPR(1)},
+			expectedSummary: "1 PR to review 👀",
 		},
 		{
-			name: "two open PRs",
+			name:            "review and author but no merge: singular noun first, plural later part",
+			openPRs:         []prview.PR{waitingForAuthorPR(1), waitingForReviewPR(2), waitingForAuthorPR(3)},
+			expectedSummary: "1 PR to review, 2 waiting for author 👀",
+		},
+		{
+			name: "merge and author but no review: the noun moves to the merge part",
 			openPRs: []prview.PR{
-				testPR(testPROptions{number: 1}), testPR(testPROptions{number: 2}),
+				waitingForAuthorPR(1), waitingForAuthorPR(2), readyToMergePR(3), waitingForAuthorPR(4),
 			},
-			expectedSummary: "2 open PRs are waiting for attention 👀",
+			expectedSummary: "1 PR to merge, 3 waiting for author 👀",
+		},
+		{
+			name:            "only waiting for author",
+			openPRs:         []prview.PR{waitingForAuthorPR(1)},
+			expectedSummary: "1 PR waiting for author 👀",
 		},
 		{
 			name:              "only merged PRs",
