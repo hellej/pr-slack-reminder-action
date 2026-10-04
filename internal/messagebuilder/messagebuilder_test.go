@@ -116,7 +116,7 @@ func rowElements(t *testing.T, element slack.RichTextElement, index int) []slack
 
 func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 	message, summaryText := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		SummaryText:      "2 open PRs are waiting for attention 👀",
+		SummaryText:      "1 PR to review 👀",
 		WaitingForReview: prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "Open PR"})}},
 		Merged: prview.PRSection{
 			Rows: []prview.Row{testPR(testPROptions{title: "Merged PR", mergedAt: &generatedAt})},
@@ -133,7 +133,7 @@ func TestEachNonEmptySectionIsAHeaderBlockAndARichTextBlock(t *testing.T) {
 			t.Errorf("expected one list in an ungrouped section block, got %d elements", len(elements))
 		}
 	}
-	if summaryText != "2 open PRs are waiting for attention 👀" {
+	if summaryText != "1 PR to review 👀" {
 		t.Errorf("expected the summary text as the fallback, got %q", summaryText)
 	}
 }
