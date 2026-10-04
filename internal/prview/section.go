@@ -48,7 +48,7 @@ func (row CollapsedRow) GetAuthorLabel() string {
 }
 
 // See prview.spec.md § Behaviour for the rule.
-func RowsCollapsingAuthors(prs []PR, collapsePRsFromAuthors []string) []Row {
+func RowsCollapsingPRsFromAuthors(prs []PR, collapsePRsFromAuthors []string) []Row {
 	authorsToCollapse := utilities.UniqueFunc(collapsePRsFromAuthors, func(a, b string) bool { return a == b })
 	collapsedRows := utilities.Filter(
 		utilities.Map(authorsToCollapse, func(author string) CollapsedRow {

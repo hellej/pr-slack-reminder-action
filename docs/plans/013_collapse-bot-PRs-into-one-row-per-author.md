@@ -32,7 +32,7 @@ Purpose: the reference deployment has 0 to 8 open PRs, so a 5 PR batch can be mo
   - `Row`: a sealed interface, implemented by `PR` and `CollapsedRow`. Builders type-switch on it
   - `CollapsedRow{AuthorLogin, PRs}`, with `GetAuthorLabel()`: the login without a trailing `[bot]`, and `GetSearchURL()`: a GitHub PR search for the author's open or merged PRs, per step 5
   - `PRSection{Rows, Groups}` and `RepositoryRows{Repository, Rows}`, replacing `messagecontent.PRSection`, `messagecontent.PRsOfRepository` and `canvascontent.PRSection`. A section fills `Rows` or `Groups`, never both, as today
-  - `RowsCollapsingAuthors(prs, collapsePRsFromAuthors) []Row`: every PR not collapsed, in the given order, then one `CollapsedRow` per author with at least `MinPRsToCollapse` (2) PRs, in `collapsePRsFromAuthors` order. Each `CollapsedRow` keeps the given order of its PRs
+  - `RowsCollapsingPRsFromAuthors(prs, collapsePRsFromAuthors) []Row`: every PR not collapsed, in the given order, then one `CollapsedRow` per author with at least `MinPRsToCollapse` (2) PRs, in `collapsePRsFromAuthors` order. Each `CollapsedRow` keeps the given order of its PRs
 - `prview.RepositoryPRs` and `GroupPRsByRepositoriesInGivenOrder` stay: content packages group PRs first, then turn each group's PRs into rows
 - `messagebuilder` takes the repository name and pulls URL off `RepositoryRows.Repository`, as `canvasbuilder` already does
 
@@ -116,9 +116,9 @@ Non-breaking: minor. A new optional input, and a layout change with no config ch
 
 ### 2: collapsing in `prview` and the content packages
 
-- `prview`: `CollapsedRow`, `GetAuthorLabel`, `MinPRsToCollapse` and `RowsCollapsingAuthors` per § Target Shape. A login listed twice in `collapsePRsFromAuthors` still gets one row
+- `prview`: `CollapsedRow`, `GetAuthorLabel`, `MinPRsToCollapse` and `RowsCollapsingPRsFromAuthors` per § Target Shape. A login listed twice in `collapsePRsFromAuthors` still gets one row
   - Package test for the rule: the 1 and 2 boundary, two authors in `collapsePRsFromAuthors` order, PRs of one author interleaved with others, exact login match, a login listed twice
-- `messagecontent` and `canvascontent`: `newPRSection` builds each flat section, or each repository group, through `RowsCollapsingAuthors`
+- `messagecontent` and `canvascontent`: `newPRSection` builds each flat section, or each repository group, through `RowsCollapsingPRsFromAuthors`
   - `canvascontent_test.go` pins the canvas wiring: an open, the WIP and the merged section collapse flat, and an open section collapses per repository group. `testhelpers.DescribeRows` renders rows as strings for these tests and the `prview` one. The message wiring is pinned by step 3's snapshots, which run the whole pipeline
 - Update `prview.spec.md`, `messagecontent.spec.md` and `canvascontent.spec.md`
 

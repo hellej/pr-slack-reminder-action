@@ -99,7 +99,7 @@ func prsWhoseNextActionIs(
 
 func newPRSection(sortedPRs []prview.PR, contentInputs config.ContentInputs) prview.PRSection {
 	if !contentInputs.GroupByRepository {
-		return prview.PRSection{Rows: prview.RowsCollapsingAuthors(sortedPRs, contentInputs.CollapsePRsFromAuthors)}
+		return prview.PRSection{Rows: prview.RowsCollapsingPRsFromAuthors(sortedPRs, contentInputs.CollapsePRsFromAuthors)}
 	}
 	return prview.PRSection{
 		Groups: utilities.Map(
@@ -107,7 +107,7 @@ func newPRSection(sortedPRs []prview.PR, contentInputs config.ContentInputs) prv
 			func(group prview.RepositoryPRs) prview.RepositoryRows {
 				return prview.RepositoryRows{
 					Repository: group.Repository,
-					Rows:       prview.RowsCollapsingAuthors(group.PRs, contentInputs.CollapsePRsFromAuthors),
+					Rows:       prview.RowsCollapsingPRsFromAuthors(group.PRs, contentInputs.CollapsePRsFromAuthors),
 				}
 			},
 		),

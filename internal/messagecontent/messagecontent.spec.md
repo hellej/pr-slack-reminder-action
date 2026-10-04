@@ -15,7 +15,7 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 - A tracked PR is recognised by its `models.PullRequestRef`, from `prview.PR.GetPullRequestRef()` rather than through `state`
 - Closed-but-not-merged `trackedPRs` reach no section
 - Each section is a `prview.PRSection`. It is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order
-- Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingAuthors` with `CollapsePRsFromAuthors`, so collapsing runs after every sort, cap and bucket. When grouped, the 2 PR threshold counts within one repository
+- Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingPRsFromAuthors` with `CollapsePRsFromAuthors`, so collapsing runs after every sort, cap and bucket. When grouped, the 2 PR threshold counts within one repository
 - `SummaryText`, Slack's plain-text fallback, reports the open PR count, collapsed PRs included, with singular phrasing for exactly 1, or is `"Nothing waiting for review 🎉"` when no open PR is listed. It is never empty
 - `NoOpenPRsText` carries the configured `no-prs-message`, set only when no open PR is listed
 - `GeneratedAt` carries the run timestamp through for the footer

@@ -34,7 +34,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
   - one repository: that repository's pulls page with `?q=<query>`
   - several: `https://github.com/search?type=pullrequests&q=<query>`, the query ending in one `repo:<owner>/<name>` per repository, in the row's order
   - the query is form-encoded: spaces as `+`, `:` and `/` escaped
-- `RowsCollapsingAuthors(prs, collapsePRsFromAuthors)` turns PRs into rows:
+- `RowsCollapsingPRsFromAuthors(prs, collapsePRsFromAuthors)` turns PRs into rows:
   - an author in `collapsePRsFromAuthors` with at least `MinPRsToCollapse` (2) of the given PRs gets one `CollapsedRow`; a lone PR by such an author stays a `PR` row
   - first every PR not collapsed, in the given order, then the collapsed rows, in `collapsePRsFromAuthors` order. Each collapsed row keeps the given order of its PRs
   - logins match exactly, case included, and an author listed twice still gets one row
@@ -45,7 +45,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Doesn't validate that mapped Slack user IDs are well-formed
 - Doesn't handle a ready-for-review time in the future: the age text goes negative, e.g. "-30 minutes"
 - The search URL doesn't follow the row's section: a row in one open section links to every open PR of that author in its repositories
-- `RowsCollapsingAuthors` doesn't skip an empty login: given `""`, it collapses PRs whose author GitHub no longer reports. [internal/config](../config/config.spec.md) drops empty items before they get here
+- `RowsCollapsingPRsFromAuthors` doesn't skip an empty login: given `""`, it collapses PRs whose author GitHub no longer reports. [internal/config](../config/config.spec.md) drops empty items before they get here
 
 ## Oddities
 

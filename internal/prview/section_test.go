@@ -21,7 +21,7 @@ func testPRByAuthor(number int, authorLogin string) prview.PR {
 	}
 }
 
-func TestRowsCollapsingAuthors(t *testing.T) {
+func TestRowsCollapsingPRsFromAuthors(t *testing.T) {
 	defaultAuthors := []string{"dependabot[bot]", "renovate[bot]"}
 
 	tests := []struct {
@@ -94,7 +94,7 @@ func TestRowsCollapsingAuthors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rows := prview.RowsCollapsingAuthors(tt.prs, tt.collapsePRsFromAuthors)
+			rows := prview.RowsCollapsingPRsFromAuthors(tt.prs, tt.collapsePRsFromAuthors)
 
 			if got := testhelpers.DescribeRows(rows); !slices.Equal(got, tt.expected) {
 				t.Errorf("expected rows %q, got %q", tt.expected, got)
