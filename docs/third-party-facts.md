@@ -52,8 +52,8 @@ date it was last checked. Re-checking an entry moves that date.
 - The 256 count the query text, excluding operators and qualifiers
 - At most five `AND`, `OR` or `NOT`
 - Bounds how many repositories one query string can name
-- Unverified: OR semantics for repeated `repo:` qualifiers, the alternative to one aliased
-  search per repository
+- Unverified for the API: OR semantics for repeated `repo:` qualifiers, the alternative to one aliased
+  search per repository. The web search ORs them: see § Repeated `repo:` qualifiers in a GitHub web search OR together
 
 ## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts [2026-08-22]
 
@@ -896,4 +896,10 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: [searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests), `author:app/USERNAME`
 - Matches issues and PRs created by the integration account `USERNAME`
-- Unverified: that `USERNAME` is the bot login without `[bot]`, e.g. `author:app/dependabot`. Plan 013 step 5's live check opens such a search
+- `USERNAME` is the bot login without `[bot]`: `author:app/dependabot` returns `dependabot[bot]` PRs (web search on `hellej/pr-slack-reminder-test-repo-1`, 2026-10-04)
+
+## Repeated `repo:` qualifiers in a GitHub web search OR together [2026-10-04]
+
+- Source: web search `is:pr author:app/dependabot repo:hellej/pr-slack-reminder-test-repo-1 repo:hellej/pr-slack-reminder-action`, 2026-10-04
+- It returned 85 PRs, the sum of each repository searched alone
+- Unverified for the REST and GraphQL `search`

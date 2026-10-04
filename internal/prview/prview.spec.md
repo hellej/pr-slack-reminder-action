@@ -51,7 +51,6 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 
 - `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
 - Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
-- Unverified: whether GitHub ORs the repeated `repo:` qualifiers of a spanning row's search URL. See docs/third-party-facts.md § A GitHub search query string is capped at 256 characters and five operators
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value

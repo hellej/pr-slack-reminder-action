@@ -155,7 +155,7 @@ Live feedback on the first version: a collapsed row reads plainer than the bold 
   - A row whose PRs are all in one repository: that repository's pulls URL with `?q=<query>`
   - A row spanning repositories: `https://github.com/search?type=pullrequests&q=<query>` with one `repo:<owner>/<name>` per repository, in the row's order
   - Query URL-encoded
-  - Unverified: whether repeated `repo:` qualifiers OR together. See docs/third-party-facts.md § A GitHub search query string is capped at 256 characters and five operators
+  - Repeated `repo:` qualifiers OR together: see docs/third-party-facts.md § Repeated `repo:` qualifiers in a GitHub web search OR together
 - The search cannot follow the message's buckets: a row in one open section links to every open PR of that author. Accepted: it reads as "this bot's PRs"
 - `prview.CollapsedRow` owns the search URL and the merged/open choice, derived from its PRs. Builders only render
 - Message: label link element with bold style, the `: ` and `" "` runs plain, each number a bold link element. Canvas: `- **[🤖 dependabot (14)](<search URL>)**: **[#3](…)** **[#4](…)**`, the label still through `escapeMarkdown`
