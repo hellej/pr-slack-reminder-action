@@ -6,7 +6,7 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 
 - `GetContent(openPRs, trackedPRs, recentlyMergedPRs, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
 - `openPRs` are open right now and already draft-filtered by the caller; `trackedPRs` are the PRs the message was posted with, as re-fetched, in whatever state they are now
-- Open sections: `openPRs` sorted oldest to newest, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
+- Open sections: `openPRs` sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest`, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
 - Merged section, ordered newest merge first:
   - every `trackedPRs` entry that has since merged, however long ago
   - every `recentlyMergedPRs` entry merged after `messagePostedAt`

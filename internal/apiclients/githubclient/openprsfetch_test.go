@@ -247,6 +247,7 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
 		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
+		testReadyForReviewEventSelection,
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {
@@ -569,5 +570,64 @@ func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
 		if !strings.Contains(logOutput.String(), expected) {
 			t.Errorf("log output is missing %q, got:\n%s", expected, logOutput.String())
 		}
+	}
+}
+
+func TestEnrichPRsLeavesAFailedPRReadyForReviewAtItsCreationTime(t *testing.T) {
+	createdAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{
+		1: {
+			errorType:    "NOT_FOUND",
+			errorPath:    []any{"pullRequest"},
+			errorMessage: "Could not resolve to a PullRequest with the number 1.",
+		},
+	}}
+	testClient := &client{graphql: graphqlClient{transport: transport}}
+	prResult := PRResult{
+		pr: &PullRequest{Number: 1, CreatedAt: createdAt}, repository: testRepositories[0],
+	}
+
+	prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), []PRResult{prResult})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prs[0].FirstReadyForReviewEventAt != nil {
+		t.Errorf("FirstReadyForReviewEventAt = %v, expected nil", *prs[0].FirstReadyForReviewEventAt)
+	}
+	if got := prs[0].ReadyForReviewAt(); !got.Equal(createdAt) {
+		t.Errorf("ReadyForReviewAt() = %v, expected the creation time %v", got, createdAt)
+	}
+}
+
+func TestLogEnrichmentPrintsTheFirstReadyForReviewEventTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		events   []readyForReviewEventNode
+		expected string
+	}{
+		{
+			name:     "PR marked ready for review",
+			events:   []readyForReviewEventNode{{CreatedAt: time.Date(2026, 5, 4, 8, 0, 0, 0, time.UTC)}},
+			expected: "first ready for review: 2026-05-04T08:00:00Z",
+		},
+		{
+			name:     "PR with no ready-for-review event",
+			expected: "first ready for review: never",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logOutput := captureLogOutput(t)
+			node := pullRequestNode{
+				ReadyForReviewEvents: connection[readyForReviewEventNode]{Nodes: tt.events},
+			}
+
+			logEnrichment(testRepositories[0], 1, node, nil)
+
+			if !strings.Contains(logOutput.String(), tt.expected) {
+				t.Errorf("log output is missing %q, got:\n%s", tt.expected, logOutput.String())
+			}
+		})
 	}
 }

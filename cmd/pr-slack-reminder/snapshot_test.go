@@ -136,6 +136,8 @@ type snapshotScenario struct {
 	mergedPRsByRepo            map[string][]*github.PullRequest
 	reviewsByPRNumber          map[int][]*github.PullRequestReview
 	timelineCommentsByPRNumber map[int][]*github.IssueComment
+
+	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 }
 
 // Dependabot and Renovate PRs over two repositories, collapsing or not by section and group:
@@ -311,6 +313,34 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
+			// Counting from creation would flag PR 61 old and list it first.
+			name: "PR marked ready for review long after it was created",
+			configOverrides: map[string]any{
+				config.InputOldPRThresholdHours: 12,
+			},
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number:      61,
+					Title:       "Long-lived draft marked ready for review recently",
+					HTMLURL:     "https://github.com/test-org/test-repo/pull/61",
+					AuthorLogin: "alice",
+					AuthorName:  "Alice Anderson",
+					Labels:      []string{"feature"},
+					AgeHours:    72,
+				}),
+				getTestPR(GetTestPROptions{
+					Number:      62,
+					Title:       "PR opened for review, never a draft",
+					HTMLURL:     "https://github.com/test-org/test-repo/pull/62",
+					AuthorLogin: "bob",
+					AuthorName:  "Bob Brown",
+					Labels:      []string{"fix"},
+					AgeHours:    48,
+				}),
+			},
+			firstReadyForReviewEventAtByPRNumber: map[int]time.Time{61: now.Add(-3 * time.Hour)},
+		},
+		{
 			name: "author mapped to a Slack user",
 			configOverrides: map[string]any{
 				config.InputSlackUserIdByGitHubUsername: map[string]string{"alice": "U2234567890"},
@@ -482,6 +512,8 @@ func runSnapshotScenario(
 		ReviewsByPRNumber:          scenario.reviewsByPRNumber,
 		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
 		MockPreviousState:          previousState,
+
+		FirstReadyForReviewEventAtByPRNumber: scenario.firstReadyForReviewEventAtByPRNumber,
 	})
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
 		PostMessageTimestamp: postedMessageTimestamp,

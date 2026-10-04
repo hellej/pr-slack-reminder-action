@@ -37,6 +37,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open PRs bucketed by whose turn it is, plus draft and recently merged PRs
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
+- PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
 - More customizable message content
 - Global and repository specific filters
@@ -180,7 +181,7 @@ jobs:
 | `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"ignored-authors": ["bot"]}`                                                                           |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`                                                                                      |
 | `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line: a run with no open PRs then still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
-| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`)                                                                               |
+| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `collapsed-pr-authors`              | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |

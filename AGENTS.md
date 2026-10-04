@@ -24,6 +24,13 @@ One known setup as an example. It's not the only supported one. Use it to weigh 
 - A daily scheduled `post` at 09:00, plus event-driven `update` runs on PR, review, comment and push events
 - The PR tracker canvas runs alongside the message as the persistent live view
 
+## GitHub API Budget
+
+- Target: a run over 20 open PRs costs at most 80 GraphQL points, so 60 runs an hour fit in a token's 5,000-point hourly limit
+  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
+- The limit is shared: `GITHUB_TOKEN`'s with the whole repository, a personal token's with everything its owner runs
+- A change to a GraphQL query compares `rateLimit.cost` in the Build E2E job log against the last run on `main`, and states the difference in its plan or PR
+
 ## Output Style
 
 Applies to all agent output: chat answers, docstrings, plans, and text written to project files (docs, plans, skills, AGENTS.md).
