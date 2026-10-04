@@ -891,3 +891,9 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - REST returns `login: "dependabot[bot]"` and `login: "renovate[bot]"`, both `type: "Bot"`
 - GraphQL returns a Dependabot PR's author as `{"__typename": "Bot", "login": "dependabot"}`, no suffix. `githubclient` appends it (`collaboratorFromAuthorNode`)
 - `renovate[bot]` is Mend's hosted app. A self-hosted Renovate posts under whatever account runs it
+
+## GitHub search matches PRs created by an app with `author:app/USERNAME` [2026-10-04]
+
+- Source: [searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests), `author:app/USERNAME`
+- Matches issues and PRs created by the integration account `USERNAME`
+- Unverified: that `USERNAME` is the bot login without `[bot]`, e.g. `author:app/dependabot`. Plan 013 step 5's live check opens such a search

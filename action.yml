@@ -68,7 +68,7 @@ inputs: {
     required: false,
     default: 'false',
   },
-  collapsed-pr-authors: {
+  collapse-prs-from-authors: {
     description: 'Line break separated list of GitHub logins whose PRs collapse into one row of linked PR numbers per author, wherever 2 or more of them share a section. Set to "" to collapse nothing.',
     required: false,
     default: "dependabot[bot]\nrenovate[bot]",

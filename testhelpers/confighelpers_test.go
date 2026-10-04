@@ -22,9 +22,9 @@ func TestSetTestEnvironmentAppliesGroupByRepository(t *testing.T) {
 	}
 }
 
-func TestSetTestEnvironmentAppliesCollapsedPRAuthors(t *testing.T) {
+func TestSetTestEnvironmentAppliesCollapsePRsFromAuthors(t *testing.T) {
 	testConfig := GetDefaultConfigFull()
-	testConfig.Config.ContentInputs.CollapsedPRAuthors = []string{"dependabot[bot]", "renovate[bot]"}
+	testConfig.Config.ContentInputs.CollapsePRsFromAuthors = []string{"dependabot[bot]", "renovate[bot]"}
 
 	SetTestEnvironment(t, testConfig, nil)
 
@@ -32,7 +32,7 @@ func TestSetTestEnvironmentAppliesCollapsedPRAuthors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetConfig() returned error: %v", err)
 	}
-	if !slices.Equal(parsedConfig.ContentInputs.CollapsedPRAuthors, []string{"dependabot[bot]", "renovate[bot]"}) {
-		t.Errorf("Expected both collapsed PR authors, got %q", parsedConfig.ContentInputs.CollapsedPRAuthors)
+	if !slices.Equal(parsedConfig.ContentInputs.CollapsePRsFromAuthors, []string{"dependabot[bot]", "renovate[bot]"}) {
+		t.Errorf("Expected both logins in CollapsePRsFromAuthors, got %q", parsedConfig.ContentInputs.CollapsePRsFromAuthors)
 	}
 }

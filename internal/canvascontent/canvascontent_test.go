@@ -705,7 +705,7 @@ func TestGetContentCollapsesFlatSections(t *testing.T) {
 	content := canvascontent.GetContent(
 		slices.Concat(collapsingTestPRs(), drafts),
 		mergedPRs,
-		config.ContentInputs{CollapsedPRAuthors: []string{"dependabot[bot]"}},
+		config.ContentInputs{CollapsePRsFromAuthors: []string{"dependabot[bot]"}},
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
@@ -721,7 +721,7 @@ func TestGetContentCollapsesEachRepositoryGroupOnItsOwn(t *testing.T) {
 	content := canvascontent.GetContent(
 		collapsingTestPRs(),
 		nil,
-		config.ContentInputs{GroupByRepository: true, CollapsedPRAuthors: []string{"dependabot[bot]"}},
+		config.ContentInputs{GroupByRepository: true, CollapsePRsFromAuthors: []string{"dependabot[bot]"}},
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 

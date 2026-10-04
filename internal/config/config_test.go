@@ -1151,7 +1151,7 @@ func TestGetConfig_PRTrackerCanvasLink(t *testing.T) {
 	}
 }
 
-func TestGetConfig_CollapsedPRAuthors(t *testing.T) {
+func TestGetConfig_CollapsePRsFromAuthors(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    *string
@@ -1181,15 +1181,15 @@ func TestGetConfig_CollapsedPRAuthors(t *testing.T) {
 			h := newConfigTestHelpers(t)
 			h.setupMinimalValidConfig()
 			if tt.input != nil {
-				h.setInput(config.InputCollapsedPRAuthors, *tt.input)
+				h.setInput(config.InputCollapsePRsFromAuthors, *tt.input)
 			}
 
 			cfg, err := config.GetConfig()
 			if err != nil {
 				t.Fatalf("Expected no error, got: %v", err)
 			}
-			if !slices.Equal(cfg.ContentInputs.CollapsedPRAuthors, tt.expected) {
-				t.Errorf("Expected CollapsedPRAuthors %q, got %q", tt.expected, cfg.ContentInputs.CollapsedPRAuthors)
+			if !slices.Equal(cfg.ContentInputs.CollapsePRsFromAuthors, tt.expected) {
+				t.Errorf("Expected CollapsePRsFromAuthors %q, got %q", tt.expected, cfg.ContentInputs.CollapsePRsFromAuthors)
 			}
 		})
 	}

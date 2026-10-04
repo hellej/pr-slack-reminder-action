@@ -141,12 +141,12 @@ type snapshotScenario struct {
 }
 
 // Dependabot and Renovate PRs over two repositories, collapsing or not by section and group:
-//   - waiting for review, oldest first: a Renovate PR leads the Dependabot ones, though the
-//     collapsed PR authors list Dependabot first, and the Dependabot numbers run out of order
+//   - waiting for review, oldest first: a Renovate PR leads the Dependabot ones, though
+//     collapse-prs-from-authors lists Dependabot first, and the Dependabot numbers run out of order
 //   - Dependabot has 1 PR in app and 2 in infra there, so only infra collapses when grouped
 //   - ready to merge holds 1 Dependabot PR, which keeps its full row
 //   - merged holds 2 Dependabot PRs in app, merged newest first as #98, #97
-func collapsedPRAuthorsScenario(name string, groupByRepository bool) snapshotScenario {
+func collapsePRsFromAuthorsScenario(name string, groupByRepository bool) snapshotScenario {
 	bot := func(number int, login, repository string, options GetTestPROptions) *github.PullRequest {
 		options.Number = number
 		options.Title = fmt.Sprintf("Bump dependency %d", number)
@@ -158,9 +158,9 @@ func collapsedPRAuthorsScenario(name string, groupByRepository bool) snapshotSce
 	return snapshotScenario{
 		name: name,
 		configOverrides: map[string]any{
-			config.InputGithubRepositories: "test-org/app; test-org/infra",
-			config.InputGroupByRepository:  groupByRepository,
-			config.InputCollapsedPRAuthors: "dependabot[bot]; renovate[bot]",
+			config.InputGithubRepositories:     "test-org/app; test-org/infra",
+			config.InputGroupByRepository:      groupByRepository,
+			config.InputCollapsePRsFromAuthors: "dependabot[bot]; renovate[bot]",
 		},
 		prsByRepo: map[string][]*github.PullRequest{
 			"app": {
@@ -210,8 +210,8 @@ func collapsedPRAuthorsScenario(name string, groupByRepository bool) snapshotSce
 
 func snapshotScenarios() []snapshotScenario {
 	return []snapshotScenario{
-		collapsedPRAuthorsScenario("collapsed PR authors", false),
-		collapsedPRAuthorsScenario("collapsed PR authors grouped by repository", true),
+		collapsePRsFromAuthorsScenario("collapse PRs from authors", false),
+		collapsePRsFromAuthorsScenario("collapse PRs from authors grouped by repository", true),
 		{
 			name: "grouped by repository over two repositories",
 			configOverrides: map[string]any{
@@ -473,7 +473,7 @@ func snapshotScenarios() []snapshotScenario {
 			// The run sends only when a section has rows, so a collapsed row must count as one.
 			name: "only collapsed merged PRs, no open PRs and no no-prs-message",
 			configOverrides: map[string]any{
-				config.InputCollapsedPRAuthors: "dependabot[bot]",
+				config.InputCollapsePRsFromAuthors: "dependabot[bot]",
 			},
 			mergedPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
@@ -548,6 +548,7 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 	}{
 		{name: "every section under load", scenarioName: "every section under load"},
 		{name: "grouped by repository over two repositories", scenarioName: "grouped by repository over two repositories"},
+		{name: "collapse PRs from authors", scenarioName: "collapse PRs from authors"},
 		{
 			name:              "every section under load, edited by an update run",
 			scenarioName:      "every section under load",

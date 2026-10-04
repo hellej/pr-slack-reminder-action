@@ -78,8 +78,21 @@
       },
       {
         "type": "rich_text",
-        "block_id": "section_ready_to_merge",
+        "block_id": "section_ready_to_merge_repository_1",
         "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pulls",
+                "text": "app",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
           {
             "type": "rich_text_list",
             "elements": [
@@ -193,11 +206,54 @@
       },
       {
         "type": "rich_text",
-        "block_id": "section_waiting_for_review",
+        "block_id": "section_waiting_for_review_repository_1",
         "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pulls",
+                "text": "app",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
           {
             "type": "rich_text_list",
             "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/app/pull/103",
+                    "text": "Bump dependency 103",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 3 days ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "dependabot[bot]",
+                    "style": {}
+                  }
+                ]
+              },
               {
                 "type": "rich_text_section",
                 "elements": [
@@ -232,53 +288,25 @@
                 "type": "rich_text_section",
                 "elements": [
                   {
-                    "type": "text",
-                    "text": "🤖 dependabot: ",
-                    "style": {}
-                  },
-                  {
                     "type": "link",
-                    "url": "https://github.com/test-org/app/pull/103",
-                    "text": "#103",
-                    "style": {}
+                    "url": "https://github.com/test-org/app/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate",
+                    "text": "🤖 renovate (2)",
+                    "style": {
+                      "bold": true
+                    }
                   },
                   {
                     "type": "text",
-                    "text": " ",
-                    "style": {}
-                  },
-                  {
-                    "type": "link",
-                    "url": "https://github.com/test-org/infra/pull/7",
-                    "text": "#7",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": " ",
-                    "style": {}
-                  },
-                  {
-                    "type": "link",
-                    "url": "https://github.com/test-org/infra/pull/6",
-                    "text": "#6",
-                    "style": {}
-                  }
-                ]
-              },
-              {
-                "type": "rich_text_section",
-                "elements": [
-                  {
-                    "type": "text",
-                    "text": "🤖 renovate: ",
+                    "text": ": ",
                     "style": {}
                   },
                   {
                     "type": "link",
                     "url": "https://github.com/test-org/app/pull/88",
                     "text": "#88",
-                    "style": {}
+                    "style": {
+                      "bold": true
+                    }
                   },
                   {
                     "type": "text",
@@ -289,7 +317,83 @@
                     "type": "link",
                     "url": "https://github.com/test-org/app/pull/90",
                     "text": "#90",
+                    "style": {
+                      "bold": true
+                    }
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": " "
+        }
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_waiting_for_review_repository_2",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/infra/pulls",
+                "text": "infra",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/infra/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot",
+                    "text": "🤖 dependabot (2)",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": ": ",
                     "style": {}
+                  },
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/infra/pull/7",
+                    "text": "#7",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " ",
+                    "style": {}
+                  },
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/infra/pull/6",
+                    "text": "#6",
+                    "style": {
+                      "bold": true
+                    }
                   }
                 ]
               }
@@ -313,8 +417,95 @@
       },
       {
         "type": "rich_text",
-        "block_id": "section_merged",
+        "block_id": "section_merged_repository_1",
         "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/app/pulls",
+                "text": "app",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/app/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot",
+                    "text": "🤖 dependabot (2)",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": ": ",
+                    "style": {}
+                  },
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/app/pull/98",
+                    "text": "#98",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " ",
+                    "style": {}
+                  },
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/app/pull/97",
+                    "text": "#97",
+                    "style": {
+                      "bold": true
+                    }
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": " "
+        }
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_merged_repository_2",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/infra/pulls",
+                "text": "infra",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          },
           {
             "type": "rich_text_list",
             "elements": [
@@ -344,33 +535,6 @@
                   {
                     "type": "text",
                     "text": "Bob Brown",
-                    "style": {}
-                  }
-                ]
-              },
-              {
-                "type": "rich_text_section",
-                "elements": [
-                  {
-                    "type": "text",
-                    "text": "🤖 dependabot: ",
-                    "style": {}
-                  },
-                  {
-                    "type": "link",
-                    "url": "https://github.com/test-org/app/pull/98",
-                    "text": "#98",
-                    "style": {}
-                  },
-                  {
-                    "type": "text",
-                    "text": " ",
-                    "style": {}
-                  },
-                  {
-                    "type": "link",
-                    "url": "https://github.com/test-org/app/pull/97",
-                    "text": "#97",
                     "style": {}
                   }
                 ]

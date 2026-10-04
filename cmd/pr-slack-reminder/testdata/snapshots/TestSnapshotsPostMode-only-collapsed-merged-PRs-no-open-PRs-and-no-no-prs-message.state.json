@@ -30,15 +30,25 @@
                 "type": "rich_text_section",
                 "elements": [
                   {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot",
+                    "text": "🤖 dependabot (2)",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
                     "type": "text",
-                    "text": "🤖 dependabot: ",
+                    "text": ": ",
                     "style": {}
                   },
                   {
                     "type": "link",
                     "url": "https://github.com/test-org/test-repo/pull/96",
                     "text": "#96",
-                    "style": {}
+                    "style": {
+                      "bold": true
+                    }
                   },
                   {
                     "type": "text",
@@ -49,7 +59,9 @@
                     "type": "link",
                     "url": "https://github.com/test-org/test-repo/pull/95",
                     "text": "#95",
-                    "style": {}
+                    "style": {
+                      "bold": true
+                    }
                   }
                 ]
               }

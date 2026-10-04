@@ -77,6 +77,7 @@ func testPR(options prOptions) prview.PR {
 				CreatedAt: time.Now().Add(-options.age),
 				UpdatedAt: updatedAt,
 				MergedAt:  mergedAt,
+				Merged:    mergedAt != nil,
 			},
 			Repository: repository,
 		},
@@ -209,7 +210,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		}),
 	}
 
-	// Ages and authors stay off a collapsed row, so only number, repository and author count.
+	// Ages and authors stay off a collapsed row, so only number, repository, merge and author count.
 	collapsedRow := func(author string, prs ...prOptions) prview.CollapsedRow {
 		return prview.CollapsedRow{AuthorLogin: author, PRs: utilities.Map(prs, testPR)}
 	}
@@ -217,9 +218,14 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		prOptions{number: 103}, prOptions{number: 7, repository: "repo-two"}, prOptions{number: 8, repository: "repo-two"},
 	)
 	renovateRow := collapsedRow("renovate[bot]", prOptions{number: 88}, prOptions{number: 90})
-	mergedDependabotRow := collapsedRow("dependabot[bot]", prOptions{number: 98}, prOptions{number: 97})
-	// A user account, so its login has no "[bot]" to strip and its "_" needs escaping.
-	wipBotRow := collapsedRow("self_hosted_renovate", prOptions{number: 61}, prOptions{number: 62})
+	mergedDependabotRow := collapsedRow("dependabot[bot]",
+		prOptions{number: 98, mergeAge: durationPointer(hoursAge)}, prOptions{number: 97, mergeAge: durationPointer(idleAge)},
+	)
+	// A user account, so its login has no "[bot]" to strip and its "_" needs escaping. Its 4 PRs
+	// in one repository make a count taken from anything but the PRs show.
+	wipBotRow := collapsedRow("self_hosted_renovate",
+		prOptions{number: 61}, prOptions{number: 62}, prOptions{number: 63}, prOptions{number: 64},
+	)
 
 	testCases := []struct {
 		name    string

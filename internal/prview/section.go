@@ -1,6 +1,7 @@
 package prview
 
 import (
+	"net/url"
 	"slices"
 	"strings"
 
@@ -8,8 +9,8 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// How many PRs one collapsed PR author needs in a section, or a repository group, to get a
-// collapsed row.
+// How many PRs one author in collapse-prs-from-authors needs in a section, or a repository group,
+// to get a collapsed row.
 const MinPRsToCollapse = 2
 
 // One section's rows, either as the flat list or as repository buckets, never both.
@@ -47,10 +48,10 @@ func (row CollapsedRow) GetAuthorLabel() string {
 }
 
 // See prview.spec.md § Behaviour for the rule.
-func RowsCollapsingAuthors(prs []PR, collapsedPRAuthors []string) []Row {
-	uniqueCollapsedPRAuthors := utilities.UniqueFunc(collapsedPRAuthors, func(a, b string) bool { return a == b })
+func RowsCollapsingAuthors(prs []PR, collapsePRsFromAuthors []string) []Row {
+	authorsToCollapse := utilities.UniqueFunc(collapsePRsFromAuthors, func(a, b string) bool { return a == b })
 	collapsedRows := utilities.Filter(
-		utilities.Map(uniqueCollapsedPRAuthors, func(author string) CollapsedRow {
+		utilities.Map(authorsToCollapse, func(author string) CollapsedRow {
 			return CollapsedRow{AuthorLogin: author, PRs: utilities.Filter(prs, func(pr PR) bool {
 				return pr.getAuthorLogin() == author
 			})}
@@ -69,4 +70,36 @@ func RowsCollapsingAuthors(prs []PR, collapsedPRAuthors []string) []Row {
 
 func (pr PR) getAuthorLogin() string {
 	return pr.PullRequest.Author.Login
+}
+
+// The search lists every PR of the author in that state, not only the row's. See prview.spec.md § Doesn't Do
+func (row CollapsedRow) GetSearchURL() string {
+	qualifiers := []string{"is:pr", row.stateQualifier(), row.authorQualifier()}
+	repositories := utilities.UniqueFunc(
+		utilities.Map(row.PRs, func(pr PR) models.Repository { return pr.Repository }),
+		func(a, b models.Repository) bool { return a == b },
+	)
+	if len(repositories) == 1 {
+		return repositories[0].GetPullsURL() + "?q=" + url.QueryEscape(strings.Join(qualifiers, " "))
+	}
+	repositoryQualifiers := utilities.Map(repositories, func(repository models.Repository) string {
+		return "repo:" + repository.GetPath()
+	})
+	query := strings.Join(slices.Concat(qualifiers, repositoryQualifiers), " ")
+	return "https://github.com/search?type=pullrequests&q=" + url.QueryEscape(query)
+}
+
+func (row CollapsedRow) stateQualifier() string {
+	if slices.ContainsFunc(row.PRs, func(pr PR) bool { return !pr.IsMerged() }) {
+		return "is:open"
+	}
+	return "is:merged"
+}
+
+// GitHub search names an app author as app/<name>, not by its login. See docs/third-party-facts.md § GitHub search matches PRs created by an app with `author:app/USERNAME`
+func (row CollapsedRow) authorQualifier() string {
+	if strings.HasSuffix(row.AuthorLogin, "[bot]") {
+		return "author:app/" + row.GetAuthorLabel()
+	}
+	return "author:" + row.AuthorLogin
 }

@@ -14,7 +14,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
 - An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist)
 - A merged PR row shows: title (linked), when it merged in italics, author, approvers/commenters. No age, no old-PR marker: the section heading says it landed
-- A collapsed row (`prview.CollapsedRow`), in any section, is one more bullet in the section's list: a plain text run `🤖 <label>: ` from `GetAuthorLabel()`, then each PR number as `#<n>` linked to its PR, joined by plain `" "` runs. No age, author, reviewers, old-PR marker or merge time
+- A collapsed row (`prview.CollapsedRow`), in any section, is one more bullet in the section's list: a bold link `🤖 <label> (<count>)`, the label from `GetAuthorLabel()`, the count the row's PRs, linking to `GetSearchURL()`; a plain `: ` run; then each PR number as a bold `#<n>` link to its PR, joined by plain `" "` runs. No age, author, reviewers, old-PR marker or merge time
 - Every section renders its rows in the given order: sorting, grouping and collapsing are [internal/messagecontent](../messagecontent/messagecontent.spec.md)'s
 - The age, merged and reviewer texts come from `prview`; this package supplies the surrounding spacing, the Block Kit styling and the old-PR marker
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name

@@ -135,10 +135,13 @@ func renderRow(row prview.Row, section section) string {
 }
 
 func renderCollapsedRow(row prview.CollapsedRow) string {
+	label := fmt.Sprintf(
+		"**[🤖 %s (%d)](%s)**", escapeMarkdown(row.GetAuthorLabel()), len(row.PRs), row.GetSearchURL(),
+	)
 	numberLinks := utilities.Map(row.PRs, func(pr prview.PR) string {
-		return fmt.Sprintf("[#%d](%s)", pr.GetNumber(), pr.GetHTMLURL())
+		return fmt.Sprintf("**[#%d](%s)**", pr.GetNumber(), pr.GetHTMLURL())
 	})
-	return "🤖 " + escapeMarkdown(row.GetAuthorLabel()) + ": " + strings.Join(numberLinks, " ")
+	return label + ": " + strings.Join(numberLinks, " ")
 }
 
 func renderOpenPRRow(pr prview.PR) string {

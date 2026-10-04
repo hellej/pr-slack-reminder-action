@@ -29,9 +29,14 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `PRSection` is one section's rows: the flat `Rows`, or `Groups` of `RepositoryRows` (a `models.Repository` and its `Rows`). `HasRows` reports whether either holds anything
 - `Row` is a sealed interface, implemented by `PR` and `CollapsedRow` only, so a renderer's type switch covers every row kind
 - `CollapsedRow` holds the PRs of one author, `AuthorLogin`. `GetAuthorLabel()` is that login without a trailing `[bot]`; a `[bot]` anywhere else stays
-- `RowsCollapsingAuthors(prs, collapsedPRAuthors)` turns PRs into rows:
-  - an author in `collapsedPRAuthors` with at least `MinPRsToCollapse` (2) of the given PRs gets one `CollapsedRow`; a lone PR by such an author stays a `PR` row
-  - first every PR not collapsed, in the given order, then the collapsed rows, in `collapsedPRAuthors` order. Each collapsed row keeps the given order of its PRs
+- `CollapsedRow.GetSearchURL()` links to a GitHub PR search for the row's author:
+  - query: `is:pr`, then `is:merged` when every PR of the row is merged, else `is:open`, then `author:app/<label>` for a login ending in `[bot]`, else `author:<login>`
+  - one repository: that repository's pulls page with `?q=<query>`
+  - several: `https://github.com/search?type=pullrequests&q=<query>`, the query ending in one `repo:<owner>/<name>` per repository, in the row's order
+  - the query is form-encoded: spaces as `+`, `:` and `/` escaped
+- `RowsCollapsingAuthors(prs, collapsePRsFromAuthors)` turns PRs into rows:
+  - an author in `collapsePRsFromAuthors` with at least `MinPRsToCollapse` (2) of the given PRs gets one `CollapsedRow`; a lone PR by such an author stays a `PR` row
+  - first every PR not collapsed, in the given order, then the collapsed rows, in `collapsePRsFromAuthors` order. Each collapsed row keeps the given order of its PRs
   - logins match exactly, case included, and an author listed twice still gets one row
   - it reads only the PRs it is given, so a caller collapsing per repository group gets a per group threshold
 
@@ -39,12 +44,14 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 
 - Doesn't validate that mapped Slack user IDs are well-formed
 - Doesn't handle a ready-for-review time in the future: the age text goes negative, e.g. "-30 minutes"
+- The search URL doesn't follow the row's section: a row in one open section links to every open PR of that author in its repositories
 - `RowsCollapsingAuthors` doesn't skip an empty login: given `""`, it collapses PRs whose author GitHub no longer reports. [internal/config](../config/config.spec.md) drops empty items before they get here
 
 ## Oddities
 
 - `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
 - Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
+- Unverified: whether GitHub ORs the repeated `repo:` qualifiers of a spanning row's search URL. See docs/third-party-facts.md § A GitHub search query string is capped at 256 characters and five operators
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value
