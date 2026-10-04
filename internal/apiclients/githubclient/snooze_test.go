@@ -54,6 +54,26 @@ func TestParseSnoozeComment(t *testing.T) {
 			expected: timePtr(baseTime.Add(10 * 24 * time.Hour)),
 		},
 		{
+			name:     "trailing space is trimmed",
+			body:     "/snooze for 4 days ",
+			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
+		},
+		{
+			name:     "trailing CRLF newline is trimmed",
+			body:     "/snooze for 4 days\r\n",
+			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
+		},
+		{
+			name:     "leading newline is trimmed",
+			body:     "\n/snooze for 4 days",
+			expected: timePtr(baseTime.Add(4 * 24 * time.Hour)),
+		},
+		{
+			name:     "second line of text does not match",
+			body:     "/snooze for 4 days\nwaiting on the API team",
+			expected: nil,
+		},
+		{
 			name:     "excessive days capped to 365",
 			body:     "/snooze for 9999999 days",
 			expected: timePtr(baseTime.Add(365 * 24 * time.Hour)),

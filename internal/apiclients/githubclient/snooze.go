@@ -4,6 +4,7 @@ import (
 	"log"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -12,7 +13,7 @@ var snoozeRegex = regexp.MustCompile(`(?i)^/snooze(?:\s+pr[\s-]*reminder)?\s+for
 const maxSnoozeDays = 365
 
 func parseSnoozeComment(body string, createdAt time.Time) *time.Time {
-	matches := snoozeRegex.FindStringSubmatch(body)
+	matches := snoozeRegex.FindStringSubmatch(strings.TrimSpace(body))
 	if matches == nil {
 		return nil
 	}
