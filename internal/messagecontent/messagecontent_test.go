@@ -69,8 +69,8 @@ func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
 	}
 }
 
-func prNumbers(prs []prview.PR) []int {
-	return utilities.Map(prs, func(pr prview.PR) int { return pr.GetNumber() })
+func prNumbers(rows []prview.Row) []int {
+	return utilities.Map(rows, func(row prview.Row) int { return row.(prview.PR).GetNumber() })
 }
 
 func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
@@ -89,10 +89,10 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 
 	content := GetContent(openPRs, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
 
-	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.PRs), []int{2})
-	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.PRs), []int{3, 5})
-	assertEqual(t, "waiting for review", prNumbers(content.WaitingForReview.PRs), []int{4, 1})
-	assertEqual(t, "merged", prNumbers(content.Merged.PRs), nil)
+	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.Rows), []int{2})
+	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{3, 5})
+	assertEqual(t, "waiting for review", prNumbers(content.WaitingForReview.Rows), []int{4, 1})
+	assertEqual(t, "merged", prNumbers(content.Merged.Rows), nil)
 }
 
 func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
@@ -105,22 +105,22 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 	content := GetContent(openPRs, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
 
 	waitingForReview := content.WaitingForReview
-	if len(waitingForReview.PRs) != 0 {
-		t.Fatalf("expected no flat PR list when grouping, got %v", prNumbers(waitingForReview.PRs))
+	if len(waitingForReview.Rows) != 0 {
+		t.Fatalf("expected no flat PR list when grouping, got %v", prNumbers(waitingForReview.Rows))
 	}
 	assertEqual(
 		t, "grouped repositories",
-		utilities.Map(waitingForReview.Groups, func(group PRsOfRepository) string {
-			return group.RepositoryName
+		utilities.Map(waitingForReview.Groups, func(group prview.RepositoryRows) string {
+			return group.Repository.Name
 		}),
 		[]string{"zebra", "alpha"},
 	)
-	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].PRs), []int{1, 3})
+	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].Rows), []int{1, 3})
 }
 
-// The two repositories have different owners, so a URL built from the name alone, or from one
-// fixed owner, fails.
-func TestGetContentGivesEachRepositoryGroupItsPullsURL(t *testing.T) {
+// The two repositories have different owners, so a group carrying the name alone, or one fixed
+// owner, fails: messagebuilder links each group to its repository's pulls page.
+func TestGetContentGivesEachRepositoryGroupItsWholeRepository(t *testing.T) {
 	openPRs := []prview.PR{
 		testPR(testPROptions{number: 1, owner: "zebra-owner", repository: "zebra", createdAt: generatedAt.Add(-9 * time.Hour)}),
 		testPR(testPROptions{number: 2, owner: "alpha-owner", repository: "alpha", createdAt: generatedAt.Add(-4 * time.Hour)}),
@@ -129,11 +129,11 @@ func TestGetContentGivesEachRepositoryGroupItsPullsURL(t *testing.T) {
 	content := GetContent(openPRs, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
 
 	assertEqual(
-		t, "repository pulls URLs",
-		utilities.Map(content.WaitingForReview.Groups, func(group PRsOfRepository) string {
-			return group.RepositoryPullsURL
+		t, "repository paths",
+		utilities.Map(content.WaitingForReview.Groups, func(group prview.RepositoryRows) string {
+			return group.Repository.GetPath()
 		}),
-		[]string{"https://github.com/zebra-owner/zebra/pulls", "https://github.com/alpha-owner/alpha/pulls"},
+		[]string{"zebra-owner/zebra", "alpha-owner/alpha"},
 	)
 }
 
@@ -155,7 +155,7 @@ func TestGetContentMergesTrackedPRsWithTheNewestUntrackedOnes(t *testing.T) {
 
 	content := GetContent(nil, trackedPRs, recentlyMergedPRs, time.Time{}, generatedAt, config.ContentInputs{})
 
-	assertEqual(t, "merged", prNumbers(content.Merged.PRs), []int{7, 3, 6, 5, 1})
+	assertEqual(t, "merged", prNumbers(content.Merged.Rows), []int{7, 3, 6, 5, 1})
 }
 
 // Four untracked PRs merged since the post, one more than the cap, and the oldest of them would
@@ -183,7 +183,7 @@ func TestGetContentShowsEveryPRMergedSinceThePost(t *testing.T) {
 		config.ContentInputs{},
 	)
 
-	assertEqual(t, "merged", prNumbers(content.Merged.PRs), []int{9, 4, 3, 2, 1, 6, 5, 7})
+	assertEqual(t, "merged", prNumbers(content.Merged.Rows), []int{9, 4, 3, 2, 1, 6, 5, 7})
 }
 
 func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {
@@ -193,7 +193,7 @@ func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {
 	content := GetContent(nil, []prview.PR{closedPR}, nil, time.Time{}, generatedAt, config.ContentInputs{})
 
 	if content.HasPRs() {
-		t.Errorf("expected no sections, got merged %v", prNumbers(content.Merged.PRs))
+		t.Errorf("expected no sections, got merged %v", prNumbers(content.Merged.Rows))
 	}
 }
 

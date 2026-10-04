@@ -9,11 +9,13 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
 - Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
 - The headings are this package's own display text: `✅ Ready to merge`, `💬 Waiting for author`, `👀 Waiting for review`, `🚀 Recently merged`
-- Grouped-by-repository case: the section's rows come as one `rich_text` block per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them. The block opens with the repository name in bold, linked to the repository's pulls page, then holds that repository's rows
+- Grouped-by-repository case: the section's rows come as one `rich_text` block per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them. The block opens with the repository name, without its owner, in bold, linked to `models.Repository.GetPullsURL()`, then holds that repository's rows
 - A spacing block, a `section` block of one blank space, sits between the repositories of a grouped section, never after its last one
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
 - An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist)
 - A merged PR row shows: title (linked), when it merged in italics, author, approvers/commenters. No age, no old-PR marker: the section heading says it landed
+- A collapsed row (`prview.CollapsedRow`), in any section, is one more bullet in the section's list: a bold link `🤖 <label> (<count>)`, the label from `GetAuthorLabel()`, the count the row's PRs, linking to `GetSearchURL()`; a plain `: ` run; then each PR number as a bold `#<n>` link to its PR, joined by plain `" "` runs. No age, author, reviewers, old-PR marker or merge time
+- Every section renders its rows in the given order: sorting, grouping and collapsing are [internal/messagecontent](../messagecontent/messagecontent.spec.md)'s
 - The age, merged and reviewer texts come from `prview`; this package supplies the surrounding spacing, the Block Kit styling and the old-PR marker
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
 - The update-time footer is a `context` block with block ID `update_time_footer`, reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
@@ -38,4 +40,5 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it. The cut ignores where a section starts, so a section heading can be left with all of its repositories dropped, and the last content block can be a spacing block
 - A message with nothing to list at all is empty, or the no-open-PRs line alone when that is set, with the update-time footer after it in an edit. None is worth sending, and it is the caller that decides
 - Same-named repositories under different owners get identical sub-headings: only their link targets tell those groups apart
+- Ungrouped, a collapsed row can span repositories, and its numbers carry no repository prefix: the same number can show twice in one row, and only the link targets tell those PRs apart
 - `BuildMessageMarkedStale` re-sends stored blocks compacted, whatever whitespace they were stored with, so an indented store sends the same JSON

@@ -3,6 +3,7 @@ package config_test
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1145,6 +1146,50 @@ func TestGetConfig_PRTrackerCanvasLink(t *testing.T) {
 			}
 			if cfg.PRTrackerCanvasID != tt.expectedID {
 				t.Errorf("Expected PRTrackerCanvasID '%s', got '%s'", tt.expectedID, cfg.PRTrackerCanvasID)
+			}
+		})
+	}
+}
+
+func TestGetConfig_CollapsePRsFromAuthors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *string
+		expected []string
+	}{
+		{name: "unset input applies no default", input: nil, expected: []string{}},
+		{name: "explicitly empty input collapses nothing", input: new(""), expected: []string{}},
+		{
+			name:     "semicolon separated",
+			input:    new("dependabot[bot]; renovate[bot]"),
+			expected: []string{"dependabot[bot]", "renovate[bot]"},
+		},
+		{
+			name:     "newline separated",
+			input:    new("dependabot[bot]\nrenovate[bot]\n"),
+			expected: []string{"dependabot[bot]", "renovate[bot]"},
+		},
+		{
+			name:     "empty item between separators is dropped",
+			input:    new("dependabot[bot];;renovate[bot]"),
+			expected: []string{"dependabot[bot]", "renovate[bot]"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			if tt.input != nil {
+				h.setInput(config.InputCollapsePRsFromAuthors, *tt.input)
+			}
+
+			cfg, err := config.GetConfig()
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+			if !slices.Equal(cfg.ContentInputs.CollapsePRsFromAuthors, tt.expected) {
+				t.Errorf("Expected CollapsePRsFromAuthors %q, got %q", tt.expected, cfg.ContentInputs.CollapsePRsFromAuthors)
 			}
 		})
 	}

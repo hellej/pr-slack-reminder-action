@@ -15,6 +15,8 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 </details>
 
+2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot (3): #101 #102 #103`. The label links to a GitHub search for that author's PRs.
+
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
@@ -181,6 +183,7 @@ jobs:
 | `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line: a run with no open PRs then still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
+| `collapse-prs-from-authors`         | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
@@ -205,6 +208,8 @@ Open PRs are split by whose turn it is: waiting for review (1) is every open PR 
 
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
+As in the message, 2 or more PRs by one author in `collapse-prs-from-authors` in a section collapse into one row of linked PR numbers.
+
 ### Setup
 
 1. Add a canvas tab to the channel that gets the reminders.
@@ -223,7 +228,7 @@ to be in the same channel as the canvas to have write access.
 
 - ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository` and `/snooze` comments. `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
+- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository`, `collapse-prs-from-authors` and `/snooze` comments. `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
 - The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
 - A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not corrupted data. Reload the canvas to see its real content (Cmd + R or Ctrl + R).

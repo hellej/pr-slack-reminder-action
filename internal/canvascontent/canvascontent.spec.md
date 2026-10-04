@@ -8,7 +8,8 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 - The open PRs are bucketed by `PR.GetNextAction()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
 - The open PRs are sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest` before bucketing
 - Bucketing filters the list rather than sorting each bucket, so every bucket keeps the sorted order
-- Each section is a `PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prview.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `PRs` list. One `PRSection` constructor fills one shape, so both are never filled at once
+- Each section is a `prview.PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prview.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `Rows` list. One constructor fills one shape, so both are never filled at once
+- Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingPRsFromAuthors` with `CollapsePRsFromAuthors`, after every sort, prune and cap. When grouped, the 2 PR threshold counts within one repository
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket, and nothing dedupes a repository across sections
 - WIP PRs are sorted most recent activity first via `prview.SortPRsNewestFirst` on `PR.LastActivityAt()`. Unknown activity sorts last, keeping the given order among such PRs
 - Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out, via `prview.PR.IsActiveAsOf(GeneratedAt, MaxDraftPRInactivity)`. A draft with a zero update time is kept: unknown is not stale
@@ -28,4 +29,5 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 ## Oddities
 
 - Draft staleness and inactivity are measured against `GeneratedAt`, not against the wall clock, so a zero-value `GeneratedAt` puts both cutoffs in year 0: every draft is kept, however long dead, and none counts as inactive. The caller always sets it
-- Grouping an empty section yields an empty grouped slice rather than a group with no PRs
+- Grouping an empty section yields an empty grouped slice rather than a group with no rows
+- The logged counts and the WIP cap count PRs, not rows: a collapsed row frees no room

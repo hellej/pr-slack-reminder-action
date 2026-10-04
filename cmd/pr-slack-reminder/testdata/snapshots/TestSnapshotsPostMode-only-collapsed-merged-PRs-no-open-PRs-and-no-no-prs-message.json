@@ -1,0 +1,66 @@
+[
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "🚀 Recently merged",
+      "emoji": true
+    },
+    "block_id": "heading_merged",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_merged",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot",
+                "text": "🤖 dependabot (2)",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": ": ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/96",
+                "text": "#96",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " ",
+                "style": {}
+              },
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/95",
+                "text": "#95",
+                "style": {
+                  "bold": true
+                }
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  }
+]

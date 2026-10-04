@@ -11,17 +11,19 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
-	number     int
-	repository string
-	draft      bool
-	createdAt  time.Time
-	updatedAt  time.Time
-	mergedAt   *time.Time
+	number      int
+	repository  string
+	authorLogin string
+	draft       bool
+	createdAt   time.Time
+	updatedAt   time.Time
+	mergedAt    *time.Time
 	// The signals PR.GetNextAction reads.
 	approved                  bool
 	conflicting               bool
@@ -44,6 +46,7 @@ func testPR(options testPROptions) prview.PR {
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
 				Number:    options.number,
+				Author:    githubclient.Collaborator{Login: options.authorLogin},
 				Draft:     options.draft,
 				CreatedAt: options.createdAt,
 				UpdatedAt: options.updatedAt,
@@ -67,8 +70,8 @@ func mergedAgo(age time.Duration) *time.Time {
 	return &timestamp
 }
 
-func prNumbers(prs []prview.PR) []int {
-	return utilities.Map(prs, func(pr prview.PR) int { return pr.GetNumber() })
+func prNumbers(rows []prview.Row) []int {
+	return utilities.Map(rows, func(row prview.Row) int { return row.(prview.PR).GetNumber() })
 }
 
 func assertEqual[T comparable](t *testing.T, what string, got []T, want []T) {
@@ -89,8 +92,8 @@ func TestGetContentSplitsDraftsIntoTheWIPSection(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "open PRs", prNumbers(content.WaitingForReview.PRs), []int{1, 3})
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{2})
+	assertEqual(t, "open PRs", prNumbers(content.WaitingForReview.Rows), []int{1, 3})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{2})
 }
 
 func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
@@ -103,7 +106,7 @@ func TestGetContentSortsOpenPRsOldestToNewest(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "open PRs", prNumbers(content.WaitingForReview.PRs), []int{8, 7})
+	assertEqual(t, "open PRs", prNumbers(content.WaitingForReview.Rows), []int{8, 7})
 }
 
 // The next action decides the section, and the fixtures name the signal rather than the bucket
@@ -123,9 +126,9 @@ func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.PRs), []int{1, 7})
-	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.PRs), []int{2, 4, 5})
-	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.PRs), []int{3, 6})
+	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{1, 7})
+	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{2, 4, 5})
+	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{3, 6})
 }
 
 // Every bucket is filtered out of one sorted list, so each stays oldest first. The given order
@@ -147,14 +150,14 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.PRs), []int{4, 1})
-	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.PRs), []int{5, 2})
-	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.PRs), []int{6, 3})
+	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{4, 1})
+	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 2})
+	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{6, 3})
 }
 
 // The repository paths of a grouped section, so its whole group order is one expectation.
-func groupPaths(groups []prview.RepositoryPRs) []string {
-	return utilities.Map(groups, func(group prview.RepositoryPRs) string {
+func groupPaths(groups []prview.RepositoryRows) []string {
+	return utilities.Map(groups, func(group prview.RepositoryRows) string {
 		return group.Repository.GetPath()
 	})
 }
@@ -178,15 +181,15 @@ func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.
 	if !content.GroupedByRepository {
 		t.Error("expected content to be marked as grouped by repository")
 	}
-	if len(content.WaitingForReview.PRs) != 0 {
-		t.Errorf("expected no flat open PRs when grouping, got %v", prNumbers(content.WaitingForReview.PRs))
+	if len(content.WaitingForReview.Rows) != 0 {
+		t.Errorf("expected no flat open PRs when grouping, got %v", prNumbers(content.WaitingForReview.Rows))
 	}
 	assertEqual(
 		t, "open PR group paths", groupPaths(content.WaitingForReview.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.WaitingForReview.Groups[0].PRs), []int{1, 3})
-	assertEqual(t, "second group PRs", prNumbers(content.WaitingForReview.Groups[1].PRs), []int{2})
+	assertEqual(t, "first group PRs", prNumbers(content.WaitingForReview.Groups[0].Rows), []int{1, 3})
+	assertEqual(t, "second group PRs", prNumbers(content.WaitingForReview.Groups[1].Rows), []int{2})
 }
 
 // Each bucket is grouped on its own, so one repository can lead two sections and appear under
@@ -219,7 +222,7 @@ func TestGetContentGroupsEachOpenBucketOnItsOwn(t *testing.T) {
 		t, "waiting for review group paths", groupPaths(content.WaitingForReview.Groups),
 		[]string{"test-org/repo-one"},
 	)
-	if len(content.ReadyToMerge.PRs) != 0 || len(content.WaitingForAuthor.PRs) != 0 {
+	if len(content.ReadyToMerge.Rows) != 0 || len(content.WaitingForAuthor.Rows) != 0 {
 		t.Error("expected no flat open PRs when grouping")
 	}
 }
@@ -248,15 +251,15 @@ func TestGetContentGroupsWIPPRsByRepositoryMostRecentActivityRepositoryFirst(t *
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
-	if len(content.WIP.PRs) != 0 {
-		t.Errorf("expected no flat WIP PRs when grouping, got %v", prNumbers(content.WIP.PRs))
+	if len(content.WIP.Rows) != 0 {
+		t.Errorf("expected no flat WIP PRs when grouping, got %v", prNumbers(content.WIP.Rows))
 	}
 	assertEqual(
 		t, "WIP PR group paths", groupPaths(content.WIP.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-three"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].PRs), []int{4})
-	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].PRs), []int{5, 3})
+	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].Rows), []int{4})
+	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].Rows), []int{5, 3})
 }
 
 func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
@@ -273,7 +276,7 @@ func TestGetContentKeepsWIPPRsFlatWithoutGrouping(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 4})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{3, 4})
 	if len(content.WIP.Groups) != 0 {
 		t.Errorf(
 			"expected no WIP PR groups without grouping, got %v",
@@ -303,7 +306,7 @@ func TestGetContentSortsWIPPRsByActivityNewestFirst(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 1, 2})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{3, 1, 2})
 }
 
 // Unknown activity is not staleness, so it sorts after every draft with a real update time
@@ -320,7 +323,7 @@ func TestGetContentSortsWIPPRsWithUnknownActivityLast(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{3, 2, 1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{3, 2, 1})
 }
 
 func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
@@ -346,7 +349,7 @@ func TestGetContentExcludesDraftsInactiveForLongerThanTheMaximum(t *testing.T) {
 				GeneratedAt: generatedAt,
 			})
 
-			if gotKept := len(content.WIP.PRs) == 1; gotKept != tc.wantKept {
+			if gotKept := len(content.WIP.Rows) == 1; gotKept != tc.wantKept {
 				t.Errorf("expected draft kept: %v, got kept: %v", tc.wantKept, gotKept)
 			}
 		})
@@ -370,7 +373,7 @@ func TestGetContentKeepsOnlyTheMostRecentlyActiveInactiveWIPPRs(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{7, 6, 5, 4, 3})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{7, 6, 5, 4, 3})
 }
 
 func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
@@ -386,7 +389,7 @@ func TestGetContentKeepsFiveInactiveWIPPRs(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{5, 4, 3, 2, 1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{5, 4, 3, 2, 1})
 }
 
 // Recently active drafts are outside the cap, however many there are.
@@ -406,7 +409,7 @@ func TestGetContentKeepsEveryRecentlyActiveWIPPR(t *testing.T) {
 	})
 
 	assertEqual(
-		t, "WIP PRs", prNumbers(content.WIP.PRs),
+		t, "WIP PRs", prNumbers(content.WIP.Rows),
 		[]int{100, 101, 102, 103, 104, 105, 106, 107, 200, 201, 202, 203, 204},
 	)
 }
@@ -448,7 +451,7 @@ func TestGetContentCountsWIPPRAsInactiveFromTheActivityThreshold(t *testing.T) {
 				GeneratedAt: generatedAt,
 			})
 
-			assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), tc.wantWIPPRs)
+			assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), tc.wantWIPPRs)
 		})
 	}
 }
@@ -468,7 +471,7 @@ func TestGetContentKeepsDraftWithUnknownActivityBesidesTheCappedInactiveOnes(t *
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{5, 4, 3, 2, 1, 6})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{5, 4, 3, 2, 1, 6})
 }
 
 // Drafts past MaxDraftPRInactivity never take one of the kept slots.
@@ -488,7 +491,7 @@ func TestGetContentKeepsNoStaleDraftAmongTheCappedInactiveOnes(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{8, 7, 6, 5, 4})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{8, 7, 6, 5, 4})
 }
 
 // The cap is global, so three repositories with three inactive drafts each yield five rows
@@ -535,9 +538,9 @@ func TestGetContentCapsInactiveWIPPRsAcrossRepositories(t *testing.T) {
 		t, "WIP PR group paths", groupPaths(content.WIP.Groups),
 		[]string{"test-org/repo-three", "test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].PRs), []int{9, 8})
-	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].PRs), []int{6, 5})
-	assertEqual(t, "third group PRs", prNumbers(content.WIP.Groups[2].PRs), []int{3})
+	assertEqual(t, "first group PRs", prNumbers(content.WIP.Groups[0].Rows), []int{9, 8})
+	assertEqual(t, "second group PRs", prNumbers(content.WIP.Groups[1].Rows), []int{6, 5})
+	assertEqual(t, "third group PRs", prNumbers(content.WIP.Groups[2].Rows), []int{3})
 }
 
 func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
@@ -547,7 +550,7 @@ func TestGetContentKeepsDraftWithUnknownActivity(t *testing.T) {
 		GeneratedAt: generatedAt,
 	})
 
-	assertEqual(t, "WIP PRs", prNumbers(content.WIP.PRs), []int{1})
+	assertEqual(t, "WIP PRs", prNumbers(content.WIP.Rows), []int{1})
 }
 
 func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
@@ -562,7 +565,7 @@ func TestGetContentTakesCapFlagsFromOptions(t *testing.T) {
 		WIPPRsCapped:  true,
 	})
 
-	if len(content.WaitingForReview.PRs) >= githubclient.MaxPRsToFetch || len(content.WIP.PRs) >= githubclient.MaxDraftPRsToFetch {
+	if len(content.WaitingForReview.Rows) >= githubclient.MaxPRsToFetch || len(content.WIP.Rows) >= githubclient.MaxDraftPRsToFetch {
 		t.Fatal("expected both sections to hold fewer PRs than their caps")
 	}
 	if !content.OpenPRsCapped || !content.WIPPRsCapped {
@@ -603,7 +606,7 @@ func TestGetContentSortsMergedPRsNewestMergeFirst(t *testing.T) {
 		},
 	)
 
-	assertEqual(t, "merged PRs", prNumbers(content.Merged.PRs), []int{2, 3, 1})
+	assertEqual(t, "merged PRs", prNumbers(content.Merged.Rows), []int{2, 3, 1})
 }
 
 // The merged PRs are sorted by merge time first, so the most recently merged PR's repository
@@ -622,15 +625,15 @@ func TestGetContentGroupsMergedPRsByRepositoryNewestMergesRepositoryFirst(t *tes
 		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
 	)
 
-	if len(content.Merged.PRs) != 0 {
-		t.Errorf("expected no flat merged PRs when grouping, got %v", prNumbers(content.Merged.PRs))
+	if len(content.Merged.Rows) != 0 {
+		t.Errorf("expected no flat merged PRs when grouping, got %v", prNumbers(content.Merged.Rows))
 	}
 	assertEqual(
 		t, "merged PR group paths", groupPaths(content.Merged.Groups),
 		[]string{"test-org/repo-two", "test-org/repo-one"},
 	)
-	assertEqual(t, "first group PRs", prNumbers(content.Merged.Groups[0].PRs), []int{2})
-	assertEqual(t, "second group PRs", prNumbers(content.Merged.Groups[1].PRs), []int{1, 3})
+	assertEqual(t, "first group PRs", prNumbers(content.Merged.Groups[0].Rows), []int{2})
+	assertEqual(t, "second group PRs", prNumbers(content.Merged.Groups[1].Rows), []int{1, 3})
 }
 
 func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
@@ -645,7 +648,7 @@ func TestGetContentKeepsMergedPRsFlatWithoutGrouping(t *testing.T) {
 		},
 	)
 
-	assertEqual(t, "merged PRs", prNumbers(content.Merged.PRs), []int{1, 2})
+	assertEqual(t, "merged PRs", prNumbers(content.Merged.Rows), []int{1, 2})
 	if len(content.Merged.Groups) != 0 {
 		t.Errorf(
 			"expected no merged PR groups without grouping, got %v",
@@ -675,4 +678,56 @@ func TestGetContentTakesGeneratedAtFromOptions(t *testing.T) {
 	if !content.GeneratedAt.Equal(generatedAt) {
 		t.Errorf("expected GeneratedAt %v, got %v", generatedAt, content.GeneratedAt)
 	}
+}
+
+// Dependabot has 1 PR in each of repo-one and repo-two and 2 in repo-three: one row across all three
+// when flat; when grouped, a full row in repo-one and repo-two and a collapsed row in repo-three.
+func collapsingTestPRs() []prview.PR {
+	return []prview.PR{
+		testPR(testPROptions{number: 5, repository: "repo-one", authorLogin: "dependabot[bot]", createdAt: activityAgo(5 * time.Hour)}),
+		testPR(testPROptions{number: 1, repository: "repo-one", authorLogin: "alice", createdAt: activityAgo(4 * time.Hour)}),
+		testPR(testPROptions{number: 3, repository: "repo-two", authorLogin: "dependabot[bot]", createdAt: activityAgo(3 * time.Hour)}),
+		testPR(testPROptions{number: 8, repository: "repo-three", authorLogin: "dependabot[bot]", createdAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 7, repository: "repo-three", authorLogin: "dependabot[bot]", createdAt: activityAgo(1 * time.Hour)}),
+	}
+}
+
+func TestGetContentCollapsesFlatSections(t *testing.T) {
+	drafts := []prview.PR{
+		testPR(testPROptions{number: 32, authorLogin: "dependabot[bot]", draft: true, updatedAt: activityAgo(2 * time.Hour)}),
+		testPR(testPROptions{number: 31, authorLogin: "dependabot[bot]", draft: true, updatedAt: activityAgo(1 * time.Hour)}),
+	}
+	mergedPRs := []prview.PR{
+		testPR(testPROptions{number: 41, authorLogin: "dependabot[bot]", mergedAt: mergedAgo(3 * time.Hour)}),
+		testPR(testPROptions{number: 42, authorLogin: "dependabot[bot]", mergedAt: mergedAgo(1 * time.Hour)}),
+	}
+
+	content := canvascontent.GetContent(
+		slices.Concat(collapsingTestPRs(), drafts),
+		mergedPRs,
+		config.ContentInputs{CollapsePRsFromAuthors: []string{"dependabot[bot]"}},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	assertEqual(
+		t, "waiting for review rows", testhelpers.DescribeRows(content.WaitingForReview.Rows),
+		[]string{"#1", "dependabot[bot]: #5 #3 #8 #7"},
+	)
+	assertEqual(t, "WIP rows", testhelpers.DescribeRows(content.WIP.Rows), []string{"dependabot[bot]: #31 #32"})
+	assertEqual(t, "merged rows", testhelpers.DescribeRows(content.Merged.Rows), []string{"dependabot[bot]: #42 #41"})
+}
+
+func TestGetContentCollapsesEachRepositoryGroupOnItsOwn(t *testing.T) {
+	content := canvascontent.GetContent(
+		collapsingTestPRs(),
+		nil,
+		config.ContentInputs{GroupByRepository: true, CollapsePRsFromAuthors: []string{"dependabot[bot]"}},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	groups := content.WaitingForReview.Groups
+	assertEqual(t, "group paths", groupPaths(groups), []string{"test-org/repo-one", "test-org/repo-two", "test-org/repo-three"})
+	assertEqual(t, "repo-one rows", testhelpers.DescribeRows(groups[0].Rows), []string{"#5", "#1"})
+	assertEqual(t, "repo-two rows", testhelpers.DescribeRows(groups[1].Rows), []string{"#3"})
+	assertEqual(t, "repo-three rows", testhelpers.DescribeRows(groups[2].Rows), []string{"dependabot[bot]: #8 #7"})
 }

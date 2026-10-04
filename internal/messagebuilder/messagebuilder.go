@@ -55,10 +55,10 @@ func buildContentBlocks(content messagecontent.Content) []slack.Block {
 }
 
 type section struct {
-	blockIDFragment string
-	heading         string
-	prs             messagecontent.PRSection
-	renderRow       func(prview.PR) slack.RichTextElement
+	blockIDFragment    string
+	heading            string
+	prSection          prview.PRSection
+	buildPRBulletPoint func(prview.PR) slack.RichTextElement
 }
 
 func buildSectionBlocks(content messagecontent.Content) []slack.Block {
@@ -70,15 +70,15 @@ func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 	}
 
 	var blocks []slack.Block
-	for _, section := range utilities.Filter(sections, sectionHasPRs) {
+	for _, section := range utilities.Filter(sections, sectionHasRows) {
 		blocks = append(blocks, buildSectionHeadingBlock(section))
 		blocks = append(blocks, buildSectionContentBlocks(section)...)
 	}
 	return blocks
 }
 
-func sectionHasPRs(section section) bool {
-	return section.prs.HasPRs()
+func sectionHasRows(section section) bool {
+	return section.prSection.HasRows()
 }
 
 // A header block is the only message text larger than bold, and it carries its own vertical
@@ -94,48 +94,67 @@ func buildSectionHeadingBlock(section section) slack.Block {
 // A spacing block cannot sit inside a rich_text block, so each repository takes a block of its
 // own and the spacing blocks go between them.
 func buildSectionContentBlocks(section section) []slack.Block {
-	if len(section.prs.Groups) == 0 {
+	if len(section.prSection.Groups) == 0 {
 		return []slack.Block{
-			buildPRListBlock("section_"+section.blockIDFragment, section.prs.PRs, section.renderRow),
+			slack.NewRichTextBlock("section_"+section.blockIDFragment, buildRowList(section.prSection.Rows, section)),
 		}
 	}
 	var blocks []slack.Block
-	for repositoryPosition, group := range section.prs.Groups {
+	for repositoryPosition, group := range section.prSection.Groups {
 		if repositoryPosition > 0 {
 			blocks = append(blocks, buildSpacingBlock())
 		}
 		// The repository's position identifies it, not its path: whether a block_id may hold
 		// the path's "/" is not documented.
 		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockIDFragment, repositoryPosition+1)
-		blocks = append(blocks, buildRepositoryBlock(blockID, group, section.renderRow))
+		blocks = append(blocks, buildRepositoryBlock(blockID, group, section))
 	}
 	return blocks
 }
 
-func buildRepositoryBlock(
-	blockID string, group messagecontent.PRsOfRepository,
-	renderRow func(prview.PR) slack.RichTextElement,
-) slack.Block {
+func buildRepositoryBlock(blockID string, group prview.RepositoryRows, section section) slack.Block {
 	subHeading := slack.NewRichTextSection(
 		slack.NewRichTextSectionLinkElement(
-			group.RepositoryPullsURL, group.RepositoryName, &slack.RichTextSectionTextStyle{Bold: true},
+			group.Repository.GetPullsURL(), group.Repository.Name, &slack.RichTextSectionTextStyle{Bold: true},
 		),
 	)
-	return slack.NewRichTextBlock(blockID, subHeading, slack.NewRichTextList(
-		slack.RichTextListElementType("bullet"), 0, utilities.Map(group.PRs, renderRow)...,
-	))
+	return slack.NewRichTextBlock(blockID, subHeading, buildRowList(group.Rows, section))
 }
 
 func buildSpacingBlock() slack.Block {
 	return slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil)
 }
 
-func buildPRListBlock(
-	blockID string, prs []prview.PR, renderRow func(prview.PR) slack.RichTextElement,
-) slack.Block {
-	return slack.NewRichTextBlock(blockID, slack.NewRichTextList(
-		slack.RichTextListElementType("bullet"), 0, utilities.Map(prs, renderRow)...,
-	))
+func buildRowList(rows []prview.Row, section section) *slack.RichTextList {
+	return slack.NewRichTextList(
+		slack.RichTextListElementType("bullet"), 0,
+		utilities.Map(rows, func(row prview.Row) slack.RichTextElement { return buildBulletPoint(row, section) })...,
+	)
+}
+
+func buildBulletPoint(row prview.Row, section section) slack.RichTextElement {
+	switch row := row.(type) {
+	case prview.CollapsedRow:
+		return buildCollapsedRowBulletPoint(row)
+	default:
+		return section.buildPRBulletPoint(row.(prview.PR))
+	}
+}
+
+func buildCollapsedRowBulletPoint(row prview.CollapsedRow) slack.RichTextElement {
+	label := slack.NewRichTextSectionLinkElement(
+		row.GetSearchURL(), fmt.Sprintf("🤖 %s (%d)", row.GetAuthorLabel(), len(row.PRs)),
+		&slack.RichTextSectionTextStyle{Bold: true},
+	)
+	colon := slack.NewRichTextSectionTextElement(": ", &slack.RichTextSectionTextStyle{})
+	numberLinks := utilities.Map(row.PRs, func(pr prview.PR) slack.RichTextSectionElement {
+		return slack.NewRichTextSectionLinkElement(
+			pr.GetHTMLURL(), fmt.Sprintf("#%d", pr.GetNumber()), &slack.RichTextSectionTextStyle{Bold: true},
+		)
+	})
+	var space slack.RichTextSectionElement = slack.NewRichTextSectionTextElement(" ", &slack.RichTextSectionTextStyle{})
+	elements := append([]slack.RichTextSectionElement{label, colon}, utilities.Intersperse(numberLinks, space)...)
+	return slack.NewRichTextSection(elements...)
 }
 
 func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {

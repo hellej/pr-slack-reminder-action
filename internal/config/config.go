@@ -37,6 +37,7 @@ const (
 	InputOldPRThresholdHours         string = "old-pr-threshold-hours"
 	InputGroupByRepository           string = "group-by-repository"
 	InputPRTrackerCanvasLink         string = "pr-tracker-canvas-link"
+	InputCollapsePRsFromAuthors      string = "collapse-prs-from-authors"
 
 	MaxRepositories int = 30
 
@@ -77,6 +78,7 @@ type ContentInputs struct {
 	NoPRsMessage                string
 	OldPRThresholdHours         int
 	GroupByRepository           bool
+	CollapsePRsFromAuthors      []string
 }
 
 func (c Config) Print() {
@@ -120,6 +122,10 @@ func GetConfig() (Config, error) {
 	groupByRepository, err10 := inputhelpers.GetInputBool(InputGroupByRepository)
 	prTrackerCanvasURL := inputhelpers.GetInput(InputPRTrackerCanvasLink)
 	prTrackerCanvasID, err11 := getCanvasIDFromLink(prTrackerCanvasURL)
+	collapsePRsFromAuthors := utilities.Filter(
+		inputhelpers.GetInputList(InputCollapsePRsFromAuthors),
+		func(login string) bool { return login != "" },
+	)
 
 	if err := errors.Join(
 		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10, err11,
@@ -157,6 +163,7 @@ func GetConfig() (Config, error) {
 			NoPRsMessage:                noPRsMessage,
 			OldPRThresholdHours:         oldPRsThresholdHours,
 			GroupByRepository:           groupByRepository,
+			CollapsePRsFromAuthors:      collapsePRsFromAuthors,
 		},
 		PRTrackerCanvasID: prTrackerCanvasID,
 	}

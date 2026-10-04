@@ -13,6 +13,7 @@ Parses and validates GitHub Action inputs into a `Config`. See [AGENTS.md](../..
 - Validation enforces: a Slack channel (ID or name) is set; repository count ≤ `MaxRepositories` (30); no duplicate repositories; every `repository-filters` key matches exactly one configured repository; `state-artifact-name` is set when run mode is `"update"`
 - `pr-tracker-canvas-link` is parsed into `PRTrackerCanvasID`, the `F…` ID from the link's `/docs/<TEAM_ID>/<CANVAS_ID>` path. Empty input leaves it empty, which `Config.CanvasEnabled()` reports as the canvas feature being off
 - A non-empty canvas link that has no `docs` path segment followed by an `F[A-Z0-9]+` segment is a parse error, joined with the other input parse errors
+- `ContentInputs.CollapsePRsFromAuthors` lists the GitHub logins from `collapse-prs-from-authors`, empty items dropped (e.g. the one in `a;;b`). Go applies no default: `action.yml` carries it, so an unset input and an explicit `""` both mean nothing collapses
 - `Config.Print()` logs the config as JSON with all tokens redacted
 - Input getters (string/int/bool/list/mapping) treat an input as required or optional depending on which getter is called
 

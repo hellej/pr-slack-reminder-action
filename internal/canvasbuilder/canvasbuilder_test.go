@@ -2,6 +2,7 @@ package canvasbuilder_test
 
 import (
 	"bytes"
+	"cmp"
 	"flag"
 	"fmt"
 	"os"
@@ -52,11 +53,12 @@ type prOptions struct {
 	mergeAge    *time.Duration
 }
 
+func testRepository(name string) models.Repository {
+	return models.Repository{Owner: "test-org", Name: name}
+}
+
 func testPR(options prOptions) prview.PR {
-	repository := models.Repository{Owner: "test-org", Name: "test-repo"}
-	if options.repository != "" {
-		repository = models.Repository{Owner: "test-org", Name: options.repository}
-	}
+	repository := testRepository(cmp.Or(options.repository, "test-repo"))
 	var updatedAt time.Time
 	if options.activityAge != nil {
 		updatedAt = time.Now().Add(-*options.activityAge)
@@ -75,6 +77,7 @@ func testPR(options prOptions) prview.PR {
 				CreatedAt: time.Now().Add(-options.age),
 				UpdatedAt: updatedAt,
 				MergedAt:  mergedAt,
+				Merged:    mergedAt != nil,
 			},
 			Repository: repository,
 		},
@@ -87,6 +90,25 @@ func testPR(options prOptions) prview.PR {
 
 func testCollaborator(name string) prview.Collaborator {
 	return prview.NewCollaborator(githubclient.Collaborator{Login: "login", Name: name}, "U1234567890")
+}
+
+func flatSection(prs []prview.PR) prview.PRSection {
+	return prview.PRSection{Rows: rowsOf(prs)}
+}
+
+func groupedSection(prs []prview.PR) prview.PRSection {
+	return prview.PRSection{
+		Groups: utilities.Map(
+			prview.GroupPRsByRepositoriesInGivenOrder(prs),
+			func(group prview.RepositoryPRs) prview.RepositoryRows {
+				return prview.RepositoryRows{Repository: group.Repository, Rows: rowsOf(group.PRs)}
+			},
+		),
+	}
+}
+
+func rowsOf(prs []prview.PR) []prview.Row {
+	return utilities.Map(prs, func(pr prview.PR) prview.Row { return pr })
 }
 
 func durationPointer(duration time.Duration) *time.Duration {
@@ -188,28 +210,83 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		}),
 	}
 
+	// Ages and authors stay off a collapsed row, so only number, repository, merge and author count.
+	collapsedRow := func(author string, prs ...prOptions) prview.CollapsedRow {
+		return prview.CollapsedRow{AuthorLogin: author, PRs: utilities.Map(prs, testPR)}
+	}
+	dependabotRowOverTwoRepositories := collapsedRow("dependabot[bot]",
+		prOptions{number: 103}, prOptions{number: 7, repository: "repo-two"}, prOptions{number: 8, repository: "repo-two"},
+	)
+	renovateRow := collapsedRow("renovate[bot]", prOptions{number: 88}, prOptions{number: 90})
+	mergedDependabotRow := collapsedRow("dependabot[bot]",
+		prOptions{number: 98, mergeAge: durationPointer(hoursAge)}, prOptions{number: 97, mergeAge: durationPointer(idleAge)},
+	)
+	// A user account, so its login has no "[bot]" to strip and its "_" needs escaping. Its 4 PRs
+	// in one repository make a count taken from anything but the PRs show.
+	wipBotRow := collapsedRow("self_hosted_renovate",
+		prOptions{number: 61}, prOptions{number: 62}, prOptions{number: 63}, prOptions{number: 64},
+	)
+
 	testCases := []struct {
 		name    string
 		content canvascontent.Content
 	}{
 		{
+			// Ready to merge holds only a collapsed row, and still renders.
+			name: "collapsed rows",
+			content: canvascontent.Content{
+				ReadyToMerge: prview.PRSection{Rows: []prview.Row{
+					collapsedRow("dependabot[bot]", prOptions{number: 104}, prOptions{number: 105}),
+				}},
+				WaitingForReview: prview.PRSection{
+					Rows: []prview.Row{openPR, dependabotRowOverTwoRepositories, renovateRow},
+				},
+				Merged:      prview.PRSection{Rows: []prview.Row{mergedPR, mergedDependabotRow}},
+				WIP:         prview.PRSection{Rows: []prview.Row{wipPR, wipBotRow}},
+				GeneratedAt: generatedAt,
+			},
+		},
+		{
+			name: "collapsed rows grouped by repository",
+			content: canvascontent.Content{
+				WaitingForReview: prview.PRSection{Groups: []prview.RepositoryRows{
+					{Repository: testRepository("test-repo"), Rows: []prview.Row{openPR, renovateRow}},
+					{
+						Repository: testRepository("repo-two"),
+						Rows: []prview.Row{collapsedRow("dependabot[bot]",
+							prOptions{number: 7, repository: "repo-two"}, prOptions{number: 8, repository: "repo-two"},
+						)},
+					},
+				}},
+				Merged: prview.PRSection{Groups: []prview.RepositoryRows{
+					{Repository: testRepository("test-repo"), Rows: []prview.Row{mergedDependabotRow}},
+					{Repository: testRepository("repo-two"), Rows: []prview.Row{otherMergedPR}},
+				}},
+				WIP: prview.PRSection{Groups: []prview.RepositoryRows{
+					{Repository: testRepository("test-repo"), Rows: []prview.Row{wipPR, wipBotRow}},
+				}},
+				GroupedByRepository: true,
+				GeneratedAt:         generatedAt,
+			},
+		},
+		{
 			// A whole canvas at a real day's volume, so the golden file shows what three
 			// open headings cost a reader.
 			name: "flat open PRs and WIP PRs",
 			content: canvascontent.Content{
-				ReadyToMerge:     canvascontent.PRSection{PRs: readyToMergePRs},
-				WaitingForAuthor: canvascontent.PRSection{PRs: waitingForAuthorPRs},
-				WaitingForReview: canvascontent.PRSection{PRs: waitingForReviewPRs},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR, otherWIPPR}},
-				Merged:           canvascontent.PRSection{PRs: []prview.PR{otherMergedPR, mergedPR}},
+				ReadyToMerge:     flatSection(readyToMergePRs),
+				WaitingForAuthor: flatSection(waitingForAuthorPRs),
+				WaitingForReview: flatSection(waitingForReviewPRs),
+				WIP:              flatSection([]prview.PR{wipPR, otherWIPPR}),
+				Merged:           flatSection([]prview.PR{otherMergedPR, mergedPR}),
 				GeneratedAt:      generatedAt,
 			},
 		},
 		{
 			name: "merged PRs could not be fetched",
 			content: canvascontent.Content{
-				WaitingForReview:     canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:                  canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForReview:     flatSection([]prview.PR{openPR}),
+				WIP:                  flatSection([]prview.PR{wipPR}),
 				MergedPRsUnavailable: true,
 				GeneratedAt:          generatedAt,
 			},
@@ -217,11 +294,9 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "open PRs grouped by repository",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{openPR, otherOpenPR}),
-				},
+				WaitingForReview:    groupedSection([]prview.PR{openPR, otherOpenPR}),
 				GroupedByRepository: true,
-				WIP:                 canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WIP:                 flatSection([]prview.PR{wipPR}),
 				GeneratedAt:         generatedAt,
 			},
 		},
@@ -231,21 +306,11 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			// sections: the golden file shows what the ### headings add up to.
 			name: "all sections grouped by repository",
 			content: canvascontent.Content{
-				ReadyToMerge: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder(readyToMergePRs),
-				},
-				WaitingForAuthor: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder(waitingForAuthorPRs),
-				},
-				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder(waitingForReviewPRs),
-				},
-				WIP: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{otherWIPPR, wipPR}),
-				},
-				Merged: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{otherMergedPR, mergedPR}),
-				},
+				ReadyToMerge:        groupedSection(readyToMergePRs),
+				WaitingForAuthor:    groupedSection(waitingForAuthorPRs),
+				WaitingForReview:    groupedSection(waitingForReviewPRs),
+				WIP:                 groupedSection([]prview.PR{otherWIPPR, wipPR}),
+				Merged:              groupedSection([]prview.PR{otherMergedPR, mergedPR}),
 				GroupedByRepository: true,
 				GeneratedAt:         generatedAt,
 			},
@@ -254,17 +319,17 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			// The two empty buckets render nothing at all, heading included.
 			name: "ready to merge PRs only",
 			content: canvascontent.Content{
-				ReadyToMerge: canvascontent.PRSection{PRs: readyToMergePRs},
-				WIP:          canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				ReadyToMerge: flatSection(readyToMergePRs),
+				WIP:          flatSection([]prview.PR{wipPR}),
 				GeneratedAt:  generatedAt,
 			},
 		},
 		{
 			name: "nothing ready to merge",
 			content: canvascontent.Content{
-				WaitingForAuthor: canvascontent.PRSection{PRs: waitingForAuthorPRs},
-				WaitingForReview: canvascontent.PRSection{PRs: waitingForReviewPRs},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForAuthor: flatSection(waitingForAuthorPRs),
+				WaitingForReview: flatSection(waitingForReviewPRs),
+				WIP:              flatSection([]prview.PR{wipPR}),
 				GeneratedAt:      generatedAt,
 			},
 		},
@@ -273,12 +338,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			// sub-headings.
 			name: "ready to merge PRs only, grouped by repository",
 			content: canvascontent.Content{
-				ReadyToMerge: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder(readyToMergePRs),
-				},
-				WIP: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{wipPR}),
-				},
+				ReadyToMerge:        groupedSection(readyToMergePRs),
+				WIP:                 groupedSection([]prview.PR{wipPR}),
 				GroupedByRepository: true,
 				GeneratedAt:         generatedAt,
 			},
@@ -286,7 +347,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "no open PRs",
 			content: canvascontent.Content{
-				WIP:         canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WIP:         flatSection([]prview.PR{wipPR}),
 				GeneratedAt: generatedAt,
 			},
 		},
@@ -294,14 +355,14 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			name: "no open PRs while grouping by repository",
 			content: canvascontent.Content{
 				GroupedByRepository: true,
-				WIP:                 canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WIP:                 flatSection([]prview.PR{wipPR}),
 				GeneratedAt:         generatedAt,
 			},
 		},
 		{
 			name: "no WIP PRs",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
 				GeneratedAt:      generatedAt,
 			},
 		},
@@ -312,67 +373,59 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "old open PR",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{
-					PRs: []prview.PR{
-						testPR(prOptions{
-							number: 4, title: "Old PR past the threshold", authorName: "Bob Brown",
-							age: oldAge, isOldPR: true,
-						}),
-						openPR,
-					},
-				},
+				WaitingForReview: flatSection([]prview.PR{
+					testPR(prOptions{
+						number: 4, title: "Old PR past the threshold", authorName: "Bob Brown",
+						age: oldAge, isOldPR: true,
+					}),
+					openPR,
+				}),
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "recently updated and idle WIP PRs",
 			content: canvascontent.Content{
-				WIP: canvascontent.PRSection{
-					PRs: []prview.PR{
-						wipPR,
-						testPR(prOptions{
-							number: 5, title: "Refactor state store", authorName: "Carol Clark",
-							age: oldAge, activityAge: durationPointer(idleAge),
-							approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
-						}),
-					},
-				},
+				WIP: flatSection([]prview.PR{
+					wipPR,
+					testPR(prOptions{
+						number: 5, title: "Refactor state store", authorName: "Carol Clark",
+						age: oldAge, activityAge: durationPointer(idleAge),
+						approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
+					}),
+				}),
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "WIP PR with unknown activity",
 			content: canvascontent.Content{
-				WIP: canvascontent.PRSection{
-					PRs: []prview.PR{
-						testPR(prOptions{
-							number: 6, title: "Prototype canvas rendering", authorName: "Alice Anderson",
-							age: idleAge,
-						}),
-					},
-				},
+				WIP: flatSection([]prview.PR{
+					testPR(prOptions{
+						number: 6, title: "Prototype canvas rendering", authorName: "Alice Anderson",
+						age: idleAge,
+					}),
+				}),
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "merged PR with unknown merge time",
 			content: canvascontent.Content{
-				Merged: canvascontent.PRSection{
-					PRs: []prview.PR{
-						testPR(prOptions{
-							number: 10, title: "Restore the deleted branch", authorName: "Carol Clark",
-							age: oldAge,
-						}),
-					},
-				},
+				Merged: flatSection([]prview.PR{
+					testPR(prOptions{
+						number: 10, title: "Restore the deleted branch", authorName: "Carol Clark",
+						age: oldAge,
+					}),
+				}),
 				GeneratedAt: generatedAt,
 			},
 		},
 		{
 			name: "open PRs capped",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				WIP:              flatSection([]prview.PR{wipPR}),
 				OpenPRsCapped:    true,
 				GeneratedAt:      generatedAt,
 			},
@@ -380,8 +433,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "WIP PRs capped",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				WIP:              flatSection([]prview.PR{wipPR}),
 				WIPPRsCapped:     true,
 				GeneratedAt:      generatedAt,
 			},
@@ -389,8 +442,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "both sections capped",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				WIP:              flatSection([]prview.PR{wipPR}),
 				OpenPRsCapped:    true,
 				WIPPRsCapped:     true,
 				GeneratedAt:      generatedAt,
@@ -399,8 +452,8 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "generated at a non-UTC time",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				WIP:              flatSection([]prview.PR{wipPR}),
 				// The same moment as every other case's generatedAt, three hours east of UTC.
 				GeneratedAt: generatedAt.In(time.FixedZone("EEST", 3*60*60)),
 			},
@@ -408,30 +461,26 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		{
 			name: "markdown characters in titles and names",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{
-						testPR(prOptions{
-							number:     7,
-							title:      "Fix [ABC-123] crash in `make test` & **WIP** _debug_ ~legacy~ C:\\path <b>",
-							repository: "repo_two",
-							authorName: "Al*ice_And[erson]",
-							commenters: []string{"E~rin <Evans>"},
-							age:        hoursAge,
-						}),
+				WaitingForReview: groupedSection([]prview.PR{
+					testPR(prOptions{
+						number:     7,
+						title:      "Fix [ABC-123] crash in `make test` & **WIP** _debug_ ~legacy~ C:\\path <b>",
+						repository: "repo_two",
+						authorName: "Al*ice_And[erson]",
+						commenters: []string{"E~rin <Evans>"},
+						age:        hoursAge,
 					}),
-				},
+				}),
 				GroupedByRepository: true,
-				WIP: canvascontent.PRSection{
-					PRs: []prview.PR{
-						testPR(prOptions{
-							number:      8,
-							title:       "Draft: &amp; <https://example.com> \\_escaped_",
-							authorName:  "B`ob & Brown",
-							age:         hoursAge,
-							activityAge: durationPointer(minutesAge),
-						}),
-					},
-				},
+				WIP: flatSection([]prview.PR{
+					testPR(prOptions{
+						number:      8,
+						title:       "Draft: &amp; <https://example.com> \\_escaped_",
+						authorName:  "B`ob & Brown",
+						age:         hoursAge,
+						activityAge: durationPointer(minutesAge),
+					}),
+				}),
 				GeneratedAt: generatedAt,
 			},
 		},
@@ -478,13 +527,12 @@ func assertMarkdownMatchesSnapshot(t *testing.T, markdown string) {
 // A snapshot would accept a heading appearing, vanishing or losing its emoji on a re-record, so
 // every heading line the render emits is pinned here, in order.
 func TestBuildMarkdownSectionHeadings(t *testing.T) {
-	filled := canvascontent.PRSection{PRs: []prview.PR{testPR(prOptions{
+	filledPRs := []prview.PR{testPR(prOptions{
 		number: 1, title: "Add pagination to the PR listing", authorName: "Alice Anderson",
 		age: hoursAge,
-	})}}
-	grouped := canvascontent.PRSection{
-		Groups: prview.GroupPRsByRepositoriesInGivenOrder(filled.PRs),
-	}
+	})}
+	filled := flatSection(filledPRs)
+	grouped := groupedSection(filledPRs)
 	alwaysRenderedHeadings := []string{"## 🚀 Merged", "## 🔧 WIP"}
 
 	testCases := []struct {
@@ -602,21 +650,19 @@ func TestBuildMarkdownHasNoTopLevelHeading(t *testing.T) {
 		{
 			name: "flat",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{PRs: []prview.PR{openPR}},
-				WIP:              canvascontent.PRSection{PRs: []prview.PR{wipPR}},
-				Merged:           canvascontent.PRSection{PRs: []prview.PR{mergedPR}},
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				WIP:              flatSection([]prview.PR{wipPR}),
+				Merged:           flatSection([]prview.PR{mergedPR}),
 				GeneratedAt:      generatedAt,
 			},
 		},
 		{
 			name: "grouped by repository",
 			content: canvascontent.Content{
-				WaitingForReview: canvascontent.PRSection{
-					Groups: prview.GroupPRsByRepositoriesInGivenOrder([]prview.PR{openPR}),
-				},
+				WaitingForReview:    groupedSection([]prview.PR{openPR}),
 				GroupedByRepository: true,
-				WIP:                 canvascontent.PRSection{PRs: []prview.PR{wipPR}},
-				Merged:              canvascontent.PRSection{PRs: []prview.PR{mergedPR}},
+				WIP:                 flatSection([]prview.PR{wipPR}),
+				Merged:              flatSection([]prview.PR{mergedPR}),
 				GeneratedAt:         generatedAt,
 			},
 		},

@@ -10,6 +10,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/canvascontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func hashTestPR(number int, title string) prview.PR {
@@ -32,8 +33,10 @@ func hashTestPR(number int, title string) prview.PR {
 
 func hashTestContent(openPRs []prview.PR, generatedAt time.Time) canvascontent.Content {
 	return canvascontent.Content{
-		WaitingForReview: canvascontent.PRSection{PRs: openPRs},
-		GeneratedAt:      generatedAt,
+		WaitingForReview: prview.PRSection{
+			Rows: utilities.Map(openPRs, func(pr prview.PR) prview.Row { return pr }),
+		},
+		GeneratedAt: generatedAt,
 	}
 }
 
