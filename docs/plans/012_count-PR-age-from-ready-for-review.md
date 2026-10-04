@@ -78,10 +78,7 @@ Non-breaking, minor: the age and 🚨 in every message and canvas change meaning
 ### Step 3: docs
 
 - `action.yml` and README inputs table: `old-pr-threshold-hours` counts from ready for review, or from creation for a PR never a draft. `go run .github/scripts/check_inputs.go` passes
-- README: new `### What the times mean` subsection under `### Example Output`, one bullet per row time:
-  - Open PR, "N days ago" / "N days old": since the PR was first marked ready for review, or since it was opened if it was never a draft. A PR moved back to draft and marked ready again keeps its first time
-  - WIP PR on the canvas, "updated N ago" / "idle N days": since the PR's last update
-  - Merged PR, "merged N ago": since the merge
+- README: one bullet under "What's special about this action": PR age counts from first ready for review
 
 ## Consequences
 

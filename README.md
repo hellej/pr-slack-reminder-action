@@ -15,12 +15,6 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 </details>
 
-### What the times mean
-
-- Open PR, "3 days ago", or "5 days old" with 🚨 past `old-pr-threshold-hours`: time since the PR was first marked ready for review, or since it was opened if it was never a draft. A PR moved back to draft and marked ready again keeps its first time
-- WIP PR on the canvas, "updated 3 hours ago" or "idle 2 days": time since the PR's last update. "Idle" from a day onwards
-- Merged PR, "merged 2 days ago": time since the merge
-
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
@@ -41,6 +35,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open PRs bucketed by whose turn it is, plus draft and recently merged PRs
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
 - Highlight old PRs that need attention (with optional age threshold input)
+- PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
 - More customizable message content
 - Global and repository specific filters
