@@ -17,6 +17,9 @@ var testRepositories = []models.Repository{
 	{Owner: "owner-two", Name: "repo-two"},
 }
 
+const testReadyForReviewEventSelection = "timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1)" +
+	"{ nodes { ... on ReadyForReviewEvent { createdAt } } }"
+
 type enrichFixture struct {
 	reviews         []map[string]any
 	comments        []map[string]any

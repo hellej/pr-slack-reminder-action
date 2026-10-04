@@ -23,23 +23,24 @@ import (
 )
 
 type MockGitHubClientOptions struct {
-	PRsByNumber                       map[int]*github.PullRequest
-	ErrByPRNumber                     map[int]error
-	PRs                               []*github.PullRequest
-	PRsByRepo                         map[string][]*github.PullRequest
-	MergedPRs                         []*github.PullRequest
-	MergedPRsByRepo                   map[string][]*github.PullRequest
-	MergedPRsSearchError              error // fails the merged PR search only
-	ListPRsResponseStatus             int
-	ReviewsByPRNumber                 map[int][]*github.PullRequestReview
-	TimelineCommentsByPRNumber        map[int][]*github.IssueComment
-	RequestedReviewerLoginsByPRNumber map[int][]string
-	PRServiceError                    error
-	IssueServiceError                 error
-	MockPreviousState                 *state.State
-	ListArtifactsError                error
-	DownloadArtifactError             error
-	Recording                         *FetchRecording
+	PRsByNumber                          map[int]*github.PullRequest
+	ErrByPRNumber                        map[int]error
+	PRs                                  []*github.PullRequest
+	PRsByRepo                            map[string][]*github.PullRequest
+	MergedPRs                            []*github.PullRequest
+	MergedPRsByRepo                      map[string][]*github.PullRequest
+	MergedPRsSearchError                 error // fails the merged PR search only
+	ListPRsResponseStatus                int
+	ReviewsByPRNumber                    map[int][]*github.PullRequestReview
+	TimelineCommentsByPRNumber           map[int][]*github.IssueComment
+	RequestedReviewerLoginsByPRNumber    map[int][]string
+	FirstReadyForReviewEventAtByPRNumber map[int]time.Time
+	PRServiceError                       error
+	IssueServiceError                    error
+	MockPreviousState                    *state.State
+	ListArtifactsError                   error
+	DownloadArtifactError                error
+	Recording                            *FetchRecording
 }
 
 // Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
@@ -315,7 +316,17 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	node["reviewRequests"] = connectionJSON(
 		utilities.Map(t.opts.RequestedReviewerLoginsByPRNumber[number], reviewRequestNodeJSON),
 	)
+	node["timelineItems"] = t.readyForReviewEventsJSON(number)
 	return node
+}
+
+// A PR with no entry was never marked ready for review, which GitHub reports as no nodes.
+func (t GraphQLTransport) readyForReviewEventsJSON(number int) map[string]any {
+	readyAt, isMarkedReady := t.opts.FirstReadyForReviewEventAtByPRNumber[number]
+	if !isMarkedReady {
+		return connectionJSON([]map[string]any{})
+	}
+	return connectionJSON([]map[string]any{{"createdAt": readyAt}})
 }
 
 func pullRequestNodeState(pr *github.PullRequest) string {

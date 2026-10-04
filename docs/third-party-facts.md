@@ -93,9 +93,9 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   connection, divided by 100
 - The budget is 5,000 points an hour
 
-## The GraphQL cost formula overestimates: read `rateLimit.cost` instead [2026-08-22]
+## The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost` [2026-10-03]
 
-- Source: `gh api graphql` against `microsoft/vscode`, `rust-lang/rust`, `kubernetes/kubernetes`, `facebook/react`; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
+- Source: `gh api graphql` against `microsoft/vscode`, `rust-lang/rust`, `kubernetes/kubernetes`, `facebook/react`; [rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api); this action's logged `rateLimit.cost`
 - The formula predicted 3 points for a two-repository search. GitHub charged 2
 - A nested connection is what costs. Aliases carrying one are charged per alias; aliases
   without one are nearly free
@@ -108,10 +108,22 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 | Merged PR search, no `labels` | 1 total, any repository count |
 | Enrichment batch, 25 PRs, `reviews(first: 100)` + `comments(first: 100)` | 1 |
 | Enrichment batch, 25 PRs, the same plus `reviewThreads(first: 100)` | 1 |
+| Enrichment as sent since 2026-09-13, with `comments(last: 1)` under `reviewThreads` | about 1 per PR |
 
-- The enrichment batch was measured with a `commits(last: 1)` selection it no longer carries
-- A fourth nested connection per alias left the cost at 1, taking the batch from 7,500 to
-  10,000 requested nodes. Individual calls cap at 500,000 nodes, so that is 2% of it
+- The two 25-PR enrichment rows were measured on 2026-09-12, with a `commits(last: 1)`
+  selection the query no longer carries, and before `reviewThreads` gained its nested
+  `comments(last: 1)` (9dc8733, 2026-09-13)
+  - Adding a fourth connection per PR left that cost at 1, taking the batch from 7,500 to
+    10,000 requested nodes. Individual calls cap at 500,000 nodes, so that is 2% of it
+- The last row is logged `rateLimit.cost` from this action's runs, 2026-10-03:
+  - 20 open PRs in one batch: 21, both in Build run 36751486175 (2026-09-30, before
+    `timelineItems`) and in Build run 37152107647 (after)
+  - Merged enrichment: 6 PRs cost 6 before, 3 PRs cost 3 after
+  - Single repository under `GITHUB_TOKEN`, PR Reminder run 37152109084: 2 PRs cost 2
+- The formula predicts every one of those: `comments(last: 1)` under `reviewThreads(first: 100)`
+  is up to 100 requests per PR, so 20 PRs at about 105 requests each come to 21 points
+- Unverified: that the nested `comments(last: 1)` drives the cost. Nobody measured the query
+  with and without it
 
 ## GitHub GraphQL `search` reports an unreadable repository as an empty result, never an error [2026-08-22]
 
@@ -853,12 +865,18 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `ReadyForReviewEvent.createdAt` is `DateTime!`; its `actor` is nullable ([schema](https://docs.github.com/public/fpt/schema.docs.graphql))
 - Unverified: PRs from before drafts existed, and an `isDraft: false` PR that started as a draft but carries no event
 
-## A filtered `timelineItems(first: 1)` on 25 aliased PRs leaves the GraphQL cost at 1 [2026-10-03]
+## A filtered `timelineItems(first: 1)` adds no GraphQL cost to a query on 25 aliased PRs [2026-10-03]
 
 - Source: [rate limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api); `gh api graphql` on `kubernetes/kubernetes`, 2026-10-03
 - By the formula: 25 PRs × `first: 1` is 25 requests, 0.25 points
-- Measured: 25 open PRs with `reviews`, `comments` and `reviewThreads` at `first: 100` cost 1, and adding the filtered connection kept it at 1
-- Unverified: the token permission. The REST timeline endpoint takes Issues read or Pull requests read ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)). See § No GitHub page documents the token permission for any GraphQL field
+- Measured: 25 open PRs with `reviews`, `comments` and `reviewThreads` at `first: 100`, no nested thread `comments`, cost 1, and adding the filtered connection kept it at 1
+- This action's own enrichment query costs about 1 per PR, and adding the connection left that unchanged. See § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
+
+## Filtered `timelineItems` returns `ReadyForReviewEvent` under `GITHUB_TOKEN` and a GitHub App token [2026-10-03]
+
+- Source: Build run 37152107647 (E2E step, GitHub App token, 3 repositories) and PR Reminder run 37152109084 (`build-first=true`, `GITHUB_TOKEN` with `pull-requests: read` and `contents: read`), 2026-10-03
+- Both logged `first ready for review: 2026-10-03T20:35:44Z` for `hellej/pr-slack-reminder-action#78`, opened as a draft and marked ready through the API, and `never` for every other PR, all opened as non-draft
+- This doesn't isolate the permission granting it: the repository is public and the job grants both permissions. The REST timeline endpoint takes Issues read or Pull requests read ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)). See § No GitHub page documents the token permission for any GraphQL field
 
 ## A message with `blocks` shows its top-level `text` only in notifications [2026-10-03]
 
