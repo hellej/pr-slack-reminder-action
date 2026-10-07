@@ -32,9 +32,9 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		"number title url isDraft createdAt updatedAt state merged mergedAt mergeable",
 		"author { login __typename ... on User { name } }",
 		"labels(first: 100){ nodes { name } }",
-		"reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
-		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
-		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
+		"reviews(last: 100){ nodes { state author { login __typename ... on User { name } } } }",
+		"comments(last: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
+		"reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 		testReadyForReviewEventSelection,
 	}

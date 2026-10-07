@@ -31,7 +31,8 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Merged PRs are enriched like open ones, so a merged row names its approvers and commenters
 - All three PR-reading paths use the GraphQL API: `FindOpenPRs` lists every repository's open PRs in one request, then fetches reviews and comments for the capped set; `GetPRs` fetches the referenced PRs directly; `FindRecentlyMergedPRs` searches in one request, then fetches reviews and comments for the capped set. All three fetch in batches of 25 PRs per request, so the merged cap (6) always fits one batch. `FetchLatestArtifactByName` is the only path that uses REST
 - Batches run at most `defaultGitHubAPIConcurrencyLimit` (3) requests at a time
-- Per PR 100 reviews, 100 timeline comments, 100 review threads and 100 review requests are read (GitHub's maximum page size), oldest first by GitHub's default connection order since the query sets none, plus the first ready-for-review event; a thread carries its last comment's author only, and review comments are not read at all (their authors always have a review of their own)
+- Per PR the newest 100 reviews, timeline comments and review threads, and the first 100 review requests, are read (GitHub's maximum page size), plus the first ready-for-review event. The newest are read since the latest activity decides whose turn it is
+- A thread carries its last comment's author only. Review comments are not read at all (their authors always have a review of their own)
 - A collaborator carries a display name only when GitHub returns one for a user, and the login otherwise
 - Every GitHub request is tried up to 3 times, 2s before the second attempt and 5s before the third, and only on a transient failure: no response (network error, attempt deadline) or a 5xx. A GraphQL request is also retried on a 429 or an unparseable body
 - Each attempt has its own 15s deadline, the same for every call: past GitHub's own 10s processing limit, so its 502 or 504 arrives first. The caller's ctx bounds the whole call: once it is done, no further attempt starts. A call can take up to 52s
@@ -62,7 +63,8 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - `GetPRs` truncates its input to the first `MaxPRsToFetch` refs if more are passed, before fetching anything
 - A GraphQL response carries HTTP 200 with an errors array; an error is scoped by its path to the whole query, a repository, a `pullRequest`, or a field below one, and when several arrive the most severe wins (query over repository over pull request)
 - A PR left without reviewer info by a failed enrichment is also left without its snooze, so a snoozed PR reappears in the reminder
-- A PR with over 100 review threads is judged on the first 100, so an unresolved thread past that is missed and the PR can read as nobody's turn
+- A PR with over 100 review threads is judged on the newest 100, so an unresolved thread older than that is missed and the PR can read as nobody's turn
+- A PR with over 100 reviews or timeline comments is judged on the newest 100, so an early approval or changes request, or an early snooze comment, drops out
 - A bot replying last in a person's thread hands the thread back to the reviewer, as the PR author replying would
 - On a bot-authored PR, such as Dependabot's, a thread waiting for the author stays waiting until someone resolves it, since the author never replies
 - A review a person posts through a bot integration counts for neither flag, so real feedback delivered by a bot leaves the PR looking untouched
