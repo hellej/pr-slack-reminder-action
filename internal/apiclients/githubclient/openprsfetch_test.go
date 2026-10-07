@@ -243,9 +243,9 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"p0: repository(owner:$owner0,name:$name0){ pullRequest(number:$num0){ ..." + testEnrichFragmentName + " } }",
 		"p1: repository(owner:$owner1,name:$name1){ pullRequest(number:$num1){ ..." + testEnrichFragmentName + " } }",
 		"fragment " + testEnrichFragmentName + " on PullRequest {",
-		"number mergeable\n  reviews(first: 100){ nodes { state author { login __typename ... on User { name } } } }",
-		"comments(first: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
-		"reviewThreads(first: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
+		"number mergeable\n  reviews(last: 100){ nodes { state author { login __typename ... on User { name } } } }",
+		"comments(last: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }",
+		"reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 		testReadyForReviewEventSelection,
 	}
