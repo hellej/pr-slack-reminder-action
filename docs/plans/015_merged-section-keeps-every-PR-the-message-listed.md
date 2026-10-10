@@ -88,4 +88,4 @@ status: draft
 
 ### Neutral
 
-- Plan 015 also edits `state.Load`, `state.spec.md` and `run.spec.md`. Whichever lands second resolves the merge conflicts
+- The plan "Trust Only Non-fork State Artifacts and Attest Release Binaries" also edits `state.Load`, `state.spec.md` and `run.spec.md`. Whichever lands second resolves the merge conflicts

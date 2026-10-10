@@ -63,9 +63,9 @@ type section struct {
 
 func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 	sections := []section{
-		{"ready_to_merge", readyToMergeHeading, content.ReadyToMerge, buildOpenPRBulletPoint},
-		{"waiting_for_author", waitingForAuthorHeading, content.WaitingForAuthor, buildOpenPRBulletPoint},
 		{"waiting_for_review", waitingForReviewHeading, content.WaitingForReview, buildOpenPRBulletPoint},
+		{"waiting_for_author", waitingForAuthorHeading, content.WaitingForAuthor, buildOpenPRBulletPoint},
+		{"ready_to_merge", readyToMergeHeading, content.ReadyToMerge, buildOpenPRBulletPoint},
 		{"merged", mergedPRsHeading, content.Merged, buildMergedPRBulletPoint},
 	}
 

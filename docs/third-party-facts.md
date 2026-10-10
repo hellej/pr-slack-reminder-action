@@ -903,3 +903,84 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: web search `is:pr author:app/dependabot repo:hellej/pr-slack-reminder-test-repo-1 repo:hellej/pr-slack-reminder-action`, 2026-10-04
 - It returned 85 PRs, the sum of each repository searched alone
 - Unverified for the REST and GraphQL `search`
+
+## A fork `pull_request` run's artifact lists in the base repository, with the fork as `head_repository_id` [2026-10-04]
+
+- Source: `gh api repos/actions/toolkit/actions/artifacts` and `.../actions/runs/36874659784`, 2026-10-04
+- Artifact 11168029224 carries `workflow_run.repository_id` 182299236 (`actions/toolkit`) and `head_repository_id` 1385572789 (the fork `tunc-d/toolkit`). Its run's `event` is `pull_request`
+- The run's `pull_requests` is empty for a fork run
+- `schedule`, `push` and same-repository `pull_request` runs carry equal IDs (all 59 artifacts of `hellej/pr-slack-reminder-action`, 2026-10-04)
+- `workflow_run` is "object or null" on the artifact ([REST: Actions artifacts](https://docs.github.com/en/rest/actions/artifacts)). Inside it no field is required
+
+## A `pull_request_review` run on a fork PR reports the base repository as `head_repository` [2026-10-04]
+
+- Source: `gh api repos/NixOS/nixpkgs/actions/runs/37199268587` and `.../runs/37198915719`, 2026-10-04
+- Both runs: `event: pull_request_review`, `head_branch` and `head_sha` from the fork PR, `head_repository` `NixOS/nixpkgs`, the same as `repository`
+- `pull_request` runs in the same repository report the fork, e.g. run 34780404753
+- So `head_repository_id` cannot tell a fork's review run from the base repository's own
+- Unverified: the artifact-level `workflow_run.head_repository_id` for such a run. Neither run uploaded one
+- `issue_comment` runs on fork PRs run on the default branch, `head_repository` the base (`pytorch/pytorch` run 36315511488)
+
+## `actions/attest-build-provenance` v4 is a wrapper around `actions/attest`, which makes SLSA build provenance by default [2026-10-04]
+
+- Source: README.md and action.yml of both at v4.2.2, via `gh api`
+- `attest-build-provenance` README: "As of version 4, `actions/attest-build-provenance` is simply a wrapper on top of `actions/attest`", and "new implementations should use `actions/attest` instead"
+  - Its action.yml is a composite with one `uses: actions/attest` step, adding only `NODE_OPTIONS: --max-http-header-size=32768`
+- `actions/attest` README: "By default, this generates a SLSA build provenance attestation", with no `sbom-path` or predicate inputs
+- `actions/attest` v4.2.2 is commit `1e69f48acb82d1966a394da916b4c1698aa569d6`, a lightweight tag
+- `subject-path` "May contain a glob pattern or list of paths". Several subjects make one attestation
+- Permissions for a file: `id-token: write`, `attestations: write`, `contents: read`. `artifact-metadata: write` only for storage records with `push-to-registry`
+- The [docs](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) use `actions/attest@v4`
+
+## An artifact attestation records the calling workflow as its signer [2026-10-04]
+
+- Source: [increase security rating](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/increase-security-rating); sigstore/fulcio@56b44b0d59ec `docs/oid-info.md`, `pkg/identity/github/principal.go`; cli/cli v2.102.0 `pkg/cmd/attestation/verify/policy.go`; `hynek/structlog` attestation for digest `sha256:e081a26d…`, 2026-10-04
+- The signer "will always be the workflow that uses the attest action, which may be a reusable workflow"
+- Fulcio sets the certificate SAN and Build Signer URI from the OIDC `job_workflow_ref` claim. No claim or certificate field names an action
+- `--signer-workflow` matches the SAN, the `@ref` optional
+- Live: `hynek/structlog` attests from inside a composite action. Its certificate SAN names the calling workflow, `.github/workflows/pypi-package.yml@refs/tags/26.1.0`
+
+## Artifact attestations are free in public repositories and need GitHub Enterprise Cloud in private ones [2026-10-04]
+
+- Source: `actions/attest` README v4.2.2
+- "Artifact attestations are available in public repositories for all current GitHub plans"
+- Private and internal repositories need GitHub Enterprise Cloud. GitHub Enterprise Server is not supported
+
+## `gh attestation verify` matches a local file by its sha256 and needs `gh` auth unless given `--bundle` [2026-10-04]
+
+- Source: `gh attestation verify --help` and cli/cli v2.101.0 `pkg/cmd/attestation/artifact/file.go`, `pkg/cmd/attestation/verify/verify.go`
+- Needs `--owner` or `--repo`. `--signer-workflow <owner>/<repo>/<path>` pins the signing workflow
+- Default `--predicate-type` is `https://slsa.dev/provenance/v1`
+- Digest of the file's bytes only, not its path, so an unchanged git checkout verifies
+- Without `--bundle`, it fetches attestations from the API and needs `gh auth login` or `GH_TOKEN`
+
+## A job's `permissions:` block replaces the workflow's, unlisted permissions become `none` [2026-10-04]
+
+- Source: [workflow syntax: permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+- "If you specify the access for any of these permissions, all of those that are not specified are set to `none`"
+- A composite action cannot declare permissions. The calling job grants them
+
+## A fork PR's `pull_request_target` run reports the fork as `head_repository` [2026-10-04]
+
+- Source: `gh api "repos/nodejs/node/actions/runs?event=pull_request_target&per_page=8"`, 2026-10-04
+- Run 37198215068: `repository` `nodejs/node` (27193779), `head_repository` `jasnell/node` (37868459), `head_branch` the PR's branch. Runs from other forks match
+- Such a run uses the base repository's workflow and secrets, yet reads as a fork run by `head_repository`
+- Unverified: the artifact-level `workflow_run.head_repository_id` for such a run
+
+## A workflow can verify a public action's attestation with its own `GITHUB_TOKEN`, then run that checkout as a local action [2026-10-04]
+
+- Source: cli/cli v2.102.0 `pkg/cmd/attestation/api/client.go`, `pkg/cmd/attestation/verify/verify.go`; [REST: list attestations](https://docs.github.com/en/rest/repos/attestations#list-attestations) and github/docs `src/rest/data/fpt-2026-03-10/repos.json` (`allowsPublicRead: true`); [workflow syntax: `steps[*].uses`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsuses); actions/runner v2.337.0 `ActionManager.cs`, `NodeScriptActionHandler.cs`; runner-images `Ubuntu2404-Readme.md` 20260927.320.1
+- `gh attestation verify --repo` calls `GET /repos/{owner}/{repo}/attestations/{digest}`. For a public repository it "can be used without authentication or the aforementioned permissions", so a job needs no `attestations: read`
+- One file per call: `ExactArgs(1, ...)`
+- `ubuntu-latest` ships GitHub CLI 2.101.0. `gh attestation` arrived in 2.49.0
+- `uses: ./<dir>` runs an action checked out into the workspace, JavaScript actions included. The docs' own example checks out another repository with `repository:`, `ref:` and `path:`
+- The runner runs `main` from `<workspace>/<dir>`, so a script resolving files by `__dirname` finds them
+- `github.action_path` is "only supported in composite actions"
+- Unverified: whether `actions/checkout` of another public repository works with `contents: none`. Its README recommends `contents: read`
+
+## A composite action gets no `INPUT_*` environment variables [2026-10-04]
+
+- Source: [metadata syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax)
+- "If the action is written using a composite, then it will not automatically get `INPUT_<VARIABLE_NAME>`." Its steps read the `inputs` context instead
+- `runs.steps[*].env` sets a step's environment, so each input maps by hand: `INPUT_X: ${{ inputs.x }}`
+- A composite step reaches the action's directory as `$GITHUB_ACTION_PATH` or `${{ github.action_path }}`
