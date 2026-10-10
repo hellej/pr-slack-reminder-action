@@ -228,11 +228,18 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 			expectedSummary: "1 PR to review, 2 waiting for author 👀",
 		},
 		{
-			name: "merge and author but no review: the noun moves to the merge part",
+			name: "author and merge but no review: the noun moves to the author part",
 			openPRs: []prview.PR{
 				waitingForAuthorPR(1), waitingForAuthorPR(2), readyToMergePR(3), waitingForAuthorPR(4),
 			},
-			expectedSummary: "1 PR to merge, 3 waiting for author 👀",
+			expectedSummary: "3 PRs waiting for author, 1 to merge 👀",
+		},
+		{
+			name: "all three: review, author, merge",
+			openPRs: []prview.PR{
+				readyToMergePR(1), waitingForAuthorPR(2), waitingForReviewPR(3), waitingForReviewPR(4),
+			},
+			expectedSummary: "2 PRs to review, 1 waiting for author, 1 to merge 👀",
 		},
 		{
 			name:            "only waiting for author",

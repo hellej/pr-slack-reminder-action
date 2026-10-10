@@ -149,13 +149,13 @@ func TestSectionHeadings(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"heading_ready_to_merge", "section_ready_to_merge",
-		"heading_waiting_for_author", "section_waiting_for_author",
 		"heading_waiting_for_review", "section_waiting_for_review",
+		"heading_waiting_for_author", "section_waiting_for_author",
+		"heading_ready_to_merge", "section_ready_to_merge",
 		"heading_merged", "section_merged",
 	})
 	expectedHeadings := []string{
-		"✅ Ready to merge", "💬 Waiting for author", "👀 Waiting for review", "🚀 Recently merged",
+		"👀 Waiting for review", "💬 Waiting for author", "✅ Ready to merge", "🚀 Recently merged",
 	}
 	headingBlocks := []slack.Block{
 		message.Blocks.BlockSet[0], message.Blocks.BlockSet[2],
@@ -305,17 +305,17 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 	})
 
 	assertBlockIDs(t, message, []string{
-		"heading_ready_to_merge",
-		"section_ready_to_merge_repository_1",
 		"heading_waiting_for_review",
 		"section_waiting_for_review_repository_1",
 		"spacing",
 		"section_waiting_for_review_repository_2",
+		"heading_ready_to_merge",
+		"section_ready_to_merge_repository_1",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-one", "https://github.com/owner-one/repo-one/pulls")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "repo-two", "https://github.com/owner-two/repo-two/pulls")
-	expectedRowTitles := map[int]string{1: "Ready PR", 3: "PR in repo one", 5: "PR in repo two"}
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one", "https://github.com/owner-one/repo-one/pulls")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two", "https://github.com/owner-two/repo-two/pulls")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
+	expectedRowTitles := map[int]string{1: "PR in repo one", 3: "PR in repo two", 5: "Ready PR"}
 	for blockIndex, expectedTitle := range expectedRowTitles {
 		if title := firstRowTitle(t, message.Blocks.BlockSet[blockIndex]); title != expectedTitle {
 			t.Errorf("expected row %q in block %d, got %q", expectedTitle, blockIndex, title)
