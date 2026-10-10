@@ -3,13 +3,18 @@
 package slackclient
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/slack-go/slack"
 )
@@ -37,24 +42,27 @@ type Client interface {
 }
 
 func GetAuthenticatedClient(token string) Client {
-	return NewClient(slack.New(token))
+	return NewClient(slack.New(token), retry.DefaultPolicy())
 }
 
-func NewClient(slackAPI SlackAPI) Client {
-	return &client{slackAPI: slackAPI}
+func NewClient(slackAPI SlackAPI, retryPolicy retry.Policy) Client {
+	return &client{slackAPI: slackAPI, retryPolicy: retryPolicy}
 }
 
 // represents the Slack API methods relevant to us from github.com/slack-go/slack
 type SlackAPI interface {
 	GetConversations(params *slack.GetConversationsParameters) ([]slack.Channel, string, error)
-	PostMessage(channelID string, options ...slack.MsgOption) (string, string, error)
-	UpdateMessage(channelID string, timestamp string, options ...slack.MsgOption) (string, string, string, error)
-	DeleteMessage(channelID string, timestamp string) (string, string, error)
-	EditCanvas(params slack.EditCanvasParams) error
+	PostMessageContext(ctx context.Context, channelID string, options ...slack.MsgOption) (string, string, error)
+	UpdateMessageContext(
+		ctx context.Context, channelID string, timestamp string, options ...slack.MsgOption,
+	) (string, string, string, error)
+	DeleteMessageContext(ctx context.Context, channelID string, timestamp string) (string, string, error)
+	EditCanvasContext(ctx context.Context, params slack.EditCanvasParams) error
 }
 
 type client struct {
-	slackAPI SlackAPI
+	slackAPI    SlackAPI
+	retryPolicy retry.Policy
 }
 
 func (c *client) GetChannelIDByName(channelName string) (string, error) {
@@ -123,21 +131,27 @@ func (c *client) SendMessage(
 	}
 
 	log.Printf("\nSending message with summary: %s", summaryText)
-	responseChannelID, timestamp, err := c.slackAPI.PostMessage(
-		channelID,
-		slack.MsgOptionBlocks(message.Blocks.BlockSet...),
-		slack.MsgOptionText(summaryText, false),
+	sentInfo, err := retry.TransientFailures(
+		context.Background(), c.retryPolicy, "Slack post",
+		func(attemptCtx context.Context) retry.AttemptResult[SentMessageInfo] {
+			responseChannelID, timestamp, err := c.slackAPI.PostMessageContext(
+				attemptCtx,
+				channelID,
+				slack.MsgOptionBlocks(message.Blocks.BlockSet...),
+				slack.MsgOptionText(summaryText, false),
+			)
+			return retry.AttemptResult[SentMessageInfo]{
+				Value:     SentMessageInfo{ChannelID: responseChannelID, Timestamp: timestamp, BlocksAsSent: sentBlocks},
+				Err:       err,
+				Transient: slackSurelyDidNotProcess(err),
+			}
+		},
 	)
 	if err != nil {
 		return SentMessageInfo{}, fmt.Errorf("failed to send Slack message: %w", err)
 	}
 	log.Printf("Sent message to Slack channel: %s", channelID)
-
-	return SentMessageInfo{
-		ChannelID:    responseChannelID,
-		Timestamp:    timestamp,
-		BlocksAsSent: sentBlocks,
-	}, nil
+	return sentInfo, nil
 }
 
 func (c *client) UpdateMessage(
@@ -152,12 +166,16 @@ func (c *client) UpdateMessage(
 	}
 
 	log.Printf("Updating message with timestamp %s and summary: %s", messageTS, summaryText)
-	_, _, _, err = c.slackAPI.UpdateMessage(
-		channelID,
-		messageTS,
-		slack.MsgOptionBlocks(message.Blocks.BlockSet...),
-		slack.MsgOptionText(summaryText, false),
-	)
+	err = c.retryIdempotentCall("Slack update", func(attemptCtx context.Context) error {
+		_, _, _, err := c.slackAPI.UpdateMessageContext(
+			attemptCtx,
+			channelID,
+			messageTS,
+			slack.MsgOptionBlocks(message.Blocks.BlockSet...),
+			slack.MsgOptionText(summaryText, false),
+		)
+		return err
+	})
 	if err != nil {
 		return SentMessageInfo{}, WrapUpdateMessageError(err)
 	}
@@ -181,7 +199,10 @@ func WrapUpdateMessageError(err error) error {
 
 func (c *client) DeleteMessage(channelID string, messageTS string) error {
 	log.Printf("Deleting message with timestamp %s from channel %s", messageTS, channelID)
-	_, _, err := c.slackAPI.DeleteMessage(channelID, messageTS)
+	err := c.retryIdempotentCall("Slack delete", func(attemptCtx context.Context) error {
+		_, _, err := c.slackAPI.DeleteMessageContext(attemptCtx, channelID, messageTS)
+		return err
+	})
 	if err != nil {
 		if strings.Contains(err.Error(), "message_not_found") {
 			log.Printf("Message already deleted or not found, ignoring error")
@@ -197,15 +218,17 @@ func (c *client) DeleteMessage(channelID string, messageTS string) error {
 // which makes Slack apply it to the entire canvas.
 func (c *client) ReplaceCanvasContent(canvasID string, markdown string) error {
 	log.Printf("Replacing content of canvas %s with %d characters of markdown", canvasID, len(markdown))
-	err := c.slackAPI.EditCanvas(slack.EditCanvasParams{
-		CanvasID: canvasID,
-		Changes: []slack.CanvasChange{{
-			Operation: "replace",
-			DocumentContent: slack.DocumentContent{
-				Type:     "markdown",
-				Markdown: markdown,
-			},
-		}},
+	err := c.retryIdempotentCall("Slack canvas edit", func(attemptCtx context.Context) error {
+		return c.slackAPI.EditCanvasContext(attemptCtx, slack.EditCanvasParams{
+			CanvasID: canvasID,
+			Changes: []slack.CanvasChange{{
+				Operation: "replace",
+				DocumentContent: slack.DocumentContent{
+					Type:     "markdown",
+					Markdown: markdown,
+				},
+			}},
+		})
 	})
 	if err != nil {
 		return fmt.Errorf(
@@ -248,4 +271,53 @@ func (c *client) fetchChannels(types []string) ([]slack.Channel, error) {
 	}
 
 	return channels, nil
+}
+
+func (c *client) retryIdempotentCall(apiName string, call func(attemptCtx context.Context) error) error {
+	_, err := retry.TransientFailures(
+		context.Background(), c.retryPolicy, apiName,
+		func(attemptCtx context.Context) retry.AttemptResult[struct{}] {
+			err := call(attemptCtx)
+			return retry.AttemptResult[struct{}]{Err: err, Transient: isTransientForIdempotentCall(err)}
+		},
+	)
+	return err
+}
+
+// See slackclient.spec.md § Behaviour.
+var errorCodesSlackRejectsUnprocessed = []string{"ratelimited", "service_unavailable"}
+
+var errorCodesWorthRetryingAnIdempotentCall = []string{"internal_error", "fatal_error", "request_timeout"}
+
+func slackSurelyDidNotProcess(err error) bool {
+	var rateLimitedError *slack.RateLimitedError
+	if errors.As(err, &rateLimitedError) {
+		return true
+	}
+	var statusCodeError slack.StatusCodeError
+	if errors.As(err, &statusCodeError) && statusCodeError.Code == http.StatusTooManyRequests {
+		return true
+	}
+	var slackError slack.SlackErrorResponse
+	if errors.As(err, &slackError) && slices.Contains(errorCodesSlackRejectsUnprocessed, slackError.Err) {
+		return true
+	}
+	var connectionError *net.OpError
+	return errors.As(err, &connectionError) && connectionError.Op == "dial"
+}
+
+func isTransientForIdempotentCall(err error) bool {
+	if slackSurelyDidNotProcess(err) {
+		return true
+	}
+	var noResponseError *url.Error
+	if errors.As(err, &noResponseError) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var statusCodeError slack.StatusCodeError
+	if errors.As(err, &statusCodeError) && statusCodeError.Code >= http.StatusInternalServerError {
+		return true
+	}
+	var slackError slack.SlackErrorResponse
+	return errors.As(err, &slackError) && slices.Contains(errorCodesWorthRetryingAnIdempotentCall, slackError.Err)
 }

@@ -37,7 +37,7 @@ run modes and the pipeline order are in
 
 ## Doesn't Do
 
-- Doesn't retry a Slack call: its failure is final for that run
+- A Slack call's failure is final for that run once [internal/apiclients/slackclient](../../internal/apiclients/slackclient/slackclient.spec.md)'s retries are spent
 - Doesn't fail the whole run because the canvas refresh failed, or vice versa: each surfaces its own error independently
 - Doesn't mark the previous message stale when post mode sends nothing: it keeps reading as current
 - Doesn't tell apart two setups posting to the same channel under one state artifact name: each marks the other's message stale
