@@ -1,66 +1,37 @@
-package githubclient
+package retry_test
 
 import (
 	"context"
 	"errors"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
-type retryWaitRecorder struct {
-	mutex sync.Mutex
-	waits []time.Duration
-}
-
-func (r *retryWaitRecorder) requestedWaits() []time.Duration {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return slices.Clone(r.waits)
-}
-
-func skipAndRecordRetryWaits(t *testing.T) *retryWaitRecorder {
-	t.Helper()
-	recorder := &retryWaitRecorder{}
-	original := waitBeforeRetry
-	waitBeforeRetry = func(ctx context.Context, wait time.Duration) error {
-		recorder.mutex.Lock()
-		defer recorder.mutex.Unlock()
-		recorder.waits = append(recorder.waits, wait)
-		return ctx.Err()
-	}
-	t.Cleanup(func() { waitBeforeRetry = original })
-	return recorder
-}
-
-func withAttemptTimeout(t *testing.T, timeout time.Duration) {
-	t.Helper()
-	original := attemptTimeout
-	attemptTimeout = timeout
-	t.Cleanup(func() { attemptTimeout = original })
-}
-
 type scriptedAttempts struct {
-	results []attemptResult[string]
+	results []retry.AttemptResult[string]
 	calls   int
 }
 
-func (s *scriptedAttempts) run(ctx context.Context) attemptResult[string] {
+func (s *scriptedAttempts) run(ctx context.Context) retry.AttemptResult[string] {
 	result := s.results[min(s.calls, len(s.results)-1)]
 	s.calls++
 	return result
 }
 
-func TestRetryTransientFailures(t *testing.T) {
-	transientFailure := attemptResult[string]{err: errors.New("bad gateway"), transient: true}
-	permanentFailure := attemptResult[string]{err: errors.New("bad credentials")}
-	success := attemptResult[string]{value: "fetched"}
+func TestTransientFailures(t *testing.T) {
+	transientFailure := retry.AttemptResult[string]{Err: errors.New("bad gateway"), Transient: true}
+	permanentFailure := retry.AttemptResult[string]{Err: errors.New("bad credentials")}
+	success := retry.AttemptResult[string]{Value: "fetched"}
 
 	tests := []struct {
 		name             string
-		results          []attemptResult[string]
+		results          []retry.AttemptResult[string]
 		expectedValue    string
 		expectedError    string
 		expectedAttempts int
@@ -69,19 +40,19 @@ func TestRetryTransientFailures(t *testing.T) {
 	}{
 		{
 			name:             "success on the first attempt",
-			results:          []attemptResult[string]{success},
+			results:          []retry.AttemptResult[string]{success},
 			expectedValue:    "fetched",
 			expectedAttempts: 1,
 		},
 		{
 			name:             "permanent failure is not retried",
-			results:          []attemptResult[string]{permanentFailure, success},
+			results:          []retry.AttemptResult[string]{permanentFailure, success},
 			expectedError:    "bad credentials",
 			expectedAttempts: 1,
 		},
 		{
 			name:             "transient failure is retried until an attempt succeeds",
-			results:          []attemptResult[string]{transientFailure, success},
+			results:          []retry.AttemptResult[string]{transientFailure, success},
 			expectedValue:    "fetched",
 			expectedAttempts: 2,
 			expectedWaits:    []time.Duration{2 * time.Second},
@@ -89,7 +60,7 @@ func TestRetryTransientFailures(t *testing.T) {
 		},
 		{
 			name:             "transient failures stop after the third attempt",
-			results:          []attemptResult[string]{transientFailure, transientFailure, transientFailure, success},
+			results:          []retry.AttemptResult[string]{transientFailure, transientFailure, transientFailure, success},
 			expectedError:    "bad gateway",
 			expectedAttempts: 3,
 			expectedWaits:    []time.Duration{2 * time.Second, 5 * time.Second},
@@ -98,7 +69,7 @@ func TestRetryTransientFailures(t *testing.T) {
 		},
 		{
 			name:             "permanent failure after a transient one ends the retries",
-			results:          []attemptResult[string]{transientFailure, permanentFailure, success},
+			results:          []retry.AttemptResult[string]{transientFailure, permanentFailure, success},
 			expectedError:    "bad credentials",
 			expectedAttempts: 2,
 			expectedWaits:    []time.Duration{2 * time.Second},
@@ -108,21 +79,27 @@ func TestRetryTransientFailures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := skipAndRecordRetryWaits(t)
-			logOutput := captureLogOutput(t)
+			retryPolicy, recorder := retryhelpers.SkipAndRecordWaits()
+			logOutput := testhelpers.CaptureLog(t)
 			attempts := &scriptedAttempts{results: tt.results}
 
-			value, err := retryTransientFailures(context.Background(), "artifact list", attempts.run)
+			value, err := retry.TransientFailures(context.Background(), retryPolicy, "artifact list", attempts.run)
 
-			assertEqualStrings(t, "value", value, tt.expectedValue)
-			assertEqualStrings(t, "error", errorText(err), tt.expectedError)
+			if value != tt.expectedValue {
+				t.Errorf("expected value %q, got %q", tt.expectedValue, value)
+			}
+			if errorText(err) != tt.expectedError {
+				t.Errorf("expected error %q, got %q", tt.expectedError, errorText(err))
+			}
 			if attempts.calls != tt.expectedAttempts {
 				t.Errorf("expected %d attempts, got %d", tt.expectedAttempts, attempts.calls)
 			}
-			if !slices.Equal(recorder.requestedWaits(), tt.expectedWaits) {
-				t.Errorf("expected waits %v, got %v", tt.expectedWaits, recorder.requestedWaits())
+			if !slices.Equal(recorder.RequestedWaits(), tt.expectedWaits) {
+				t.Errorf("expected waits %v, got %v", tt.expectedWaits, recorder.RequestedWaits())
 			}
-			assertEqualStrings(t, "log", logOutput.String(), tt.expectedLog)
+			if logOutput.String() != tt.expectedLog {
+				t.Errorf("expected log %q, got %q", tt.expectedLog, logOutput.String())
+			}
 		})
 	}
 }
@@ -134,7 +111,7 @@ func errorText(err error) string {
 	return err.Error()
 }
 
-func TestRetryTransientFailuresStopsWhenTheCallerIsDone(t *testing.T) {
+func TestTransientFailuresStopsWhenTheCallerIsDone(t *testing.T) {
 	tests := []struct {
 		name             string
 		cancelDuringWait bool
@@ -145,20 +122,20 @@ func TestRetryTransientFailuresStopsWhenTheCallerIsDone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logOutput := captureLogOutput(t)
+			logOutput := testhelpers.CaptureLog(t)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			attempts := 0
 			started := time.Now()
-			_, err := retryTransientFailures(ctx, "GraphQL", func(context.Context) attemptResult[string] {
+			_, err := retry.TransientFailures(ctx, retry.DefaultPolicy(), "GraphQL", func(context.Context) retry.AttemptResult[string] {
 				attempts++
 				if tt.cancelDuringWait {
 					time.AfterFunc(20*time.Millisecond, cancel)
 				} else {
 					cancel()
 				}
-				return attemptResult[string]{err: errors.New("bad gateway"), transient: true}
+				return retry.AttemptResult[string]{Err: errors.New("bad gateway"), Transient: true}
 			})
 
 			if attempts != 1 {

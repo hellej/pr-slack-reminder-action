@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
 const testMergedSinceDay = "2026-08-15"
@@ -110,7 +112,7 @@ func TestSearchMergedPRsMapsNodesPerAlias(t *testing.T) {
 			},
 		),
 	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 
 	prResults, err := testClient.searchMergedPRs(
 		context.Background(), testRepositories, testMergedSince,
@@ -157,7 +159,7 @@ func TestSearchMergedPRsLogsTruncatedRepository(t *testing.T) {
 			},
 		),
 	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 
 	if _, err := testClient.searchMergedPRs(
 		context.Background(), testRepositories, testMergedSince,
@@ -175,7 +177,7 @@ func TestSearchMergedPRsLogsTruncatedRepository(t *testing.T) {
 }
 
 func TestSearchMergedPRsFailsOnAnyError(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	tests := []struct {
 		name             string
@@ -218,7 +220,7 @@ func TestSearchMergedPRsFailsOnAnyError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &recordingTransport{status: tt.status, responseBody: tt.responseBody}
-			testClient := &client{graphql: graphqlClient{transport: transport}}
+			testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}
 
 			prResults, err := testClient.searchMergedPRs(
 				context.Background(), testRepositories, testMergedSince,
@@ -257,6 +259,7 @@ func TestFindRecentlyMergedPRsCutsTheWindowClientSide(t *testing.T) {
 			}},
 		),
 		nil,
+		retry.DefaultPolicy(),
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
@@ -285,6 +288,7 @@ func TestFindRecentlyMergedPRsKeepsTheNewestUpToTheCap(t *testing.T) {
 			map[string][]string{"s0": mergedNodesSinceJSON(mergedAts...)},
 		),
 		reviewedAndCommentedFixtures(len(mergedAts), nil),
+		retry.DefaultPolicy(),
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
@@ -347,6 +351,7 @@ func TestFindRecentlyMergedPRsAppliesFilters(t *testing.T) {
 					map[string][]string{"s0": {excludedNode, keptNode}},
 				),
 				nil,
+				retry.DefaultPolicy(),
 			)
 
 			prs, err := testClient.FindRecentlyMergedPRs(
@@ -381,11 +386,11 @@ func (t *mergedFetchTransport) Post(
 }
 
 func mergedFetchClient(
-	searchResponse string, fixtureByNumber map[int]enrichFixture,
+	searchResponse string, fixtureByNumber map[int]enrichFixture, retryPolicy retry.Policy,
 ) (*client, *fakeEnrichTransport) {
 	enrich := &fakeEnrichTransport{fixtureByNumber: fixtureByNumber}
 	transport := &mergedFetchTransport{searchResponse: searchResponse, enrich: enrich}
-	return &client{graphql: graphqlClient{transport: transport}}, enrich
+	return &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}, enrich
 }
 
 // The fixture PR is snoozed as well: the merged list keeps it, since a merged row asks for nothing.
@@ -402,6 +407,7 @@ func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
 				commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),
 			},
 		}},
+		retry.DefaultPolicy(),
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
@@ -427,7 +433,7 @@ func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
 
 // A reviewer query must not take down a canvas-enabled run.
 func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 	logOutput := captureLogOutput(t)
 
 	testClient, _ := mergedFetchClient(
@@ -438,6 +444,7 @@ func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
 			)},
 		),
 		map[int]enrichFixture{1: {requestStatus: 500}},
+		retryPolicy,
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(

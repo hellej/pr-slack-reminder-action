@@ -14,6 +14,7 @@ import (
 	"sort"
 
 	"github.com/google/go-github/v78/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 )
 
 // GitHub answers a name no artifact has with an empty list, not an error. See
@@ -32,7 +33,7 @@ func (client *client) FetchLatestArtifactByName(
 		ListOptions: github.ListOptions{PerPage: 100},
 		Name:        &artifactName,
 	}
-	res, err := retryTransientFailures(ctx, "artifact list", func(attemptCtx context.Context) attemptResult[*github.ArtifactList] {
+	res, err := retry.TransientFailures(ctx, client.graphql.retryPolicy, "artifact list", func(attemptCtx context.Context) retry.AttemptResult[*github.ArtifactList] {
 		return client.listArtifacts(attemptCtx, owner, repo, opts)
 	})
 	if err != nil {
@@ -55,7 +56,7 @@ func (client *client) FetchLatestArtifactByName(
 		artifactName, artifactID, latest.GetCreatedAt(),
 	)
 
-	zipBytes, err := retryTransientFailures(ctx, "artifact download", func(attemptCtx context.Context) attemptResult[[]byte] {
+	zipBytes, err := retry.TransientFailures(ctx, client.graphql.retryPolicy, "artifact download", func(attemptCtx context.Context) retry.AttemptResult[[]byte] {
 		return client.downloadArtifactZip(attemptCtx, owner, repo, artifactID)
 	})
 	if err != nil {
@@ -94,56 +95,56 @@ func (client *client) FetchLatestArtifactByName(
 
 func (client *client) listArtifacts(
 	ctx context.Context, owner, repo string, opts *github.ListArtifactsOptions,
-) attemptResult[*github.ArtifactList] {
+) retry.AttemptResult[*github.ArtifactList] {
 	artifacts, resp, err := client.actionsService.ListArtifacts(ctx, owner, repo, opts)
 	if err != nil {
 		statusText := ""
 		if resp != nil && resp.Status != "" {
 			statusText = " status=" + resp.Status
 		}
-		return attemptResult[*github.ArtifactList]{
-			err:       fmt.Errorf("failed to list artifacts: %w%s", err, statusText),
-			transient: isTransientGitHubFailure(resp),
+		return retry.AttemptResult[*github.ArtifactList]{
+			Err:       fmt.Errorf("failed to list artifacts: %w%s", err, statusText),
+			Transient: isTransientGitHubFailure(resp),
 		}
 	}
-	return attemptResult[*github.ArtifactList]{value: artifacts}
+	return retry.AttemptResult[*github.ArtifactList]{Value: artifacts}
 }
 
 // Gets a fresh download URL, since one expires after a minute, and reads the whole zip under the
 // same ctx. See docs/third-party-facts.md § `go-github` v78 `DownloadArtifact` returns a plain error on a non-302, with the `*Response`
 func (client *client) downloadArtifactZip(
 	ctx context.Context, owner, repo string, artifactID int64,
-) attemptResult[[]byte] {
+) retry.AttemptResult[[]byte] {
 	downloadURL, resp, err := client.actionsService.DownloadArtifact(ctx, owner, repo, artifactID, 1)
 	if err != nil {
-		return attemptResult[[]byte]{
-			err:       fmt.Errorf("get artifact download URL: %w", err),
-			transient: isTransientGitHubFailure(resp),
+		return retry.AttemptResult[[]byte]{
+			Err:       fmt.Errorf("get artifact download URL: %w", err),
+			Transient: isTransientGitHubFailure(resp),
 		}
 	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL.String(), nil)
 	if err != nil {
-		return attemptResult[[]byte]{err: fmt.Errorf("build artifact zip request: %w", err)}
+		return retry.AttemptResult[[]byte]{Err: fmt.Errorf("build artifact zip request: %w", err)}
 	}
 	httpResp, err := client.http.Do(request)
 	if err != nil {
-		return attemptResult[[]byte]{err: fmt.Errorf("download artifact zip: %w", err), transient: true}
+		return retry.AttemptResult[[]byte]{Err: fmt.Errorf("download artifact zip: %w", err), Transient: true}
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != http.StatusOK {
-		return attemptResult[[]byte]{
-			err:       fmt.Errorf("unexpected status code %d when downloading artifact", httpResp.StatusCode),
-			transient: httpResp.StatusCode >= http.StatusInternalServerError,
+		return retry.AttemptResult[[]byte]{
+			Err:       fmt.Errorf("unexpected status code %d when downloading artifact", httpResp.StatusCode),
+			Transient: httpResp.StatusCode >= http.StatusInternalServerError,
 		}
 	}
 
 	zipBytes, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		return attemptResult[[]byte]{err: fmt.Errorf("read artifact zip: %w", err), transient: true}
+		return retry.AttemptResult[[]byte]{Err: fmt.Errorf("read artifact zip: %w", err), Transient: true}
 	}
-	return attemptResult[[]byte]{value: zipBytes}
+	return retry.AttemptResult[[]byte]{Value: zipBytes}
 }
 
 // The status is read off the *Response, since DownloadArtifact reports a failed status as a

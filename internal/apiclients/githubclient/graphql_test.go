@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
 type recordingTransport struct {
@@ -48,7 +51,7 @@ type testResponseData struct {
 }
 
 func TestGraphQLDo(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	tests := []struct {
 		name                 string
@@ -277,7 +280,7 @@ func TestGraphQLDo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &recordingTransport{status: tt.status, responseBody: tt.responseBody}
-			client := graphqlClient{transport: transport}
+			client := graphqlClient{transport: transport, retryPolicy: retryPolicy}
 
 			var data testResponseData
 			fieldErrors, err := client.Do(context.Background(), "query{}", nil, tt.aliases, &data)
@@ -310,7 +313,7 @@ func TestGraphQLDoFailsOnMalformedAliasedData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &recordingTransport{status: 200, responseBody: `{"data":` + tt.data + `}`}
-			client := graphqlClient{transport: transport}
+			client := graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}
 
 			var data aliasedData[testAliasData]
 			_, err := client.Do(context.Background(), "query{}", nil, []string{"r0"}, &data)
@@ -446,7 +449,7 @@ func assertEqualStrings(t *testing.T, name, actual, expected string) {
 }
 
 func TestGraphQLDoRetrySucceeds(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	tests := []struct {
 		name            string
@@ -471,7 +474,7 @@ func TestGraphQLDoRetrySucceeds(t *testing.T) {
 				tt.firstAttempt,
 				{status: 200, responseBody: `{"data":{"r0":{"number":3}}}`},
 			}}
-			client := graphqlClient{transport: transport}
+			client := graphqlClient{transport: transport, retryPolicy: retryPolicy}
 
 			var data testResponseData
 			fieldErrors, err := client.Do(context.Background(), "query{}", nil, []string{"r0"}, &data)
@@ -504,12 +507,12 @@ func (t *hangingOnceTransport) Post(ctx context.Context, body []byte) (int, json
 }
 
 func TestGraphQLDoRetriesAnAttemptCutOffByItsDeadline(t *testing.T) {
-	recorder := skipAndRecordRetryWaits(t)
-	withAttemptTimeout(t, 20*time.Millisecond)
+	retryPolicy, recorder := retryhelpers.SkipAndRecordWaits()
+	retryPolicy.AttemptTimeout = 20 * time.Millisecond
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	transport := &hangingOnceTransport{}
-	client := graphqlClient{transport: transport}
+	client := graphqlClient{transport: transport, retryPolicy: retryPolicy}
 
 	var data testResponseData
 	_, err := client.Do(ctx, "query{}", nil, []string{"r0"}, &data)
@@ -520,14 +523,14 @@ func TestGraphQLDoRetriesAnAttemptCutOffByItsDeadline(t *testing.T) {
 	if transport.calls != 2 {
 		t.Errorf("expected 2 attempts, got %d", transport.calls)
 	}
-	if waits := recorder.requestedWaits(); len(waits) != 1 || waits[0] != 2*time.Second {
+	if waits := recorder.RequestedWaits(); len(waits) != 1 || waits[0] != 2*time.Second {
 		t.Errorf("expected one 2s wait, got %v", waits)
 	}
 	assertAliasData(t, "r0", data.R0, &testAliasData{Number: 3})
 }
 
 func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	pullRequestNotFound := `{"type":"NOT_FOUND","path":["p3","pullRequest"],"message":"no pull request"}`
 	repositoryForbidden := `{"type":"FORBIDDEN","path":["p7"],"message":"no access"}`
@@ -574,7 +577,7 @@ func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
 				`{"data":{"p0":{"number":42}},"errors":[%s]}`, strings.Join(tt.responseErrors, ","),
 			)
 			transport := &recordingTransport{status: 200, responseBody: responseBody}
-			client := graphqlClient{transport: transport}
+			client := graphqlClient{transport: transport, retryPolicy: retryPolicy}
 
 			var data testResponseData
 			_, err := client.Do(context.Background(), "query{}", nil, []string{"p0", "p3", "p7"}, &data)
@@ -587,7 +590,7 @@ func TestGraphQLDoReturnsMostSevereError(t *testing.T) {
 func TestGraphQLDoStopsRetryingOnCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	transport := &cancellingTransport{cancel: cancel}
-	client := graphqlClient{transport: transport}
+	client := graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}
 
 	_, err := client.Do(ctx, "query{}", nil, []string{"r0"}, &testResponseData{})
 
@@ -612,10 +615,10 @@ func (t *cancellingTransport) Post(ctx context.Context, body []byte) (int, json.
 }
 
 func TestGraphQLDoPostsQueryAndVariables(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	transport := &recordingTransport{status: 200, responseBody: `{"data":{}}`}
-	client := graphqlClient{transport: transport}
+	client := graphqlClient{transport: transport, retryPolicy: retryPolicy}
 
 	query := "query($owner0:String!){ r0: repository(owner:$owner0) { name } }"
 	variables := map[string]any{"owner0": "testowner"}

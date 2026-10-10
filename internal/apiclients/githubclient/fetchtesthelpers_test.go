@@ -118,3 +118,10 @@ func captureLogOutput(t *testing.T) *bytes.Buffer {
 	})
 	return &captured
 }
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}

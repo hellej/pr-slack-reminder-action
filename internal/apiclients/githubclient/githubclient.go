@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v78/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -66,11 +67,12 @@ func NewClient(
 	httpClient HTTPClient,
 	actionsService GithubActionsService,
 	transport graphqlTransport,
+	retryPolicy retry.Policy,
 ) Client {
 	return &client{
 		http:           httpClient,
 		actionsService: actionsService,
-		graphql:        graphqlClient{transport: transport},
+		graphql:        graphqlClient{transport: transport, retryPolicy: retryPolicy},
 	}
 }
 
@@ -90,6 +92,7 @@ func GetAuthenticatedClient(token, tokenForState string) Client {
 		http.DefaultClient,
 		ghClientForState.Actions,
 		newHTTPGraphQLTransport(token),
+		retry.DefaultPolicy(),
 	)
 }
 

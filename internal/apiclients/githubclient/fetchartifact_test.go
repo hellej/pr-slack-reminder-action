@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v78/github"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
 type testState struct {
@@ -379,7 +381,7 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder := skipAndRecordRetryWaits(t)
+			retryPolicy, recorder := retryhelpers.SkipAndRecordWaits()
 			logOutput := captureLogOutput(t)
 			artifacts := tt.artifacts
 			if artifacts == nil {
@@ -397,7 +399,7 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			zipClient := &scriptedZipClient{t: t, results: tt.zipResults, zipData: zipData}
 
 			var loaded testState
-			err := NewClient(zipClient, actions, nil).FetchLatestArtifactByName(
+			err := NewClient(zipClient, actions, nil, retryPolicy).FetchLatestArtifactByName(
 				context.Background(), "test-owner", "test-repo", "test-artifact",
 				cmp.Or(tt.jsonFilePath, "state.json"), &loaded,
 			)
@@ -427,8 +429,8 @@ func TestFetchLatestArtifactByName(t *testing.T) {
 			if len(slices.Compact(slices.Sorted(slices.Values(zipClient.requestedURLs)))) != len(zipClient.requestedURLs) {
 				t.Errorf("expected a fresh download URL for each zip download, got %v", zipClient.requestedURLs)
 			}
-			if !slices.Equal(recorder.requestedWaits(), tt.expectedWaits) {
-				t.Errorf("expected waits %v, got %v", tt.expectedWaits, recorder.requestedWaits())
+			if !slices.Equal(recorder.RequestedWaits(), tt.expectedWaits) {
+				t.Errorf("expected waits %v, got %v", tt.expectedWaits, recorder.RequestedWaits())
 			}
 			if !strings.Contains(logOutput.String(), tt.expectedRetryLog) {
 				t.Errorf("expected a log line containing %q, got %q", tt.expectedRetryLog, logOutput.String())
@@ -443,7 +445,7 @@ func TestFetchLatestArtifactByNameGivesEachCallA15sAttemptDeadline(t *testing.T)
 
 	started := time.Now()
 	var loaded testState
-	err := NewClient(zipClient, actions, nil).FetchLatestArtifactByName(
+	err := NewClient(zipClient, actions, nil, retry.DefaultPolicy()).FetchLatestArtifactByName(
 		context.Background(), "test-owner", "test-repo", "test-artifact", "state.json", &loaded,
 	)
 	finished := time.Now()
@@ -473,8 +475,8 @@ func TestFetchLatestArtifactByNameRetriesAZipDownloadCutOffByItsDeadline(t *test
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			skipAndRecordRetryWaits(t)
-			withAttemptTimeout(t, 20*time.Millisecond)
+			retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
+			retryPolicy.AttemptTimeout = 20 * time.Millisecond
 			actions := &scriptedActionsService{artifacts: []*github.Artifact{testArtifact(123, time.Hour)}}
 			zipClient := &scriptedZipClient{
 				t:       t,
@@ -483,7 +485,7 @@ func TestFetchLatestArtifactByNameRetriesAZipDownloadCutOffByItsDeadline(t *test
 			}
 
 			var loaded testState
-			err := NewClient(zipClient, actions, nil).FetchLatestArtifactByName(
+			err := NewClient(zipClient, actions, nil, retryPolicy).FetchLatestArtifactByName(
 				context.Background(), "test-owner", "test-repo", "test-artifact", "state.json", &loaded,
 			)
 

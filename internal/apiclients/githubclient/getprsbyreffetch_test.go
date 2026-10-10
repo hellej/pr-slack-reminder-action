@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
 const testFullFragmentName = "fullPr"
@@ -79,7 +81,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 
 // Unlike phase 2 under FindOpenPRs, an alias that carries no PR has nothing to fall back to.
 func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	tests := []struct {
 		name            string
@@ -105,7 +107,7 @@ func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{2: tt.fixture}}
-			testClient := &client{graphql: graphqlClient{transport: transport}}
+			testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}
 
 			references := []models.PullRequestRef{
 				{Repository: testRepositories[0], Number: 1},
@@ -126,7 +128,7 @@ func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
 // See githubclient.spec.md § Oddities.
 func TestGetPRsFetchesOnlyTheFirstMaxPRsToFetchRefs(t *testing.T) {
 	transport := &fakeEnrichTransport{}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 
 	references := make([]models.PullRequestRef, MaxPRsToFetch+1)
 	for index := range references {
@@ -150,7 +152,7 @@ func TestGetPRsKeepsASnoozedPR(t *testing.T) {
 			commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),
 		}},
 	}}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 
 	prs, err := testClient.GetPRs(
 		context.Background(),
