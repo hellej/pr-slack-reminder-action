@@ -219,6 +219,7 @@ Shared by all:
 
 - **Models** (`internal/models/`): value types `Repository` and `PullRequestRef`
 - **Utilities** (`internal/utilities/`): generic slice helpers used in place of manual loops
+- **Retry** (`internal/apiclients/retry/`): retries an API call's transient failures, for both API clients
 
 ## Key Patterns
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/go-github/v78/github"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -47,6 +48,7 @@ func newTestClient(opts mockgithubclient.MockGitHubClientOptions) githubclient.C
 		&mockHTTPClient{},
 		&mockActionsService{},
 		mockgithubclient.NewGraphQLTransport(opts),
+		retry.DefaultPolicy(),
 	)
 }
 

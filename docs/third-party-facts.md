@@ -903,3 +903,26 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: web search `is:pr author:app/dependabot repo:hellej/pr-slack-reminder-test-repo-1 repo:hellej/pr-slack-reminder-action`, 2026-10-04
 - It returned 85 PRs, the sum of each repository searched alone
 - Unverified for the REST and GraphQL `search`
+
+## `slack-go` v0.29.0 returns a transport error as is, a 429 as `*RateLimitedError` or `StatusCodeError`, any other non-200 as `StatusCodeError` [2026-10-10]
+
+- Source: `slack-go@v0.29.0/misc.go` `doPost`, `checkStatusCode`; `status_code_error.go`
+- `doPost` returns the `http.Client.Do` error unwrapped: a `*url.Error`, a DNS failure or refused connection under it as `*net.OpError` with `Op == "dial"`
+- A 429 with a `Retry-After` header becomes `*slack.RateLimitedError{RetryAfter}`. An unparseable header returns the `strconv` error instead
+- Any other non-200, a 429 without `Retry-After` included, becomes `slack.StatusCodeError{Code, Status}`, its `Error()` `slack server error: <Status>`. The body is not parsed
+- A 200 with `ok: false` is `slack.SlackErrorResponse`. See § `slack-go` v0.29.0 returns a Slack API error as `slack.SlackErrorResponse`, its `Err` the error code
+- `PostMessageContext`, `UpdateMessageContext`, `DeleteMessageContext` and `EditCanvasContext` take a ctx, used as the request's ctx
+- A ctx deadline hit while reading the body, after the headers arrived, returns a bare `context.DeadlineExceeded`, not a `*url.Error`. One hit before the headers returns a `*url.Error`
+  - Source: httptest probe with `slack.New(..., slack.OptionAPIURL(<httptest server>))`, the server sending headers and part of the body then stalling, 200ms ctx, Go 1.26.7, slack-go v0.29.0, `UpdateMessageContext` and `PostMessageContext`
+
+## `chat.postMessage` has no idempotency key, and `internal_error` or `fatal_error` may follow a partial success [2026-10-10]
+
+- Source: [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage), arguments and errors tables, read 2026-10-10
+- No argument dedupes a post. `client_msg_id` appears only in two error descriptions, not as an argument
+- `internal_error` and `fatal_error`: the docs warn part of the operation may have succeeded
+- `ratelimited`: "Refer to the `Retry-After` header for when to retry the request"
+- `service_unavailable`: "The service is temporarily unavailable"
+- `request_timeout`: the POST data was missing or truncated
+- `rate_limited` is a separate code: "Application has posted too many messages"
+- Unverified: that Slack never posts on a 429 or `ratelimited`. The docs don't say
+- The docs don't say whether a post that got `service_unavailable` went through

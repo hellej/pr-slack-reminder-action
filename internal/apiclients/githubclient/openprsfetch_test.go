@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
 const testFragmentName = "prs"
@@ -85,7 +87,7 @@ func pullRequestNodeJSON(number int, title string) string {
 }
 
 func TestListOpenPRs(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	notFoundMessage := "repository owner-one/repo-one not found - check the repository name and permissions"
 
@@ -159,7 +161,7 @@ func TestListOpenPRs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &recordingTransport{status: tt.status, responseBody: tt.responseBody}
-			testClient := &client{graphql: graphqlClient{transport: transport}}
+			testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}
 
 			prResults, err := testClient.listOpenPRs(context.Background(), testRepositories)
 
@@ -197,7 +199,7 @@ func TestListOpenPRsMapsNodeToPullRequest(t *testing.T) {
 			`"r0":{"pullRequests":{"nodes":[` + pullRequestNodeJSON(1, "First") + `]}},` +
 			`"r1":{"pullRequests":{"nodes":[]}}}}`,
 	}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 
 	prResults, err := testClient.listOpenPRs(context.Background(), testRepositories)
 	if err != nil {
@@ -365,7 +367,7 @@ func assertLogins(t *testing.T, label string, collaborators []Collaborator, expe
 }
 
 func TestEnrichPRs(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 
 	tests := []struct {
 		name             string
@@ -505,7 +507,7 @@ func TestEnrichPRs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &fakeEnrichTransport{fixtureByNumber: tt.fixtureByNumber}
-			testClient := &client{graphql: graphqlClient{transport: transport}}
+			testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}
 
 			prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), testPRResults(tt.prCount))
 
@@ -537,7 +539,7 @@ func TestEnrichPRs(t *testing.T) {
 }
 
 func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
-	skipAndRecordRetryWaits(t)
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
 	logOutput := captureLogOutput(t)
 
 	transport := &fakeEnrichTransport{fixtureByNumber: map[int]enrichFixture{
@@ -548,7 +550,7 @@ func TestEnrichPRsFieldErrorOnCommentsLosesTheSnooze(t *testing.T) {
 			errorMessage: "resource limit exceeded",
 		},
 	}}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retryPolicy}}
 
 	prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), testPRResults(1))
 	if err != nil {
@@ -582,7 +584,7 @@ func TestEnrichPRsLeavesAFailedPRReadyForReviewAtItsCreationTime(t *testing.T) {
 			errorMessage: "Could not resolve to a PullRequest with the number 1.",
 		},
 	}}
-	testClient := &client{graphql: graphqlClient{transport: transport}}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
 	prResult := PRResult{
 		pr: &PullRequest{Number: 1, CreatedAt: createdAt}, repository: testRepositories[0],
 	}

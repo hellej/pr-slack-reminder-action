@@ -34,9 +34,9 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Per PR the newest 100 reviews, timeline comments and review threads, and the first 100 review requests, are read (GitHub's maximum page size), plus the first ready-for-review event. The newest are read since the latest activity decides whose turn it is
 - A thread carries its last comment's author only. Review comments are not read at all (their authors always have a review of their own)
 - A collaborator carries a display name only when GitHub returns one for a user, and the login otherwise
-- Every GitHub request is tried up to 3 times, 2s before the second attempt and 5s before the third, and only on a transient failure: no response (network error, attempt deadline) or a 5xx. A GraphQL request is also retried on a 429 or an unparseable body
-- Each attempt has its own 15s deadline, the same for every call: past GitHub's own 10s processing limit, so its 502 or 504 arrives first. The caller's ctx bounds the whole call: once it is done, no further attempt starts. A call can take up to 52s
-- Each retry logs one line naming the API, the attempt number, the wait and the error. A retry is never an annotation
+- Every GitHub request is retried under [internal/apiclients/retry](../retry/retry.spec.md)'s `DefaultPolicy`, and only on a transient failure: no response (network error, attempt deadline) or a 5xx. A GraphQL request is also retried on a 429 or an unparseable body
+- The policy's 15s attempt deadline is past GitHub's own 10s processing limit, so its 502 or 504 arrives first. A call can take up to 52s
+- A retry is only logged, never an annotation
 - A PR with an active `/snooze [pr-reminder] for N (day|days|d)` comment (case-insensitive; most recent matching comment wins) is excluded from `FindOpenPRs` results until the snooze expires. `GetPRs` and `FindRecentlyMergedPRs` keep such a PR and only record the expiry on it: a snooze suppresses a request for attention, and the merged rows those two serve ask for nothing
 - `FetchLatestArtifactByName` downloads the newest GitHub Actions artifact matching a given name and decodes a named JSON file from it into a caller-supplied target, used by [internal/state](../../state/state.spec.md) to load prior-run state
   - It retries the artifact listing and the download separately. Each download attempt gets a fresh download URL, which expires after a minute, then reads the whole zip under that attempt's deadline
