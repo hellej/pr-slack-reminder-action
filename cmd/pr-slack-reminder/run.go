@@ -216,14 +216,15 @@ func runUpdateMode(
 		return nil, fmt.Errorf("failed to load state: %w", err)
 	}
 	trackedPRs, trackedPRsErr := resolveTrackedPRs(
-		githubClient, cfg, loadedState.PullRequests, openPRs.PRs, mergedPRs,
+		githubClient, cfg, loadedState.TrackedPRs, openPRs.PRs, mergedPRs,
 	)
 	if trackedPRsErr != nil {
 		logWarning(fmt.Sprintf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr))
 	}
 
+	listedOpenPRViews := buildNonDraftPRViews(openPRs, cfg)
 	content := messagecontent.GetContent(
-		buildNonDraftPRViews(openPRs, cfg),
+		listedOpenPRViews,
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		loadedState.MessagePostedAt,
@@ -261,7 +262,10 @@ func runUpdateMode(
 	if err != nil {
 		return loadedState, err
 	}
-	editedState := state.WithLastWrittenMessage(*loadedState, sentMessageInfo, summaryText, generatedAt)
+	editedState := state.WithTrackedPRsAdded(
+		state.WithLastWrittenMessage(*loadedState, sentMessageInfo, summaryText, generatedAt),
+		listedOpenPRViews,
+	)
 	return &editedState, sentMessageHandler(sentMessageInfo)
 }
 

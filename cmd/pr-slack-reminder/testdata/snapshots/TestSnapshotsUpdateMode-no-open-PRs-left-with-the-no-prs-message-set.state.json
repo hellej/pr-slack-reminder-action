@@ -5,7 +5,7 @@
     "channelId": "C12345678",
     "messageTs": "1623850245.000200"
   },
-  "pullRequests": [
+  "trackedPRs": [
     {
       "repository": {
         "Owner": "test-org",

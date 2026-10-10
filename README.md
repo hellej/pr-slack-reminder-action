@@ -122,7 +122,7 @@ jobs:
 
 Setup where the latest message is also updated when PRs get reviewed/merged.
 An updated message lists the PRs that are open at that moment, including ones opened after the original message.
-PRs that merged since the original message move to the recently merged section.
+PRs that merged since the original message move to the recently merged section, including ones opened after it.
 
 ```yaml
 name: PR Reminder

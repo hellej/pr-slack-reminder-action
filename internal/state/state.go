@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
@@ -22,7 +23,7 @@ type State struct {
 	SchemaVersion                 int                     `json:"schemaVersion"`
 	MessagePostedAt               time.Time               `json:"messagePostedAt"`
 	MessageRef                    SlackRef                `json:"messageRef"`
-	PullRequests                  []models.PullRequestRef `json:"pullRequests"`
+	TrackedPRs                    []models.PullRequestRef `json:"trackedPRs"`
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 }
@@ -32,8 +33,9 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	type stateWithDefaultDecoding State
 	var decoded struct {
 		stateWithDefaultDecoding
-		LegacyMessagePostedAt time.Time `json:"createdAt"`
-		LegacyMessageRef      SlackRef  `json:"slackMessage"`
+		LegacyMessagePostedAt time.Time               `json:"createdAt"`
+		LegacyMessageRef      SlackRef                `json:"slackMessage"`
+		LegacyTrackedPRs      []models.PullRequestRef `json:"pullRequests"`
 	}
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
@@ -44,6 +46,9 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	}
 	if s.MessageRef == (SlackRef{}) {
 		s.MessageRef = decoded.LegacyMessageRef
+	}
+	if len(s.TrackedPRs) == 0 {
+		s.TrackedPRs = decoded.LegacyTrackedPRs
 	}
 	return nil
 }
@@ -110,7 +115,7 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		PullRequests:       utilities.Map(prViews, PRToPullRequestRef),
+		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
 		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
 	}
 }
@@ -122,6 +127,15 @@ func WithLastWrittenMessage(
 	generatedAt time.Time,
 ) State {
 	loadedState.LastWrittenMessage = newLastWrittenMessage(messageInfo, summaryText, generatedAt)
+	return loadedState
+}
+
+func WithTrackedPRsAdded(loadedState State, listedPRViews []prview.PR) State {
+	newlyListedRefs := utilities.Filter(
+		utilities.Map(listedPRViews, PRToPullRequestRef),
+		func(ref models.PullRequestRef) bool { return !slices.Contains(loadedState.TrackedPRs, ref) },
+	)
+	loadedState.TrackedPRs = slices.Concat(loadedState.TrackedPRs, newlyListedRefs)
 	return loadedState
 }
 
@@ -169,6 +183,6 @@ func Save(filePath string, state State) error {
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write state file %s: %w", filePath, err)
 	}
-	log.Printf("Saved state to %s with %d PRs", filePath, len(state.PullRequests))
+	log.Printf("Saved state to %s with %d PRs", filePath, len(state.TrackedPRs))
 	return nil
 }

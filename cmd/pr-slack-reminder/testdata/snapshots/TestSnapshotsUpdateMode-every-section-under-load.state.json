@@ -5,7 +5,7 @@
     "channelId": "C12345678",
     "messageTs": "1623850245.000200"
   },
-  "pullRequests": [
+  "trackedPRs": [
     {
       "repository": {
         "Owner": "test-org",
@@ -68,6 +68,13 @@
         "Name": "test-repo"
       },
       "number": 68
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 69
     }
   ],
   "canvasContentHash": "",
