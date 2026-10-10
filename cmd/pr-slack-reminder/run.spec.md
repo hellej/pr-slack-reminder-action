@@ -33,7 +33,10 @@ run modes and the pipeline order are in
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
 - State is saved carrying whichever canvas content hash is now current:
   - Post mode saves it only when the message was sent, recording the new message
-  - Update mode saves it whenever the previous state loaded. After a successful edit it records the edited message; when the message is deleted or kept, or the edit fails, the loaded state is saved back unchanged
+  - Update mode saves it whenever the previous state loaded
+    - After a successful edit: it records the edited message and adds the PRs the edit listed to the tracked PRs
+      - Also when saving the sent blocks then fails
+    - A deleted or kept message, or a failed edit: it saves the loaded state back unchanged
 
 ## Doesn't Do
 

@@ -1,7 +1,7 @@
 # Merged Section Keeps Every PR the Message Listed
 
 date: 2026-10-10
-status: draft
+status: implemented
 
 ## Requirements
 
@@ -63,11 +63,13 @@ status: draft
 - Tests:
   - The update-mode snapshot "every section under load" lists a PR missing from its loaded state, so its `.state.json` is the test. Read the diff, then re-record
   - Extend the "message edit fails" case in `TestUpdateModeStateSavingOnEarlyReturns` with an open PR missing from state, asserting the loaded tracked PRs save unchanged
+  - The snapshot can't tell "keep the loaded order and append" from sorting by number, so `TestWithTrackedPRsAddedAppendsNewlyListedRefsAfterTheLoadedOnes` in `internal/state` pins it: loaded refs out of order with spare capacity, a newly listed ref with a lower number, one already loaded, and equal numbers in two repositories. It also checks the loaded slice's backing array is untouched
+  - `TestUpdateModeTracksTheListedPRsWhenSavingTheSentBlocksFails`: the sent message handler fails after a successful edit, and the listed PRs are still tracked. The canvas is on, so the open fetch includes a draft, which stays untracked
   - Reword the doc comment of `TestUpdateModeSavesTheLoadedState`: the saved state is the loaded one plus the listed PRs
 - Specs:
   - `state.spec.md` § Behaviour: a bullet for `WithTrackedPRsAdded`, next to `WithLastWrittenMessage`
   - `state.spec.md` § Oddities: the bullet on what an update run rewrites becomes `LastWrittenMessage`, the canvas hash and the tracked PRs. `MessageRef` and `MessagePostedAt` stay the post run's
-  - `run.spec.md` § Behaviour: update mode's saved state adds the edit's listed PRs
+  - `run.spec.md` § Behaviour: update mode's saved state adds the edit's listed PRs, even when saving the sent blocks then fails
   - `messagecontent.spec.md`: `trackedPRs` are the PRs the message has listed in an open section since it was posted, as re-fetched
 - `README.md` [update mode](#3-update-mode-enabled): PRs that merged since the original message move to the merged section, including ones opened after it
 

@@ -226,7 +226,7 @@ func getTestState(options GetTestStateOptions) state.State {
 			ChannelID: "C12345678",
 			MessageTS: "1623850245.000200",
 		},
-		PullRequests: prRefs,
+		TrackedPRs: prRefs,
 	}
 }
 
@@ -799,8 +799,8 @@ func TestPostModeSavesNoStateWhenSendFails(t *testing.T) {
 	}
 }
 
-// Update mode tracks the PR set of the message it edits, so the state it writes back has to be
-// the loaded one, not the PRs that survived this run's filters.
+// Update mode tracks every PR the message it edits has listed, so the state it writes back has to be
+// the loaded one plus the PRs this edit listed, not only the PRs that survived this run's filters.
 func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
@@ -831,7 +831,7 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 		t.Fatalf("Failed to load the saved state file: %v", loadErr)
 	}
 
-	savedPRNumbers := utilities.Map(savedState.PullRequests, func(ref models.PullRequestRef) int {
+	savedPRNumbers := utilities.Map(savedState.TrackedPRs, func(ref models.PullRequestRef) int {
 		return ref.Number
 	})
 	if !slices.Equal(savedPRNumbers, []int{1, 2}) {
@@ -978,11 +978,49 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 	if savedState.MessageRef != expectedMessageRef {
 		t.Errorf("Expected the loaded message ref %+v, got %+v", expectedMessageRef, savedState.MessageRef)
 	}
-	if !slices.Equal(savedState.PullRequests, []models.PullRequestRef{stateRef(1)}) {
-		t.Errorf("Expected the loaded PR 1, got %+v", savedState.PullRequests)
+	if !slices.Equal(savedState.TrackedPRs, []models.PullRequestRef{stateRef(1)}) {
+		t.Errorf("Expected the loaded PR 1, got %+v", savedState.TrackedPRs)
 	}
 	if !savedState.MessagePostedAt.Equal(loadedState.MessagePostedAt) {
 		t.Errorf("Expected the loaded MessagePostedAt %v, got %v", loadedState.MessagePostedAt, savedState.MessagePostedAt)
+	}
+}
+
+// The edit already succeeded, so the PRs it listed are tracked even though saving its blocks failed.
+// The canvas makes the open fetch include drafts, which the message doesn't list.
+func TestUpdateModeTracksTheListedPRsWhenSavingTheSentBlocksFails(t *testing.T) {
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	existingDirectoryAsTheSentBlocksFilePath := t.TempDir()
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:               config.RunModeUpdate,
+		config.EnvStateFilePath:           stateFilePath,
+		config.EnvSentSlackBlocksFilePath: existingDirectoryAsTheSentBlocksFilePath,
+		config.InputPRTrackerCanvasLink:   testCanvasLink,
+	})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+	openPRInState := getTestPR(GetTestPROptions{Number: 1, Title: "Still open since the post", AuthorLogin: "alice"})
+	openPRNotInState := getTestPR(GetTestPROptions{Number: 2, Title: "Opened after the post", AuthorLogin: "bob"})
+	openDraftPR := getTestPR(GetTestPROptions{
+		Number: 3, Title: "Draft the message leaves out", AuthorLogin: "carol", Draft: github.Ptr(true),
+	})
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs:               []*github.PullRequest{openPRInState, openPRNotInState, openDraftPR},
+			PRsByNumber:       map[int]*github.PullRequest{1: openPRInState},
+			MockPreviousState: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+
+	if err == nil {
+		t.Fatal("Expected Run to fail when saving the sent blocks fails")
+	}
+	savedState := loadSavedState(t, stateFilePath)
+	if !slices.Equal(savedState.TrackedPRs, []models.PullRequestRef{stateRef(1), stateRef(2)}) {
+		t.Errorf("Expected the loaded PR 1 and the listed PR 2, not the draft PR 3, got %+v", savedState.TrackedPRs)
 	}
 }
 
@@ -1328,6 +1366,7 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			},
 			openPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+				getTestPR(GetTestPROptions{Number: 2, Title: "Opened after the post", AuthorLogin: "bob"}),
 			},
 			updateMessageError: errors.New("cant_update_message"),
 			expectRunError:     true,
@@ -1390,7 +1429,11 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			if statErr != nil {
 				t.Fatalf("Expected the state file to be saved: %v", statErr)
 			}
-			assertLastWrittenMessageIsTheSeededOne(t, loadSavedState(t, stateFilePath).LastWrittenMessage)
+			savedState := loadSavedState(t, stateFilePath)
+			assertLastWrittenMessageIsTheSeededOne(t, savedState.LastWrittenMessage)
+			if !slices.Equal(savedState.TrackedPRs, loadedState.TrackedPRs) {
+				t.Errorf("Expected the loaded tracked PRs %+v, got %+v", loadedState.TrackedPRs, savedState.TrackedPRs)
+			}
 		})
 	}
 }

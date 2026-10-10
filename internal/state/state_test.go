@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func createTestState() State {
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
-		PullRequests: []models.PullRequestRef{
+		TrackedPRs: []models.PullRequestRef{
 			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
 		},
 	}
@@ -73,7 +74,7 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
-		PullRequests: []models.PullRequestRef{
+		TrackedPRs: []models.PullRequestRef{
 			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
 			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 2},
 			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 5},
@@ -106,14 +107,14 @@ func TestStateSaveAndLoadRoundTrip(t *testing.T) {
 		t.Errorf("MessageRef.MessageTS mismatch: got %s, want %s", loadedState.MessageRef.MessageTS, originalState.MessageRef.MessageTS)
 	}
 
-	if len(loadedState.PullRequests) != len(originalState.PullRequests) {
-		t.Errorf("PullRequests length mismatch: got %d, want %d", len(loadedState.PullRequests), len(originalState.PullRequests))
+	if len(loadedState.TrackedPRs) != len(originalState.TrackedPRs) {
+		t.Errorf("TrackedPRs length mismatch: got %d, want %d", len(loadedState.TrackedPRs), len(originalState.TrackedPRs))
 	}
 
-	for i, pr := range loadedState.PullRequests {
-		original := originalState.PullRequests[i]
+	for i, pr := range loadedState.TrackedPRs {
+		original := originalState.TrackedPRs[i]
 		if pr.Repository.Owner != original.Repository.Owner || pr.Repository.Name != original.Repository.Name || pr.Number != original.Number {
-			t.Errorf("PullRequest[%d] mismatch: got %+v, want %+v", i, pr, original)
+			t.Errorf("TrackedPRs[%d] mismatch: got %+v, want %+v", i, pr, original)
 		}
 	}
 }
@@ -277,7 +278,7 @@ func TestLoadSuccessful(t *testing.T) {
 			ChannelID: "C123456789",
 			MessageTS: "1729123456.123456",
 		},
-		PullRequests: []models.PullRequestRef{
+		TrackedPRs: []models.PullRequestRef{
 			{Repository: models.Repository{Owner: "owner1", Name: "repo1"}, Number: 1},
 			{Repository: models.Repository{Owner: "owner2", Name: "repo2"}, Number: 42},
 		},
@@ -299,8 +300,8 @@ func TestLoadSuccessful(t *testing.T) {
 		t.Errorf("ChannelID mismatch: got %s, want %s", loadedState.MessageRef.ChannelID, expectedState.MessageRef.ChannelID)
 	}
 
-	if len(loadedState.PullRequests) != len(expectedState.PullRequests) {
-		t.Errorf("PullRequests length mismatch: got %d, want %d", len(loadedState.PullRequests), len(expectedState.PullRequests))
+	if len(loadedState.TrackedPRs) != len(expectedState.TrackedPRs) {
+		t.Errorf("TrackedPRs length mismatch: got %d, want %d", len(loadedState.TrackedPRs), len(expectedState.TrackedPRs))
 	}
 }
 
@@ -337,28 +338,48 @@ func TestPRToPullRequestRef(t *testing.T) {
 	}
 }
 
-func TestStateDecodesTheLegacyMessageKeysWhenTheNewOnesAreAbsent(t *testing.T) {
+func TestStateDecodesTheLegacyKeysWhenTheNewOnesAreAbsentOrEmpty(t *testing.T) {
+	legacyPR := models.PullRequestRef{Repository: models.Repository{Owner: "o", Name: "legacy"}, Number: 7}
+	trackedPR := models.PullRequestRef{Repository: models.Repository{Owner: "o", Name: "tracked"}, Number: 8}
 	tests := []struct {
 		name                    string
 		stateJSON               string
 		expectedMessagePostedAt time.Time
 		expectedMessageRef      SlackRef
+		expectedTrackedPRs      []models.PullRequestRef
 	}{
 		{
 			name: "legacy keys only",
 			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
-				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"}}`,
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"},` +
+				`"pullRequests":[{"Repository":{"Owner":"o","Name":"legacy"},"Number":7}]}`,
 			expectedMessagePostedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
 			expectedMessageRef:      SlackRef{ChannelID: "C-LEGACY", MessageTS: "1788253200.000100"},
+			expectedTrackedPRs:      []models.PullRequestRef{legacyPR},
 		},
 		{
 			name: "new keys win over legacy ones",
 			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
 				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"},` +
+				`"pullRequests":[{"Repository":{"Owner":"o","Name":"legacy"},"Number":7}],` +
 				`"messagePostedAt":"2026-09-02T09:00:00Z",` +
-				`"messageRef":{"channelId":"C-NEW","messageTs":"1788339600.000200"}}`,
+				`"messageRef":{"channelId":"C-NEW","messageTs":"1788339600.000200"},` +
+				`"trackedPRs":[{"Repository":{"Owner":"o","Name":"tracked"},"Number":8}]}`,
 			expectedMessagePostedAt: time.Date(2026, 9, 2, 9, 0, 0, 0, time.UTC),
 			expectedMessageRef:      SlackRef{ChannelID: "C-NEW", MessageTS: "1788339600.000200"},
+			expectedTrackedPRs:      []models.PullRequestRef{trackedPR},
+		},
+		{
+			name: "empty new keys fall back to legacy ones",
+			stateJSON: `{"schemaVersion":1,"createdAt":"2026-09-01T09:00:00Z",` +
+				`"slackMessage":{"channelId":"C-LEGACY","messageTs":"1788253200.000100"},` +
+				`"pullRequests":[{"Repository":{"Owner":"o","Name":"legacy"},"Number":7}],` +
+				`"messagePostedAt":"0001-01-01T00:00:00Z",` +
+				`"messageRef":{"channelId":"","messageTs":""},` +
+				`"trackedPRs":[]}`,
+			expectedMessagePostedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+			expectedMessageRef:      SlackRef{ChannelID: "C-LEGACY", MessageTS: "1788253200.000100"},
+			expectedTrackedPRs:      []models.PullRequestRef{legacyPR},
 		},
 	}
 	for _, tt := range tests {
@@ -373,9 +394,51 @@ func TestStateDecodesTheLegacyMessageKeysWhenTheNewOnesAreAbsent(t *testing.T) {
 			if decoded.MessageRef != tt.expectedMessageRef {
 				t.Errorf("MessageRef: got %+v, want %+v", decoded.MessageRef, tt.expectedMessageRef)
 			}
+			if !slices.Equal(decoded.TrackedPRs, tt.expectedTrackedPRs) {
+				t.Errorf("TrackedPRs: got %+v, want %+v", decoded.TrackedPRs, tt.expectedTrackedPRs)
+			}
 			if decoded.SchemaVersion != 1 {
 				t.Errorf("SchemaVersion: got %d, want 1", decoded.SchemaVersion)
 			}
 		})
+	}
+}
+
+func TestWithTrackedPRsAddedAppendsNewlyListedRefsAfterTheLoadedOnes(t *testing.T) {
+	repoA := models.Repository{Owner: "o", Name: "repo-a"}
+	repoB := models.Repository{Owner: "o", Name: "repo-b"}
+	loadedRefsWithSpareCapacity := make([]models.PullRequestRef, 3, 10)
+	copy(loadedRefsWithSpareCapacity, []models.PullRequestRef{
+		{Repository: repoA, Number: 5},
+		{Repository: repoA, Number: 2},
+		{Repository: repoB, Number: 3},
+	})
+	loadedState := createTestState()
+	loadedState.TrackedPRs = loadedRefsWithSpareCapacity
+	listedPRViews := []prview.PR{
+		createTestPR(9, "o", "repo-a"),
+		createTestPR(2, "o", "repo-a"),
+		createTestPR(2, "o", "repo-b"),
+		createTestPR(1, "o", "repo-a"),
+	}
+
+	result := WithTrackedPRsAdded(loadedState, listedPRViews)
+
+	expectedTrackedPRs := []models.PullRequestRef{
+		{Repository: repoA, Number: 5},
+		{Repository: repoA, Number: 2},
+		{Repository: repoB, Number: 3},
+		{Repository: repoA, Number: 9},
+		{Repository: repoB, Number: 2},
+		{Repository: repoA, Number: 1},
+	}
+	if !slices.Equal(result.TrackedPRs, expectedTrackedPRs) {
+		t.Errorf("TrackedPRs: got %+v, want %+v", result.TrackedPRs, expectedTrackedPRs)
+	}
+	if result.MessageRef != loadedState.MessageRef {
+		t.Errorf("MessageRef: got %+v, want the loaded %+v", result.MessageRef, loadedState.MessageRef)
+	}
+	if loadedState.TrackedPRs[:cap(loadedState.TrackedPRs)][3] != (models.PullRequestRef{}) {
+		t.Errorf("Wrote into the loaded state's spare capacity: %+v", loadedState.TrackedPRs[:cap(loadedState.TrackedPRs)])
 	}
 }
