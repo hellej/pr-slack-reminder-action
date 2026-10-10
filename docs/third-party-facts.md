@@ -924,4 +924,5 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `service_unavailable`: "The service is temporarily unavailable"
 - `request_timeout`: the POST data was missing or truncated
 - `rate_limited` is a separate code: "Application has posted too many messages"
-- Unverified: that Slack never posts on `service_unavailable`, a 429 or `ratelimited`. The docs don't say
+- Unverified: that Slack never posts on a 429 or `ratelimited`. The docs don't say
+- The docs don't say whether a post that got `service_unavailable` went through

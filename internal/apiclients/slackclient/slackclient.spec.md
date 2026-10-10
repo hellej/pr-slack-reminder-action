@@ -13,7 +13,7 @@ Sends PR reminder messages to Slack and replaces PR tracker canvas content.
 - Transient for update, delete and canvas edit, idempotent calls Slack can safely receive twice:
   - No response, the attempt deadline included
   - A 429 or a 5xx, and the error codes `ratelimited`, `internal_error`, `fatal_error`, `service_unavailable`, `request_timeout`
-- Transient for a post, only where Slack surely did not post: a 429, the error codes `ratelimited` and `service_unavailable`, and a failed connection (DNS or connection refused). `chat.postMessage` has no idempotency key. See docs/third-party-facts.md § `chat.postMessage` has no idempotency key, and `internal_error` or `fatal_error` may follow a partial success
+- Transient for a post, only where Slack surely did not post: a 429, the error code `ratelimited`, and a failed connection (DNS or connection refused). `chat.postMessage` has no idempotency key. See docs/third-party-facts.md § `chat.postMessage` has no idempotency key, and `internal_error` or `fatal_error` may follow a partial success
 - `MarshalBlocksAsSent` returns a message's block array as sent: slack-go's form sender marshals the same `BlockSet` at request time, for posts and edits alike (slack-go v0.29.0 `chat.go`)
 
 ## Doesn't Do

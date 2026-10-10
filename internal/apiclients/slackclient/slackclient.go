@@ -285,9 +285,9 @@ func (c *client) retryIdempotentCall(apiName string, call func(attemptCtx contex
 }
 
 // See slackclient.spec.md § Behaviour.
-var errorCodesSlackRejectsUnprocessed = []string{"ratelimited", "service_unavailable"}
+var errorCodesSlackRejectsUnprocessed = []string{"ratelimited"}
 
-var errorCodesWorthRetryingAnIdempotentCall = []string{"internal_error", "fatal_error", "request_timeout"}
+var errorCodesWorthRetryingAnIdempotentCall = []string{"internal_error", "fatal_error", "service_unavailable", "request_timeout"}
 
 func slackSurelyDidNotProcess(err error) bool {
 	var rateLimitedError *slack.RateLimitedError

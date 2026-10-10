@@ -547,10 +547,10 @@ var slackCallsUnderTest = []slackCallUnderTest{
 		transientErrors: []error{
 			slack.StatusCodeError{Code: 429, Status: "429 Too Many Requests"},
 			slack.SlackErrorResponse{Err: "ratelimited"},
-			slack.SlackErrorResponse{Err: "service_unavailable"},
+			netOpError("dial"),
 		},
 		permanentError:   "failed to send Slack message: invalid_auth",
-		lastErrorAfter3:  "failed to send Slack message: service_unavailable",
+		lastErrorAfter3:  `failed to send Slack message: Post "https://slack.com/api/chat.postMessage": dial tcp: connection refused`,
 		transientLogLine: "Slack post attempt 1 failed, retrying in 2s: slack server error: 429 Too Many Requests",
 	},
 	{
@@ -705,8 +705,8 @@ func TestSendMessageRetriesOnlyFailuresWhereSlackDidNotPost(t *testing.T) {
 		{name: "rate limited with Retry-After", err: &slack.RateLimitedError{RetryAfter: 30 * time.Second}, expectedRetried: true},
 		{name: "status 429", err: slack.StatusCodeError{Code: 429, Status: "429 Too Many Requests"}, expectedRetried: true},
 		{name: "ratelimited code", err: slack.SlackErrorResponse{Err: "ratelimited"}, expectedRetried: true},
-		{name: "service_unavailable code", err: slack.SlackErrorResponse{Err: "service_unavailable"}, expectedRetried: true},
 		{name: "dial failure", err: netOpError("dial"), expectedRetried: true},
+		{name: "service_unavailable code", err: slack.SlackErrorResponse{Err: "service_unavailable"}},
 		{name: "status 502", err: slack.StatusCodeError{Code: 502, Status: "502 Bad Gateway"}},
 		{name: "internal_error code", err: slack.SlackErrorResponse{Err: "internal_error"}},
 		{name: "fatal_error code", err: slack.SlackErrorResponse{Err: "fatal_error"}},
