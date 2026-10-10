@@ -51,13 +51,13 @@ func GetContent(
 	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs, messagePostedAt)
 
 	log.Printf(
-		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests "+
+		"Putting %d waiting for review, %d waiting for author and %d ready to merge pull requests "+
 			"and %d merged pull requests in the message",
-		len(readyToMerge), len(waitingForAuthor), len(waitingForReview), len(mergedPRs),
+		len(waitingForReview), len(waitingForAuthor), len(readyToMerge), len(mergedPRs),
 	)
 
 	content := Content{
-		SummaryText:         getSummaryText(len(waitingForReview), len(readyToMerge), len(waitingForAuthor)),
+		SummaryText:         getSummaryText(len(waitingForReview), len(waitingForAuthor), len(readyToMerge)),
 		ReadyToMerge:        newPRSection(readyToMerge, contentInputs),
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
@@ -131,11 +131,11 @@ type summaryPart struct {
 	nextAction string
 }
 
-func getSummaryText(waitingForReviewCount, readyToMergeCount, waitingForAuthorCount int) string {
+func getSummaryText(waitingForReviewCount, waitingForAuthorCount, readyToMergeCount int) string {
 	nonEmptyParts := utilities.Filter([]summaryPart{
 		{prCount: waitingForReviewCount, nextAction: "to review"},
-		{prCount: readyToMergeCount, nextAction: "to merge"},
 		{prCount: waitingForAuthorCount, nextAction: "waiting for author"},
+		{prCount: readyToMergeCount, nextAction: "to merge"},
 	}, func(part summaryPart) bool { return part.prCount > 0 })
 	if len(nonEmptyParts) == 0 {
 		return noOpenPRsSummaryText

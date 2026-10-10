@@ -3,201 +3,6 @@
     "type": "header",
     "text": {
       "type": "plain_text",
-      "text": "✅ Ready to merge",
-      "emoji": true
-    },
-    "block_id": "heading_ready_to_merge",
-    "level": 2
-  },
-  {
-    "type": "rich_text",
-    "block_id": "section_ready_to_merge",
-    "elements": [
-      {
-        "type": "rich_text_list",
-        "elements": [
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/72",
-                "text": "Approved by two reviewers",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 9 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Bob Brown",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (✅ ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Dana Davis",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ", ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Erin Evans",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/71",
-                "text": "Approved and ready to go",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 2 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Alice Anderson",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (✅ ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Dana Davis",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
-          }
-        ],
-        "style": "bullet",
-        "indent": 0,
-        "border": 0,
-        "offset": 0
-      }
-    ]
-  },
-  {
-    "type": "header",
-    "text": {
-      "type": "plain_text",
-      "text": "💬 Waiting for author",
-      "emoji": true
-    },
-    "block_id": "heading_waiting_for_author",
-    "level": 2
-  },
-  {
-    "type": "rich_text",
-    "block_id": "section_waiting_for_author",
-    "elements": [
-      {
-        "type": "rich_text_list",
-        "elements": [
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/73",
-                "text": "Changes were requested here",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 1 day ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Carol Clark",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (💬 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Dana Davis",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
-          }
-        ],
-        "style": "bullet",
-        "indent": 0,
-        "border": 0,
-        "offset": 0
-      }
-    ]
-  },
-  {
-    "type": "header",
-    "text": {
-      "type": "plain_text",
       "text": "👀 Waiting for review",
       "emoji": true
     },
@@ -318,6 +123,201 @@
               {
                 "type": "text",
                 "text": "Erin Evans",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "💬 Waiting for author",
+      "emoji": true
+    },
+    "block_id": "heading_waiting_for_author",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_author",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/73",
+                "text": "Changes were requested here",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 1 day ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Carol Clark",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "✅ Ready to merge",
+      "emoji": true
+    },
+    "block_id": "heading_ready_to_merge",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_ready_to_merge",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/72",
+                "text": "Approved by two reviewers",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 9 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Bob Brown",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ", ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/71",
+                "text": "Approved and ready to go",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 2 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
                 "style": {}
               }
             ]

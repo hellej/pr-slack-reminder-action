@@ -2,7 +2,7 @@ module github.com/hellej/pr-slack-reminder-action
 
 go 1.26.0
 
-toolchain go1.26.7
+toolchain go1.26.9
 
 require (
 	github.com/google/go-github/v78 v78.0.0

@@ -8,7 +8,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - `BuildMessageWithUpdateTimeFooter(content)` returns the same message ending with an update-time footer, for an edit in place
 - The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
 - Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
-- The headings are this package's own display text: `✅ Ready to merge`, `💬 Waiting for author`, `👀 Waiting for review`, `🚀 Recently merged`
+- Sections render top to bottom in this order, under this package's own heading text: `👀 Waiting for review`, `💬 Waiting for author`, `✅ Ready to merge`, `🚀 Recently merged`. The open sections match the canvas's order ([internal/canvasbuilder](../canvasbuilder/canvasbuilder.spec.md))
 - Grouped-by-repository case: the section's rows come as one `rich_text` block per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them. The block opens with the repository name, without its owner, in bold, linked to `models.Repository.GetPullsURL()`, then holds that repository's rows
 - A spacing block, a `section` block of one blank space, sits between the repositories of a grouped section, never after its last one
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
