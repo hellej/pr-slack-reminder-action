@@ -33,6 +33,7 @@ type Client interface {
 		repositories []models.Repository,
 		getFiltersForRepository func(repo models.Repository) config.Filters,
 		mergedSince time.Time,
+		mergedPRCache []PR,
 	) ([]PR, error)
 	GetPRs(
 		ctx context.Context,
@@ -163,13 +164,15 @@ func (c *client) FindOpenPRs(
 }
 
 // Returns the PRs merged since the given moment, newest merge first. The window is a parameter
-// rather than a clock read, so the canvas footer and the merged list share one "now". The capped
-// PRs are enriched with their reviewers; a failed enrichment is logged and leaves them without.
+// rather than a clock read, so the canvas footer and the merged list share one "now". A capped PR
+// found in mergedPRCache is returned as cached. The rest are enriched with their reviewers; a
+// failed enrichment is logged and leaves them without.
 func (c *client) FindRecentlyMergedPRs(
 	ctx context.Context,
 	repositories []models.Repository,
 	getFiltersForRepository func(repo models.Repository) config.Filters,
 	mergedSince time.Time,
+	mergedPRCache []PR,
 ) ([]PR, error) {
 	log.Printf("Fetching recently merged pull requests for repositories: %v", repositories)
 
@@ -186,12 +189,41 @@ func (c *client) FindRecentlyMergedPRs(
 	mergedPRs = capMergedPRResultsToLimit(sortByMergeTimeNewestFirst(mergedPRs))
 	logFoundMergedPRs(mergedPRs)
 
-	enrichedPRs, err := c.enrichPRsWithReviewInfo(ctx, mergedPRs)
+	uncachedPRs := utilities.Filter(mergedPRs, func(result PRResult) bool {
+		_, isCached := findPROfResult(mergedPRCache, result)
+		return !isCached
+	})
+	log.Printf(
+		"Taking %d of the recently merged pull requests from the cache",
+		len(mergedPRs)-len(uncachedPRs),
+	)
+	enrichedPRs := c.enrichMergedPRs(ctx, uncachedPRs)
+
+	return utilities.Map(mergedPRs, func(result PRResult) PR {
+		if cachedPR, isCached := findPROfResult(mergedPRCache, result); isCached {
+			return cachedPR
+		}
+		enrichedPR, _ := findPROfResult(enrichedPRs, result)
+		return enrichedPR
+	}), nil
+}
+
+// An empty slice makes enrichPRsWithReviewInfo log a fetch it never sends, so that case skips it.
+func (c *client) enrichMergedPRs(ctx context.Context, prResults []PRResult) []PR {
+	if len(prResults) == 0 {
+		return nil
+	}
+	enrichedPRs, err := c.enrichPRsWithReviewInfo(ctx, prResults)
 	if err != nil {
 		log.Printf("Unable to fetch reviewers for the merged pull requests: %v", err)
-		return utilities.Map(mergedPRs, prWithoutReviewers), nil
+		return utilities.Map(prResults, prWithoutReviewers)
 	}
-	return enrichedPRs, nil
+	return enrichedPRs
+}
+
+func findPROfResult(prs []PR, result PRResult) (PR, bool) {
+	resultRef := result.getPullRequestRef()
+	return utilities.Find(prs, func(pr PR) bool { return pr.GetPullRequestRef() == resultRef })
 }
 
 func isMergedSince(mergedSince time.Time) func(result PRResult) bool {

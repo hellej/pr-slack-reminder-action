@@ -550,5 +550,97 @@
     ],
     "summaryText": "6 PRs to review, 2 to merge 👀",
     "generatedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergedPRCache": [
+    {
+      "Number": 98,
+      "Title": "Bump dependency 98",
+      "HTMLURL": "https://github.com/test-org/app/pull/98",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dependabot[bot]",
+        "Name": ""
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "app"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 20,
+      "Title": "Add canvas footer",
+      "HTMLURL": "https://github.com/test-org/infra/pull/20",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "bob",
+        "Name": "Bob Brown"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "infra"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 97,
+      "Title": "Bump dependency 97",
+      "HTMLURL": "https://github.com/test-org/app/pull/97",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dependabot[bot]",
+        "Name": ""
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "app"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ]
 }

@@ -574,5 +574,102 @@
     ],
     "summaryText": "5 PRs to review, 1 waiting for author, 1 to merge 👀",
     "generatedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergedPRCache": [
+    {
+      "Number": 70,
+      "Title": "Merged without ever being listed",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/70",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "heidi",
+        "Name": "Heidi Hill"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 66,
+      "Title": "Landed an hour ago",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/66",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "frank",
+        "Name": "Frank Foster"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": [
+        {
+          "Login": "erin",
+          "Name": "Erin Evans"
+        }
+      ],
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 67,
+      "Title": "Landed three days ago",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/67",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "alice",
+        "Name": "Alice Anderson"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ]
 }

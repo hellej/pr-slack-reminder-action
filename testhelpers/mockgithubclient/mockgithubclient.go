@@ -45,20 +45,27 @@ type MockGitHubClientOptions struct {
 }
 
 // Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
-// once whatever the run renders from it. GetPRsRequests gets one entry per request, so a skipped
-// call shows up as no entry at all. GetPRs fetches in batches of 25 refs over its own goroutines,
-// so every write takes the lock.
+// once whatever the run renders from it. GetPRsRequests and EnrichmentRequests get one entry per
+// request, so a skipped call shows up as no entry at all. Both fetch in batches of 25 refs over
+// their own goroutines, so every write takes the lock.
 type FetchRecording struct {
-	mutex           sync.Mutex
-	OpenPRFetches   int
-	MergedPRFetches int
-	GetPRsRequests  [][]models.PullRequestRef
+	mutex              sync.Mutex
+	OpenPRFetches      int
+	MergedPRFetches    int
+	GetPRsRequests     [][]models.PullRequestRef
+	EnrichmentRequests [][]models.PullRequestRef
 }
 
 func (r *FetchRecording) recordGetPRsRequest(references []models.PullRequestRef) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.GetPRsRequests = append(r.GetPRsRequests, references)
+}
+
+func (r *FetchRecording) recordEnrichmentRequest(references []models.PullRequestRef) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.EnrichmentRequests = append(r.EnrichmentRequests, references)
 }
 
 func (r *FetchRecording) recordOpenPRFetch() {
@@ -150,15 +157,25 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 		return t.openPRsResponse(request.Variables)
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
-		if t.opts.Recording != nil && isGetPRsQuery(request.Query) {
-			t.opts.Recording.recordGetPRsRequest(pullRequestReferences(request.Variables))
-		}
+		t.recordPullRequestsRequest(request.Query, request.Variables)
 		return t.enrichedPRsResponse(request.Variables)
 	}
 	if strings.Contains(request.Query, "search(") {
 		return t.mergedPRsResponse(request.Variables)
 	}
 	return 0, nil, errors.New("unrecognized GraphQL query: " + request.Query)
+}
+
+func (t GraphQLTransport) recordPullRequestsRequest(query string, variables map[string]any) {
+	if t.opts.Recording == nil {
+		return
+	}
+	references := pullRequestReferences(variables)
+	if isGetPRsQuery(query) {
+		t.opts.Recording.recordGetPRsRequest(references)
+		return
+	}
+	t.opts.Recording.recordEnrichmentRequest(references)
 }
 
 type renderedResponse struct {
