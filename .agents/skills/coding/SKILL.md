@@ -15,7 +15,7 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 
 ## Mandatory Implementation Steps
 
-Implement only what was asked, plus the readability refactors AGENTS.md § Code Style puts in scope.
+Implement only what was asked, plus the small refactors AGENTS.md § Code Style puts in scope.
 
 1. Write a failing test for the change, per AGENTS.md § Testing (TDD, and the snapshot exception)
 2. Implement the minimal code to make it pass
