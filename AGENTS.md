@@ -140,8 +140,8 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - **Readability > Speed:** Data sets are tiny; never trade clarity for execution speed or micro-optimizations.
 - **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or generic helpers built for callers that don't exist yet.
-- **Simple means easy to read, not fewest functions or lines:** Every function you add or grow reads top-down, as named steps at one level of detail. When one doesn't, refactor it in the same change. Small refactors in code the change touches are in scope, whether for readability, maintainability or ease of change, e.g.:
-  - Extract a helper that names a step, even with one caller, or a pattern the function repeats inline
+- **Simple means easy to read, not fewest functions or lines:** A reader follows every function you add or grow without decoding it. When one takes decoding, refactor it in the same change. Small refactors in code the change touches are in scope, whether for readability, maintainability or ease of change, e.g.:
+  - Extract a helper that names a step, even with one caller, or a pattern the function repeats inline. A function doing several steps often reads best as those steps, named
   - Rename what no longer says what it holds or does
   - Inline an indirection that hides nothing
   - Flip a negated condition, or reorder so the function reads top-down

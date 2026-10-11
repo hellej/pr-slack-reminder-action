@@ -23,10 +23,10 @@ Check it against:
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
   state, so whether the test came first is unverifiable: skip it.
 - AGENTS.md § Code Style
-- Readability of each function the change added or grew, per AGENTS.md § Code Style: does
-  it read top-down, as named steps at one level of detail? A pattern repeated inline, a
-  name gone stale, or mixed levels of detail is a `medium` Fix. Name the refactor: the
-  helper to extract and its name, the rename, the reorder
+- Readability of each function the change added or grew, per AGENTS.md § Code Style: can
+  a reader follow it without decoding it? A pattern repeated inline, a name gone stale, or
+  steps mixed with their low-level detail is a `medium` Fix. Name the refactor: the helper
+  to extract and its name, the rename, the reorder. A short, plain function needs none
 - AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
   docstrings. Each breach is a `nit`
 - Every comment the change added, production and test code, each with a verdict against

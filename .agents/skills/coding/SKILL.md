@@ -19,7 +19,7 @@ Implement only what was asked, plus the small refactors AGENTS.md § Code Style 
 
 1. Write a failing test for the change, per AGENTS.md § Testing (TDD, and the snapshot exception)
 2. Implement the minimal code to make it pass
-3. Run `make test`, then refactor: re-read each function you added or grew against AGENTS.md § Code Style, refactor until it reads top-down, and run `make test` again
+3. Run `make test`, then refactor: re-read each function you added or grew against AGENTS.md § Code Style, refactor any that takes decoding to follow, and run `make test` again
 4. Update the package's `.spec.md` in the same change if behaviour changed, Oddities included, per AGENTS.md § Package Specs (use [spec-writer skill](../spec-writer/SKILL.md))
 5. For each comment you added, name the fact it states, per AGENTS.md § Code Style's comment rule. If there is none, rename or refactor the code and delete the comment
 6. Last, re-read the prose you wrote: `git diff -- '*.md'` and the remaining comments. Apply AGENTS.md § Output Style and see if anything can be clearer or cut
