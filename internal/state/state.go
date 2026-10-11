@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
@@ -26,6 +27,7 @@ type State struct {
 	TrackedPRs                    []models.PullRequestRef `json:"trackedPRs"`
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
+	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -139,6 +141,19 @@ func WithTrackedPRsAdded(loadedState State, listedPRViews []prview.PR) State {
 	return loadedState
 }
 
+// A PR whose enrichment failed stays out, so the next run retries it.
+func WithMergedPRCache(s State, prs []githubclient.PR) State {
+	cacheablePRs := utilities.Filter(prs, func(pr githubclient.PR) bool {
+		return pr.GetMerged() && pr.HasCompleteReviewerInfo
+	})
+	s.MergedPRCache = utilities.UniqueFunc(cacheablePRs, isSamePullRequest)
+	return s
+}
+
+func isSamePullRequest(a, b githubclient.PR) bool {
+	return a.GetPullRequestRef() == b.GetPullRequestRef()
+}
+
 func newLastWrittenMessage(
 	messageInfo slackclient.SentMessageInfo, summaryText string, generatedAt time.Time,
 ) LastWrittenMessage {
@@ -183,6 +198,9 @@ func Save(filePath string, state State) error {
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write state file %s: %w", filePath, err)
 	}
-	log.Printf("Saved state to %s with %d PRs", filePath, len(state.TrackedPRs))
+	log.Printf(
+		"Saved state to %s with %d PRs and %d cached merged PRs",
+		filePath, len(state.TrackedPRs), len(state.MergedPRCache),
+	)
 	return nil
 }

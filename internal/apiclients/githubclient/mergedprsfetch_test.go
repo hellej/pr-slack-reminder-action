@@ -263,7 +263,7 @@ func TestFindRecentlyMergedPRsCutsTheWindowClientSide(t *testing.T) {
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
-		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince, nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -292,7 +292,7 @@ func TestFindRecentlyMergedPRsKeepsTheNewestUpToTheCap(t *testing.T) {
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
-		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince, nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -359,6 +359,7 @@ func TestFindRecentlyMergedPRsAppliesFilters(t *testing.T) {
 				testRepositories[:1],
 				func(models.Repository) config.Filters { return tt.filters },
 				testMergedSince,
+				nil,
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -411,7 +412,7 @@ func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
-		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince, nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -448,7 +449,7 @@ func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
 	)
 
 	prs, err := testClient.FindRecentlyMergedPRs(
-		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince, nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -459,7 +460,105 @@ func TestFindRecentlyMergedPRsDegradesWhenEnrichmentFails(t *testing.T) {
 	if prs[0].ApprovedByUsers != nil || prs[0].CommentedByUsers != nil {
 		t.Errorf("expected no reviewers after a failed enrichment, got %+v", prs[0])
 	}
+	if prs[0].HasCompleteReviewerInfo || prs[1].HasCompleteReviewerInfo {
+		t.Error("HasCompleteReviewerInfo = true, expected false after a failed enrichment")
+	}
 	if !strings.Contains(logOutput.String(), "status 500") {
 		t.Errorf("expected the enrichment failure to be logged, got:\n%s", logOutput.String())
+	}
+}
+
+func cachedMergedPR(number int, title string) PR {
+	return PR{
+		PullRequest:             &PullRequest{Number: number, Title: title, Merged: true},
+		Repository:              testRepositories[0],
+		ApprovedByUsers:         []Collaborator{{Login: "cached-approver"}},
+		HasCompleteReviewerInfo: true,
+	}
+}
+
+// The live check reads the log for an enrichment, so not even its log line may appear.
+func TestFindRecentlyMergedPRsSendsNoEnrichmentWhenEveryResultIsCached(t *testing.T) {
+	logOutput := captureLogOutput(t)
+	testClient, enrich := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 2},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z", "2026-08-21T12:00:00Z")},
+		),
+		nil,
+		retry.DefaultPolicy(),
+	)
+
+	prs, err := testClient.FindRecentlyMergedPRs(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		[]PR{cachedMergedPR(1, "Cached PR 1"), cachedMergedPR(2, "Cached PR 2")},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if numbers := prNumbersOf(prs); !reflect.DeepEqual(numbers, []int{2, 1}) {
+		t.Errorf("PR numbers = %v, expected [2 1]", numbers)
+	}
+	if len(enrich.requestedNumbers) != 0 {
+		t.Errorf("enriched %v, expected no enrichment request", enrich.requestedNumbers)
+	}
+	if strings.Contains(logOutput.String(), "Fetching pull request reviews and comments") {
+		t.Errorf("expected no enrichment logged, got:\n%s", logOutput.String())
+	}
+}
+
+func TestFindRecentlyMergedPRsMatchesTheCacheByRepositoryAndNumber(t *testing.T) {
+	testClient, enrich := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 1},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z")},
+		),
+		reviewedAndCommentedFixtures(1, nil),
+		retry.DefaultPolicy(),
+	)
+	otherRepositoryPR := cachedMergedPR(1, "Cached PR 1 of another repository")
+	otherRepositoryPR.Repository = testRepositories[1]
+
+	prs, err := testClient.FindRecentlyMergedPRs(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+		[]PR{otherRepositoryPR},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 1 || prs[0].GetTitle() != "PR 1" {
+		t.Errorf("got %+v, expected the searched PR 1, enriched", prs)
+	}
+	if !reflect.DeepEqual(enrich.requestedNumbers, [][]int{{1}}) {
+		t.Errorf("enriched %v, expected one request for [1]", enrich.requestedNumbers)
+	}
+}
+
+func TestFindRecentlyMergedPRsKeepsCachedPRsWhenEnrichingTheRestFails(t *testing.T) {
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 2},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z", "2026-08-21T12:00:00Z")},
+		),
+		map[int]enrichFixture{1: {requestStatus: 500}},
+		retryPolicy,
+	)
+	cachedPR := cachedMergedPR(2, "Cached PR 2")
+
+	prs, err := testClient.FindRecentlyMergedPRs(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince, []PR{cachedPR},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 2 {
+		t.Fatalf("expected 2 PRs, got %d", len(prs))
+	}
+	if !reflect.DeepEqual(prs[0], cachedPR) {
+		t.Errorf("PR 2 = %+v, expected the cached PR as saved", prs[0])
+	}
+	if prs[1].GetNumber() != 1 || prs[1].ApprovedByUsers != nil || prs[1].HasCompleteReviewerInfo {
+		t.Errorf("PR 1 = %+v, expected it without reviewer info", prs[1])
 	}
 }

@@ -57,6 +57,7 @@ status: draft
   - `enrichedPR` (open and merged enrichment) and `getPRBatchByRef` (`GetPRs`) set it when the alias returned a node and no error for that alias
   - `prWithoutReviewers` leaves it false
   - Open PRs carry it too, unread
+- Add `PR.GetPullRequestRef()`, the single ref helper used by the cache match, `WithMergedPRCache` and run.go
 - Update githubclient.spec.md § Behaviour
 
 ### Step 2: Return cached merged PRs instead of enriching them
@@ -67,12 +68,12 @@ status: draft
   - The merge order stays. The failed-enrichment fallback (`prWithoutReviewers`) applies to the uncached results only
   - Log how many came from the cache
 - The `Client` interface and its callers take the new parameter
-- Step 4's integration test pins this step's behaviour
+- Step 4's integration test pins the cache read and the interleaved merge order. Package tests pin what it cannot reach: `TestFindRecentlyMergedPRsSendsNoEnrichmentWhenEveryResultIsCached` (no enrichment logged), `TestFindRecentlyMergedPRsMatchesTheCacheByRepositoryAndNumber` and `TestFindRecentlyMergedPRsKeepsCachedPRsWhenEnrichingTheRestFails`
 - Update githubclient.spec.md
 
 ### Step 3: Merged PR cache in state
 
-- `internal/state/`: add `State.MergedPRCache []githubclient.PR`, JSON key `mergedPRCache`
+- `internal/state/`: add `State.MergedPRCache []githubclient.PR`, JSON key `mergedPRCache` with `omitempty`, so a state without merged PRs saves no key
 - `WithMergedPRCache(state, prs)` returns a copy with the cache replaced by the merged PRs out of `prs` that have complete reviewer info, deduplicated by ref (`utilities.UniqueFunc`)
 - An entry stores `githubclient.PR` as is, with no JSON tags, so its keys are Go field names, as `models.Repository`'s already are. The state snapshots pin them
   - `HasCompleteReviewerInfo` saves with it, so an entry taken from the cache passes `WithMergedPRCache` again
@@ -81,13 +82,14 @@ status: draft
 ### Step 4: Wire the cache into the run
 
 - `cmd/pr-slack-reminder/run.go`:
-  - `Run` loads state before the merged fetch in update mode, and hands the loaded state or its error to `runUpdateMode`. A load error still fails update mode, after the canvas refresh, as today
+  - `Run` loads state after the open fetch and before the merged fetch in update mode, and hands the loaded state to `runUpdateMode`. A load error skips `runUpdateMode` and still fails update mode, after the canvas refresh, as today
   - Update mode passes the loaded cache to `FindRecentlyMergedPRs`. Post mode passes nil
   - `resolveTrackedPRs` takes the cache and resolves an unresolved tracked ref from it before `GetPRs`
   - Post mode saves `WithMergedPRCache` over its merged PRs. Update mode, after a successful edit, over its merged and tracked PRs
 - `testhelpers/mockgithubclient/`: `FetchRecording` records each enrichment request's refs, as it records `GetPRsRequests`
 - `main_test.go` pins with `FetchRecording` that a cached merged PR is neither enriched nor in a `GetPRs` request, and that a PR whose enrichment failed is not saved
 - The state snapshots re-record with the cache. Read the diff before re-recording
+  - A cache entry saves its fixture times, taken off the real clock, and its labels. The snapshot normaliser fixes the PR time keys as it fixes `messagePostedAt`, and `getTestPR`'s default label is a fixed string, not a random one
 - Update run.spec.md: § Behaviour for the load order and the cache read and write. § Oddities for the Caveats on cached rows and on filters
 - Live check: on the PR, the Build E2E step "Run with filters and canvas link: update" loads the state its post step saved in the same job
   - Needs at least one merge in the E2E repositories inside the 7-day window

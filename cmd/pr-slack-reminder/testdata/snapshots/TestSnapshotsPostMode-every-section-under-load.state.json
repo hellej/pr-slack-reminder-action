@@ -526,5 +526,137 @@
     ],
     "summaryText": "3 PRs to review, 1 waiting for author, 2 to merge 👀",
     "generatedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergedPRCache": [
+    {
+      "Number": 83,
+      "Title": "Landed an hour ago",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/83",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "carol",
+        "Name": "Carol Clark"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": [
+        {
+          "Login": "dana",
+          "Name": "Dana Davis"
+        }
+      ],
+      "CommentedByUsers": [
+        {
+          "Login": "erin",
+          "Name": "Erin Evans"
+        }
+      ],
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 81,
+      "Title": "Landed this morning",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/81",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "alice",
+        "Name": "Alice Anderson"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 82,
+      "Title": "Landed yesterday",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/82",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "bob",
+        "Name": "Bob Brown"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 84,
+      "Title": "Landed three days ago",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/84",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dana",
+        "Name": "Dana Davis"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ]
 }

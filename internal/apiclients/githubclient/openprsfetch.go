@@ -208,5 +208,7 @@ func enrichedPR(result PRResult, aliasNode *pullRequestWrapperNode, aliasError e
 		aliasError = cmp.Or(aliasError, errNoPullRequestReturned)
 	}
 	logEnrichment(result.repository, result.pr.GetNumber(), node, aliasError)
-	return prWithReviewers(result.pr, result.repository, node)
+	pr := prWithReviewers(result.pr, result.repository, node)
+	pr.HasCompleteReviewerInfo = aliasError == nil
+	return pr
 }

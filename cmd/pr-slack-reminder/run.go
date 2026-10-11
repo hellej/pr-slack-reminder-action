@@ -53,7 +53,14 @@ func Run(
 	if err != nil {
 		return err
 	}
-	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(githubClient, cfg, generatedAt)
+	var loadedState *state.State
+	var loadStateErr error
+	if cfg.RunMode == config.RunModeUpdate {
+		loadedState, loadStateErr = loadPreviousState(githubClient, cfg)
+	}
+	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(
+		githubClient, cfg, generatedAt, mergedPRCacheOf(loadedState),
+	)
 	if mergedPRsErr != nil {
 		logWarning(fmt.Sprintf("Failed to fetch recently merged PRs: %v", mergedPRsErr))
 	}
@@ -67,8 +74,12 @@ func Run(
 			githubClient, slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
+		if loadStateErr != nil {
+			messageErr = fmt.Errorf("failed to load state: %w", loadStateErr)
+			break
+		}
 		stateToSave, messageErr = runUpdateMode(
-			githubClient, slackClient, cfg, openPRs, mergedPRs, mergedPRsErr, generatedAt,
+			githubClient, slackClient, cfg, *loadedState, openPRs, mergedPRs, mergedPRsErr, generatedAt,
 			sentMessageHandler,
 		)
 	default:
@@ -124,7 +135,9 @@ func runPostMode(
 		return nil, err
 	}
 
-	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt)
+	postState := state.WithMergedPRCache(
+		state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt), mergedPRs,
+	)
 	return &postState, errors.Join(
 		sentMessageHandler(sentMessageInfo),
 		markPreviousMessageStale(githubClient, slackClient, cfg, sentMessageInfo.ChannelID),
@@ -139,13 +152,7 @@ func markPreviousMessageStale(
 	cfg config.Config,
 	newMessageChannelID string,
 ) error {
-	previousState, err := state.Load(
-		context.Background(),
-		githubClient,
-		cfg.CurrentRepository,
-		cfg.StateArtifactName,
-		cfg.StateFilePath,
-	)
+	previousState, err := loadPreviousState(githubClient, cfg)
 	if errors.Is(err, githubclient.ErrNoArtifactFound) {
 		log.Printf("Not marking the previous message stale, there is no previous state: %v", err)
 		return nil
@@ -188,6 +195,23 @@ func markPreviousMessageStale(
 	return nil
 }
 
+func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*state.State, error) {
+	return state.Load(
+		context.Background(),
+		githubClient,
+		cfg.CurrentRepository,
+		cfg.StateArtifactName,
+		cfg.StateFilePath,
+	)
+}
+
+func mergedPRCacheOf(loadedState *state.State) []githubclient.PR {
+	if loadedState == nil {
+		return nil
+	}
+	return loadedState.MergedPRCache
+}
+
 func buildNonDraftPRViews(openPRs githubclient.OpenPRsResult, cfg config.Config) []prview.PR {
 	nonDraftPRs := utilities.Filter(openPRs.PRs, func(pr githubclient.PR) bool {
 		return !pr.GetDraft()
@@ -199,24 +223,15 @@ func runUpdateMode(
 	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
+	loadedState state.State,
 	openPRs githubclient.OpenPRsResult,
 	mergedPRs []githubclient.PR,
 	mergedPRsErr error,
 	generatedAt time.Time,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
-	loadedState, err := state.Load(
-		context.Background(),
-		githubClient,
-		cfg.CurrentRepository,
-		cfg.StateArtifactName,
-		cfg.StateFilePath,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load state: %w", err)
-	}
 	trackedPRs, trackedPRsErr := resolveTrackedPRs(
-		githubClient, cfg, loadedState.TrackedPRs, openPRs.PRs, mergedPRs,
+		githubClient, cfg, loadedState.TrackedPRs, openPRs.PRs, mergedPRs, loadedState.MergedPRCache,
 	)
 	if trackedPRsErr != nil {
 		logWarning(fmt.Sprintf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr))
@@ -235,7 +250,7 @@ func runUpdateMode(
 	if !content.HasPRs() && content.NoOpenPRsText == "" {
 		if mergedPRsErr != nil || trackedPRsErr != nil {
 			log.Println("Keeping the Slack message: nothing to show, but a PR fetch failed")
-			return loadedState, nil
+			return &loadedState, nil
 		}
 		log.Println("Nothing left to show: no open PRs and no merged ones")
 		log.Println("Deleting Slack message as no-prs-message is set to empty")
@@ -245,7 +260,7 @@ func runUpdateMode(
 		); err != nil {
 			logWarning(fmt.Sprintf("Keeping the Slack message with nothing left to show, its delete failed: %v", err))
 		}
-		return loadedState, nil
+		return &loadedState, nil
 	}
 	if !content.HasPRs() {
 		log.Printf("Updating Slack message with no-prs-message: %s", content.NoOpenPRsText)
@@ -260,11 +275,14 @@ func runUpdateMode(
 		summaryText,
 	)
 	if err != nil {
-		return loadedState, err
+		return &loadedState, err
 	}
-	editedState := state.WithTrackedPRsAdded(
-		state.WithLastWrittenMessage(*loadedState, sentMessageInfo, summaryText, generatedAt),
-		listedOpenPRViews,
+	editedState := state.WithMergedPRCache(
+		state.WithTrackedPRsAdded(
+			state.WithLastWrittenMessage(loadedState, sentMessageInfo, summaryText, generatedAt),
+			listedOpenPRViews,
+		),
+		slices.Concat(mergedPRs, trackedPRs),
 	)
 	return &editedState, sentMessageHandler(sentMessageInfo)
 }
@@ -278,19 +296,27 @@ func resolveTrackedPRs(
 	references []models.PullRequestRef,
 	openPRs []githubclient.PR,
 	mergedPRs []githubclient.PR,
+	mergedPRCache []githubclient.PR,
 ) ([]githubclient.PR, error) {
 	trackedMergedPRs := utilities.Filter(mergedPRs, func(pr githubclient.PR) bool {
-		return slices.Contains(references, refOf(pr))
+		return slices.Contains(references, pr.GetPullRequestRef())
 	})
-	resolvedReferences := utilities.Map(slices.Concat(openPRs, mergedPRs), refOf)
+	resolvedReferences := utilities.Map(slices.Concat(openPRs, mergedPRs), githubclient.PR.GetPullRequestRef)
 	unresolvedReferences := utilities.Filter(references, func(ref models.PullRequestRef) bool {
 		return !slices.Contains(resolvedReferences, ref)
 	})
-	fetchedPRs, err := fetchUnresolvedPRs(githubClient, cfg, unresolvedReferences)
+	trackedCachedPRs := utilities.Filter(mergedPRCache, func(pr githubclient.PR) bool {
+		return slices.Contains(unresolvedReferences, pr.GetPullRequestRef())
+	})
+	cachedReferences := utilities.Map(trackedCachedPRs, githubclient.PR.GetPullRequestRef)
+	uncachedReferences := utilities.Filter(unresolvedReferences, func(ref models.PullRequestRef) bool {
+		return !slices.Contains(cachedReferences, ref)
+	})
+	fetchedPRs, err := fetchUnresolvedPRs(githubClient, cfg, uncachedReferences)
 	if err != nil {
-		return trackedMergedPRs, err
+		return slices.Concat(trackedMergedPRs, trackedCachedPRs), err
 	}
-	return slices.Concat(trackedMergedPRs, fetchedPRs), nil
+	return slices.Concat(trackedMergedPRs, trackedCachedPRs, fetchedPRs), nil
 }
 
 // An empty ref slice makes GetPRs log a fetch it never sends, so that case skips the call.
@@ -307,10 +333,6 @@ func fetchUnresolvedPRs(
 	return githubClient.GetPRs(ctx, references, cfg.GetFiltersForRepository)
 }
 
-func refOf(pr githubclient.PR) models.PullRequestRef {
-	return models.PullRequestRef{Repository: pr.Repository, Number: pr.GetNumber()}
-}
-
 func findOpenPRs(
 	githubClient githubclient.Client,
 	cfg config.Config,
@@ -322,7 +344,10 @@ func findOpenPRs(
 }
 
 func findRecentlyMergedPRs(
-	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+	githubClient githubclient.Client,
+	cfg config.Config,
+	generatedAt time.Time,
+	mergedPRCache []githubclient.PR,
 ) ([]githubclient.PR, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
@@ -331,6 +356,7 @@ func findRecentlyMergedPRs(
 		cfg.Repositories,
 		cfg.GetFiltersForRepository,
 		generatedAt.Add(-githubclient.RecentlyMergedWindow),
+		mergedPRCache,
 	)
 }
 

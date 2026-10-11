@@ -76,5 +76,67 @@
     ],
     "summaryText": "Nothing waiting for review 🎉",
     "generatedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergedPRCache": [
+    {
+      "Number": 96,
+      "Title": "Bump dependency 96",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/96",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dependabot[bot]",
+        "Name": ""
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 95,
+      "Title": "Bump dependency 95",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/95",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dependabot[bot]",
+        "Name": ""
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ]
 }

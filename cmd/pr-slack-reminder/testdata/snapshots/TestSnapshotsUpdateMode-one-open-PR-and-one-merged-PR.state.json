@@ -147,5 +147,37 @@
     ],
     "summaryText": "1 PR to review 👀",
     "generatedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergedPRCache": [
+    {
+      "Number": 72,
+      "Title": "The only merged PR",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/72",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "bob",
+        "Name": "Bob Brown"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ]
 }

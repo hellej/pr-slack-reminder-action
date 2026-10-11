@@ -101,6 +101,12 @@ type PR struct {
 	HasOutstandingChangesRequest bool
 	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
 	FirstReadyForReviewEventAt *time.Time
+	// False after a failed enrichment. See githubclient.spec.md § Behaviour
+	HasCompleteReviewerInfo bool
+}
+
+func (p PR) GetPullRequestRef() models.PullRequestRef {
+	return models.PullRequestRef{Repository: p.Repository, Number: p.GetNumber()}
 }
 
 func (p PR) ReadyForReviewAt() time.Time {

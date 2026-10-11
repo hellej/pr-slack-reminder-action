@@ -633,3 +633,36 @@ func TestLogEnrichmentPrintsTheFirstReadyForReviewEventTime(t *testing.T) {
 		})
 	}
 }
+
+func TestEnrichPRsMarksOnlyPRsEnrichedWithoutAnErrorAsComplete(t *testing.T) {
+	transport := &fakeEnrichTransport{fixtureByNumber: reviewedAndCommentedFixtures(4, map[int]enrichFixture{
+		2: {
+			errorType:    "RESOURCE_LIMITS_EXCEEDED",
+			errorPath:    []any{"pullRequest", "comments"},
+			errorMessage: "resource limit exceeded",
+		},
+		3: {nullPullRequest: true},
+		4: {
+			errorType:    "NOT_FOUND",
+			errorPath:    []any{"pullRequest"},
+			errorMessage: "Could not resolve to a PullRequest with the number 4.",
+		},
+	})}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
+
+	prs, err := testClient.enrichPRsWithReviewInfo(context.Background(), testPRResults(4))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	completeness := make([]bool, len(prs))
+	for index, pr := range prs {
+		completeness[index] = pr.HasCompleteReviewerInfo
+	}
+	if !reflect.DeepEqual(completeness, []bool{true, false, false, false}) {
+		t.Errorf(
+			"HasCompleteReviewerInfo = %v, expected [true false false false]: "+
+				"clean, field error, null pull request, pull request error", completeness,
+		)
+	}
+}
