@@ -293,44 +293,44 @@ func runUpdateMode(
 func resolveTrackedPRs(
 	githubClient githubclient.Client,
 	cfg config.Config,
-	references []models.PullRequestRef,
+	trackedRefs []models.PullRequestRef,
 	openPRs []githubclient.PR,
 	mergedPRs []githubclient.PR,
 	mergedPRCache []githubclient.PR,
 ) ([]githubclient.PR, error) {
-	trackedMergedPRs := utilities.Filter(mergedPRs, func(pr githubclient.PR) bool {
-		return slices.Contains(references, pr.GetPullRequestRef())
+	refsNotListedOpen := refsMissingFrom(trackedRefs, openPRs)
+	fromMergedFetch := prsWithRefIn(mergedPRs, refsNotListedOpen)
+	fromCache := prsWithRefIn(mergedPRCache, refsMissingFrom(refsNotListedOpen, fromMergedFetch))
+	refsToFetch := refsMissingFrom(refsNotListedOpen, slices.Concat(fromMergedFetch, fromCache))
+	fetchedPRs, err := fetchPRsByRef(githubClient, cfg, refsToFetch)
+	return slices.Concat(fromMergedFetch, fromCache, fetchedPRs), err
+}
+
+func prsWithRefIn(prs []githubclient.PR, refs []models.PullRequestRef) []githubclient.PR {
+	return utilities.Filter(prs, func(pr githubclient.PR) bool {
+		return slices.Contains(refs, pr.GetPullRequestRef())
 	})
-	resolvedReferences := utilities.Map(slices.Concat(openPRs, mergedPRs), githubclient.PR.GetPullRequestRef)
-	unresolvedReferences := utilities.Filter(references, func(ref models.PullRequestRef) bool {
-		return !slices.Contains(resolvedReferences, ref)
+}
+
+func refsMissingFrom(refs []models.PullRequestRef, prs []githubclient.PR) []models.PullRequestRef {
+	refsOfPRs := utilities.Map(prs, githubclient.PR.GetPullRequestRef)
+	return utilities.Filter(refs, func(ref models.PullRequestRef) bool {
+		return !slices.Contains(refsOfPRs, ref)
 	})
-	trackedCachedPRs := utilities.Filter(mergedPRCache, func(pr githubclient.PR) bool {
-		return slices.Contains(unresolvedReferences, pr.GetPullRequestRef())
-	})
-	cachedReferences := utilities.Map(trackedCachedPRs, githubclient.PR.GetPullRequestRef)
-	uncachedReferences := utilities.Filter(unresolvedReferences, func(ref models.PullRequestRef) bool {
-		return !slices.Contains(cachedReferences, ref)
-	})
-	fetchedPRs, err := fetchUnresolvedPRs(githubClient, cfg, uncachedReferences)
-	if err != nil {
-		return slices.Concat(trackedMergedPRs, trackedCachedPRs), err
-	}
-	return slices.Concat(trackedMergedPRs, trackedCachedPRs, fetchedPRs), nil
 }
 
 // An empty ref slice makes GetPRs log a fetch it never sends, so that case skips the call.
-func fetchUnresolvedPRs(
+func fetchPRsByRef(
 	githubClient githubclient.Client,
 	cfg config.Config,
-	references []models.PullRequestRef,
+	refs []models.PullRequestRef,
 ) ([]githubclient.PR, error) {
-	if len(references) == 0 {
+	if len(refs) == 0 {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
-	return githubClient.GetPRs(ctx, references, cfg.GetFiltersForRepository)
+	return githubClient.GetPRs(ctx, refs, cfg.GetFiltersForRepository)
 }
 
 func findOpenPRs(
