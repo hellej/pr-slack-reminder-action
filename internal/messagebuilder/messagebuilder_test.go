@@ -13,6 +13,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 var generatedAt = time.Date(2026, 9, 19, 12, 12, 0, 0, time.UTC)
@@ -31,7 +32,7 @@ func testPR(options testPROptions) prview.PR {
 			PullRequest: &githubclient.PullRequest{
 				Title:     options.title,
 				HTMLURL:   "https://github.com/test-org/test-repo/pull/1",
-				CreatedAt: time.Now().Add(-3 * time.Hour),
+				CreatedAt: testhelpers.WeekdayTimeBefore(time.Now(), 3*time.Hour),
 				MergedAt:  options.mergedAt,
 				Merged:    options.mergedAt != nil,
 			},

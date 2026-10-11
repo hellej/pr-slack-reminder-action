@@ -68,7 +68,11 @@ func (pr PR) GetNextAction() PRNextAction {
 }
 
 func (pr PR) GetPRAgeText() string {
-	return durationText(time.Since(pr.ReadyForReviewAt()))
+	readyForReviewAt := pr.ReadyForReviewAt()
+	if readyForReviewAt.IsZero() {
+		return durationText(time.Since(readyForReviewAt))
+	}
+	return durationText(weekdayTimeBetween(readyForReviewAt, time.Now()))
 }
 
 func (pr PR) IsOpen() bool { return !pr.GetDraft() }
@@ -210,5 +214,29 @@ func isOlderThan(pr githubclient.PR, hours int) bool {
 	if pr.ReadyForReviewAt().IsZero() {
 		return true
 	}
-	return pr.ReadyForReviewAt().Before(time.Now().Add(-time.Duration(hours) * time.Hour))
+	return weekdayTimeBetween(pr.ReadyForReviewAt(), time.Now()) > time.Duration(hours)*time.Hour
+}
+
+// weekdayTimeBetween returns the part of from..to falling on Monday to Friday, UTC. It walks one
+// day at a time, so a zero from would walk from year 1 and overflow: callers guard it.
+func weekdayTimeBetween(from, to time.Time) time.Duration {
+	if !from.Before(to) {
+		return 0
+	}
+	var weekdayTime time.Duration
+	for dayStart := from.UTC().Truncate(24 * time.Hour); dayStart.Before(to); dayStart = dayStart.AddDate(0, 0, 1) {
+		if dayStart.Weekday() == time.Saturday || dayStart.Weekday() == time.Sunday {
+			continue
+		}
+		spanStartInDay := dayStart
+		if from.After(dayStart) {
+			spanStartInDay = from
+		}
+		spanEndInDay := dayStart.AddDate(0, 0, 1)
+		if to.Before(spanEndInDay) {
+			spanEndInDay = to
+		}
+		weekdayTime += spanEndInDay.Sub(spanStartInDay)
+	}
+	return weekdayTime
 }

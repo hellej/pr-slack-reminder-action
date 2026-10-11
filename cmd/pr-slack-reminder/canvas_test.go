@@ -949,7 +949,7 @@ func TestCanvasCountsOpenPRAgeFromTheReadyForReviewTime(t *testing.T) {
 					Number: 2, Title: "Never a draft", AuthorLogin: "bob", AgeHours: 48,
 				}),
 			},
-			FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{1: now.Add(-3 * time.Hour)},
+			FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{1: testhelpers.WeekdayTimeBefore(now, 3*time.Hour)},
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 	)

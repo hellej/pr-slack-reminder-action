@@ -71,7 +71,7 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 			float64(cmp.Or(options.AgeHours, float32(5.0)) * 60),
 		),
 	)
-	prTime := now.Add(-time.Duration(ageMinutes) * time.Minute)
+	prTime := testhelpers.WeekdayTimeBefore(now, time.Duration(ageMinutes)*time.Minute)
 
 	state := cmp.Or(options.State, "open")
 

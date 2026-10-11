@@ -7,7 +7,8 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `BuildPRViews(prs, contentInputs)` returns PRs enriched for display, in the given order
 - Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
 - A PR's age counts from its ready-for-review time, `githubclient.PR.ReadyForReviewAt()`: its first switch from draft to ready, else its creation
-- A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it
+- Age is weekday time: Saturdays and Sundays, whole UTC days, don't count. A PR that turned ready on a weekend starts ageing Monday 00:00 UTC, and on a weekend ages hold at their Friday 24:00 value
+- A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR is older than it, so the threshold's hours are weekday hours
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards
 - `GetMergedText` renders time since `MergedAt` as "merged N minutes/hours/days ago", prefixed like the activity text so a merge time cannot be misread as an age. A PR that was never merged yields no text
@@ -43,7 +44,9 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 ## Doesn't Do
 
 - Doesn't validate that mapped Slack user IDs are well-formed
-- Doesn't handle a ready-for-review time in the future: the age text goes negative, e.g. "-30 minutes"
+- Doesn't flag a ready-for-review time in the future: its age reads "0 minutes"
+- Activity and merged texts, `IsActiveAsOf` and `IsRecentlyUpdated` don't leave out weekends: they keep calendar time
+- Doesn't leave out holidays
 - The search URL doesn't follow the row's section: a row in one open section links to every open PR of that author in its repositories
 - `RowsCollapsingPRsFromAuthors` doesn't skip an empty login: given `""`, it collapses PRs whose author GitHub no longer reports. [internal/config](../config/config.spec.md) drops empty items before they get here
 
@@ -54,4 +57,6 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value
+- A zero ready-for-review time also keeps calendar time for the age text: "106752 days", the most `time.Since` returns
+- Weekends are UTC days, so far from UTC they sit hours off local midnight: in Helsinki, Saturday starts at 02:00 or 03:00
 - An old-PR threshold of 0 turns the check off instead of flagging every PR as old

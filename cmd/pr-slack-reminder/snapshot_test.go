@@ -338,7 +338,7 @@ func snapshotScenarios() []snapshotScenario {
 					AgeHours:    48,
 				}),
 			},
-			firstReadyForReviewEventAtByPRNumber: map[int]time.Time{61: now.Add(-3 * time.Hour)},
+			firstReadyForReviewEventAtByPRNumber: map[int]time.Time{61: testhelpers.WeekdayTimeBefore(now, 3*time.Hour)},
 		},
 		{
 			name: "author mapped to a Slack user",

@@ -10,6 +10,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 func testPR(number int, createdAt, updatedAt time.Time) githubclient.PR {
@@ -54,12 +55,15 @@ func TestBuildPRViewsReturnsGivenOrder(t *testing.T) {
 
 func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	now := time.Now()
-	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
-	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
-	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
-	prWithUnknownCreationTime := testPR(4, time.Time{}, now.Add(-1*time.Hour))
-	prWithUnknownCreationTimeMarkedReadyRecently := testPR(5, time.Time{}, now.Add(-1*time.Hour))
-	prWithUnknownCreationTimeMarkedReadyRecently.FirstReadyForReviewEventAt = timePointer(now.Add(-1 * time.Hour))
+	weekdayHoursAgo := func(hours int) time.Time {
+		return testhelpers.WeekdayTimeBefore(now, time.Duration(hours)*time.Hour)
+	}
+	pr1 := testPR(1, weekdayHoursAgo(1), weekdayHoursAgo(1))
+	pr3 := testPR(2, weekdayHoursAgo(30), weekdayHoursAgo(30))
+	pr2 := testPR(3, weekdayHoursAgo(40), weekdayHoursAgo(40))
+	prWithUnknownCreationTime := testPR(4, time.Time{}, weekdayHoursAgo(1))
+	prWithUnknownCreationTimeMarkedReadyRecently := testPR(5, time.Time{}, weekdayHoursAgo(1))
+	prWithUnknownCreationTimeMarkedReadyRecently.FirstReadyForReviewEventAt = timePointer(weekdayHoursAgo(1))
 
 	prViews := prview.BuildPRViews(
 		[]githubclient.PR{
@@ -79,6 +83,24 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 		t.Errorf("expected PR views to have IsOldPR flags %v, got %v", want, got)
 	}
 
+}
+
+// 9 weekday days back spans at least one weekend, so calendar time is past the threshold.
+func TestBuildPRViewsCountsOnlyWeekdayTimeTowardsTheOldPRThreshold(t *testing.T) {
+	now := time.Now()
+	nineWeekdayDaysOld := testPR(1, testhelpers.WeekdayTimeBefore(now, 9*24*time.Hour), time.Time{})
+	elevenWeekdayDaysOld := testPR(2, testhelpers.WeekdayTimeBefore(now, 11*24*time.Hour), time.Time{})
+
+	prViews := prview.BuildPRViews(
+		[]githubclient.PR{nineWeekdayDaysOld, elevenWeekdayDaysOld},
+		config.ContentInputs{OldPRThresholdHours: 240},
+	)
+
+	want := []bool{false, true}
+	got := utilities.Map(prViews, func(pr prview.PR) bool { return pr.IsOldPR })
+	if !slices.Equal(got, want) {
+		t.Errorf("expected IsOldPR flags %v, got %v", want, got)
+	}
 }
 
 func TestSortPRsOldestToNewest(t *testing.T) {
@@ -263,19 +285,31 @@ func TestGetPRAgeDisplayText(t *testing.T) {
 		isOldPR  bool
 		expected string
 	}{
-		{name: "PR under the old-PR threshold", isOldPR: false, expected: "3 days ago"},
-		{name: "PR past the old-PR threshold", isOldPR: true, expected: "3 days old"},
+		{name: "PR under the old-PR threshold", isOldPR: false, expected: "10 days ago"},
+		{name: "PR past the old-PR threshold", isOldPR: true, expected: "10 days old"},
 	}
 
+	// 10 weekday days back spans at least one weekend, so calendar time reads at least 12 days.
+	tenWeekdayDaysAgo := testhelpers.WeekdayTimeBefore(time.Now(), 10*24*time.Hour)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := testPR(1, time.Now().Add(-72*time.Hour), time.Time{})
+			pr := testPR(1, tenWeekdayDaysAgo, time.Time{})
 			prView := prview.PR{PR: &pr, IsOldPR: tt.isOldPR}
 
 			if prView.GetPRAgeDisplayText() != tt.expected {
 				t.Errorf("expected '%s', got '%s'", tt.expected, prView.GetPRAgeDisplayText())
 			}
 		})
+	}
+}
+
+// A zero ready-for-review time keeps the text of a saturated time.Since, neither walking every
+// day from year 1 nor overflowing.
+func TestGetPRAgeTextOfAZeroReadyForReviewTime(t *testing.T) {
+	pr := testPR(1, time.Time{}, time.Time{})
+
+	if got := (prview.PR{PR: &pr}).GetPRAgeText(); got != "106752 days" {
+		t.Errorf("expected '106752 days', got '%s'", got)
 	}
 }
 
