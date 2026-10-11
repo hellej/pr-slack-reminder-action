@@ -139,7 +139,13 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 ## Code Style
 
 - **Readability > Speed:** Data sets are tiny; never trade clarity for execution speed or micro-optimizations.
-- **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or premature helpers.
+- **KISS, YAGNI, & Avoid Hasty Abstractions (AHA):** Implement only what is required right now. Prefer concrete types and minor duplication over speculative wrappers, single-use interfaces, or generic helpers built for callers that don't exist yet.
+- **Simple means easy to read, not fewest functions or lines:** Every function you add or grow reads top-down, as named steps at one level of detail. When one doesn't, refactor it in the same change. Small readability refactors in code the change touches are in scope, e.g.:
+  - Extract a helper that names a step, even with one caller, or a pattern the function repeats inline
+  - Rename what no longer says what it holds or does
+  - Inline an indirection that hides nothing
+  - Flip a negated condition, or reorder so the function reads top-down
+  - Split a function doing two jobs
 - **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
   - Name a UI element by what it shows: `updateTimeFooter`, not `liveFooter`. Don't put an adjective before a noun it doesn't describe: the edit marking a message stale is a `markAsStaleEdit`, not a `staleEdit`
   - Short-lived names may be short: receivers, loop variables, a value used within a few lines. Maps still follow `<value>By<key>`

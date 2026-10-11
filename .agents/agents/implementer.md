@@ -20,5 +20,7 @@ code to satisfy it.
 
 Report back: every file you changed or added, including untracked ones, the test result,
 each deviation from the plan, and anything you had to decide that the task left open.
+List readability refactors apart from behaviour changes, so the reviewer knows which code
+needs no mutants.
 Write it for a reviewer who has no context beyond the diff, so state facts that feel
 obvious to you.
