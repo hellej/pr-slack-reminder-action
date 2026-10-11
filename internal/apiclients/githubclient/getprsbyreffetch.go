@@ -67,10 +67,10 @@ func (c *client) getPRBatchByRef(
 		if !isFetched {
 			return nil, pullRequestFetchError(reference, errNoPullRequestReturned)
 		}
-		logEnrichment(
-			reference.Repository, reference.Number, node, errorsForAlias(alias, nil, fieldErrors),
-		)
+		aliasError := errorsForAlias(alias, nil, fieldErrors)
+		logEnrichment(reference.Repository, reference.Number, node, aliasError)
 		prs[index] = prWithReviewers(pullRequestFromNode(node), reference.Repository, node)
+		prs[index].HasCompleteReviewerInfo = aliasError == nil
 	}
 	return prs, nil
 }

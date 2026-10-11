@@ -14,14 +14,21 @@ Before reviewing, read the AGENTS.md sections the `coding` skill lists, plus
 
 A final review covers the whole branch against its base, committed and uncommitted:
 `git diff <base>...` plus the working tree, untracked files included. A checkpoint review
-covers the working tree only. Review only the files this change touched, per the task and
-the implementer's report.
+covers the working tree only. Review the files this change touched, per the task and
+the implementer's report. Code you read outside them, such as a caller or a helper, can
+still yield an **Outside this change** item.
 Check it against:
 
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
   state, so whether the test came first is unverifiable: skip it.
 - AGENTS.md § Code Style
+- Readability of each function the change added or grew, per AGENTS.md § Code Style: can
+  a reader follow it without decoding it? A pattern repeated inline, or steps mixed with
+  their low-level detail, is a `medium` Fix. Name the refactor: the helper to extract and
+  its name, the reorder. A short, plain function needs none
+- Every name the change added or kept in code it touched: a clearer one, even only
+  slightly more explicit, is a `nit` naming it
 - AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
   docstrings. Each breach is a `nit`
 - Every comment the change added, production and test code, each with a verdict against
@@ -122,8 +129,10 @@ Classify every finding before reporting it:
 - **Document**: a real rough edge, but fixing it needs significant complexity for a rare
   case. The finding is that the package's `.spec.md` **Oddities** section does not cover
   it. Write the bullet that belongs there
-- **Drop**: already an Oddity in the spec, or pre-existing and outside this change. A
-  cleanup this change did not create the opportunity for is a Drop. Do not report it
+- **Outside this change**: a pre-existing problem the change did not create or grow,
+  such as hard-to-read code. Report it in its own list, with the fix you'd make. It
+  never counts toward the verdict
+- **Drop**: already an Oddity in the spec
 
 Give every Fix a severity:
 
@@ -142,6 +151,7 @@ Report back:
 - Then each finding: `Fix (high|medium|nit)` or `Document`, `file:line`, what is wrong,
   why it matters. Most severe first
 - The comment list: each added comment with its verdict
+- The Outside this change list, each item with `file:line` and the fix you'd make
 - One line on what you mutated, and how many survived. When you mutated in place, that
   the tree is restored
 - Nothing else. No praise, no summary of what the code does

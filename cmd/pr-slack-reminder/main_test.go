@@ -23,6 +23,7 @@ import (
 	"github.com/slack-go/slack"
 
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
+	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
@@ -58,7 +59,8 @@ func getTestPR(options GetTestPROptions) *github.PullRequest {
 
 	var githubLabels []*github.Label
 	if len(options.Labels) == 0 {
-		options.Labels = []string{testhelpers.RandomString(10)}
+		// Fixed, not random: the merged PR cache saves labels into the state snapshots.
+		options.Labels = []string{"label-no-filter-names"}
 	}
 	for _, label := range options.Labels {
 		githubLabels = append(githubLabels, &github.Label{
@@ -1397,6 +1399,7 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 			loadedState := getTestState(GetTestStateOptions{PRNumbers: tc.prNumbersInState})
 			loadedState.LastWrittenMessage = seededLastWrittenMessage
+			loadedState.MergedPRCache = []githubclient.PR{cachedMergedPR(50, "Cached nine days ago", 9*24)}
 
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
@@ -1433,6 +1436,9 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 			assertLastWrittenMessageIsTheSeededOne(t, savedState.LastWrittenMessage)
 			if !slices.Equal(savedState.TrackedPRs, loadedState.TrackedPRs) {
 				t.Errorf("Expected the loaded tracked PRs %+v, got %+v", loadedState.TrackedPRs, savedState.TrackedPRs)
+			}
+			if !slices.Equal(mergedPRCacheRefs(savedState), []models.PullRequestRef{stateRef(50)}) {
+				t.Errorf("Expected the loaded merged PR cache, got %v", mergedPRCacheRefs(savedState))
 			}
 		})
 	}
@@ -2242,5 +2248,298 @@ func TestPostModeWarnsWhenTheRecentlyMergedPRFetchFails(t *testing.T) {
 				warningAnnotationPrefix + `Failed to fetch recently merged PRs: error fetching merged pull requests: GraphQL request failed with status 403: unexpected response: {"message":"search failed"}`,
 			})
 		})
+	}
+}
+
+func cachedMergedPR(number int, title string, mergedHoursAgo float32) githubclient.PR {
+	mergedAt := now.Add(-time.Duration(mergedHoursAgo * float32(time.Hour)))
+	return githubclient.PR{
+		PullRequest: &githubclient.PullRequest{
+			Number:    number,
+			Title:     title,
+			CreatedAt: mergedAt.Add(-24 * time.Hour),
+			State:     "closed",
+			Merged:    true,
+			MergedAt:  &mergedAt,
+			Author:    githubclient.Collaborator{Login: "carol", Name: "Carol"},
+		},
+		Repository:              models.Repository{Owner: "test-org", Name: "test-repo"},
+		ApprovedByUsers:         []githubclient.Collaborator{{Login: "dana", Name: "Dana"}},
+		HasCompleteReviewerInfo: true,
+	}
+}
+
+func mergedPRCacheRefs(savedState state.State) []models.PullRequestRef {
+	return utilities.Map(savedState.MergedPRCache, githubclient.PR.GetPullRequestRef)
+}
+
+// PR 1 is merged inside the window and tracked, PR 2 merged before it and tracked. PR 3 and 4 are
+// merged since the last run, one before and one after PR 1, so cached and uncached interleave.
+// PR 5 is a cache entry this run no longer uses.
+func TestUpdateModeTakesCachedMergedPRsInsteadOfFetchingThem(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	overrides[config.InputRunMode] = config.RunModeUpdate
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+	loadedState.MergedPRCache = []githubclient.PR{
+		cachedMergedPR(5, "Cache entry no longer used", 3),
+		cachedMergedPR(2, "Cached PR 2, merged nine days ago", 9*24),
+		cachedMergedPR(1, "Cached PR 1", 2),
+	}
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 1, Title: "Searched PR 1", AuthorLogin: "carol",
+					State: "closed", Merged: true, MergedHoursAgo: 2,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 3, Title: "Merged since the last run", AuthorLogin: "bob",
+					State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 4, Title: "Also merged since the last run", AuthorLogin: "bob",
+					State: "closed", Merged: true, MergedHoursAgo: 3,
+				}),
+			},
+			PRsByNumber: map[int]*github.PullRequest{
+				2: getTestPR(GetTestPROptions{
+					Number: 2, Title: "Fetched PR 2", AuthorLogin: "carol",
+					State: "closed", Merged: true, MergedHoursAgo: 9 * 24,
+				}),
+			},
+			MockPreviousState: &loadedState,
+			Recording:         &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	expectedEnrichmentRequests := [][]models.PullRequestRef{{stateRef(3), stateRef(4)}}
+	if !slices.EqualFunc(recording.EnrichmentRequests, expectedEnrichmentRequests, slices.Equal) {
+		t.Errorf("Expected enrichment requests %v, got %v", expectedEnrichmentRequests, recording.EnrichmentRequests)
+	}
+	if len(recording.GetPRsRequests) != 0 {
+		t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+	}
+	updatedMessage := mockSlackAPI.UpdatedMessage.Blocks
+	for _, expectedTitle := range []string{"Cached PR 1", "Cached PR 2, merged nine days ago", "Merged since the last run"} {
+		if !updatedMessage.SomePRItemContainsText(expectedTitle) {
+			t.Errorf("Expected %q in the updated message, got items %v", expectedTitle, updatedMessage.GetAllPRItemTexts())
+		}
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	expectedCacheRefs := []models.PullRequestRef{stateRef(3), stateRef(1), stateRef(4), stateRef(2)}
+	if !slices.Equal(mergedPRCacheRefs(savedState), expectedCacheRefs) {
+		t.Errorf("Expected the cache to hold %v, got %v", expectedCacheRefs, mergedPRCacheRefs(savedState))
+	}
+	if savedState.MergedPRCache[1].GetTitle() != "Cached PR 1" {
+		t.Errorf("Expected PR 1 saved as it was cached, got %+v", savedState.MergedPRCache[1])
+	}
+}
+
+// PR 3 and 4 are merged inside the window. PR 6 is tracked and closed without merging, PR 7
+// tracked and merged before the window, PR 8 tracked and still open.
+func TestUpdateModeCachesOnlyMergedPRsWithCompleteReviewerInfo(t *testing.T) {
+	testCases := []struct {
+		name              string
+		errByPRNumber     map[int]error
+		issueServiceError error
+		expectedCacheRefs []models.PullRequestRef
+	}{
+		{
+			name:              "every enrichment succeeds",
+			expectedCacheRefs: []models.PullRequestRef{stateRef(4), stateRef(3), stateRef(7)},
+		},
+		{
+			name:              "a pull request error on PR 3",
+			errByPRNumber:     map[int]error{3: errors.New("enrichment failed")},
+			expectedCacheRefs: []models.PullRequestRef{stateRef(4), stateRef(7)},
+		},
+		{
+			name:              "a field error under every pull request",
+			issueServiceError: errors.New("comments failed"),
+			expectedCacheRefs: []models.PullRequestRef{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			overrides, _ := getFilePathOverrides(t)
+			overrides[config.InputRunMode] = config.RunModeUpdate
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+			loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{6, 7, 8}})
+			openPR := getTestPR(GetTestPROptions{Number: 8, Title: "Still open", AuthorLogin: "alice"})
+
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs: []*github.PullRequest{openPR},
+					MergedPRs: []*github.PullRequest{
+						getTestPR(GetTestPROptions{
+							Number: 3, Title: "Merged two hours ago", State: "closed", Merged: true, MergedHoursAgo: 2,
+						}),
+						getTestPR(GetTestPROptions{
+							Number: 4, Title: "Merged an hour ago", State: "closed", Merged: true, MergedHoursAgo: 1,
+						}),
+					},
+					PRsByNumber: map[int]*github.PullRequest{
+						6: getTestPR(GetTestPROptions{Number: 6, Title: "Closed without merging", State: "closed"}),
+						7: getTestPR(GetTestPROptions{
+							Number: 7, Title: "Merged nine days ago", State: "closed", Merged: true, MergedHoursAgo: 9 * 24,
+						}),
+						8: openPR,
+					},
+					ErrByPRNumber:     tc.errByPRNumber,
+					IssueServiceError: tc.issueServiceError,
+					MockPreviousState: &loadedState,
+				}),
+				mockslackclient.MakeSlackClientGetter(
+					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+				),
+			)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+			if !slices.Equal(mergedPRCacheRefs(savedState), tc.expectedCacheRefs) {
+				t.Errorf("Expected the cache to hold %v, got %v", tc.expectedCacheRefs, mergedPRCacheRefs(savedState))
+			}
+		})
+	}
+}
+
+func TestPostModeEnrichesMergedPRsDespiteACachedPreviousState(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	previousState := getTestState(GetTestStateOptions{})
+	previousState.MergedPRCache = []githubclient.PR{cachedMergedPR(3, "Cached PR 3", 2)}
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+				Number: 3, Title: "Searched PR 3", State: "closed", Merged: true, MergedHoursAgo: 2,
+			})},
+			MockPreviousState: &previousState,
+			Recording:         &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	expectedEnrichmentRequests := [][]models.PullRequestRef{{stateRef(3)}}
+	if !slices.EqualFunc(recording.EnrichmentRequests, expectedEnrichmentRequests, slices.Equal) {
+		t.Errorf("Expected enrichment requests %v, got %v", expectedEnrichmentRequests, recording.EnrichmentRequests)
+	}
+	if !mockSlackAPI.SentMessage.Blocks.SomePRItemContainsText("Searched PR 3") {
+		t.Errorf("Expected the searched PR in the message, got items %v", mockSlackAPI.SentMessage.Blocks.GetAllPRItemTexts())
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	if len(savedState.MergedPRCache) != 1 || savedState.MergedPRCache[0].GetTitle() != "Searched PR 3" {
+		t.Errorf("Expected the cache to hold the searched PR 3 alone, got %+v", savedState.MergedPRCache)
+	}
+}
+
+func TestUpdateModeRefreshesTheCanvasWhenTheStateFailsToLoad(t *testing.T) {
+	stateFilePath := filepath.Join(t.TempDir(), stateFileName)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:             config.RunModeUpdate,
+		config.EnvStateFilePath:         stateFilePath,
+		config.InputPRTrackerCanvasLink: testCanvasLink,
+	})
+	recording := mockgithubclient.FetchRecording{}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+				Number: 3, Title: "Merged two hours ago", State: "closed", Merged: true, MergedHoursAgo: 2,
+			})},
+			ListArtifactsError: errors.New("artifact listing error"),
+			Recording:          &recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err == nil || !strings.Contains(err.Error(), "failed to load state") {
+		t.Fatalf("Expected Run to fail on the state load, got %v", err)
+	}
+	if recording.MergedPRFetches != 1 {
+		t.Errorf("Expected 1 merged PR fetch, got %d", recording.MergedPRFetches)
+	}
+	if !strings.Contains(mockSlackAPI.ReplacedCanvas.Markdown, "Merged two hours ago") {
+		t.Errorf("Expected the canvas written with the merged PR, got:\n%s", mockSlackAPI.ReplacedCanvas.Markdown)
+	}
+	if _, statErr := os.Stat(stateFilePath); !os.IsNotExist(statErr) {
+		t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+	}
+}
+
+// PR 1 is tracked, cached and merged before the window. PR 2 is tracked and uncached, and its
+// GetPRs fetch fails.
+func TestUpdateModeKeepsTheCachedTrackedPRsWhenTheTrackedPRFetchFails(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	overrides[config.InputRunMode] = config.RunModeUpdate
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+	loadedState.MergedPRCache = []githubclient.PR{cachedMergedPR(1, "Cached PR 1, merged nine days ago", 9*24)}
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			ErrByPRNumber:     map[int]error{2: errors.New("tracked PR fetch failed")},
+			MockPreviousState: &loadedState,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed despite the tracked PR fetch failure, got error: %v", err)
+	}
+	if !mockSlackAPI.UpdatedMessage.Blocks.SomePRItemContainsText("Cached PR 1, merged nine days ago") {
+		t.Errorf("Expected the cached PR in the message, got items %v", mockSlackAPI.UpdatedMessage.Blocks.GetAllPRItemTexts())
+	}
+}
+
+func TestPostModeCachesSameNumberedMergedPRsFromTwoRepositories(t *testing.T) {
+	overrides, _ := getFilePathOverrides(t)
+	overrides[config.InputGithubRepositories] = "test-org/app; test-org/infra"
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			MergedPRsByRepo: map[string][]*github.PullRequest{
+				"app": {getTestPR(GetTestPROptions{
+					Number: 5, Title: "Merged in app", State: "closed", Merged: true, MergedHoursAgo: 1,
+				})},
+				"infra": {getTestPR(GetTestPROptions{
+					Number: 5, Title: "Merged in infra", State: "closed", Merged: true, MergedHoursAgo: 2,
+				})},
+			},
+		}),
+		mockslackclient.MakeSlackClientGetter(
+			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
+		),
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+	expectedCacheRefs := []models.PullRequestRef{
+		{Repository: models.Repository{Owner: "test-org", Name: "app"}, Number: 5},
+		{Repository: models.Repository{Owner: "test-org", Name: "infra"}, Number: 5},
+	}
+	if !slices.Equal(mergedPRCacheRefs(savedState), expectedCacheRefs) {
+		t.Errorf("Expected the cache to hold %v, got %v", expectedCacheRefs, mergedPRCacheRefs(savedState))
 	}
 }

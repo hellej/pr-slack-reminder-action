@@ -172,6 +172,8 @@ Report to the user:
 - Each deviation from the plan, and how the plan now reads
 - Nits, cleared or left, and why any was left
 - Any finding the implementer rejected, and any the reviewer labelled `unverified`
+- The reviewer's Outside this change items, for the user to fold into this change or queue
+  as a separate task
 
 Leave the changes uncommitted, unless the user asked for commits.
 

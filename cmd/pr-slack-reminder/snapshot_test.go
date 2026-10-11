@@ -44,7 +44,10 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 	return stalenessWarningTimestamp.ReplaceAll(blocks, []byte(`!date^0^{date_pretty} at {time}|Jan 1 00:00 UTC`))
 }
 
-var stateTimestampField = regexp.MustCompile(`"(messagePostedAt|generatedAt)": "[^"]*"`)
+// The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
+var stateTimestampField = regexp.MustCompile(
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt)": "[^"]*"`,
+)
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
 
