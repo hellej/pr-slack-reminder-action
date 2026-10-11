@@ -222,7 +222,7 @@ func (c *client) enrichMergedPRs(ctx context.Context, prResults []PRResult) []PR
 }
 
 func findPROfResult(prs []PR, result PRResult) (PR, bool) {
-	resultRef := pullRequestRefOfResult(result)
+	resultRef := result.getPullRequestRef()
 	return utilities.Find(prs, func(pr PR) bool { return pr.GetPullRequestRef() == resultRef })
 }
 

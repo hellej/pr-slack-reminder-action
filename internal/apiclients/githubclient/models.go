@@ -132,6 +132,10 @@ func (r PRResult) getPullRequest() *PullRequest { return r.pr }
 
 func (r PRResult) getRepository() models.Repository { return r.repository }
 
+func (r PRResult) getPullRequestRef() models.PullRequestRef {
+	return models.PullRequestRef{Repository: r.repository, Number: r.pr.GetNumber()}
+}
+
 func (p PR) getPullRequest() *PullRequest { return p.PullRequest }
 
 func (p PR) getRepository() models.Repository { return p.Repository }

@@ -160,7 +160,7 @@ func (c *client) enrichPRsWithReviewInfo(ctx context.Context, prResults []PRResu
 
 func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, error) {
 	query := buildPullRequestsQuery(
-		utilities.Map(batch, pullRequestRefOfResult), enrichedPullRequestFragment,
+		utilities.Map(batch, PRResult.getPullRequestRef), enrichedPullRequestFragment,
 	)
 
 	var data aliasedData[pullRequestWrapperNode]
@@ -196,10 +196,6 @@ func enrichPRsWithReviewInfoError(err error, repositoryByAlias map[string]models
 		}
 	}
 	return fmt.Errorf("error fetching reviews and comments: %w", err)
-}
-
-func pullRequestRefOfResult(result PRResult) models.PullRequestRef {
-	return models.PullRequestRef{Repository: result.repository, Number: result.pr.GetNumber()}
 }
 
 func enrichedPR(result PRResult, aliasNode *pullRequestWrapperNode, aliasError error) PR {
