@@ -19,7 +19,6 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
-	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 var updateSnapshots = flag.Bool(
@@ -75,7 +74,7 @@ func testPR(options prOptions) prview.PR {
 				Number:    options.number,
 				Title:     options.title,
 				HTMLURL:   fmt.Sprintf("https://github.com/%s/pull/%d", repository.GetPath(), options.number),
-				CreatedAt: testhelpers.WeekdayTimeBefore(time.Now(), options.age),
+				CreatedAt: time.Now().Add(-options.age),
 				UpdatedAt: updatedAt,
 				MergedAt:  mergedAt,
 				Merged:    mergedAt != nil,

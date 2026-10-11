@@ -8,6 +8,7 @@ import (
 // 2026-10-09 is a Friday.
 func TestWeekdayTimeBetween(t *testing.T) {
 	utcPlus3 := time.FixedZone("UTC+3", 3*60*60)
+	utcMinus5 := time.FixedZone("UTC-5", -5*60*60)
 	at := func(day, hour int) time.Time { return time.Date(2026, time.October, day, hour, 0, 0, 0, time.UTC) }
 	tests := []struct {
 		name     string
@@ -34,6 +35,12 @@ func TestWeekdayTimeBetween(t *testing.T) {
 			from:     time.Date(2026, time.October, 10, 1, 0, 0, 0, utcPlus3),
 			to:       at(10, 12),
 			expected: 2 * time.Hour,
+		},
+		{
+			name:     "local Sunday that is a UTC Monday counts",
+			from:     time.Date(2026, time.October, 11, 22, 0, 0, 0, utcMinus5),
+			to:       at(12, 9),
+			expected: 6 * time.Hour,
 		},
 		{
 			name:     "local Monday that is a UTC Sunday does not count",

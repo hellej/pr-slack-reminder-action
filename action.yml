@@ -59,7 +59,7 @@ inputs: {
     default: 'No open PRs - happy coding! 🎉',
   },
   old-pr-threshold-hours: {
-    description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft. Age leaves out Saturdays and Sundays (UTC), so the hours are weekday hours',
+    description: 'PR age in hours after which a PR is highlighted as old (with alarm emoji and bold age text). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft. The hours are weekday hours: Saturdays and Sundays (UTC) are left out',
     required: false,
     default: '96',
   },

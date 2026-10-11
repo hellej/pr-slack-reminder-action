@@ -338,10 +338,11 @@ func snapshotScenarios() []snapshotScenario {
 					AuthorLogin: "bob",
 					AuthorName:  "Bob Brown",
 					Labels:      []string{"fix"},
-					AgeHours:    48,
+					// Reads "2 days", and holds at least 22 weekday hours whatever the weekday.
+					AgeHours: 70,
 				}),
 			},
-			firstReadyForReviewEventAtByPRNumber: map[int]time.Time{61: testhelpers.WeekdayTimeBefore(now, 3*time.Hour)},
+			firstReadyForReviewEventAtByPRNumber: map[int]time.Time{61: now.Add(-3 * time.Hour)},
 		},
 		{
 			name: "author mapped to a Slack user",
