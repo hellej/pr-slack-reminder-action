@@ -56,7 +56,7 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	now := time.Now()
 	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
 	pr3 := testPR(2, now.Add(-30*time.Hour), now.Add(-30*time.Hour))
-	pr2 := testPR(3, now.Add(-40*time.Hour), now.Add(-40*time.Hour))
+	pr2 := testPR(3, now.Add(-90*time.Hour), now.Add(-90*time.Hour))
 	prWithUnknownCreationTime := testPR(4, time.Time{}, now.Add(-1*time.Hour))
 	prWithUnknownCreationTimeMarkedReadyRecently := testPR(5, time.Time{}, now.Add(-1*time.Hour))
 	prWithUnknownCreationTimeMarkedReadyRecently.FirstReadyForReviewEventAt = timePointer(now.Add(-1 * time.Hour))
@@ -79,6 +79,32 @@ func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 		t.Errorf("expected PR views to have IsOldPR flags %v, got %v", want, got)
 	}
 
+}
+
+// Any 7 calendar days hold exactly 48 weekend hours, so a PR 7 days old has 120 weekday hours.
+func TestBuildPRViewsCountsOnlyWeekdayTimeTowardsTheOldPRThreshold(t *testing.T) {
+	sevenDaysAgo := time.Now().Add(-7 * 24 * time.Hour)
+	tests := []struct {
+		name                string
+		oldPRThresholdHours int
+		expected            bool
+	}{
+		{name: "threshold under 120 weekday hours", oldPRThresholdHours: 119, expected: true},
+		{name: "threshold over 120 weekday hours", oldPRThresholdHours: 144, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prViews := prview.BuildPRViews(
+				[]githubclient.PR{testPR(1, sevenDaysAgo, time.Time{})},
+				config.ContentInputs{OldPRThresholdHours: tt.oldPRThresholdHours},
+			)
+
+			if prViews[0].IsOldPR != tt.expected {
+				t.Errorf("expected IsOldPR %v, got %v", tt.expected, prViews[0].IsOldPR)
+			}
+		})
+	}
 }
 
 func TestSortPRsOldestToNewest(t *testing.T) {
@@ -263,13 +289,15 @@ func TestGetPRAgeDisplayText(t *testing.T) {
 		isOldPR  bool
 		expected string
 	}{
-		{name: "PR under the old-PR threshold", isOldPR: false, expected: "3 days ago"},
-		{name: "PR past the old-PR threshold", isOldPR: true, expected: "3 days old"},
+		{name: "PR under the old-PR threshold", isOldPR: false, expected: "7 days ago"},
+		{name: "PR past the old-PR threshold", isOldPR: true, expected: "7 days old"},
 	}
 
+	// 7 calendar days always hold 48 weekend hours, so the text tells calendar time from weekday time.
+	sevenDaysAgo := time.Now().Add(-7 * 24 * time.Hour)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := testPR(1, time.Now().Add(-72*time.Hour), time.Time{})
+			pr := testPR(1, sevenDaysAgo, time.Time{})
 			prView := prview.PR{PR: &pr, IsOldPR: tt.isOldPR}
 
 			if prView.GetPRAgeDisplayText() != tt.expected {

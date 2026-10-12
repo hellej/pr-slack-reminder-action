@@ -165,7 +165,7 @@ func getTestPRs(options GetTestPRsOptions) TestPRs {
 		Title:       "This PR is getting old and needs attention",
 		AuthorLogin: cmp.Or(options.AuthorUser, "bob"),
 		Labels:      options.Labels,
-		AgeHours:    26,
+		AgeHours:    120,
 	})
 	pr5 := getTestPR(GetTestPROptions{
 		Number:      5,
@@ -173,7 +173,7 @@ func getTestPRs(options GetTestPRsOptions) TestPRs {
 		AuthorLogin: cmp.Or(options.AuthorUser, ""), // to cover the case where username is not set
 		AuthorName:  cmp.Or(options.AuthorUser, "Jim"),
 		Labels:      options.Labels,
-		AgeHours:    48,
+		AgeHours:    168,
 	})
 
 	return TestPRs{
@@ -517,8 +517,8 @@ func TestScenarios(t *testing.T) {
 				"This is a test PR 5 minutes ago by Stitch",
 				"This PR was created 3 hours ago and contains important changes 3 hours ago by U2234567890",
 				"This PR has the same time as PR2 but a longer title 3 hours ago by U2234567890",
-				"This PR is getting old and needs attention 🚨 1 day old by U3234567890",
-				"This is a big PR that no one dares to review 🚨 2 days old by Jim",
+				"This PR is getting old and needs attention 🚨 5 days old by U3234567890",
+				"This is a big PR that no one dares to review 🚨 7 days old by Jim",
 			},
 			expectedSummary: "5 PRs to review 👀",
 		},
@@ -539,13 +539,13 @@ func TestScenarios(t *testing.T) {
 					Number:      2,
 					Title:       "Old PR needs attention",
 					AuthorLogin: "bob",
-					AgeHours:    48,
+					AgeHours:    96,
 				}),
 			},
 			expectedPRNumbers: []int{1, 2},
 			expectedPRItemTexts: []string{
 				"Recent PR 2 hours ago by Alice",
-				"Old PR needs attention 🚨 2 days old by Bob",
+				"Old PR needs attention 🚨 4 days old by Bob",
 			},
 			expectedSummary: "2 PRs to review 👀",
 		},
