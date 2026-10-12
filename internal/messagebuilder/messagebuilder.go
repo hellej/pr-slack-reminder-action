@@ -143,18 +143,17 @@ func buildBulletPoint(row prview.Row, section section) slack.RichTextElement {
 
 func buildCollapsedRowBulletPoint(row prview.CollapsedRow) slack.RichTextElement {
 	label := slack.NewRichTextSectionLinkElement(
-		row.GetSearchURL(), "🤖 "+row.GetAuthorLabel(),
+		row.GetSearchURL(), "🤖 "+row.GetAuthorLabel()+":",
 		&slack.RichTextSectionTextStyle{Bold: true},
 	)
-	colon := slack.NewRichTextSectionTextElement(": ", &slack.RichTextSectionTextStyle{})
 	numberLinks := utilities.Map(row.PRs, func(pr prview.PR) slack.RichTextSectionElement {
 		return slack.NewRichTextSectionLinkElement(
 			pr.GetHTMLURL(), fmt.Sprintf("#%d", pr.GetNumber()), &slack.RichTextSectionTextStyle{Bold: true},
 		)
 	})
 	var space slack.RichTextSectionElement = slack.NewRichTextSectionTextElement(" ", &slack.RichTextSectionTextStyle{})
-	elements := append([]slack.RichTextSectionElement{label, colon}, utilities.Intersperse(numberLinks, space)...)
-	return slack.NewRichTextSection(elements...)
+	labelAndNumberLinks := append([]slack.RichTextSectionElement{label}, numberLinks...)
+	return slack.NewRichTextSection(utilities.Intersperse(labelAndNumberLinks, space)...)
 }
 
 func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
