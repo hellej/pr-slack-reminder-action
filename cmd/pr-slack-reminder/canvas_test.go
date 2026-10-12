@@ -946,7 +946,7 @@ func TestCanvasCountsOpenPRAgeFromTheReadyForReviewTime(t *testing.T) {
 					Number: 1, Title: "Long-lived draft marked ready", AuthorLogin: "alice", AgeHours: 72,
 				}),
 				getTestPR(GetTestPROptions{
-					Number: 2, Title: "Never a draft", AuthorLogin: "bob", AgeHours: 48,
+					Number: 2, Title: "Never a draft", AuthorLogin: "bob", AgeHours: 96,
 				}),
 			},
 			FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{1: now.Add(-3 * time.Hour)},
@@ -958,7 +958,7 @@ func TestCanvasCountsOpenPRAgeFromTheReadyForReviewTime(t *testing.T) {
 		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
 	markdown := mockSlackAPI.ReplacedCanvas.Markdown
-	assertCanvasContains(t, markdown, "Long-lived draft marked ready]", "_3 hours ago_", "🚨 `2 days old`")
+	assertCanvasContains(t, markdown, "Long-lived draft marked ready]", "_3 hours ago_", "🚨 `4 days old`")
 	assertCanvasDoesNotContain(t, markdown, "3 days")
 	if strings.Index(markdown, "Never a draft") > strings.Index(markdown, "Long-lived draft marked ready") {
 		t.Errorf("Expected the PR waiting longest for review first, got:\n%s", markdown)
