@@ -150,7 +150,7 @@ func (c *client) FindOpenPRs(
 	prResults, openPRsCapped, draftPRsCapped := capOpenPRResultsToLimit(
 		prResults, fetchOptions.IncludeDrafts,
 	)
-	logFoundPRs(prResults, fetchOptions.IncludeDrafts)
+	logFoundOpenPRs(prResults, fetchOptions.IncludeDrafts)
 
 	prs, err := c.enrichPRsWithReviewInfo(ctx, prResults)
 	if err != nil {
@@ -286,7 +286,8 @@ func (c *client) GetPRs(
 
 	prs := utilities.Filter(fetchedPRs, getPRFilterFunc[PR](getFiltersForRepository, false))
 	prs = capPRsToLimit(prs)
-	logFoundPRs(prs, false)
+	log.Printf("Found %d pull requests:", len(prs))
+	logPRPaths(prs)
 
 	return prs, nil
 }
@@ -302,13 +303,17 @@ func getPRFilterFunc[T repositoryPullRequest](
 	}
 }
 
-func logFoundPRs[T repositoryPullRequest](prs []T, includeDrafts bool) {
+func logFoundOpenPRs(prs []PRResult, includeDrafts bool) {
 	if includeDrafts {
 		drafts := utilities.Filter(prs, isDraftPR)
 		log.Printf("Found %d open pull requests, %d of them drafts:", len(prs), len(drafts))
 	} else {
 		log.Printf("Found %d open pull requests:", len(prs))
 	}
+	logPRPaths(prs)
+}
+
+func logPRPaths[T repositoryPullRequest](prs []T) {
 	for _, item := range prs {
 		log.Printf("%s/%v", item.getRepository().GetPath(), item.getPullRequest().GetNumber())
 	}
