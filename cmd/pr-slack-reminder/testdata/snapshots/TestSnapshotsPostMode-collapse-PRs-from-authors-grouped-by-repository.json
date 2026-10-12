@@ -95,7 +95,7 @@
               {
                 "type": "link",
                 "url": "https://github.com/test-org/app/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate",
-                "text": "🤖 renovate (2)",
+                "text": "🤖 renovate",
                 "style": {
                   "bold": true
                 }
@@ -169,7 +169,7 @@
               {
                 "type": "link",
                 "url": "https://github.com/test-org/infra/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot",
-                "text": "🤖 dependabot (2)",
+                "text": "🤖 dependabot",
                 "style": {
                   "bold": true
                 }
@@ -374,7 +374,7 @@
               {
                 "type": "link",
                 "url": "https://github.com/test-org/app/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot",
-                "text": "🤖 dependabot (2)",
+                "text": "🤖 dependabot",
                 "style": {
                   "bold": true
                 }

@@ -143,7 +143,7 @@ func buildBulletPoint(row prview.Row, section section) slack.RichTextElement {
 
 func buildCollapsedRowBulletPoint(row prview.CollapsedRow) slack.RichTextElement {
 	label := slack.NewRichTextSectionLinkElement(
-		row.GetSearchURL(), fmt.Sprintf("🤖 %s (%d)", row.GetAuthorLabel(), len(row.PRs)),
+		row.GetSearchURL(), "🤖 "+row.GetAuthorLabel(),
 		&slack.RichTextSectionTextStyle{Bold: true},
 	)
 	colon := slack.NewRichTextSectionTextElement(": ", &slack.RichTextSectionTextStyle{})

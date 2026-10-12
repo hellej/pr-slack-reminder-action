@@ -15,7 +15,7 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 </details>
 
-2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot (3): #101 #102 #103`. The label links to a GitHub search for that author's PRs.
+2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot: #101 #102 #103`. The label links to a GitHub search for that author's PRs.
 
 ## GitHub's Built-in vs This Action
 
