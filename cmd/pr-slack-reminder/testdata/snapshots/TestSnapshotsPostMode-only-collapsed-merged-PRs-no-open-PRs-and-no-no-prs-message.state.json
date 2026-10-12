@@ -32,14 +32,14 @@
                   {
                     "type": "link",
                     "url": "https://github.com/test-org/test-repo/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot",
-                    "text": "🤖 dependabot (2)",
+                    "text": "🤖 dependabot:",
                     "style": {
                       "bold": true
                     }
                   },
                   {
                     "type": "text",
-                    "text": ": ",
+                    "text": " ",
                     "style": {}
                   },
                   {
