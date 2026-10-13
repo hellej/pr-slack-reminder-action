@@ -10,22 +10,19 @@
     "level": 2
   },
   {
+    "type": "context",
+    "block_id": "section_waiting_for_review_repository_1_sub_heading",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "*\u003chttps://github.com/test-org/repo-two/pulls|repo-two\u003e*"
+      }
+    ]
+  },
+  {
     "type": "rich_text",
     "block_id": "section_waiting_for_review_repository_1",
     "elements": [
-      {
-        "type": "rich_text_section",
-        "elements": [
-          {
-            "type": "link",
-            "url": "https://github.com/test-org/repo-two/pulls",
-            "text": "repo-two",
-            "style": {
-              "bold": true
-            }
-          }
-        ]
-      },
       {
         "type": "rich_text_list",
         "elements": [
@@ -98,29 +95,19 @@
     ]
   },
   {
-    "type": "section",
-    "text": {
-      "type": "mrkdwn",
-      "text": " "
-    }
+    "type": "context",
+    "block_id": "section_waiting_for_review_repository_2_sub_heading",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "*\u003chttps://github.com/test-org/repo-one/pulls|repo-one\u003e*"
+      }
+    ]
   },
   {
     "type": "rich_text",
     "block_id": "section_waiting_for_review_repository_2",
     "elements": [
-      {
-        "type": "rich_text_section",
-        "elements": [
-          {
-            "type": "link",
-            "url": "https://github.com/test-org/repo-one/pulls",
-            "text": "repo-one",
-            "style": {
-              "bold": true
-            }
-          }
-        ]
-      },
       {
         "type": "rich_text_list",
         "elements": [

@@ -63,8 +63,6 @@ func blockIDs(blocks []slack.Block) []string {
 			ids = append(ids, typedBlock.BlockID)
 		case *slack.HeaderBlock:
 			ids = append(ids, typedBlock.BlockID)
-		case *slack.SectionBlock:
-			ids = append(ids, "spacing")
 		case *slack.ContextBlock:
 			ids = append(ids, typedBlock.BlockID)
 		default:
@@ -178,54 +176,33 @@ func TestSectionHeadings(t *testing.T) {
 	}
 }
 
-func assertRepositorySubHeading(t *testing.T, block slack.Block, expectedName string, expectedURL string) {
+func assertRepositorySubHeading(t *testing.T, block slack.Block, expectedText string) {
 	t.Helper()
-	elements := richTextElements(t, block)
-	if len(elements) != 2 {
-		t.Fatalf("expected a sub-heading and a list in %q's block, got %d elements", expectedName, len(elements))
+	contextBlock, isContext := block.(*slack.ContextBlock)
+	if !isContext {
+		t.Fatalf("expected a context sub-heading, got %T", block)
 	}
-	subHeading, isSection := elements[0].(*slack.RichTextSection)
-	if !isSection {
-		t.Fatalf("expected a rich_text_section sub-heading, got %T", elements[0])
+	if len(contextBlock.ContextElements.Elements) != 1 {
+		t.Fatalf("expected one element in the sub-heading, got %d", len(contextBlock.ContextElements.Elements))
 	}
-	if len(subHeading.Elements) != 1 {
-		t.Fatalf("expected the linked name alone in the sub-heading, got %d elements", len(subHeading.Elements))
+	text, isText := contextBlock.ContextElements.Elements[0].(*slack.TextBlockObject)
+	if !isText || text.Type != "mrkdwn" {
+		t.Fatalf("expected an mrkdwn sub-heading, got %+v", contextBlock.ContextElements.Elements[0])
 	}
-	link, isLink := subHeading.Elements[0].(*slack.RichTextSectionLinkElement)
-	if !isLink {
-		t.Fatalf("expected a link sub-heading, got %T", subHeading.Elements[0])
-	}
-	if link.Text != expectedName {
-		t.Errorf("expected the sub-heading to read %q, got %q", expectedName, link.Text)
-	}
-	if link.URL != expectedURL {
-		t.Errorf("expected sub-heading %q to link to %q, got %q", expectedName, expectedURL, link.URL)
-	}
-	if link.Style == nil || !link.Style.Bold {
-		t.Errorf("expected sub-heading %q bold", expectedName)
+	if text.Text != expectedText {
+		t.Errorf("expected the sub-heading to read %q, got %q", expectedText, text.Text)
 	}
 }
 
-func assertSpacingBlock(t *testing.T, block slack.Block) {
-	t.Helper()
-	sectionBlock, isSection := block.(*slack.SectionBlock)
-	if !isSection {
-		t.Fatalf("expected a spacing section block, got %T", block)
-	}
-	if sectionBlock.Text == nil || sectionBlock.Text.Text != " " {
-		t.Errorf("expected a spacing block of one blank space, got %+v", sectionBlock.Text)
-	}
-}
-
-// A grouped repository block holds its own rows alone, so the title of its first row identifies
-// which repository's rows landed in it.
+// A grouped repository list block holds its own rows alone, so the title of its first row
+// identifies which repository's rows landed in it.
 func firstRowTitle(t *testing.T, block slack.Block) string {
 	t.Helper()
 	elements := richTextElements(t, block)
-	if len(elements) != 2 {
-		t.Fatalf("expected a sub-heading and a list in the block, got %d elements", len(elements))
+	if len(elements) != 1 {
+		t.Fatalf("expected the list alone in the block, got %d elements", len(elements))
 	}
-	return rowElements(t, elements[1], 0)[0].(*slack.RichTextSectionLinkElement).Text
+	return rowElements(t, elements[0], 0)[0].(*slack.RichTextSectionLinkElement).Text
 }
 
 func groupedOverTwoRepositories() prview.PRSection {
@@ -243,7 +220,7 @@ func groupedOverTwoRepositories() prview.PRSection {
 	}
 }
 
-func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *testing.T) {
+func TestGroupedSectionIsAContextSubHeadingAndAListBlockPerRepository(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverTwoRepositories(),
@@ -252,43 +229,19 @@ func TestGroupedSectionIsARichTextBlockPerRepositoryWithSpacingBetweenThem(t *te
 
 	assertBlockIDs(t, message, []string{
 		"heading_waiting_for_review",
+		"section_waiting_for_review_repository_1_sub_heading",
 		"section_waiting_for_review_repository_1",
-		"spacing",
+		"section_waiting_for_review_repository_2_sub_heading",
 		"section_waiting_for_review_repository_2",
 	})
-	sectionHeading := headerBlock(t, message.Blocks.BlockSet[0])
-	if sectionHeading.Text.Text != "👀 Waiting for review" {
-		t.Errorf("expected the section heading text, got %q", sectionHeading.Text.Text)
-	}
-	if sectionHeading.Level != 2 {
-		t.Errorf("expected the section heading at level 2, got level %d", sectionHeading.Level)
-	}
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one", "https://github.com/owner-one/repo-one/pulls")
-	assertSpacingBlock(t, message.Blocks.BlockSet[2])
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two", "https://github.com/owner-two/repo-two/pulls")
-	if title := firstRowTitle(t, message.Blocks.BlockSet[1]); title != "PR in repo one" {
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "*<https://github.com/owner-one/repo-one/pulls|repo-one>*")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "*<https://github.com/owner-two/repo-two/pulls|repo-two>*")
+	if title := firstRowTitle(t, message.Blocks.BlockSet[2]); title != "PR in repo one" {
 		t.Errorf("expected the first repository's row under its own sub-heading, got %q", title)
 	}
-	if title := firstRowTitle(t, message.Blocks.BlockSet[3]); title != "PR in repo two" {
+	if title := firstRowTitle(t, message.Blocks.BlockSet[4]); title != "PR in repo two" {
 		t.Errorf("expected the second repository's row under its own sub-heading, got %q", title)
 	}
-}
-
-func TestGroupedSectionOverOneRepositoryGetsNoSpacingBlock(t *testing.T) {
-	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-		GroupedByRepository: true,
-		WaitingForReview: prview.PRSection{
-			Groups: []prview.RepositoryRows{{
-				Repository: models.Repository{Owner: "test-org", Name: "repo-one"},
-				Rows:       []prview.Row{testPR(testPROptions{title: "PR in repo one"})},
-			}},
-		},
-		GeneratedAt: generatedAt,
-	})
-
-	assertBlockIDs(t, message, []string{
-		"heading_waiting_for_review", "section_waiting_for_review_repository_1",
-	})
 }
 
 func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
@@ -306,20 +259,17 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 
 	assertBlockIDs(t, message, []string{
 		"heading_waiting_for_review",
+		"section_waiting_for_review_repository_1_sub_heading",
 		"section_waiting_for_review_repository_1",
-		"spacing",
+		"section_waiting_for_review_repository_2_sub_heading",
 		"section_waiting_for_review_repository_2",
 		"heading_ready_to_merge",
+		"section_ready_to_merge_repository_1_sub_heading",
 		"section_ready_to_merge_repository_1",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "repo-one", "https://github.com/owner-one/repo-one/pulls")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "repo-two", "https://github.com/owner-two/repo-two/pulls")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[5], "ready-repo", "https://github.com/ready-owner/ready-repo/pulls")
-	expectedRowTitles := map[int]string{1: "PR in repo one", 3: "PR in repo two", 5: "Ready PR"}
-	for blockIndex, expectedTitle := range expectedRowTitles {
-		if title := firstRowTitle(t, message.Blocks.BlockSet[blockIndex]); title != expectedTitle {
-			t.Errorf("expected row %q in block %d, got %q", expectedTitle, blockIndex, title)
-		}
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[6], "*<https://github.com/ready-owner/ready-repo/pulls|ready-repo>*")
+	if title := firstRowTitle(t, message.Blocks.BlockSet[7]); title != "Ready PR" {
+		t.Errorf("expected the ready-to-merge row under its own sub-heading, got %q", title)
 	}
 }
 
@@ -495,12 +445,12 @@ func groupedOverRepositories(count int) prview.PRSection {
 	return prview.PRSection{Groups: groups}
 }
 
-const repositoriesBuildingSixtyContentBlocks = 30
+const repositoriesBuildingSixtyOneContentBlocks = 30
 
 func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		GroupedByRepository: true,
-		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
 		GeneratedAt:         generatedAt,
 	})
 
@@ -509,8 +459,8 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 		t.Fatalf("expected 50 blocks, got %d", len(blocks))
 	}
 	ids := blockIDs(blocks)
-	if ids[47] != "section_waiting_for_review_repository_24" || ids[48] != "spacing" {
-		t.Errorf("expected the 24th repository and a spacing block before the footer, got %s and %s", ids[47], ids[48])
+	if ids[47] != "section_waiting_for_review_repository_24_sub_heading" || ids[48] != "section_waiting_for_review_repository_24" {
+		t.Errorf("expected the 24th repository's sub-heading and list before the footer, got %s and %s", ids[47], ids[48])
 	}
 	footer, isContextBlock := blocks[49].(*slack.ContextBlock)
 	if !isContextBlock {
@@ -525,7 +475,7 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
-		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyContentBlocks),
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
 		GeneratedAt:         generatedAt,
 	})
 	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)
@@ -552,7 +502,10 @@ func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T
 	if len(markedMessageBlocks) != 50 {
 		t.Fatalf("expected 50 blocks, got %d", len(markedMessageBlocks))
 	}
-	if markedMessageBlocks[48].BlockID != "section_waiting_for_review_repository_24" || markedMessageBlocks[49].Type != "section" {
-		t.Errorf("expected the 24th repository and a spacing block last, got %+v and %+v", markedMessageBlocks[48], markedMessageBlocks[49])
+	if markedMessageBlocks[48].BlockID != "section_waiting_for_review_repository_24_sub_heading" || markedMessageBlocks[48].Type != "context" {
+		t.Errorf("expected the 24th repository's sub-heading second to last, got %+v", markedMessageBlocks[48])
+	}
+	if markedMessageBlocks[49].BlockID != "section_waiting_for_review_repository_24" || markedMessageBlocks[49].Type != "rich_text" {
+		t.Errorf("expected the 24th repository's list last, got %+v", markedMessageBlocks[49])
 	}
 }

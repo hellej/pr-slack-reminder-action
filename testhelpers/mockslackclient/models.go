@@ -29,17 +29,17 @@ func (b BlocksWrapper) GetPRLists() []PRList {
 			currentHeading = block.Text.Text
 			continue
 		}
+		if block.isRepositorySubHeading() {
+			currentHeading = block.repositorySubHeadingLinkText()
+			continue
+		}
 		if !block.holdsPRRows() {
 			continue
 		}
-		for _, element := range block.richTextElements() {
-			if element.Type == "rich_text_section" {
-				currentHeading = concatenatedText(element.textRuns())
-				continue
-			}
+		for _, list := range block.richTextElements() {
 			prLists = append(prLists, PRList{
 				Heading:     currentHeading,
-				PRListItems: utilities.Map(element.listItems(), listItemText),
+				PRListItems: utilities.Map(list.listItems(), listItemText),
 			})
 		}
 	}
@@ -106,6 +106,21 @@ type Block struct {
 
 func (b Block) holdsPRRows() bool {
 	return b.Type == "rich_text" && strings.HasPrefix(b.BlockID, "section_")
+}
+
+func (b Block) isRepositorySubHeading() bool {
+	return b.Type == "context" && strings.HasPrefix(b.BlockID, "section_")
+}
+
+// The sub-heading is one mrkdwn element reading "*<url|name>*".
+func (b Block) repositorySubHeadingLinkText() string {
+	var elements []Element
+	if err := json.Unmarshal(b.Elements, &elements); err != nil {
+		panic(fmt.Sprintf("Unexpected context element array type: %v", err))
+	}
+	_, linkTextAndEnd, _ := strings.Cut(elements[0].Text, "|")
+	linkText, _, _ := strings.Cut(linkTextAndEnd, ">")
+	return linkText
 }
 
 func (b Block) richTextElements() []RichTextElement {
