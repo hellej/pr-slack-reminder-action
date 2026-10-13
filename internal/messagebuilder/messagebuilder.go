@@ -110,7 +110,7 @@ func buildSectionContentBlocks(section section) []slack.Block {
 	return blocks
 }
 
-// A context block renders smaller and greyer than a rich_text line, so the sub-heading doesn't
+// A context block renders smaller than a rich_text line, so the sub-heading doesn't
 // compete with the bold PR titles. GitHub repository names hold none of the characters mrkdwn
 // escapes: &, < and >.
 func buildRepositorySubHeadingBlock(blockID string, repository models.Repository) slack.Block {
