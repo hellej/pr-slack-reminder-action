@@ -24,7 +24,7 @@
     "elements": [
       {
         "type": "mrkdwn",
-        "text": "*\u003chttps://github.com/test-org/repo-two/pulls|repo-two:\u003e*"
+        "text": "*\u003chttps://github.com/test-org/repo-two/pulls|repo-two\u003e*"
       }
     ]
   },
@@ -109,7 +109,7 @@
     "elements": [
       {
         "type": "mrkdwn",
-        "text": "*\u003chttps://github.com/test-org/repo-one/pulls|repo-one:\u003e*"
+        "text": "*\u003chttps://github.com/test-org/repo-one/pulls|repo-one\u003e*"
       }
     ]
   },

@@ -234,8 +234,8 @@ func TestGroupedSectionIsAContextSubHeadingAndAListBlockPerRepository(t *testing
 		"section_waiting_for_review_repository_2_sub_heading",
 		"section_waiting_for_review_repository_2",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "*<https://github.com/owner-one/repo-one/pulls|repo-one:>*")
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "*<https://github.com/owner-two/repo-two/pulls|repo-two:>*")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[1], "*<https://github.com/owner-one/repo-one/pulls|repo-one>*")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[3], "*<https://github.com/owner-two/repo-two/pulls|repo-two>*")
 	if title := firstRowTitle(t, message.Blocks.BlockSet[2]); title != "PR in repo one" {
 		t.Errorf("expected the first repository's row under its own sub-heading, got %q", title)
 	}
@@ -267,7 +267,7 @@ func TestTwoGroupedSectionsKeepTheirBlocksInSectionOrder(t *testing.T) {
 		"section_ready_to_merge_repository_1_sub_heading",
 		"section_ready_to_merge_repository_1",
 	})
-	assertRepositorySubHeading(t, message.Blocks.BlockSet[6], "*<https://github.com/ready-owner/ready-repo/pulls|ready-repo:>*")
+	assertRepositorySubHeading(t, message.Blocks.BlockSet[6], "*<https://github.com/ready-owner/ready-repo/pulls|ready-repo>*")
 	if title := firstRowTitle(t, message.Blocks.BlockSet[7]); title != "Ready PR" {
 		t.Errorf("expected the ready-to-merge row under its own sub-heading, got %q", title)
 	}

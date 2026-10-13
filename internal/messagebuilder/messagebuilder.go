@@ -114,7 +114,7 @@ func buildSectionContentBlocks(section section) []slack.Block {
 // compete with the bold PR titles. GitHub repository names hold none of the characters mrkdwn
 // escapes: &, < and >.
 func buildRepositorySubHeadingBlock(blockID string, repository models.Repository) slack.Block {
-	subHeadingText := fmt.Sprintf("*<%s|%s:>*", repository.GetPullsURL(), repository.Name)
+	subHeadingText := fmt.Sprintf("*<%s|%s>*", repository.GetPullsURL(), repository.Name)
 	return slack.NewContextBlock(blockID, slack.NewTextBlockObject("mrkdwn", subHeadingText, false, false))
 }
 

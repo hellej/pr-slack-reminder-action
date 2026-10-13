@@ -112,7 +112,7 @@ func (b Block) isRepositorySubHeading() bool {
 	return b.Type == "context" && strings.HasPrefix(b.BlockID, "section_")
 }
 
-// The sub-heading is one mrkdwn element reading "*<url|name:>*".
+// The sub-heading is one mrkdwn element reading "*<url|name>*".
 func (b Block) repositorySubHeadingLinkText() string {
 	var elements []Element
 	if err := json.Unmarshal(b.Elements, &elements); err != nil {

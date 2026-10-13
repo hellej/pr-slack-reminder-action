@@ -82,7 +82,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "*\u003chttps://github.com/test-org/app/pulls|app:\u003e*"
+            "text": "*\u003chttps://github.com/test-org/app/pulls|app\u003e*"
           }
         ]
       },
@@ -206,7 +206,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "*\u003chttps://github.com/test-org/infra/pulls|infra:\u003e*"
+            "text": "*\u003chttps://github.com/test-org/infra/pulls|infra\u003e*"
           }
         ]
       },
@@ -280,7 +280,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "*\u003chttps://github.com/test-org/app/pulls|app:\u003e*"
+            "text": "*\u003chttps://github.com/test-org/app/pulls|app\u003e*"
           }
         ]
       },
@@ -405,7 +405,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "*\u003chttps://github.com/test-org/app/pulls|app:\u003e*"
+            "text": "*\u003chttps://github.com/test-org/app/pulls|app\u003e*"
           }
         ]
       },
@@ -469,7 +469,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "*\u003chttps://github.com/test-org/infra/pulls|infra:\u003e*"
+            "text": "*\u003chttps://github.com/test-org/infra/pulls|infra\u003e*"
           }
         ]
       },

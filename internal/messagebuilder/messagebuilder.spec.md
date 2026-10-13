@@ -10,7 +10,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
 - Sections render top to bottom in this order, under this package's own heading text: `👀 Waiting for review`, `💬 Waiting for author`, `✅ Ready to merge`, `🚀 Recently merged`. The open sections match the canvas's order ([internal/canvasbuilder](../canvasbuilder/canvasbuilder.spec.md))
 - Grouped-by-repository case: the section's rows come as two blocks per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them, with nothing between repositories:
-  - A sub-heading: a `context` block of one mrkdwn element `*<url|name:>*`, the repository name without its owner, linked to `models.Repository.GetPullsURL()`
+  - A sub-heading: a `context` block of one mrkdwn element `*<url|name>*`, the repository name without its owner, linked to `models.Repository.GetPullsURL()`
   - A `rich_text` block holding only that repository's bullet list
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
 - An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist)
