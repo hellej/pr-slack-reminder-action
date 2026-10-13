@@ -926,3 +926,14 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `rate_limited` is a separate code: "Application has posted too many messages"
 - Unverified: that Slack never posts on a 429 or `ratelimited`. The docs don't say
 - The docs don't say whether a post that got `service_unavailable` went through
+
+## `PullRequestReview.submittedAt` is a nullable `DateTime`, and a scalar adds no GraphQL cost by the formula [2026-10-12]
+
+- Source: [Pulls reference](https://docs.github.com/en/graphql/reference/pulls), `PullRequestReview`. The objects page no longer lists its fields
+- `submittedAt` is `DateTime`, nullable: "Identifies when the Pull Request Review was submitted"
+- `createdAt` is `DateTime!`
+- `publishedAt` is nullable too. Its description says "comment", and the page doesn't say how it differs from `submittedAt`
+- Undocumented: that `submittedAt` is null on a `PENDING` review, and that a single inline diff comment's review has it set
+- Source: [Rate limits and query limits for the GraphQL API](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
+  - The formula counts the requests each connection needs, at its `first` or `last` limit. A scalar is not a connection, so adding one leaves the formula's cost unchanged
+  - The page never mentions scalars, so this follows from the formula only. `rateLimit.cost` is the measured figure
