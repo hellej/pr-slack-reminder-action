@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
+	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/slack-go/slack"
@@ -27,9 +28,8 @@ const (
 	mergedPRsHeading        = "🚀 Recently merged"
 )
 
-// Slack rejects a message of more than 50 blocks. When grouped by repository, a section spends
-// 2 × repositories of them: one block per repository, one spacing block between each pair, and
-// the section heading.
+// Slack rejects a message of more than 50 blocks. See messagebuilder.spec.md § Oddities for
+// when grouping by repository reaches it.
 const maximumBlocksInSlackMessage = 50
 
 const slotsForFooterOrStalenessWarning = 1
@@ -91,8 +91,6 @@ func buildSectionHeadingBlock(section section) slack.Block {
 	)
 }
 
-// A spacing block cannot sit inside a rich_text block, so each repository takes a block of its
-// own and the spacing blocks go between them.
 func buildSectionContentBlocks(section section) []slack.Block {
 	if len(section.prSection.Groups) == 0 {
 		return []slack.Block{
@@ -101,28 +99,23 @@ func buildSectionContentBlocks(section section) []slack.Block {
 	}
 	var blocks []slack.Block
 	for repositoryPosition, group := range section.prSection.Groups {
-		if repositoryPosition > 0 {
-			blocks = append(blocks, buildSpacingBlock())
-		}
 		// The repository's position identifies it, not its path: whether a block_id may hold
 		// the path's "/" is not documented.
 		blockID := fmt.Sprintf("section_%s_repository_%d", section.blockIDFragment, repositoryPosition+1)
-		blocks = append(blocks, buildRepositoryBlock(blockID, group, section))
+		blocks = append(blocks,
+			buildRepositorySubHeadingBlock(blockID+"_sub_heading", group.Repository),
+			slack.NewRichTextBlock(blockID, buildRowList(group.Rows, section)),
+		)
 	}
 	return blocks
 }
 
-func buildRepositoryBlock(blockID string, group prview.RepositoryRows, section section) slack.Block {
-	subHeading := slack.NewRichTextSection(
-		slack.NewRichTextSectionLinkElement(
-			group.Repository.GetPullsURL(), group.Repository.Name, &slack.RichTextSectionTextStyle{Bold: true},
-		),
-	)
-	return slack.NewRichTextBlock(blockID, subHeading, buildRowList(group.Rows, section))
-}
-
-func buildSpacingBlock() slack.Block {
-	return slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", " ", false, false), nil, nil)
+// A context block renders smaller and greyer than a rich_text line, so the sub-heading doesn't
+// compete with the bold PR titles. GitHub repository names hold none of the characters mrkdwn
+// escapes: &, < and >.
+func buildRepositorySubHeadingBlock(blockID string, repository models.Repository) slack.Block {
+	subHeadingText := fmt.Sprintf("*<%s|%s:>*", repository.GetPullsURL(), repository.Name)
+	return slack.NewContextBlock(blockID, slack.NewTextBlockObject("mrkdwn", subHeadingText, false, false))
 }
 
 func buildRowList(rows []prview.Row, section section) *slack.RichTextList {
