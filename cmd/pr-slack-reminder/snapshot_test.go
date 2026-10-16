@@ -464,6 +464,26 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
+			name: "one open PR and one merged PR, merged section hidden",
+			configOverrides: map[string]any{
+				config.InputShowMergedPRsInMessage: false,
+			},
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 91, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/91",
+					AgeHours: 4,
+				}),
+			},
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 92, Title: "The only merged PR", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/92",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+		},
+		{
 			name: "no open PRs and no no-prs-message, but a merged one",
 			mergedPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
@@ -708,6 +728,34 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					Number: 72, Title: "The only merged PR", AuthorLogin: "bob",
 					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/72",
 					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+		},
+		{
+			// Saved state: see run.spec.md § Oddities.
+			name: "one open PR and a tracked PR merged since the post, merged section hidden",
+			configOverrides: map[string]any{
+				config.InputShowMergedPRsInMessage: false,
+			},
+			statePRNumbers: []int{71, 72},
+			openPRNumbers:  []int{71},
+			prByNumber: map[int]*github.PullRequest{
+				71: getTestPR(GetTestPROptions{
+					Number: 71, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/71",
+					AgeHours: 4, State: "open",
+				}),
+				72: getTestPR(GetTestPROptions{
+					Number: 72, Title: "The only merged PR", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/72",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 5,
+				}),
+			},
+			mergedPRsFromSearch: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 73, Title: "Merged without ever being listed", AuthorLogin: "carol",
+					AuthorName: "Carol Clark", HTMLURL: "https://github.com/test-org/test-repo/pull/73",
+					AgeHours: 30, State: "closed", Merged: true, MergedHoursAgo: 3,
 				}),
 			},
 		},

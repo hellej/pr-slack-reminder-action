@@ -48,7 +48,10 @@ func GetContent(
 	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
 	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
 	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
-	mergedPRs := selectMergedPRsToShow(trackedPRs, recentlyMergedPRs, messagePostedAt)
+	var mergedPRs []prview.PR
+	if contentInputs.ShowMergedPRsInMessage {
+		mergedPRs = selectMergedPRsToShow(trackedPRs, recentlyMergedPRs, messagePostedAt)
+	}
 
 	log.Printf(
 		"Putting %d waiting for review, %d waiting for author and %d ready to merge pull requests "+

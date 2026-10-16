@@ -20,6 +20,10 @@ run modes and the pipeline order are in
 - `Run(getGitHubClient, getSlackClient)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - Update mode loads the previous state after the open-PR fetch and before the merged-PR fetch, which reads its merged PR cache. A load error still fails update mode only after the merged fetch and the canvas refresh
 - Update mode passes the loaded merged PR cache to the merged fetch, which returns a cached PR instead of enriching it. Post mode passes none, so it enriches every merged PR
+- With `show-merged-prs-in-message` false, the run skips the work only the message's merged section needs:
+  - the merged-PR fetch, unless the canvas is enabled, which still lists merged PRs
+  - in update mode, resolving the tracked PRs, `GetPRs` included
+- With `show-merged-prs-in-message` false, update mode's delete decision ignores a failed merged fetch: it doesn't keep a message with nothing left to show
 - The open-PR fetch and the merged-PR fetch (bounded by `githubclient.RecentlyMergedWindow` before `generatedAt`) share one `generatedAt`, used for both the merged-PR window and the canvas footer
 - A failed merged-PR fetch does not fail the run: the message and canvas publish without merged rows, and the error is carried through so it can still reach the run's exit code and, in update mode, affect whether the message may be deleted
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
@@ -28,7 +32,7 @@ run modes and the pipeline order are in
   - Any other failure joins the run's error. The new state is still saved
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
   - The mark-as-stale edit never reaches the sent-blocks record, which holds the new message only
-- Update mode re-resolves each tracked PR ref the run's own fetches didn't already resolve, from the merged PR cache first, then through `GetPRs`, builds the message from the live open fetch plus the resolved tracked and merged PRs, and edits the existing message. It deletes the message only when there is nothing left to show and both the merged and residue fetches succeeded; a fetch failure keeps the message standing instead
+- Update mode re-resolves each tracked PR ref the run's own fetches didn't already resolve, from the merged PR cache first, then through `GetPRs`, when the merged section is shown. It builds the message from the live open fetch plus the resolved tracked and merged PRs, and edits the existing message. It deletes the message only when there is nothing left to show and, with the merged section shown, both the merged and residue fetches succeeded; such a fetch failure keeps the message standing instead
 - Post mode passes a zero `messagePostedAt` to `messagecontent.GetContent` (no message posted yet); update mode passes the loaded state's `MessagePostedAt`
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
@@ -57,4 +61,5 @@ run modes and the pipeline order are in
 - A merged row taken from the cache doesn't show reviews, comments or title edits made after it was cached
 - A tracked PR taken from the cache skips the current filters until the next post
 - A failed merged search drops its untracked PRs from the saved cache, so the next run re-enriches them
+- With `show-merged-prs-in-message` false, the saved merged PR cache holds only what the merged fetch returned, nothing when the canvas is off. Tracked PR refs are still saved and extended, so a later run showing the section again lists their merges, re-fetching what the cache lacks
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied

@@ -58,9 +58,14 @@ func Run(
 	if cfg.RunMode == config.RunModeUpdate {
 		loadedState, loadStateErr = loadPreviousState(githubClient, cfg)
 	}
-	mergedPRs, mergedPRsErr := findRecentlyMergedPRs(
-		githubClient, cfg, generatedAt, mergedPRCacheOf(loadedState),
-	)
+	mergedPRsShownAnywhere := cfg.ContentInputs.ShowMergedPRsInMessage || cfg.CanvasEnabled()
+	var mergedPRs []githubclient.PR
+	var mergedPRsErr error
+	if mergedPRsShownAnywhere {
+		mergedPRs, mergedPRsErr = findRecentlyMergedPRs(
+			githubClient, cfg, generatedAt, mergedPRCacheOf(loadedState),
+		)
+	}
 	if mergedPRsErr != nil {
 		logWarning(fmt.Sprintf("Failed to fetch recently merged PRs: %v", mergedPRsErr))
 	}
@@ -230,9 +235,13 @@ func runUpdateMode(
 	generatedAt time.Time,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
-	trackedPRs, trackedPRsErr := resolveTrackedPRs(
-		githubClient, cfg, loadedState.TrackedPRs, openPRs.PRs, mergedPRs, loadedState.MergedPRCache,
-	)
+	var trackedPRs []githubclient.PR
+	var trackedPRsErr error
+	if cfg.ContentInputs.ShowMergedPRsInMessage {
+		trackedPRs, trackedPRsErr = resolveTrackedPRs(
+			githubClient, cfg, loadedState.TrackedPRs, openPRs.PRs, mergedPRs, loadedState.MergedPRCache,
+		)
+	}
 	if trackedPRsErr != nil {
 		logWarning(fmt.Sprintf("Failed to fetch the tracked PRs the run's own fetches left unresolved: %v", trackedPRsErr))
 	}
@@ -248,7 +257,8 @@ func runUpdateMode(
 	)
 
 	if !content.HasPRs() && content.NoOpenPRsText == "" {
-		if mergedPRsErr != nil || trackedPRsErr != nil {
+		mergedSectionFetchFailed := mergedPRsErr != nil || trackedPRsErr != nil
+		if cfg.ContentInputs.ShowMergedPRsInMessage && mergedSectionFetchFailed {
 			log.Println("Keeping the Slack message: nothing to show, but a PR fetch failed")
 			return &loadedState, nil
 		}

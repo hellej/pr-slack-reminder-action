@@ -153,7 +153,10 @@ func TestGetContentMergesTrackedPRsWithTheNewestUntrackedOnes(t *testing.T) {
 		testPR(testPROptions{number: 7, mergedAt: hoursBefore(2)}),
 	}
 
-	content := GetContent(nil, trackedPRs, recentlyMergedPRs, time.Time{}, generatedAt, config.ContentInputs{})
+	content := GetContent(
+		nil, trackedPRs, recentlyMergedPRs, time.Time{}, generatedAt,
+		config.ContentInputs{ShowMergedPRsInMessage: true},
+	)
 
 	assertEqual(t, "merged", prNumbers(content.Merged.Rows), []int{7, 3, 6, 5, 1})
 }
@@ -180,7 +183,7 @@ func TestGetContentShowsEveryPRMergedSinceThePost(t *testing.T) {
 
 	content := GetContent(
 		nil, []prview.PR{trackedMergedSincePost}, recentlyMergedPRs, messagePostedAt, generatedAt,
-		config.ContentInputs{},
+		config.ContentInputs{ShowMergedPRsInMessage: true},
 	)
 
 	assertEqual(t, "merged", prNumbers(content.Merged.Rows), []int{9, 4, 3, 2, 1, 6, 5, 7})
@@ -190,7 +193,10 @@ func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {
 	closedPR := testPR(testPROptions{number: 1})
 	closedPR.PullRequest.State = "closed"
 
-	content := GetContent(nil, []prview.PR{closedPR}, nil, time.Time{}, generatedAt, config.ContentInputs{})
+	content := GetContent(
+		nil, []prview.PR{closedPR}, nil, time.Time{}, generatedAt,
+		config.ContentInputs{ShowMergedPRsInMessage: true},
+	)
 
 	if content.HasPRs() {
 		t.Errorf("expected no sections, got merged %v", prNumbers(content.Merged.Rows))
@@ -263,7 +269,7 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			content := GetContent(
 				tc.openPRs, tc.trackedPRs, nil, time.Time{}, generatedAt,
-				config.ContentInputs{NoPRsMessage: "All caught up"},
+				config.ContentInputs{NoPRsMessage: "All caught up", ShowMergedPRsInMessage: true},
 			)
 
 			if content.SummaryText != tc.expectedSummary {

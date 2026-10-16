@@ -2543,3 +2543,153 @@ func TestPostModeCachesSameNumberedMergedPRsFromTwoRepositories(t *testing.T) {
 		t.Errorf("Expected the cache to hold %v, got %v", expectedCacheRefs, mergedPRCacheRefs(savedState))
 	}
 }
+
+func messageBlocksOfRun(mockSlackAPI *mockslackclient.MockSlackAPI, runMode config.RunMode) mockslackclient.BlocksWrapper {
+	if runMode == config.RunModeUpdate {
+		return mockSlackAPI.UpdatedMessage.Blocks
+	}
+	return mockSlackAPI.SentMessage.Blocks
+}
+
+// PR 2 is tracked and merged before the merged fetch's window, so only a GetPRs request
+// resolves it.
+func runWithMergedSectionHidden(
+	t *testing.T, runMode config.RunMode, canvasLink string, recording *mockgithubclient.FetchRecording,
+) (*mockslackclient.MockSlackAPI, error) {
+	t.Helper()
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+		config.InputRunMode:                runMode,
+		config.InputPRTrackerCanvasLink:    canvasLink,
+		config.InputShowMergedPRsInMessage: false,
+	})
+	trackedPRMergedLongAgo := getTestPR(GetTestPROptions{
+		Number: 2, Title: "Tracked PR merged nine days ago", AuthorLogin: "bob",
+		State: "closed", Merged: true, MergedHoursAgo: 9 * 24,
+	})
+	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1, 2}})
+
+	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+			},
+			PRsByNumber: map[int]*github.PullRequest{2: trackedPRMergedLongAgo},
+			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+				Number: 3, Title: "Merged two hours ago", AuthorLogin: "carol",
+				State: "closed", Merged: true, MergedHoursAgo: 2,
+			})},
+			MockPreviousState: &loadedState,
+			Recording:         recording,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+	)
+	return mockSlackAPI, err
+}
+
+func TestHiddenMergedSectionSkipsTheMergedAndTrackedPRFetchesWithTheCanvasDisabled(t *testing.T) {
+	for _, runMode := range []config.RunMode{config.RunModePost, config.RunModeUpdate} {
+		t.Run(string(runMode), func(t *testing.T) {
+			recording := mockgithubclient.FetchRecording{}
+
+			mockSlackAPI, err := runWithMergedSectionHidden(t, runMode, "", &recording)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			if recording.MergedPRFetches != 0 {
+				t.Errorf("Expected no merged PR fetch, got %d", recording.MergedPRFetches)
+			}
+			if len(recording.GetPRsRequests) != 0 {
+				t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+			}
+			messageBlocks := messageBlocksOfRun(mockSlackAPI, runMode)
+			if !messageBlocks.SomePRItemContainsText("Open PR") || messageBlocks.GetPRCount() != 1 {
+				t.Errorf("Expected only the open PR in the message, got items %v", messageBlocks.GetAllPRItemTexts())
+			}
+		})
+	}
+}
+
+func TestHiddenMergedSectionStillFetchesMergedPRsForTheCanvas(t *testing.T) {
+	for _, runMode := range []config.RunMode{config.RunModePost, config.RunModeUpdate} {
+		t.Run(string(runMode), func(t *testing.T) {
+			recording := mockgithubclient.FetchRecording{}
+
+			mockSlackAPI, err := runWithMergedSectionHidden(t, runMode, testCanvasLink, &recording)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			if recording.MergedPRFetches != 1 {
+				t.Errorf("Expected 1 merged PR fetch, got %d", recording.MergedPRFetches)
+			}
+			if len(recording.GetPRsRequests) != 0 {
+				t.Errorf("Expected no GetPRs request, got %v", recording.GetPRsRequests)
+			}
+			assertCanvasContains(t, mockSlackAPI.ReplacedCanvas.Markdown, "## 🚀 Merged\n", "Merged two hours ago")
+			messageBlocks := messageBlocksOfRun(mockSlackAPI, runMode)
+			if !messageBlocks.SomePRItemContainsText("Open PR") || messageBlocks.GetPRCount() != 1 {
+				t.Errorf("Expected only the open PR in the message, got items %v", messageBlocks.GetAllPRItemTexts())
+			}
+		})
+	}
+}
+
+// The canvas is on, so the merged fetch runs. See run.spec.md § Behaviour.
+func TestHiddenMergedSectionLeavesNothingToShowWithoutOpenPRs(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		runMode              config.RunMode
+		mergedPRsSearchError error
+	}{
+		{name: "post sends nothing", runMode: config.RunModePost},
+		{name: "update deletes the message", runMode: config.RunModeUpdate},
+		{
+			name:                 "update deletes the message despite a failed merged fetch",
+			runMode:              config.RunModeUpdate,
+			mergedPRsSearchError: errors.New("unable to search merged PRs"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &map[string]any{
+				config.InputRunMode:                tc.runMode,
+				config.InputPRTrackerCanvasLink:    testCanvasLink,
+				config.InputShowMergedPRsInMessage: false,
+			})
+			loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+						Number: 1, Title: "Merged two hours ago", AuthorLogin: "alice",
+						State: "closed", Merged: true, MergedHoursAgo: 2,
+					})},
+					MergedPRsSearchError: tc.mergedPRsSearchError,
+					MockPreviousState:    &loadedState,
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			)
+
+			if tc.mergedPRsSearchError == nil && err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			if mockSlackAPI.SentMessage.ChannelID != "" {
+				t.Errorf("Expected no message sent, got one with items %v", mockSlackAPI.SentMessage.Blocks.GetAllPRItemTexts())
+			}
+			if mockSlackAPI.UpdatedMessage.ChannelID != "" {
+				t.Errorf("Expected no message edited, got one with items %v", mockSlackAPI.UpdatedMessage.Blocks.GetAllPRItemTexts())
+			}
+			expectedDeletedTimestamp := ""
+			if tc.runMode == config.RunModeUpdate {
+				expectedDeletedTimestamp = "1623850245.000200"
+			}
+			if mockSlackAPI.DeletedMessage.Timestamp != expectedDeletedTimestamp {
+				t.Errorf("Expected deleted message timestamp %q, got %+v", expectedDeletedTimestamp, mockSlackAPI.DeletedMessage)
+			}
+		})
+	}
+}
