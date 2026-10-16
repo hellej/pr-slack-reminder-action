@@ -91,6 +91,8 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputGroupByRepository, c.Config.ContentInputs.GroupByRepository)
 	setInputEnv(t, overrides, config.InputPRTrackerCanvasLink, c.PRTrackerCanvasLink)
 	setInputEnv(t, overrides, config.InputCollapsePRsFromAuthors, c.ContentInputs.CollapsePRsFromAuthors)
+	// Left unset unless overridden: TestConfig's zero-valued field would hide the merged section.
+	setInputEnv(t, overrides, config.InputShowMergedPRsInMessage, nil)
 }
 
 func setEnv(t *testing.T, overrides *map[string]any, envName string, value any) {

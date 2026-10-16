@@ -185,6 +185,7 @@ jobs:
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft. The hours are weekday hours: Saturdays and Sundays (UTC) are left out |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `collapse-prs-from-authors`         | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
+| `show-merged-prs-in-message`        | ❌       | Show the recently merged PRs section in the message (defaults to `true`). Set it to `false` to list open PRs only. The [PR Tracker Canvas](#pr-tracker-canvas) keeps its merged section either way |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
@@ -229,7 +230,7 @@ to be in the same channel as the canvas to have write access.
 
 - ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
 - The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository`, `collapse-prs-from-authors` and `/snooze` comments. `no-prs-message` and `github-user-slack-user-id-mapping` don't apply, the canvas has fixed headings and no mentions.
+- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository`, `collapse-prs-from-authors` and `/snooze` comments. `no-prs-message`, `github-user-slack-user-id-mapping` and `show-merged-prs-in-message` don't apply: the canvas has fixed headings, no mentions, and always lists recently merged PRs.
 - A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
 - The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
 - A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not corrupted data. Reload the canvas to see its real content (Cmd + R or Ctrl + R).

@@ -75,9 +75,14 @@ func GetInputInt(name string) (int, error) {
 // and returns the parsed value.
 // Returns false if the environment variable is not set.
 func GetInputBool(name string) (bool, error) {
+	return GetInputBoolOr(name, false)
+}
+
+// Like GetInputBool, but an unset or empty input returns defaultValue.
+func GetInputBoolOr(name string, defaultValue bool) (bool, error) {
 	val := GetInput(name)
 	if val == "" {
-		return false, nil
+		return defaultValue, nil
 	}
 	parsed, err := strconv.ParseBool(val)
 	if err != nil {

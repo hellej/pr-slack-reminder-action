@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -1192,5 +1193,48 @@ func TestGetConfig_CollapsePRsFromAuthors(t *testing.T) {
 				t.Errorf("Expected CollapsePRsFromAuthors %q, got %q", tt.expected, cfg.ContentInputs.CollapsePRsFromAuthors)
 			}
 		})
+	}
+}
+
+func TestGetConfig_ShowMergedPRsInMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *string
+		expected bool
+	}{
+		{name: "unset input shows the section", input: nil, expected: true},
+		{name: "explicitly empty input shows the section", input: new(""), expected: true},
+		{name: "false hides the section", input: new("false"), expected: false},
+		{name: "true shows the section", input: new("true"), expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			if tt.input != nil {
+				h.setInput(config.InputShowMergedPRsInMessage, *tt.input)
+			}
+
+			cfg, err := config.GetConfig()
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+			if cfg.ContentInputs.ShowMergedPRsInMessage != tt.expected {
+				t.Errorf("Expected ShowMergedPRsInMessage %v, got %v", tt.expected, cfg.ContentInputs.ShowMergedPRsInMessage)
+			}
+		})
+	}
+}
+
+func TestGetConfig_ShowMergedPRsInMessage_Invalid(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputShowMergedPRsInMessage, "sometimes")
+
+	_, err := config.GetConfig()
+
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Errorf("Expected an error wrapping strconv.ErrSyntax, got %v", err)
 	}
 }
