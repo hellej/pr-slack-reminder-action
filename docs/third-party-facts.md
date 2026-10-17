@@ -937,3 +937,19 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [Rate limits and query limits for the GraphQL API](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api)
   - The formula counts the requests each connection needs, at its `first` or `last` limit. A scalar is not a connection, so adding one leaves the formula's cost unchanged
   - The page never mentions scalars, so this follows from the formula only. `rateLimit.cost` is the measured figure
+
+## Slack message metadata caps at 4000 bytes, drops an oversized payload silently, and reads back only with `channels:history` [2026-10-17]
+
+- Source: probe in `pr-reminders-test`, 2026-10-17: `chat.postMessage` and `chat.update` with `metadata: {event_type, event_payload}`, then `conversations.history` with `include_all_metadata=true`, using the dev bot token. Docs: [Message metadata](https://docs.slack.dev/messaging/message-metadata/), [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage/), [conversations.history](https://docs.slack.dev/reference/methods/conversations.history/), read 2026-10-17
+- Posting and editing metadata worked with the bot token and `chat:write` only, no manifest schema registered
+- Limit: "The total size of a message's metadata should not exceed 4000 bytes"
+  - An oversized payload still returns `ok: true`, with `warning: metadata_too_large`, and the metadata is dropped
+  - An oversized `chat.update` also left no metadata on a message that had some before
+  - The docs list `metadata_too_large` as an error but give no number
+- `chat.update` without a `metadata` argument keeps the existing metadata
+- The `chat.postMessage` and `chat.update` responses echo the stored metadata under `message.metadata`
+- Reading it back: `conversations.history` returned `missing_scope`, needing `channels:history` (`groups:history` for private channels). The dev token has `chat:write,users:read,users:read.email,channels:read,groups:read,canvases:write`
+- `conversations.history` is Tier 3 for internal apps. New apps distributed outside the Marketplace get 1 request per minute since 2025-05-29
+- Measured against this action's state file:
+  - A dev run's state minus `lastWrittenMessage` was 4358 bytes minified, over the limit with 1 tracked PR: `mergedPRCache` alone was 4018 bytes for 6 PRs
+  - Tracked PR refs only, plus a 64 character hash: 40 refs took 3121 bytes and fit, 60 refs took 4621 bytes and were dropped
