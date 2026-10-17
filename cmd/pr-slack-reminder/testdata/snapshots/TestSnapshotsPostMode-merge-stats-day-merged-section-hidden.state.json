@@ -91,5 +91,13 @@
     "medianTimeToFirstReview": 216000000000000,
     "medianTimeToMerge": 648000000000000,
     "computedAt": "1970-01-01T00:00:00Z"
+  },
+  "mergeStatsByDate": {
+    "<run date>": {
+      "mergedCount": 4,
+      "medianTimeToFirstReview": 216000000000000,
+      "medianTimeToMerge": 648000000000000,
+      "computedAt": "1970-01-01T00:00:00Z"
+    }
   }
 }

@@ -63,8 +63,9 @@ status: draft
 ### Step R1: Load post mode's previous state first
 
 - `cmd/pr-slack-reminder/`: `Run` loads the previous state before the merged fetch in post mode too, as it does in update mode
-  - `markPreviousMessageStale` takes the loaded state and its load error instead of loading. Same skips and warnings as today
-  - Post mode still passes no merged PR cache to the merged fetch: `Run` passes `mergedPRCacheOf(loadedState)` whenever state is loaded, so that call has to tell the modes apart
+  - Post mode turns the load result into the previous post's state or nil (`previousPostStateOrNil`), logging the skip or warning right after the load, so a post that sends nothing warns too. Same texts as today
+  - `markPreviousMessageStale` takes that loaded state instead of loading, and runs only when there is one
+  - Post mode still passes no merged PR cache to the merged fetch: `Run` would pass the loaded cache whenever state is loaded, so `mergedPRCacheToReuse(runMode, loadedState)` tells the modes apart
 - Behaviour changes only in the load order, and in a post that sends nothing, or whose send fails, now loading state. A failed load there warns too. Existing tests and snapshots pass unchanged
 - Update run.spec.md § Behaviour: the load order, and the load on a post that sends nothing
 
@@ -78,7 +79,8 @@ status: draft
 
 - `internal/state/`: add `State.MergeStatsByDate`
 - `WithRecentMergeStats(state, loadedMergeStatsByDate, newMergeStats, asOf)`: adds the new entry when there is one, drops entries dated more than 7 days before `asOf`
-- Package test: the prune boundary at 7 and 8 days
+- `MergeStatsWeekBefore(mergeStatsByDate, shown)`: the entry dated 7 days before `shown.ComputedAt`, so the date key format stays in this package
+- Package test: the prune boundary at 7 and 8 days, by UTC date for an `asOf` and a `ComputedAt` outside UTC
 - Update state.spec.md § Behaviour, and § Oddities: added without a schema bump
 
 ### Step 3: The parenthetical
@@ -90,17 +92,18 @@ status: draft
 ### Step 4: Wire the week before into the run
 
 - `cmd/pr-slack-reminder/`:
-  - Post mode on a merge stats day looks up the week before in the loaded map. Every saved post state goes through `WithRecentMergeStats`
+  - Post mode on a merge stats day looks up the week before in the loaded map, through `state.MergeStatsWeekBefore`. Every saved post state goes through `WithRecentMergeStats`
   - Update mode looks up the week before off the loaded `MergeStats.ComputedAt`
 - Snapshots, read before re-recording. The normaliser, which today rewrites values only, also rewrites the `mergeStatsByDate` keys to placeholders relative to the run, such as `<run date>` and `<run date - 7>`:
   - Monday post with a week before
-  - The same message edited by an update run
-  - Monday post without a week before
+  - An update run's edit a day after a Monday post: its stats computed a day before the run, the week before 8 days before, so a lookup off the run's clock misses it
+  - Monday post without a week before: the existing merge stats snapshots, their messages unchanged, their states gaining the map
+  - A second Monday post the same day, marking the first stale: the stale message keeps the parenthetical, and the saved state's message compares against the week before, not today's entry
 - `main_test.go`:
   - A non-Monday post carries the map and prunes it
-  - A second Monday post compares against the week before, not today's entry
-  - An entry 6 or 8 days old is not used
-- Update run.spec.md § Behaviour, AGENTS.md § Architecture's state line, and README's line description
+  - An entry 6 or 8 days old is not used, one 7 days old is
+  - A Monday whose stats are left out carries the map without a new entry
+- Update run.spec.md § Behaviour, AGENTS.md § Architecture's state line, README's line description, the `action.yml` descriptions of `github-token-for-state` and `state-artifact-name` with their README inputs rows, and the README `actions: read` comment: post now reads state for the merge stats too
 - Live check, after release: `pr-reminder.yml`'s scheduled daily posts to the `github` dev channel, which run the binary committed on `main`
   - The first Monday after the release shows no change
   - Done when the second Monday's post shows the parenthetical, and an update run's edit of that post keeps it

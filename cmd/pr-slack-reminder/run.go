@@ -60,17 +60,13 @@ func Run(
 	if err != nil {
 		return err
 	}
-	var loadedState *state.State
-	var loadStateErr error
-	if cfg.RunMode == config.RunModeUpdate {
-		loadedState, loadStateErr = loadPreviousState(githubClient, cfg)
-	}
+	loadedState, loadStateErr := loadPreviousState(githubClient, cfg)
 	mergedPRsShownAnywhere := cfg.ContentInputs.ShowMergedPRsInMessage || cfg.CanvasEnabled()
 	var mergedPRs []githubclient.PR
 	var mergedPRsErr error
 	if mergedPRsShownAnywhere {
 		mergedPRs, mergedPRsErr = findRecentlyMergedPRs(
-			githubClient, cfg, generatedAt, mergedPRCacheOf(loadedState),
+			githubClient, cfg, generatedAt, mergedPRCacheToReuse(cfg.RunMode, loadedState),
 		)
 	}
 	if mergedPRsErr != nil {
@@ -82,12 +78,13 @@ func Run(
 
 	switch cfg.RunMode {
 	case config.RunModePost:
+		previousPost := previousPostStateOrNil(loadedState, loadStateErr)
 		var mergeStats *mergestats.MergeStats
 		if isMergeStatsDay {
 			mergeStats = computeMergeStats(githubClient, cfg, generatedAt)
 		}
 		stateToSave, messageErr = runPostMode(
-			githubClient, slackClient, cfg, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
+			slackClient, cfg, previousPost, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		if loadStateErr != nil {
@@ -123,9 +120,9 @@ func Run(
 
 // Returns a nil state when there is nothing to send, so callers write nothing.
 func runPostMode(
-	githubClient githubclient.Client,
 	slackClient slackclient.Client,
 	cfg config.Config,
+	previousPost *state.State,
 	openPRs githubclient.OpenPRsResult,
 	mergedPRs []githubclient.PR,
 	mergeStats *mergestats.MergeStats,
@@ -133,11 +130,13 @@ func runPostMode(
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
 	prViews := buildNonDraftPRViews(openPRs, cfg)
+	mergeStatsByDateOfPreviousPost := mergeStatsByDateOf(previousPost)
 	content := messagecontent.GetContent(
 		prViews,
 		nil,
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		mergeStats,
+		state.MergeStatsWeekBefore(mergeStatsByDateOfPreviousPost, mergeStats),
 		time.Time{},
 		generatedAt,
 		cfg.ContentInputs,
@@ -153,32 +152,45 @@ func runPostMode(
 		return nil, err
 	}
 
-	postState := state.WithMergedPRCache(
-		state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats), mergedPRs,
+	postState := state.WithRecentMergeStats(
+		state.WithMergedPRCache(
+			state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats), mergedPRs,
+		),
+		mergeStatsByDateOfPreviousPost, mergeStats, generatedAt,
 	)
-	return &postState, errors.Join(
-		sentMessageHandler(sentMessageInfo),
-		markPreviousMessageStale(githubClient, slackClient, cfg, sentMessageInfo.ChannelID),
-	)
+	var markAsStaleErr error
+	if previousPost != nil {
+		markAsStaleErr = markPreviousMessageStale(slackClient, *previousPost, sentMessageInfo.ChannelID)
+	}
+	return &postState, errors.Join(sentMessageHandler(sentMessageInfo), markAsStaleErr)
 }
 
-// This run's own state is uploaded after it ends, so the load still finds the previous post's.
+// This run's own state is uploaded after it ends, so the load finds the previous post's.
+func previousPostStateOrNil(loadedState *state.State, loadStateErr error) *state.State {
+	if errors.Is(loadStateErr, githubclient.ErrNoArtifactFound) {
+		log.Printf("Not marking the previous message stale, there is no previous state: %v", loadStateErr)
+		return nil
+	}
+	if loadStateErr != nil {
+		logWarning(fmt.Sprintf("Not marking the previous message stale, its state did not load: %v", loadStateErr))
+		return nil
+	}
+	return loadedState
+}
+
+func mergeStatsByDateOf(previousPost *state.State) map[string]mergestats.MergeStats {
+	if previousPost == nil {
+		return nil
+	}
+	return previousPost.MergeStatsByDate
+}
+
 // Channel check: see run.spec.md § Behaviour.
 func markPreviousMessageStale(
-	githubClient githubclient.Client,
 	slackClient slackclient.Client,
-	cfg config.Config,
+	previousState state.State,
 	newMessageChannelID string,
 ) error {
-	previousState, err := loadPreviousState(githubClient, cfg)
-	if errors.Is(err, githubclient.ErrNoArtifactFound) {
-		log.Printf("Not marking the previous message stale, there is no previous state: %v", err)
-		return nil
-	}
-	if err != nil {
-		logWarning(fmt.Sprintf("Not marking the previous message stale, its state did not load: %v", err))
-		return nil
-	}
 	lastWrittenMessage := previousState.LastWrittenMessage
 	if len(lastWrittenMessage.Blocks) == 0 {
 		log.Println("Not marking the previous message stale, its state records no sent message")
@@ -223,8 +235,8 @@ func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*st
 	)
 }
 
-func mergedPRCacheOf(loadedState *state.State) []githubclient.PR {
-	if loadedState == nil {
+func mergedPRCacheToReuse(runMode config.RunMode, loadedState *state.State) []githubclient.PR {
+	if runMode != config.RunModeUpdate || loadedState == nil {
 		return nil
 	}
 	return loadedState.MergedPRCache
@@ -265,6 +277,7 @@ func runUpdateMode(
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		loadedState.MergeStats,
+		state.MergeStatsWeekBefore(loadedState.MergeStatsByDate, loadedState.MergeStats),
 		loadedState.MessagePostedAt,
 		generatedAt,
 		cfg.ContentInputs,

@@ -4,7 +4,7 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 
 ## Behaviour
 
-- `GetContent(openPRs, trackedPRs, recentlyMergedPRs, mergeStats, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
+- `GetContent(openPRs, trackedPRs, recentlyMergedPRs, mergeStats, mergeStatsWeekBefore, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
 - `openPRs` are open right now and already draft-filtered by the caller; `trackedPRs` are the PRs the message has listed in an open section since it was posted, as re-fetched, in whatever state they are now
 - Open sections: `openPRs` sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest`, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
 - Merged section, ordered newest merge first:
@@ -24,8 +24,8 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
   - `"Nothing waiting for review 🎉"` when no open PR is listed
 - `NoOpenPRsText` carries the configured `no-prs-message`, set only when no open PR is listed
 - `GeneratedAt` carries the run timestamp through for the footer
-- `MergeStats` carries the given merge stats through, nil included, whatever `ShowMergedPRsInMessage` says
-- `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included. `MergeStats` never counts
+- `MergeStats` and `MergeStatsWeekBefore` carry the given merge stats and those of the week before through, nil included, whatever `ShowMergedPRsInMessage` says
+- `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included. Neither merge stats field ever counts
 
 ## Doesn't Do
 

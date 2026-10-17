@@ -89,5 +89,11 @@
   "mergeStats": {
     "mergedCount": 0,
     "computedAt": "1970-01-01T00:00:00Z"
+  },
+  "mergeStatsByDate": {
+    "<run date>": {
+      "mergedCount": 0,
+      "computedAt": "1970-01-01T00:00:00Z"
+    }
   }
 }

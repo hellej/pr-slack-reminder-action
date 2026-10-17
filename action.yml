@@ -16,7 +16,7 @@ inputs: {
     required: true,
   },
   github-token-for-state: {
-    description: 'GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads. Only needed if the default github-token misses permissions.',
+    description: 'GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads for the previous message and merge stats. Only needed if the default github-token misses permissions.',
     required: false,
   },
   run-mode: {
@@ -25,7 +25,7 @@ inputs: {
     default: 'post',
   },
   state-artifact-name: {
-    description: 'Name of the artifact containing state from previous runs (required when run-mode is update; post reads it to mark the previous message stale)',
+    description: 'Name of the artifact containing state from previous runs (required when run-mode is update; post reads it to mark the previous message stale and compare the merge stats against the week before)',
     required: false,
     default: 'pr-slack-reminder-state',
   },

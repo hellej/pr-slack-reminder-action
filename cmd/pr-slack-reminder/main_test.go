@@ -1212,6 +1212,38 @@ func TestPostModeMarksNothingWithoutASuccessfulSend(t *testing.T) {
 	})
 }
 
+func TestPostModeWarnsOnAFailedStateLoadWithoutASuccessfulSend(t *testing.T) {
+	testCases := []struct {
+		name    string
+		options postOverPreviousStateOptions
+	}{
+		{
+			name: "the send fails",
+			options: postOverPreviousStateOptions{
+				listArtifactsError: errors.New("403 Forbidden"),
+				postMessageError:   errors.New("invalid_auth"),
+			},
+		},
+		{
+			name: "there is nothing to send",
+			options: postOverPreviousStateOptions{
+				listArtifactsError: errors.New("403 Forbidden"),
+				nothingToSend:      true,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := runPostModeOverPreviousState(t, tc.options)
+
+			assertWarningAnnotations(t, result.logOutput, []string{
+				warningAnnotationPrefix + "Not marking the previous message stale, its state did not load: failed to list artifacts: 403 Forbidden",
+			})
+		})
+	}
+}
+
 func TestPostModeSkipsMarkingThePreviousMessage(t *testing.T) {
 	previousStateWithoutLastWrittenMessage := getTestState(GetTestStateOptions{PRNumbers: []int{7}})
 	previousState := previousStateInThisChannelEditedByAnUpdateRun()
@@ -2798,6 +2830,9 @@ func TestPostModeLeavesTheMergeStatsOutWhenTheyCannotBeComputed(t *testing.T) {
 			overrides[config.InputShowMergedPRsInMessage] = false
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+			weekBefore := mergeStatsComputedDaysBefore(time.Now(), 7)
+			previousPost := getTestState(GetTestStateOptions{})
+			previousPost.MergeStatsByDate = mergeStatsKeyedByDate(weekBefore)
 
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
@@ -2810,6 +2845,7 @@ func TestPostModeLeavesTheMergeStatsOutWhenTheyCannotBeComputed(t *testing.T) {
 					})},
 					MergedPRsSearchError: tc.mergedPRsSearchError,
 					ErrByPRNumber:        tc.errByPRNumber,
+					MockPreviousState:    &previousPost,
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
 				true,
@@ -2823,8 +2859,12 @@ func TestPostModeLeavesTheMergeStatsOutWhenTheyCannotBeComputed(t *testing.T) {
 			if !sentBlocks.SomePRItemContainsText("Open PR") || sentBlocks.ContainsBlockWithID("merge_stats_line") {
 				t.Errorf("Expected the open PR sent without the merge stats line, got items %v", sentBlocks.GetAllPRItemTexts())
 			}
-			if savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string)); savedState.MergeStats != nil {
+			savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+			if savedState.MergeStats != nil {
 				t.Errorf("Expected no merge stats saved, got %+v", savedState.MergeStats)
+			}
+			if _, isSaved := savedState.MergeStatsByDate[utcDateKey(weekBefore.ComputedAt)]; len(savedState.MergeStatsByDate) != 1 || !isSaved {
+				t.Errorf("Expected the saved merge stats to hold the week before alone, got %+v", savedState.MergeStatsByDate)
 			}
 		})
 	}
@@ -2884,4 +2924,90 @@ func TestMergeStatsLineAloneIsNothingToShow(t *testing.T) {
 			t.Errorf("Expected the loaded message deleted, got %+v", mockSlackAPI.DeletedMessage)
 		}
 	})
+}
+
+func mergeStatsComputedDaysBefore(runStart time.Time, days int) mergestats.MergeStats {
+	computedAt := runStart.Add(-time.Duration(days) * 24 * time.Hour)
+	return mergestats.MergeStats{
+		MergedCount:       days,
+		MedianTimeToMerge: github.Ptr(time.Duration(days) * time.Hour),
+		ComputedAt:        computedAt,
+	}
+}
+
+func mergeStatsKeyedByDate(entries ...mergestats.MergeStats) map[string]mergestats.MergeStats {
+	mergeStatsByDate := map[string]mergestats.MergeStats{}
+	for _, entry := range entries {
+		mergeStatsByDate[utcDateKey(entry.ComputedAt)] = entry
+	}
+	return mergeStatsByDate
+}
+
+// Builds the previous post's merge stats off the clock read right before the run, so the run's
+// own date is theirs too.
+func runPostModeAfterAPostWithMergeStats(
+	t *testing.T, mergeStatsComputedDaysBeforeTheRun []int, isMergeStatsDay bool,
+) state.State {
+	t.Helper()
+	overrides, _ := getFilePathOverrides(t)
+	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+	runStart := time.Now()
+	previousPost := getTestState(GetTestStateOptions{})
+	previousPost.MergeStatsByDate = mergeStatsKeyedByDate(
+		utilities.Map(mergeStatsComputedDaysBeforeTheRun, func(days int) mergestats.MergeStats {
+			return mergeStatsComputedDaysBefore(runStart, days)
+		})...,
+	)
+
+	err := main.Run(
+		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+			PRs: []*github.PullRequest{getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"})},
+			MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+				Number: 2, Title: "Merged PR", AuthorLogin: "bob", AgeHours: 30,
+				State: "closed", Merged: true, MergedHoursAgo: 2,
+			})},
+			MockPreviousState: &previousPost,
+		}),
+		mockslackclient.MakeSlackClientGetter(mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})),
+		isMergeStatsDay,
+	)
+
+	if err != nil {
+		t.Fatalf("Expected Run to succeed, got error: %v", err)
+	}
+	return loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+}
+
+func TestPostModeOnAnotherDayCarriesTheRecentMergeStatsAndPrunesThem(t *testing.T) {
+	savedState := runPostModeAfterAPostWithMergeStats(t, []int{7, 8}, false)
+
+	savedEntries := slices.Collect(maps.Values(savedState.MergeStatsByDate))
+	if len(savedEntries) != 1 || savedEntries[0].MergedCount != 7 {
+		t.Errorf("Expected the saved merge stats to hold the entry 7 days old alone, got %+v", savedState.MergeStatsByDate)
+	}
+}
+
+func TestPostModeComparesOnlyAgainstMergeStatsComputedExactlyAWeekBefore(t *testing.T) {
+	testCases := []struct {
+		daysAgo               int
+		expectsAPercentChange bool
+	}{
+		{daysAgo: 6},
+		{daysAgo: 7, expectsAPercentChange: true},
+		{daysAgo: 8},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%d days ago", tc.daysAgo), func(t *testing.T) {
+			savedState := runPostModeAfterAPostWithMergeStats(t, []int{tc.daysAgo}, true)
+
+			sentBlocks := string(savedState.LastWrittenMessage.Blocks)
+			if !strings.Contains(sentBlocks, "Last 7 days: 1 merged") {
+				t.Fatalf("Expected the merge stats line, got %s", sentBlocks)
+			}
+			if strings.Contains(sentBlocks, " %)") != tc.expectsAPercentChange {
+				t.Errorf("Expected a percent change: %t, got %s", tc.expectsAPercentChange, sentBlocks)
+			}
+		})
+	}
 }
