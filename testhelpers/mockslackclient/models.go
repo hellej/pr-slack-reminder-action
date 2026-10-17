@@ -3,6 +3,7 @@ package mockslackclient
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -95,6 +96,23 @@ func (b BlocksWrapper) ContainsHeading(heading string) bool {
 
 func (b BlocksWrapper) GetPRCount() int {
 	return len(b.GetAllPRItemTexts())
+}
+
+func (b BlocksWrapper) ContainsBlockWithID(blockID string) bool {
+	return slices.ContainsFunc(b.Blocks, func(block Block) bool { return block.BlockID == blockID })
+}
+
+// The text of a context block's first element, "" when no block has the ID.
+func (b BlocksWrapper) ContextBlockText(blockID string) string {
+	block, isFound := utilities.Find(b.Blocks, func(block Block) bool { return block.BlockID == blockID })
+	if !isFound {
+		return ""
+	}
+	var elements []Element
+	if err := json.Unmarshal(block.Elements, &elements); err != nil || len(elements) == 0 {
+		panic(fmt.Sprintf("Unexpected context element array: %s", block.Elements))
+	}
+	return elements[0].Text
 }
 
 type Block struct {

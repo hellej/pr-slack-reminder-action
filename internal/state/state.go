@@ -13,6 +13,7 @@ import (
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -28,6 +29,9 @@ type State struct {
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
+	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
+	// The ComputedAt of the last stats a post computed. See state.spec.md § Behaviour
+	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -109,6 +113,8 @@ func NewPostState(
 	messageInfo slackclient.SentMessageInfo,
 	summaryText string,
 	generatedAt time.Time,
+	mergeStats *mergestats.MergeStats,
+	mergeStatsLastComputedAt *time.Time,
 ) State {
 	return State{
 		SchemaVersion:   CurrentSchemaVersion,
@@ -117,8 +123,10 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
-		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
+		TrackedPRs:               utilities.Map(prViews, PRToPullRequestRef),
+		LastWrittenMessage:       newLastWrittenMessage(messageInfo, summaryText, generatedAt),
+		MergeStats:               mergeStats,
+		MergeStatsLastComputedAt: mergeStatsLastComputedAt,
 	}
 }
 

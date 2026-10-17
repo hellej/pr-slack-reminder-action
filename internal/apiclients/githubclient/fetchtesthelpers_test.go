@@ -17,6 +17,10 @@ var testRepositories = []models.Repository{
 	{Owner: "owner-two", Name: "repo-two"},
 }
 
+// A selection missing submittedAt or createdAt decodes a zero time without an error.
+const testReviewsSelection = "reviews(last: 100){ nodes { state submittedAt createdAt " +
+	"author { login __typename ... on User { name } } } }"
+
 const testReadyForReviewEventSelection = "timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1)" +
 	"{ nodes { ... on ReadyForReviewEvent { createdAt } } }"
 

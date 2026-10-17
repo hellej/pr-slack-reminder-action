@@ -101,6 +101,8 @@ type PR struct {
 	HasOutstandingChangesRequest bool
 	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
 	FirstReadyForReviewEventAt *time.Time
+	// Nil without a submitted review by a person other than the author. See githubclient.spec.md § Behaviour
+	FirstReviewAt *time.Time
 	// False after a failed enrichment. See githubclient.spec.md § Behaviour
 	HasCompleteReviewerInfo bool
 }

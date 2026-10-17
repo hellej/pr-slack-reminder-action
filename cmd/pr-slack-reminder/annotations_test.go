@@ -155,6 +155,7 @@ func TestLogErrorWritesOneErrorAnnotationPerFailedCanvasPart(t *testing.T) {
 				mockslackclient.MakeSlackClientGetter(mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{
 					ReplaceCanvasError: errors.New("canvas_not_found"),
 				})),
+				false,
 			)
 			logOutput := testhelpers.CaptureLog(t)
 

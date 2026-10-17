@@ -106,6 +106,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     },
     {
@@ -136,6 +137,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     }
   ]
