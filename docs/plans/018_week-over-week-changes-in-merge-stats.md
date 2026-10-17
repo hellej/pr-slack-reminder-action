@@ -15,7 +15,7 @@ status: draft
   - Trends beyond one week
   - The canvas
   - Any new action input
-  - Downloading a week-old artifact: the README and this repository set `retention-days: 4`, an expired artifact can't be downloaded, and each update run uploads one (385 in the dev channel). See docs/third-party-facts.md § GitHub's repository-level "List artifacts" has no sort parameter and documents no order
+  - Downloading a week-old artifact: state artifacts expire after 4 days (`retention-days: 4`)
 - Depends on plan 017 being implemented
 - Serves AGENTS.md § Purpose: a direction, so the medians read as better or worse than last week instead of in isolation. In the reference deployment, about 5 to 15 merges a week
 - Lands on a feature branch, through a PR
@@ -36,7 +36,7 @@ status: draft
   - Without a week before: the plan 017 line, unchanged
 - Post mode loads the previous state before building its message, once, for both the week-before lookup and marking the previous message stale. Same warnings as today on a failed load
 - A second Monday post on the same day finds the week before in the map, not the first post's entry from today
-- No change to action inputs or permissions. No new API call: the post's state load moves earlier
+- No change to action inputs or permissions, and no GraphQL change. A post that sends nothing, or whose send fails, now loads state too: one artifact list and download
 
 ### Message States
 
@@ -52,12 +52,21 @@ status: draft
 
 ## Summary
 
-1. `mergestats.PercentChanges`
-2. `State.MergeStatsByDate` and its 7-day prune
-3. The parenthetical in the message
-4. Run wiring: post mode loads state first, every post carries the map, both modes look up the week before
+- R1: post mode loads the previous state before building its message
+- 1: `mergestats.PercentChanges`
+- 2: `State.MergeStatsByDate` and its 7-day prune
+- 3: the parenthetical in the message
+- 4: run wiring: every post carries the map, both modes look up the week before
 
 ## Steps
+
+### Step R1: Load post mode's previous state first
+
+- `cmd/pr-slack-reminder/`: `Run` loads the previous state before the merged fetch in post mode too, as it does in update mode
+  - `markPreviousMessageStale` takes the loaded state and its load error instead of loading. Same skips and warnings as today
+  - Post mode still passes no merged PR cache to the merged fetch: `Run` passes `mergedPRCacheOf(loadedState)` whenever state is loaded, so that call has to tell the modes apart
+- Behaviour changes only in the load order, and in a post that sends nothing, or whose send fails, now loading state. A failed load there warns too. Existing tests and snapshots pass unchanged
+- Update run.spec.md § Behaviour: the load order, and the load on a post that sends nothing
 
 ### Step 1: Percent changes
 
@@ -75,17 +84,15 @@ status: draft
 ### Step 3: The parenthetical
 
 - `internal/messagecontent/`: `Content.MergeStatsWeekBefore`, passed through by `GetContent`
-- `internal/messagebuilder/`: appends the parenthetical per § Target Shape
+- `internal/messagebuilder/`: calls `mergestats.PercentChanges` on `Content.MergeStats` and `Content.MergeStatsWeekBefore`, and appends the parenthetical per § Target Shape
 - Update messagecontent.spec.md and messagebuilder.spec.md § Behaviour
 
 ### Step 4: Wire the week before into the run
 
 - `cmd/pr-slack-reminder/`:
-  - `Run` loads the previous state before the merged fetch in post mode too. `markPreviousMessageStale` takes the loaded state and its load error instead of loading
-  - Post mode passes no merged PR cache to the merged fetch, as today
   - Post mode on a merge stats day looks up the week before in the loaded map. Every saved post state goes through `WithRecentMergeStats`
   - Update mode looks up the week before off the loaded `MergeStats.ComputedAt`
-- Snapshots, read before re-recording:
+- Snapshots, read before re-recording. The normaliser, which today rewrites values only, also rewrites the `mergeStatsByDate` keys to placeholders relative to the run, such as `<run date>` and `<run date - 7>`:
   - Monday post with a week before
   - The same message edited by an update run
   - Monday post without a week before
@@ -94,7 +101,9 @@ status: draft
   - A second Monday post compares against the week before, not today's entry
   - An entry 6 or 8 days old is not used
 - Update run.spec.md § Behaviour, AGENTS.md § Architecture's state line, and README's line description
-- Live check, after release, on the reference workflow's channel: the second Monday's line shows the parenthetical. The dev channel's daily posts run the released binary, so a branch build can't keep its state chain for a week
+- Live check, after release: `pr-reminder.yml`'s scheduled daily posts to the `github` dev channel, which run the binary committed on `main`
+  - The first Monday after the release shows no change
+  - Done when the second Monday's post shows the parenthetical, and an update run's edit of that post keeps it
 
 ## Consequences
 
@@ -109,10 +118,11 @@ None
 ### Caveats
 
 - A week of 1 or 2 merges swings the change widely
-- A broken state chain, no saved run for over 4 days at the README's retention, loses the week before for one Monday
+- A broken state chain loses the week before for one Monday: no saved run for over 4 days at the README's retention, or a post whose state load failed or found no artifact
 - A week with no first review, after one that had one, shows no parenthetical at all
 
 ### Neutral
 
 - State carries up to 2 small entries
 - Post mode loads state earlier in the run, which changes the log line order
+- A post that sends nothing now loads state, so a failed load warns on a run that posts nothing
