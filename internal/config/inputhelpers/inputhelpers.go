@@ -91,6 +91,17 @@ func GetInputBoolOr(name string, defaultValue bool) (bool, error) {
 	return parsed, nil
 }
 
+func GetInputOptionalBool(name string) (*bool, error) {
+	if GetInput(name) == "" {
+		return nil, nil
+	}
+	parsed, err := GetInputBool(name)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
 func GetInputList(name string) []string {
 	val := GetInput(name)
 	if val == "" {

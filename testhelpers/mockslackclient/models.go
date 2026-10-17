@@ -102,6 +102,19 @@ func (b BlocksWrapper) ContainsBlockWithID(blockID string) bool {
 	return slices.ContainsFunc(b.Blocks, func(block Block) bool { return block.BlockID == blockID })
 }
 
+// The text of a context block's first element, "" when no block has the ID.
+func (b BlocksWrapper) ContextBlockText(blockID string) string {
+	block, isFound := utilities.Find(b.Blocks, func(block Block) bool { return block.BlockID == blockID })
+	if !isFound {
+		return ""
+	}
+	var elements []Element
+	if err := json.Unmarshal(block.Elements, &elements); err != nil || len(elements) == 0 {
+		panic(fmt.Sprintf("Unexpected context element array: %s", block.Elements))
+	}
+	return elements[0].Text
+}
+
 type Block struct {
 	Type     string          `json:"type"`
 	BlockID  string          `json:"block_id,omitempty"`

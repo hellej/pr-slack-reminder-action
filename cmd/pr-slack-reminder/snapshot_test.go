@@ -47,7 +47,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 
 // The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
 var stateTimestampField = regexp.MustCompile(
-	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt)": "[^"]*"`,
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince|mergeStatsLastComputedAt)": "[^"]*"`,
 )
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
@@ -168,16 +168,15 @@ type snapshotScenario struct {
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
-	mergeStatsByDateOfPreviousPost       func(runStart time.Time) map[string]mergestats.MergeStats
+	previousPostStateAt                  func(runStart time.Time) state.State
 }
 
-// Nil without merge stats in the previous post, as every other post scenario runs without one.
+// Nil when the scenario sets no previous post, as most post scenarios run without one.
 func (scenario snapshotScenario) previousPostState(runStart time.Time) *state.State {
-	if scenario.mergeStatsByDateOfPreviousPost == nil {
+	if scenario.previousPostStateAt == nil {
 		return nil
 	}
-	previousPost := getTestState(GetTestStateOptions{})
-	previousPost.MergeStatsByDate = scenario.mergeStatsByDateOfPreviousPost(runStart)
+	previousPost := scenario.previousPostStateAt(runStart)
 	return &previousPost
 }
 
@@ -205,6 +204,21 @@ func mergeStatsPR(options mergeStatsPROptions) *github.PullRequest {
 		Time: mergedAt.Add(-time.Duration(options.weeksReadyBeforeMerge) * 7 * 24 * time.Hour),
 	}
 	return pr
+}
+
+// #104 merged 30 hours ago, before the window, so 3 PRs count. To merge: 10, 5 and 5 weekdays.
+func previousMergeStatsADayAgoScenario() snapshotScenario {
+	scenario := mergeStatsDayScenario(
+		"merge stats on every post, previous stats a day ago",
+		map[string]any{config.InputShowMergeStatsInMessage: true},
+	)
+	scenario.isMergeStatsDay = false
+	scenario.previousPostStateAt = func(runStart time.Time) state.State {
+		previousPost := getTestState(GetTestStateOptions{})
+		previousPost.MergeStatsLastComputedAt = github.Ptr(runStart.Add(-24 * time.Hour))
+		return previousPost
+	}
+	return scenario
 }
 
 func reviewSubmittedAt(review *github.PullRequestReview, submittedAt time.Time) *github.PullRequestReview {
@@ -267,16 +281,19 @@ func mergeStatsDayScenario(name string, configOverrides map[string]any) snapshot
 // and -10 %.
 func mergeStatsDayWithAWeekBeforeScenario() snapshotScenario {
 	scenario := mergeStatsDayScenario("merge stats day with a week before", nil)
-	scenario.mergeStatsByDateOfPreviousPost = func(runStart time.Time) map[string]mergestats.MergeStats {
+	scenario.previousPostStateAt = func(runStart time.Time) state.State {
 		weekBeforeComputedAt := runStart.Add(-7 * 24 * time.Hour)
-		return map[string]mergestats.MergeStats{
+		previousPost := getTestState(GetTestStateOptions{})
+		previousPost.MergeStatsByDate = map[string]mergestats.MergeStats{
 			utcDateKey(weekBeforeComputedAt): {
 				MergedCount:             6,
 				MedianTimeToFirstReview: github.Ptr(50 * time.Hour),
 				MedianTimeToMerge:       github.Ptr(200 * time.Hour),
+				MergedSince:             weekBeforeComputedAt.Add(-7 * 24 * time.Hour),
 				ComputedAt:              weekBeforeComputedAt,
 			},
 		}
+		return previousPost
 	}
 	return scenario
 }
@@ -657,6 +674,7 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		mergeStatsDayScenario("merge stats day", nil),
+		previousMergeStatsADayAgoScenario(),
 		mergeStatsDayScenario("merge stats day, merged section hidden", map[string]any{
 			config.InputShowMergedPRsInMessage: false,
 		}),
@@ -794,6 +812,7 @@ func mergeStatsOfAPostADayBeforeTheRun(runStart time.Time) (*mergestats.MergeSta
 		MergedCount:             11,
 		MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
 		MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+		MergedSince:             runStart.Add(-8 * 24 * time.Hour),
 		ComputedAt:              runStart.Add(-24 * time.Hour),
 	}
 	weekBeforeComputedAt := runStart.Add(-8 * 24 * time.Hour)
@@ -803,6 +822,7 @@ func mergeStatsOfAPostADayBeforeTheRun(runStart time.Time) (*mergestats.MergeSta
 			MergedCount:             6,
 			MedianTimeToFirstReview: github.Ptr(4 * time.Hour),
 			MedianTimeToMerge:       github.Ptr(24 * time.Hour),
+			MergedSince:             weekBeforeComputedAt.Add(-7 * 24 * time.Hour),
 			ComputedAt:              weekBeforeComputedAt,
 		},
 	}
@@ -934,6 +954,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					MergedCount:             11,
 					MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
 					MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+					MergedSince:             time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
 					ComputedAt:              time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC),
 				}, nil
 			},

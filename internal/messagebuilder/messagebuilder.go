@@ -188,7 +188,7 @@ type shownMedian struct {
 }
 
 func mergeStatsLineText(stats mergestats.MergeStats, weekBefore *mergestats.MergeStats) string {
-	mergedCountText := fmt.Sprintf("Last 7 days: %d merged", stats.MergedCount)
+	mergedCountText := fmt.Sprintf("%s: %d merged", mergeStatsWindowText(stats), stats.MergedCount)
 	medians := shownMedians(stats, weekBefore)
 	if len(medians) == 0 {
 		return mergedCountText
@@ -234,6 +234,15 @@ func percentChangeText(percentChange int) string {
 		return fmt.Sprintf("+%d %%", percentChange)
 	}
 	return fmt.Sprintf("%d %%", percentChange)
+}
+
+// A window under 12 hours rounds to 0 and reads as 1 day. See messagebuilder.spec.md § Oddities
+func mergeStatsWindowText(stats mergestats.MergeStats) string {
+	windowDays := max(1, int(math.Round(stats.ComputedAt.Sub(stats.MergedSince).Hours()/24)))
+	if windowDays == 1 {
+		return "Last 1 day"
+	}
+	return fmt.Sprintf("Last %d days", windowDays)
 }
 
 // See messagebuilder.spec.md § Oddities for the rounding at each switch.

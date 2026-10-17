@@ -79,10 +79,7 @@ func Run(
 	switch cfg.RunMode {
 	case config.RunModePost:
 		previousPost := previousPostStateOrNil(loadedState, loadStateErr)
-		var mergeStats *mergestats.MergeStats
-		if isMergeStatsDay {
-			mergeStats = computeMergeStats(githubClient, cfg, generatedAt)
-		}
+		mergeStats := mergeStatsForThisPost(githubClient, cfg, previousPost, isMergeStatsDay, generatedAt)
 		stateToSave, messageErr = runPostMode(
 			slackClient, cfg, previousPost, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
 		)
@@ -154,7 +151,11 @@ func runPostMode(
 
 	postState := state.WithRecentMergeStats(
 		state.WithMergedPRCache(
-			state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats), mergedPRs,
+			state.NewPostState(
+				prViews, sentMessageInfo, summaryText, generatedAt,
+				mergeStats, mergeStatsLastComputedAt(mergeStats, previousPost),
+			),
+			mergedPRs,
 		),
 		mergeStatsByDateOfPreviousPost, mergeStats, generatedAt,
 	)
@@ -183,6 +184,49 @@ func mergeStatsByDateOf(previousPost *state.State) map[string]mergestats.MergeSt
 		return nil
 	}
 	return previousPost.MergeStatsByDate
+}
+
+// Nil when this post computes none, or fails to.
+func mergeStatsForThisPost(
+	githubClient githubclient.Client,
+	cfg config.Config,
+	previousState *state.State,
+	isMergeStatsDay bool,
+	generatedAt time.Time,
+) *mergestats.MergeStats {
+	if !shouldComputeMergeStats(cfg.ContentInputs.ShowMergeStatsInMessage, isMergeStatsDay) {
+		return nil
+	}
+	return computeMergeStats(githubClient, cfg, mergeStatsWindowStart(previousState, generatedAt), generatedAt)
+}
+
+func shouldComputeMergeStats(showMergeStatsInMessage *bool, isMergeStatsDay bool) bool {
+	if showMergeStatsInMessage != nil {
+		return *showMergeStatsInMessage
+	}
+	return isMergeStatsDay
+}
+
+func mergeStatsWindowStart(previousState *state.State, generatedAt time.Time) time.Time {
+	longestWindowStart := generatedAt.Add(-githubclient.RecentlyMergedWindow)
+	if previousState == nil || previousState.MergeStatsLastComputedAt == nil {
+		return longestWindowStart
+	}
+	if previousState.MergeStatsLastComputedAt.After(longestWindowStart) {
+		return *previousState.MergeStatsLastComputedAt
+	}
+	return longestWindowStart
+}
+
+// A post computing no stats, or failing to, carries the loaded time forward.
+func mergeStatsLastComputedAt(mergeStats *mergestats.MergeStats, previousState *state.State) *time.Time {
+	if mergeStats != nil {
+		return &mergeStats.ComputedAt
+	}
+	if previousState == nil {
+		return nil
+	}
+	return previousState.MergeStatsLastComputedAt
 }
 
 // Channel check: see run.spec.md § Behaviour.
@@ -398,11 +442,11 @@ func findRecentlyMergedPRs(
 }
 
 // Returns nil, after a warning, when the stats cannot be computed over every merged PR: a median
-// over part of them would read as the whole week's.
+// over part of them would read as the whole window's.
 func computeMergeStats(
-	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+	githubClient githubclient.Client, cfg config.Config, mergedSince, generatedAt time.Time,
 ) *mergestats.MergeStats {
-	mergedPRs, err := findPRsMergedSince(githubClient, cfg, generatedAt)
+	mergedPRs, err := findPRsMergedSince(githubClient, cfg, mergedSince)
 	if err != nil {
 		logWarning(fmt.Sprintf("Leaving the merge stats out, their merged PR fetch failed: %v", err))
 		return nil
@@ -414,9 +458,10 @@ func computeMergeStats(
 		))
 		return nil
 	}
-	mergeStats := mergestats.FromMergedPRs(mergedPRs, generatedAt)
+	mergeStats := mergestats.FromMergedPRs(mergedPRs, mergedSince, generatedAt)
 	log.Printf(
-		"Merge stats: %d merged, median %s to first review, %s to merge",
+		"Merge stats since %s: %d merged, median %s to first review, %s to merge",
+		mergedSince.Format(time.RFC3339),
 		mergeStats.MergedCount,
 		durationLogText(mergeStats.MedianTimeToFirstReview),
 		durationLogText(mergeStats.MedianTimeToMerge),
@@ -436,16 +481,11 @@ func durationLogText(duration *time.Duration) string {
 }
 
 func findPRsMergedSince(
-	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+	githubClient githubclient.Client, cfg config.Config, mergedSince time.Time,
 ) ([]githubclient.PR, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
-	return githubClient.FindPRsMergedSince(
-		ctx,
-		cfg.Repositories,
-		cfg.GetFiltersForRepository,
-		generatedAt.Add(-githubclient.RecentlyMergedWindow),
-	)
+	return githubClient.FindPRsMergedSince(ctx, cfg.Repositories, cfg.GetFiltersForRepository, mergedSince)
 }
 
 // Returns a handler function that saves the sent Slack message blocks as a JSON file.

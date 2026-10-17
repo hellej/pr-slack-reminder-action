@@ -36,6 +36,14 @@ func mergeStatsLineText(t *testing.T, message slack.Message) string {
 	return text.Text
 }
 
+func statsOverWindowEndingAtGeneratedAt(window time.Duration, stats mergestats.MergeStats) *mergestats.MergeStats {
+	stats.ComputedAt = generatedAt
+	stats.MergedSince = generatedAt.Add(-window)
+	return &stats
+}
+
+const sevenDays = 7 * 24 * time.Hour
+
 func TestMergeStatsLineText(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -131,7 +139,7 @@ func TestMergeStatsLineText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-				MergeStats:           &tt.stats,
+				MergeStats:           statsOverWindowEndingAtGeneratedAt(sevenDays, tt.stats),
 				MergeStatsWeekBefore: tt.weekBefore,
 				GeneratedAt:          generatedAt,
 			})
@@ -162,13 +170,42 @@ func TestMergeStatsLineDurationText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.duration.String(), func(t *testing.T) {
 			message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
-				MergeStats:  &mergestats.MergeStats{MergedCount: 1, MedianTimeToMerge: durationPtr(tt.duration)},
+				MergeStats: statsOverWindowEndingAtGeneratedAt(sevenDays, mergestats.MergeStats{
+					MergedCount: 1, MedianTimeToMerge: durationPtr(tt.duration),
+				}),
 				GeneratedAt: generatedAt,
 			})
 
 			expected := "Last 7 days: 1 merged · median " + tt.expected + " to merge"
 			if text := mergeStatsLineText(t, message); text != expected {
 				t.Errorf("expected %q, got %q", expected, text)
+			}
+		})
+	}
+}
+
+func TestMergeStatsLineWindowText(t *testing.T) {
+	tests := []struct {
+		name     string
+		window   time.Duration
+		expected string
+	}{
+		{name: "under 12 hours", window: 11 * time.Hour, expected: "Last 1 day: 2 merged"},
+		{name: "exactly 1 day", window: 24 * time.Hour, expected: "Last 1 day: 2 merged"},
+		{name: "2.4 days", window: 57*time.Hour + 36*time.Minute, expected: "Last 2 days: 2 merged"},
+		{name: "2.6 days", window: 62*time.Hour + 24*time.Minute, expected: "Last 3 days: 2 merged"},
+		{name: "7 days", window: sevenDays, expected: "Last 7 days: 2 merged"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
+				MergeStats:  statsOverWindowEndingAtGeneratedAt(tt.window, mergestats.MergeStats{MergedCount: 2}),
+				GeneratedAt: generatedAt,
+			})
+
+			if text := mergeStatsLineText(t, message); text != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, text)
 			}
 		})
 	}

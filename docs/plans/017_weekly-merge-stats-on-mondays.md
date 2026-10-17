@@ -11,9 +11,10 @@ status: draft
   - Computed once, by the post run on a Monday in UTC. Update runs read it from state and render it again, unchanged, for as long as Monday's message is the live one
   - Weekday time, as the old-PR check counts it: Saturdays and Sundays left out as whole UTC days. No working hours. The 7-day window stays calendar days
   - Every PR merged in the window counts, bot-authored ones included
+  - An optional `show-merge-stats-in-message` input overrides the Monday default in post mode: `true` computes the stats on every post, `false` on none. Unset keeps the Monday default. Update mode ignores it
+  - The line names its real window: the time since the previous merge stats, at most 7 days. `Last 1 day`, `Last 3 days`, `Last 7 days`
 - Non-goals:
   - The canvas
-  - Any new action input
   - Trends, targets or per-person numbers
   - Telling a scheduled post from a manual one: every post run on a Monday computes the stats
 - Serves AGENTS.md § Purpose: a weekly feedback loop on review and merge speed, at the cost of one line on a message the team already gets. In the reference deployment, about 5 to 15 merges a week, a weekly Dependabot batch of about 5 among them
@@ -21,7 +22,7 @@ status: draft
 
 ## Target Shape
 
-- **Merge stats** (`mergestats.MergeStats`): over the PRs merged in the 7 days before the run, `githubclient.RecentlyMergedWindow`:
+- **Merge stats** (`mergestats.MergeStats`): over the PRs merged in the merge stats window:
   - `MergedCount`
   - `MedianTimeToFirstReview`: over the PRs with a first review. Nil when none has one
   - `MedianTimeToMerge`: nil when nothing merged
@@ -29,21 +30,29 @@ status: draft
   - The line's text doesn't say weekdays. The README does, as it does for `old-pr-threshold-hours`
   - An even count takes the mean of the two middle values
   - `ComputedAt`: the post run's `generatedAt`. Plan 018 finds the stats a week before by it
+  - `MergedSince`: the window's start, JSON key `mergedSince`. An update run re-renders the line's window from it, unchanged
+- **Merge stats window**: from the later of the previous merge stats' `ComputedAt` (`State.MergeStatsLastComputedAt`) and `generatedAt` minus `githubclient.RecentlyMergedWindow` (7 days), to `generatedAt`
+  - 7 days when no previous state loads, or it has no `mergeStatsLastComputedAt`
+  - `State.MergeStatsLastComputedAt`, JSON key `mergeStatsLastComputedAt` with `omitempty`: the `ComputedAt` of the last stats a post computed. A post that computes stats sets it. Every other post, and a post whose stats fetch failed, carries the loaded state's value forward. Update runs carry it through the `With*` copies
+- **Merge stats input** (`show-merge-stats-in-message`, `config.ContentInputs.ShowMergeStatsInMessage *bool`): unset or empty is nil. `true` or `false` parses as a bool, anything else fails the config like `show-merged-prs-in-message`
+  - A post computes the stats when the input is `true`, or when it is unset on a merge stats day. `false` never does
+  - Update mode never reads it: it renders the loaded state's `mergeStats`, as before
 - **First review** (`githubclient.PR.FirstReviewAt`): the earliest submitted review by a person other than the PR author, out of the reviews `isSubmittedUserReview` already keeps: not pending, not a bot. Its time is `submittedAt`, else `createdAt`. A PR conversation comment is not a review
 - **Merge stats day**: a run whose start falls on a Monday in UTC (`isMondayInUTC`)
 - **Merge stats line**: a `context` block with block ID `merge_stats_line`, one plain `mrkdwn` element:
+  - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`. Examples below show a 7-day window
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - `Last 7 days: 2 merged · median 1.0 days to merge` when no merged PR had a first review
   - `Last 7 days: 0 merged` when nothing merged
   - A duration reads in whole minutes under an hour, in hours with one decimal under 24 hours, else in days with one decimal: `24 minutes`, `1 minute`, `4.0 hours`, `1.0 days`
 - Where the line shows:
-  - The post run on a merge stats day fetches every PR merged in the window, enriched and uncapped, computes the merge stats, renders the line and saves the stats in state under `mergeStats`
+  - A post computing the stats (per the merge stats input) fetches every PR merged in the window, enriched and uncapped, computes the merge stats, renders the line and saves the stats in state under `mergeStats`
   - An update run renders the line whenever the loaded state has `mergeStats`, and saves it back with the state. The line stays on Monday's message while it is the live one, until a later post replaces it
-  - A post on any other day computes nothing and saves no `mergeStats`
+  - A post not computing the stats saves no `mergeStats`
   - The line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else left deletes the message, as today
   - A failed stats fetch, or a merged PR in it without complete reviewer info, leaves the line out, with a `::warning` annotation. The run goes on
 - `show-merged-prs-in-message: false` hides the merged section only. The line shows either way
-- No change to action inputs or permissions
+- One new optional input. No permission change
 
 ### Message States
 
@@ -86,11 +95,13 @@ The line above the footer was probed live in the dev channel.
 - Every run: both review selections gain `submittedAt` and `createdAt`. They add no connection, so the formula's cost is unchanged. See docs/third-party-facts.md § `PullRequestReview.submittedAt` is a nullable `DateTime`, and a scalar adds no GraphQL cost by the formula
 - A Monday post adds one merged search, about 1 point per repository, and enriches every merge in the window, about 1 point per PR, the shown merged PRs a second time. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
   - Reference deployment: about 10 to 20 points, once a week
+  - With `show-merge-stats-in-message: true`, the same on every post, over a window of about 1 day, so fewer merges to enrich
+- Post runs load the state artifact before the stats fetch rather than after sending: the same one REST download, no GraphQL cost
 - Update runs: no change
 
 ## Breaking Change
 
-- Non-breaking, minor: a new line on Monday's message, no input change
+- Non-breaking, minor: a new line on Monday's message, and one new optional input whose unset default keeps that behaviour
 - State keeps its schema version. A state saved before this has no `mergeStats` key, so an update run on it shows no line. The next Monday post saves one
 - A downgrade ignores the key: `state.Load` decodes with `json.Unmarshal`, which skips unknown keys
 
@@ -102,6 +113,8 @@ The line above the footer was probed live in the dev channel.
 4. `State.MergeStats`
 5. The merge stats line in the message
 6. Run wiring: the Monday post computes and saves the stats, update runs re-render them
+7. The `show-merge-stats-in-message` input
+8. The real window: since the previous merge stats, at most 7 days
 
 ## Steps
 
@@ -157,8 +170,8 @@ The line above the footer was probed live in the dev channel.
 - `cmd/pr-slack-reminder/`:
   - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMondayInUTC(time.Now())`. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
   - Test call sites pass false, 51 of them, mechanical
-  - `Run`'s post branch on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
-  - `runPostMode` takes the stats and passes them to `GetContent` and `NewPostState`. Update mode passes the loaded state's
+  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
+  - `runPostMode` passes the stats to `GetContent` and `NewPostState`. Update mode passes the loaded state's
 - `internal/state` copies already carry the stats through an update's save, so update mode writes nothing new
 - Snapshots, read before re-recording. The normaliser adds `computedAt` to its time keys:
   - Post on a merge stats day: the line, with fixture reviews giving a review median and an even merge count
@@ -175,6 +188,38 @@ The line above the footer was probed live in the dev channel.
 - Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
 - Live check, on a Monday in UTC: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, then the same with `run-mode=update`
   - Done when the post logs the computed stats, the dev channel's message shows the line, and the update keeps it above the footer
+
+### Step 7: The `show-merge-stats-in-message` input
+
+- `internal/config/`: `InputShowMergeStatsInMessage = "show-merge-stats-in-message"`, `ContentInputs.ShowMergeStatsInMessage *bool`. Add an `inputhelpers` reader returning nil for an unset or empty input, and the parse error for anything `strconv.ParseBool` rejects
+- `action.yml`: the input, not required, no default. README inputs table: unset computes the stats on Monday posts only, `true` on every post, `false` never, post mode only. `go run .github/scripts/check_inputs.go` passes
+- `cmd/pr-slack-reminder/run.go`: a post computes the stats when `shouldComputeMergeStats(cfg.ContentInputs.ShowMergeStatsInMessage, isMergeStatsDay)` holds. `Run` keeps its `isMergeStatsDay` parameter and hands it to `runPostMode`
+- `testhelpers/confighelpers.go` leaves the input unset unless a test overrides it
+- Tests:
+  - `config_test.go`: unset, empty, `true`, `false`, and an invalid value failing
+  - `main_test.go`, table-driven, post mode: unset, `true` and `false`, each on a merge stats day and on another day. Assert the stats fetch count (`FetchRecording`), the line shown or not, and `mergeStats` saved or not
+  - `main_test.go`: an update run with `false` set and `mergeStats` in the loaded state still renders the line
+- Update config.spec.md, inputhelpers.spec.md and run.spec.md § Behaviour
+
+### Step 8: The real window
+
+- `internal/mergestats/`: `MergeStats.MergedSince`. `FromMergedPRs` takes it
+- `internal/state/`: `State.MergeStatsLastComputedAt *time.Time`. `NewPostState` takes it. The `With*` copies carry it
+- `cmd/pr-slack-reminder/run.go`:
+  - `runPostMode` loads the previous state once, before the stats fetch, and hands the state and the load error to `markPreviousMessageStale` instead of a second load. The outcomes for marking stale stay as they are. The artifact fetch's own log lines now print before the send; the stale-marking decision logs and the load warning stay after it
+  - The window start per § Target Shape. `findPRsMergedSince` takes it in place of the fixed 7 days. `findRecentlyMergedPRs` keeps its 7 days
+  - `NewPostState` gets the new stats' `ComputedAt` when stats were computed, else the loaded state's `MergeStatsLastComputedAt`
+- `internal/messagebuilder/`: the line's window text, `Last 1 day` singular, else `Last N days`
+- Tests:
+  - `messagebuilder` package test: windows of 1 day, 2.4 days reading `Last 2 days`, 2.6 days reading `Last 3 days`, 7 days, and under 12 hours reading `Last 1 day`
+  - `main_test.go`: previous state with `mergeStatsLastComputedAt` 1 day before the run: the stats fetch's `mergedSince` is that time, the line reads `Last 1 day`. 10 days before: capped, `Last 7 days`. Absent: `Last 7 days`
+  - `main_test.go`: a post not computing stats carries `mergeStatsLastComputedAt` forward. A post computing stats saves its own `ComputedAt`. A failed stats fetch carries the old value
+  - `main_test.go`: post mode downloads the state artifact once. `FetchRecording` gains `StateArtifactDownloads` and `MergedPRSearchQueries`: the mock search only sees a day, so the window tests check that day plus the merged count in the line
+  - `main_test.go`: a state that fails to load gives the 7-day window
+  - Snapshot: a post with `true` and previous stats 1 day old, showing `Last 1 day`
+- Existing message snapshots keep `Last 7 days`: their runs load no previous stats. A changed message snapshot means a bug. The merge stats `.state.json` snapshots gain `mergedSince` and `mergeStatsLastComputedAt`. The normaliser adds both to its time keys
+  - The stale snapshot's second post loads the first post's stats from moments before, so its own saved message reads `Last 1 day: 0 merged`, per § Caveats
+- Update mergestats.spec.md, state.spec.md, messagebuilder.spec.md, run.spec.md. Oddities: a window under 12 hours reads `Last 1 day`
 
 ## Consequences
 
@@ -197,6 +242,7 @@ None
 - The medians cover merged PRs only: a PR still waiting is not in them
 - A first review's timestamp is unverified for a single inline comment. `createdAt` stands in when `submittedAt` is null
 - A grouped message loses one content block on every day, line or not
+- Two posts hours apart with `show-merge-stats-in-message: true` give the second a window of hours, read as `Last 1 day`
 
 ### Neutral
 

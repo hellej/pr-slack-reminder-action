@@ -492,13 +492,11 @@ func TestWithRecentMergeStats(t *testing.T) {
 			},
 		},
 		{
-			name:                   "new stats replace a loaded entry of the same date",
+			name:                   "a loaded entry of the same date stays over the new stats",
 			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-12": statsOf12th},
 			newMergeStats:          new(mergeStatsComputedAt(time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC))),
 			asOf:                   time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC),
-			expected: map[string]mergestats.MergeStats{
-				"2026-10-12": mergeStatsComputedAt(time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)),
-			},
+			expected:               map[string]mergestats.MergeStats{"2026-10-12": statsOf12th},
 		},
 		{
 			name:                   "every entry pruned leaves none",

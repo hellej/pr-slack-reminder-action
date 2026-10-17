@@ -32,6 +32,8 @@ type State struct {
 	MergedPRCache                 []githubclient.PR                `json:"mergedPRCache,omitempty"`
 	MergeStats                    *mergestats.MergeStats           `json:"mergeStats,omitempty"`
 	MergeStatsByDate              map[string]mergestats.MergeStats `json:"mergeStatsByDate,omitempty"`
+	// The ComputedAt of the last stats a post computed. See state.spec.md § Behaviour
+	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -114,6 +116,7 @@ func NewPostState(
 	summaryText string,
 	generatedAt time.Time,
 	mergeStats *mergestats.MergeStats,
+	mergeStatsLastComputedAt *time.Time,
 ) State {
 	return State{
 		SchemaVersion:   CurrentSchemaVersion,
@@ -122,9 +125,10 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
-		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
-		MergeStats:         mergeStats,
+		TrackedPRs:               utilities.Map(prViews, PRToPullRequestRef),
+		LastWrittenMessage:       newLastWrittenMessage(messageInfo, summaryText, generatedAt),
+		MergeStats:               mergeStats,
+		MergeStatsLastComputedAt: mergeStatsLastComputedAt,
 	}
 }
 
@@ -158,7 +162,8 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 
 const daysInAWeek = 7
 
-// Keeps the entries back to the week before, the oldest a later run looks up.
+// Keeps the entries back to the week before, the oldest a later run looks up. A day's first
+// entry stays: a later post that day covers only the hours since. See state.spec.md § Behaviour
 func WithRecentMergeStats(
 	s State,
 	loadedMergeStatsByDate map[string]mergestats.MergeStats,
@@ -168,7 +173,10 @@ func WithRecentMergeStats(
 	recentMergeStatsByDate := map[string]mergestats.MergeStats{}
 	maps.Copy(recentMergeStatsByDate, loadedMergeStatsByDate)
 	if newMergeStats != nil {
-		recentMergeStatsByDate[mergeStatsDateKey(newMergeStats.ComputedAt)] = *newMergeStats
+		dateKey := mergeStatsDateKey(newMergeStats.ComputedAt)
+		if _, hasEntryOfTheDay := recentMergeStatsByDate[dateKey]; !hasEntryOfTheDay {
+			recentMergeStatsByDate[dateKey] = *newMergeStats
+		}
 	}
 	oldestKeptDateKey := weekBeforeDateKey(asOf)
 	// The keys are ISO dates, which sort as text.
