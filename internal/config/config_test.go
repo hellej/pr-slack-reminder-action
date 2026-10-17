@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -1231,6 +1232,57 @@ func TestGetConfig_ShowMergedPRsInMessage_Invalid(t *testing.T) {
 	h := newConfigTestHelpers(t)
 	h.setupMinimalValidConfig()
 	h.setInput(config.InputShowMergedPRsInMessage, "sometimes")
+
+	_, err := config.GetConfig()
+
+	if !errors.Is(err, strconv.ErrSyntax) {
+		t.Errorf("Expected an error wrapping strconv.ErrSyntax, got %v", err)
+	}
+}
+
+func TestGetConfig_ShowMergeStatsInMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *string
+		expected *bool
+	}{
+		{name: "unset input leaves the choice to the run", input: nil, expected: nil},
+		{name: "explicitly empty input leaves the choice to the run", input: new(""), expected: nil},
+		{name: "true", input: new("true"), expected: new(true)},
+		{name: "false", input: new("false"), expected: new(false)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newConfigTestHelpers(t)
+			h.setupMinimalValidConfig()
+			if tt.input != nil {
+				h.setInput(config.InputShowMergeStatsInMessage, *tt.input)
+			}
+
+			cfg, err := config.GetConfig()
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+			if !reflect.DeepEqual(cfg.ContentInputs.ShowMergeStatsInMessage, tt.expected) {
+				t.Errorf("Expected ShowMergeStatsInMessage %v, got %v",
+					describeOptionalBool(tt.expected), describeOptionalBool(cfg.ContentInputs.ShowMergeStatsInMessage))
+			}
+		})
+	}
+}
+
+func describeOptionalBool(value *bool) string {
+	if value == nil {
+		return "unset"
+	}
+	return strconv.FormatBool(*value)
+}
+
+func TestGetConfig_ShowMergeStatsInMessage_Invalid(t *testing.T) {
+	h := newConfigTestHelpers(t)
+	h.setupMinimalValidConfig()
+	h.setInput(config.InputShowMergeStatsInMessage, "mondays")
 
 	_, err := config.GetConfig()
 

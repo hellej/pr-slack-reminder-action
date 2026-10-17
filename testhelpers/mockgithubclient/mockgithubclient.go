@@ -54,6 +54,9 @@ type FetchRecording struct {
 	MergedPRFetches    int
 	GetPRsRequests     [][]models.PullRequestRef
 	EnrichmentRequests [][]models.PullRequestRef
+	// One entry per merged search request: its qN search query strings, in alias order
+	MergedPRSearchQueries  [][]string
+	StateArtifactDownloads int
 }
 
 func (r *FetchRecording) recordGetPRsRequest(references []models.PullRequestRef) {
@@ -74,10 +77,17 @@ func (r *FetchRecording) recordOpenPRFetch() {
 	r.OpenPRFetches++
 }
 
-func (r *FetchRecording) recordMergedPRFetch() {
+func (r *FetchRecording) recordMergedPRFetch(searchQueries []string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.MergedPRFetches++
+	r.MergedPRSearchQueries = append(r.MergedPRSearchQueries, searchQueries)
+}
+
+func (r *FetchRecording) recordStateArtifactDownload() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.StateArtifactDownloads++
 }
 
 func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenForState string) githubclient.Client {
@@ -97,6 +107,7 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 			listErr:           opts.ListArtifactsError,
 			downloadErr:       opts.DownloadArtifactError,
 			mockPreviousState: opts.MockPreviousState,
+			recording:         opts.Recording,
 		}
 		return githubclient.NewClient(
 			mockHTTPClient,
@@ -265,7 +276,7 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 // since githubclient waits seconds before retrying a 5xx.
 func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
 	if t.opts.Recording != nil {
-		t.opts.Recording.recordMergedPRFetch()
+		t.opts.Recording.recordMergedPRFetch(searchQueries(variables))
 	}
 	if t.opts.MergedPRsSearchError != nil {
 		body, err := json.Marshal(
@@ -508,13 +519,17 @@ func postedRepositoryNames(variables map[string]any) []string {
 // The search query declares no name variable, since GraphQL rejects an operation declaring a
 // variable it never uses. The repository comes out of the qN query string's repo: qualifier.
 func searchedRepositoryNames(variables map[string]any) []string {
-	names := []string{}
+	return utilities.Map(searchQueries(variables), repositoryNameOfSearchQuery)
+}
+
+func searchQueries(variables map[string]any) []string {
+	queries := []string{}
 	for index := 0; ; index++ {
 		searchQuery, isSet := variables[fmt.Sprintf("q%d", index)].(string)
 		if !isSet {
-			return names
+			return queries
 		}
-		names = append(names, repositoryNameOfSearchQuery(searchQuery))
+		queries = append(queries, searchQuery)
 	}
 }
 
@@ -548,6 +563,7 @@ type mockActionsService struct {
 	listErr           error
 	downloadErr       error
 	mockPreviousState *state.State
+	recording         *FetchRecording
 }
 
 func (m *mockActionsService) ListArtifacts(
@@ -576,6 +592,9 @@ func (m *mockActionsService) ListArtifacts(
 func (m *mockActionsService) DownloadArtifact(
 	ctx context.Context, owner, repo string, artifactID int64, maxRedirects int,
 ) (*url.URL, *github.Response, error) {
+	if m.recording != nil {
+		m.recording.recordStateArtifactDownload()
+	}
 	// A 404, not a 5xx or a 2xx: githubclient waits seconds before retrying either.
 	if m.downloadErr != nil {
 		return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}, m.downloadErr

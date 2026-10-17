@@ -12,6 +12,8 @@ import (
 
 var computedAt = time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
 
+var mergedSince = time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
+
 // 2026-10-06 is a Tuesday, 2026-10-09 a Friday, 2026-10-12 a Monday.
 func at(day, hour int) time.Time {
 	return time.Date(2026, time.October, day, hour, 0, 0, 0, time.UTC)
@@ -164,9 +166,11 @@ func TestFromMergedPRs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := mergestats.FromMergedPRs(tt.prs, computedAt)
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("expected %s, got %s", describe(tt.expected), describe(got))
+			expected := tt.expected
+			expected.MergedSince = mergedSince
+			got := mergestats.FromMergedPRs(tt.prs, mergedSince, computedAt)
+			if !reflect.DeepEqual(got, expected) {
+				t.Errorf("expected %s, got %s", describe(expected), describe(got))
 			}
 		})
 	}
@@ -180,8 +184,8 @@ func describe(stats mergestats.MergeStats) string {
 		return duration.String()
 	}
 	return fmt.Sprintf(
-		"{merged %d, first review %s, merge %s, computed at %s}",
+		"{merged %d, first review %s, merge %s, merged since %s, computed at %s}",
 		stats.MergedCount, durationText(stats.MedianTimeToFirstReview),
-		durationText(stats.MedianTimeToMerge), stats.ComputedAt,
+		durationText(stats.MedianTimeToMerge), stats.MergedSince, stats.ComputedAt,
 	)
 }

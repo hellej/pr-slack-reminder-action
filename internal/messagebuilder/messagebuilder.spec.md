@@ -21,6 +21,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - The author renders as a Slack mention when a Slack user ID is mapped for them, otherwise by GitHub name; approvers and commenters always render by GitHub name
 - When `Content.MergeStats` is set, both messages render the merge stats line after the sections, before the update-time footer: a `context` block with block ID `merge_stats_line`, one plain `mrkdwn` element
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
+  - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`
   - A nil median drops its part: `Last 7 days: 2 merged · median 1.0 days to merge`, and with both nil, `Last 7 days: 0 merged`
   - A duration reads in whole minutes under an hour, in hours with one decimal under 24 hours, else in days with one decimal: `24 minutes`, `1 minute`, `4.0 hours`, `1.0 days`
 - The update-time footer is a `context` block with block ID `update_time_footer`, reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
@@ -44,6 +45,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - Grouped by repository, a section costs 1 + 2 × repositories blocks (the section heading, then a sub-heading and a list per repository), so the cap is reachable: 5 repositories with PRs in all four sections is the most that fits, at 44 content blocks. 6 build 52 content blocks, of which 4 are dropped
 - Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it. The cut ignores where a section starts, so a section heading can be left with all of its repositories dropped, and the last content block can be a repository sub-heading with its list dropped
 - The cap keeps a slot for the merge stats line on every day, so a grouped message without the line drops a content block it had room for
+- A window under 12 hours rounds to 0 days and reads `Last 1 day`, as does any window from 12 to 36 hours
 - The line's rounding can read one unit past its switch: 59.6 minutes reads `60 minutes`, and 23.96 hours `24.0 hours`
 - A message with nothing to list at all is empty, or holds only the no-open-PRs line and the merge stats line, whichever are set, with the update-time footer after them in an edit. None is worth sending, and it is the caller that decides
 - Same-named repositories under different owners get identical sub-headings: only their link targets tell those groups apart

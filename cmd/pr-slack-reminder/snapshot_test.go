@@ -47,7 +47,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 
 // The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
 var stateTimestampField = regexp.MustCompile(
-	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt)": "[^"]*"`,
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince|mergeStatsLastComputedAt)": "[^"]*"`,
 )
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
@@ -143,6 +143,7 @@ type snapshotScenario struct {
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
+	previousStateForPostMode             *state.State
 }
 
 // Every span is a whole number of weeks, or a review before the PR turned ready, so the weekday
@@ -169,6 +170,19 @@ func mergeStatsPR(options mergeStatsPROptions) *github.PullRequest {
 		Time: mergedAt.Add(-time.Duration(options.weeksReadyBeforeMerge) * 7 * 24 * time.Hour),
 	}
 	return pr
+}
+
+// #104 merged 30 hours ago, before the window, so 3 PRs count. To merge: 10, 5 and 5 weekdays.
+func previousMergeStatsADayAgoScenario() snapshotScenario {
+	scenario := mergeStatsDayScenario(
+		"merge stats on every post, previous stats a day ago",
+		map[string]any{config.InputShowMergeStatsInMessage: true},
+	)
+	scenario.isMergeStatsDay = false
+	previousState := getTestState(GetTestStateOptions{})
+	previousState.MergeStatsLastComputedAt = github.Ptr(now.Add(-24 * time.Hour))
+	scenario.previousStateForPostMode = &previousState
+	return scenario
 }
 
 func reviewSubmittedAt(review *github.PullRequestReview, submittedAt time.Time) *github.PullRequestReview {
@@ -603,6 +617,7 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		mergeStatsDayScenario("merge stats day", nil),
+		previousMergeStatsADayAgoScenario(),
 		mergeStatsDayScenario("merge stats day, merged section hidden", map[string]any{
 			config.InputShowMergedPRsInMessage: false,
 		}),
@@ -655,7 +670,7 @@ func TestSnapshotsPostMode(t *testing.T) {
 			maps.Copy(overrides, scenario.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runSnapshotScenario(t, scenario, nil, "")
+			runSnapshotScenario(t, scenario, scenario.previousStateForPostMode, "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
@@ -851,6 +866,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				MergedCount:             11,
 				MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
 				MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+				MergedSince:             time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
 				ComputedAt:              time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC),
 			},
 		},

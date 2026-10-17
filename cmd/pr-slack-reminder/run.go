@@ -82,12 +82,8 @@ func Run(
 
 	switch cfg.RunMode {
 	case config.RunModePost:
-		var mergeStats *mergestats.MergeStats
-		if isMergeStatsDay {
-			mergeStats = computeMergeStats(githubClient, cfg, generatedAt)
-		}
 		stateToSave, messageErr = runPostMode(
-			githubClient, slackClient, cfg, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
+			githubClient, slackClient, cfg, openPRs, mergedPRs, isMergeStatsDay, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		if loadStateErr != nil {
@@ -128,10 +124,13 @@ func runPostMode(
 	cfg config.Config,
 	openPRs githubclient.OpenPRsResult,
 	mergedPRs []githubclient.PR,
-	mergeStats *mergestats.MergeStats,
+	isMergeStatsDay bool,
 	generatedAt time.Time,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
+	// This run's own state is uploaded after it ends, so the load still finds the previous post's.
+	previousState, loadPreviousStateErr := loadPreviousState(githubClient, cfg)
+	mergeStats := mergeStatsForThisPost(githubClient, cfg, previousState, isMergeStatsDay, generatedAt)
 	prViews := buildNonDraftPRViews(openPRs, cfg)
 	content := messagecontent.GetContent(
 		prViews,
@@ -154,29 +153,74 @@ func runPostMode(
 	}
 
 	postState := state.WithMergedPRCache(
-		state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats), mergedPRs,
+		state.NewPostState(
+			prViews, sentMessageInfo, summaryText, generatedAt,
+			mergeStats, mergeStatsLastComputedAt(mergeStats, previousState),
+		),
+		mergedPRs,
 	)
 	return &postState, errors.Join(
 		sentMessageHandler(sentMessageInfo),
-		markPreviousMessageStale(githubClient, slackClient, cfg, sentMessageInfo.ChannelID),
+		markPreviousMessageStale(slackClient, previousState, loadPreviousStateErr, sentMessageInfo.ChannelID),
 	)
 }
 
-// This run's own state is uploaded after it ends, so the load still finds the previous post's.
-// Channel check: see run.spec.md § Behaviour.
-func markPreviousMessageStale(
+// Nil when this post computes none, or fails to.
+func mergeStatsForThisPost(
 	githubClient githubclient.Client,
-	slackClient slackclient.Client,
 	cfg config.Config,
-	newMessageChannelID string,
-) error {
-	previousState, err := loadPreviousState(githubClient, cfg)
-	if errors.Is(err, githubclient.ErrNoArtifactFound) {
-		log.Printf("Not marking the previous message stale, there is no previous state: %v", err)
+	previousState *state.State,
+	isMergeStatsDay bool,
+	generatedAt time.Time,
+) *mergestats.MergeStats {
+	if !shouldComputeMergeStats(cfg.ContentInputs.ShowMergeStatsInMessage, isMergeStatsDay) {
 		return nil
 	}
-	if err != nil {
-		logWarning(fmt.Sprintf("Not marking the previous message stale, its state did not load: %v", err))
+	return computeMergeStats(githubClient, cfg, mergeStatsWindowStart(previousState, generatedAt), generatedAt)
+}
+
+func shouldComputeMergeStats(showMergeStatsInMessage *bool, isMergeStatsDay bool) bool {
+	if showMergeStatsInMessage != nil {
+		return *showMergeStatsInMessage
+	}
+	return isMergeStatsDay
+}
+
+func mergeStatsWindowStart(previousState *state.State, generatedAt time.Time) time.Time {
+	longestWindowStart := generatedAt.Add(-githubclient.RecentlyMergedWindow)
+	if previousState == nil || previousState.MergeStatsLastComputedAt == nil {
+		return longestWindowStart
+	}
+	if previousState.MergeStatsLastComputedAt.After(longestWindowStart) {
+		return *previousState.MergeStatsLastComputedAt
+	}
+	return longestWindowStart
+}
+
+// A post computing no stats, or failing to, carries the loaded time forward.
+func mergeStatsLastComputedAt(mergeStats *mergestats.MergeStats, previousState *state.State) *time.Time {
+	if mergeStats != nil {
+		return &mergeStats.ComputedAt
+	}
+	if previousState == nil {
+		return nil
+	}
+	return previousState.MergeStatsLastComputedAt
+}
+
+// Channel check: see run.spec.md § Behaviour.
+func markPreviousMessageStale(
+	slackClient slackclient.Client,
+	previousState *state.State,
+	loadPreviousStateErr error,
+	newMessageChannelID string,
+) error {
+	if errors.Is(loadPreviousStateErr, githubclient.ErrNoArtifactFound) {
+		log.Printf("Not marking the previous message stale, there is no previous state: %v", loadPreviousStateErr)
+		return nil
+	}
+	if loadPreviousStateErr != nil {
+		logWarning(fmt.Sprintf("Not marking the previous message stale, its state did not load: %v", loadPreviousStateErr))
 		return nil
 	}
 	lastWrittenMessage := previousState.LastWrittenMessage
@@ -387,9 +431,9 @@ func findRecentlyMergedPRs(
 // Returns nil, after a warning, when the stats cannot be computed over every merged PR: a median
 // over part of them would read as the whole week's.
 func computeMergeStats(
-	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+	githubClient githubclient.Client, cfg config.Config, mergedSince, generatedAt time.Time,
 ) *mergestats.MergeStats {
-	mergedPRs, err := findPRsMergedSince(githubClient, cfg, generatedAt)
+	mergedPRs, err := findPRsMergedSince(githubClient, cfg, mergedSince)
 	if err != nil {
 		logWarning(fmt.Sprintf("Leaving the merge stats out, their merged PR fetch failed: %v", err))
 		return nil
@@ -401,9 +445,10 @@ func computeMergeStats(
 		))
 		return nil
 	}
-	mergeStats := mergestats.FromMergedPRs(mergedPRs, generatedAt)
+	mergeStats := mergestats.FromMergedPRs(mergedPRs, mergedSince, generatedAt)
 	log.Printf(
-		"Merge stats: %d merged, median %s to first review, %s to merge",
+		"Merge stats since %s: %d merged, median %s to first review, %s to merge",
+		mergedSince.Format(time.RFC3339),
 		mergeStats.MergedCount,
 		durationLogText(mergeStats.MedianTimeToFirstReview),
 		durationLogText(mergeStats.MedianTimeToMerge),
@@ -423,16 +468,11 @@ func durationLogText(duration *time.Duration) string {
 }
 
 func findPRsMergedSince(
-	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+	githubClient githubclient.Client, cfg config.Config, mergedSince time.Time,
 ) ([]githubclient.PR, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
 	defer cancel()
-	return githubClient.FindPRsMergedSince(
-		ctx,
-		cfg.Repositories,
-		cfg.GetFiltersForRepository,
-		generatedAt.Add(-githubclient.RecentlyMergedWindow),
-	)
+	return githubClient.FindPRsMergedSince(ctx, cfg.Repositories, cfg.GetFiltersForRepository, mergedSince)
 }
 
 // Returns a handler function that saves the sent Slack message blocks as a JSON file.

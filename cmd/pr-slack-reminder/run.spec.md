@@ -28,9 +28,12 @@ run modes and the pipeline order are in
 - The open-PR fetch and the merged-PR fetch (bounded by `githubclient.RecentlyMergedWindow` before `generatedAt`) share one `generatedAt`, used for both the merged-PR window and the canvas footer
 - A failed merged-PR fetch does not fail the run: the message and canvas publish without merged rows, and the error is carried through so it can still reach the run's exit code and, in update mode, affect whether the message may be deleted
 - `main` passes `isMergeStatsDay` true when the run starts on a Monday in UTC
-- Post mode on a merge stats day fetches every PR merged in the `githubclient.RecentlyMergedWindow` before `generatedAt`, through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with `generatedAt` as their computed time, and logs them. The message carries them as its merge stats line and the new state saves them
+- Post mode computes the merge stats when `show-merge-stats-in-message` is `true`, or when it is unset on a merge stats day. `false` never does. Update mode never reads the input
+- Post mode loads the previous state once, before the stats fetch, and marks the previous message stale from that same load
+- A post computing the stats fetches every PR merged in the merge stats window through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with the window start and `generatedAt`, and logs them. The message carries them as its merge stats line and the new state saves them
+  - The window starts at the loaded state's `MergeStatsLastComputedAt`, at most `githubclient.RecentlyMergedWindow` (7 days) before `generatedAt`, and at 7 days when the state did not load or has no such time. The recently merged fetch keeps its 7 days either way
   - A failed fetch, or a merged PR in it without complete reviewer info, leaves them out with a warning. The run goes on
-  - On another day, and in update mode, no such fetch goes out
+  - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's, a failed fetch included
 - Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
 - The merge stats line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else deletes the message. It shows with `show-merged-prs-in-message` false too
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
@@ -55,7 +58,7 @@ run modes and the pipeline order are in
 
 - Doesn't fail the whole run because the canvas refresh failed, or vice versa: each surfaces its own error independently
 - Doesn't mark the previous message stale when post mode sends nothing: it keeps reading as current
-- Doesn't tell a scheduled post from a manual one: every post on a Monday in UTC computes the merge stats
+- Doesn't tell a scheduled post from a manual one: every post on a Monday in UTC computes the merge stats, unless the input says otherwise
 - Doesn't tell apart two setups posting to the same channel under one state artifact name: each marks the other's message stale
 - Doesn't annotate an expected skip: no state artifact yet, no stored message in the previous state, the previous message in another channel, update mode keeping its message after a failed fetch (the fetch's own warning covers it)
 - Doesn't distinguish, for its own caller, "empty because there is truly nothing" from "empty because a fetch failed": that distinction only changes whether update mode deletes the message
@@ -70,7 +73,9 @@ run modes and the pipeline order are in
 - A tracked PR taken from the cache skips the current filters until the next post
 - A failed merged search drops its untracked PRs from the saved cache, so the next run re-enriches them
 - With `show-merged-prs-in-message` false, the saved merged PR cache holds only what the merged fetch returned, nothing when the canvas is off. Tracked PR refs are still saved and extended, so a later run showing the section again lists their merges, re-fetching what the cache lacks
-- A Monday post fetches the merge stats before it knows whether it has anything to send, so a post that sends nothing still spends that fetch
+- A post fetches the merge stats, and loads the previous state, before it knows whether it has anything to send, so a post that sends nothing still spends both
+- Two posts computing the stats hours apart give the second a window of hours, read as `Last 1 day`
+- A post that sends nothing saves no state, so the next post's window still starts at the stats before it
 - When later posts send nothing, Monday's merge stats line stays on a message read days later
 - A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied

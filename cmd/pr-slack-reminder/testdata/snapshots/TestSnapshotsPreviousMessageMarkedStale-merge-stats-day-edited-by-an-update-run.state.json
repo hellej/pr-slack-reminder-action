@@ -223,7 +223,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "Last 7 days: 4 merged · median 2.5 days to first review, 7.5 days to merge"
+            "text": "Last 1 day: 0 merged"
           }
         ]
       }
@@ -368,9 +368,9 @@
     }
   ],
   "mergeStats": {
-    "mergedCount": 4,
-    "medianTimeToFirstReview": 216000000000000,
-    "medianTimeToMerge": 648000000000000,
+    "mergedCount": 0,
+    "mergedSince": "1970-01-01T00:00:00Z",
     "computedAt": "1970-01-01T00:00:00Z"
-  }
+  },
+  "mergeStatsLastComputedAt": "1970-01-01T00:00:00Z"
 }

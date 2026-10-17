@@ -9,6 +9,7 @@ Reads GitHub Action inputs and environment variables, and parses them into strin
 - `GetInputOr`: the input's value, or the default only when the env var is unset. An input set to empty or whitespace yields `""`
 - `GetInputRequired`: errors with `required input <name> is not set` when the value is empty
 - `GetInputBoolOr`: like `GetInputBool`, but returns the given default when the value is empty
+- `GetInputOptionalBool`: like `GetInputBool`, but returns nil when the value is empty, so a caller can tell an unset input from `false`
 - `GetInputInt`, `GetInputBool`: parse the value, returning `0` / `false` without error when it is empty, and an error naming the input when it doesn't parse. Booleans accept Go's `strconv.ParseBool` forms (`true`, `TRUE`, `1`, `false`, `0`, …)
 - `GetInputList`: splits the value into trimmed items, on `;` when the value contains one, otherwise on newlines. An empty value yields an empty slice
 - `GetInputMapping`: parses `key: value` lines into a map, split on `;` or newlines by the same rule as lists. Blank lines and lines starting with `#` are skipped. Splits on the first `:`, so a value may contain `:`. Errors when a line has no `:` or an empty key or value

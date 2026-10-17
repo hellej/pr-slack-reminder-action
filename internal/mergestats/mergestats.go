@@ -1,5 +1,5 @@
-// Package mergestats computes the weekly merge stats: how many PRs merged in a window, and the
-// median weekday time they took to a first review and to merge.
+// Package mergestats computes the merge stats: how many PRs merged in a window, and the median
+// weekday time they took to a first review and to merge.
 package mergestats
 
 import (
@@ -16,10 +16,11 @@ type MergeStats struct {
 	MergedCount             int            `json:"mergedCount"`
 	MedianTimeToFirstReview *time.Duration `json:"medianTimeToFirstReview,omitempty"`
 	MedianTimeToMerge       *time.Duration `json:"medianTimeToMerge,omitempty"`
+	MergedSince             time.Time      `json:"mergedSince"`
 	ComputedAt              time.Time      `json:"computedAt"`
 }
 
-func FromMergedPRs(prs []githubclient.PR, computedAt time.Time) MergeStats {
+func FromMergedPRs(prs []githubclient.PR, mergedSince, computedAt time.Time) MergeStats {
 	timedPRs := utilities.Filter(prs, hasReadyForReviewAndMergeTimes)
 	reviewedPRs := utilities.Filter(timedPRs, func(pr githubclient.PR) bool {
 		return pr.FirstReviewAt != nil
@@ -28,6 +29,7 @@ func FromMergedPRs(prs []githubclient.PR, computedAt time.Time) MergeStats {
 		MergedCount:             len(prs),
 		MedianTimeToFirstReview: median(utilities.Map(reviewedPRs, timeToFirstReview)),
 		MedianTimeToMerge:       median(utilities.Map(timedPRs, timeToMerge)),
+		MergedSince:             mergedSince,
 		ComputedAt:              computedAt,
 	}
 }

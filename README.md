@@ -17,7 +17,7 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot: #101 #102 #103`. The label links to a GitHub search for that author's PRs.
 
-A post run on a Monday (UTC) adds one line under the PRs: `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`. It counts every PR merged in the past 7 days, bot PRs included. Each time counts from when the PR was first marked ready for review, in weekday time: Saturdays and Sundays (UTC) are left out. Update runs keep the line until the next post.
+A post run on a Monday (UTC) adds one line under the PRs: `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`. It counts every PR merged since the previous stats were computed, at most 7 days back, bot PRs included. Set `show-merge-stats-in-message` to put it on every post, or on none. Each time counts from when the PR was first marked ready for review, in weekday time: Saturdays and Sundays (UTC) are left out. Update runs keep the line until the next post.
 
 ## GitHub's Built-in vs This Action
 
@@ -189,6 +189,7 @@ jobs:
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `collapse-prs-from-authors`         | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
 | `show-merged-prs-in-message`        | ❌       | Show the recently merged PRs section in the message (defaults to `true`). Set it to `false` to hide the merged section. The [PR Tracker Canvas](#pr-tracker-canvas) keeps its merged section either way |
+| `show-merge-stats-in-message`       | ❌       | Post mode only. Unset, posts on a Monday (UTC) carry the merge stats line. `true` puts it on every post, `false` on none. Update runs keep whatever line the post had |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options
