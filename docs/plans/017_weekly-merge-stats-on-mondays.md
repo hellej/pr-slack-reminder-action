@@ -30,7 +30,7 @@ status: draft
   - An even count takes the mean of the two middle values
   - `ComputedAt`: the post run's `generatedAt`. Plan 018 finds the stats a week before by it
 - **First review** (`githubclient.PR.FirstReviewAt`): the earliest submitted review by a person other than the PR author, out of the reviews `isSubmittedUserReview` already keeps: not pending, not a bot. Its time is `submittedAt`, else `createdAt`. A PR conversation comment is not a review
-- **Merge stats day**: a run whose start falls on a Monday in UTC (`isMergeStatsDay`)
+- **Merge stats day**: a run whose start falls on a Monday in UTC (`isMondayInUTC`)
 - **Merge stats line**: a `context` block with block ID `merge_stats_line`, one plain `mrkdwn` element:
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - `Last 7 days: 2 merged · median 1.0 days to merge` when no merged PR had a first review
@@ -112,8 +112,9 @@ The line above the footer was probed live in the dev channel.
   - Take the minimum time, never the first node: `reviews(last: 100)` is the newest 100, in an order GitHub doesn't document
 - `testhelpers/mockgithubclient/`: go-github's `PullRequestReview` has `SubmittedAt` but no `CreatedAt`, so `reviewNodeJSON` renders the fixture's `SubmittedAt` as both times
   - `NewReview` sets `SubmittedAt` to an hour before its call by default. A stats fixture overrides it on the returned review
-- Package test: the earliest human review wins over an earlier bot review, an earlier self-review and a later human one, and a null `submittedAt` falls back to `createdAt`
-- Every cached merged PR now saves a `FirstReviewAt` key. The snapshot normaliser adds it to its time keys, and ~12 `.state.json` snapshots re-record. Read the diff first
+- Package test, decoding raw JSON with the earliest review last: the earliest human review wins over an earlier bot review, an earlier self-review, an earlier pending review and a later human one, and a null `submittedAt` falls back to `createdAt`
+- The existing query text tests pin `submittedAt createdAt` in both selections: the mock answers whatever a query asks
+- Every cached merged PR now saves a `FirstReviewAt` key. The snapshot normaliser adds it to its time keys, and 12 `.state.json` snapshots re-record. Read the diff first
 - Update githubclient.spec.md § Behaviour, and § Oddities: a PR with over 100 reviews takes its first review from the newest 100
 - The Build E2E log shows the enrichment query's `rateLimit.cost` unchanged against the last `main` run. The PR states both
 
@@ -154,19 +155,23 @@ The line above the footer was probed live in the dev channel.
 ### Step 6: Wire the Monday stats into the run
 
 - `cmd/pr-slack-reminder/`:
-  - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMergeStatsDay(time.Now())`, true on a Monday in UTC. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
-  - Test call sites pass false, ~50 of them, mechanical
-  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
-  - Post mode passes the stats to `GetContent` and `NewPostState`. Update mode passes the loaded state's
+  - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMondayInUTC(time.Now())`. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
+  - Test call sites pass false, 51 of them, mechanical
+  - `Run`'s post branch on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
+  - `runPostMode` takes the stats and passes them to `GetContent` and `NewPostState`. Update mode passes the loaded state's
 - `internal/state` copies already carry the stats through an update's save, so update mode writes nothing new
 - Snapshots, read before re-recording. The normaliser adds `computedAt` to its time keys:
   - Post on a merge stats day: the line, with fixture reviews giving a review median and an even merge count
+    - The tests read the real clock, so each fixture span is a whole number of weeks, or a review before the PR turned ready: the weekday time is then the same whatever day the test runs
   - Post on a merge stats day with nothing merged: `Last 7 days: 0 merged`
   - Update with stats in the loaded state: the line above the update-time footer
   - Post on a merge stats day with `show-merged-prs-in-message: false`: the line, no merged section
-  - The Monday message marked stale: the line kept, the footer dropped
-- `main_test.go`: a post on another day sends no stats fetch (`FetchRecording`) and saves no `mergeStats`. A failed stats fetch warns, sends the message without the line and saves no `mergeStats`
-- `isMergeStatsDay`: internal table test, Sunday 23:59 and Monday 00:00 UTC
+  - The Monday message, edited by an update run, then marked stale: the line kept, the footer dropped
+- `main_test.go`:
+  - A post on another day sends no stats fetch (`FetchRecording`) and saves no `mergeStats`
+  - A failed stats fetch, and a merged PR without complete reviewer info, each warn, send the message without the line and save no `mergeStats`. The merged section is hidden and the canvas off, so the stats search is the run's only merged one
+  - A Monday post with only the line to show sends nothing, and an update with only the line deletes the message
+- `isMondayInUTC`: internal table test, Sunday 23:59 and Monday 00:00 UTC, plus a local weekday that differs from UTC's
 - Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
 - Live check, on a Monday in UTC: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, then the same with `run-mode=update`
   - Done when the post logs the computed stats, the dev channel's message shows the line, and the update keeps it above the footer

@@ -11,6 +11,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -22,10 +23,16 @@ import (
 // An open-PR fetch is a listing then one wave of enrichment batches, each call retried for up to 52s.
 const prFetchTimeout = 2 * time.Minute
 
+// Monday is the day weekday time starts counting again.
+func isMondayInUTC(runStart time.Time) bool {
+	return runStart.UTC().Weekday() == time.Monday
+}
+
 // See run.spec.md for this function's full behaviour.
 func Run(
 	getGitHubClient func(token, tokenForState string) githubclient.Client,
 	getSlackClient func(token string) slackclient.Client,
+	isMergeStatsDay bool,
 ) error {
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -75,8 +82,12 @@ func Run(
 
 	switch cfg.RunMode {
 	case config.RunModePost:
+		var mergeStats *mergestats.MergeStats
+		if isMergeStatsDay {
+			mergeStats = computeMergeStats(githubClient, cfg, generatedAt)
+		}
 		stateToSave, messageErr = runPostMode(
-			githubClient, slackClient, cfg, openPRs, mergedPRs, generatedAt, sentMessageHandler,
+			githubClient, slackClient, cfg, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		if loadStateErr != nil {
@@ -117,6 +128,7 @@ func runPostMode(
 	cfg config.Config,
 	openPRs githubclient.OpenPRsResult,
 	mergedPRs []githubclient.PR,
+	mergeStats *mergestats.MergeStats,
 	generatedAt time.Time,
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
@@ -125,6 +137,7 @@ func runPostMode(
 		prViews,
 		nil,
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
+		mergeStats,
 		time.Time{},
 		generatedAt,
 		cfg.ContentInputs,
@@ -141,7 +154,7 @@ func runPostMode(
 	}
 
 	postState := state.WithMergedPRCache(
-		state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt), mergedPRs,
+		state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats), mergedPRs,
 	)
 	return &postState, errors.Join(
 		sentMessageHandler(sentMessageInfo),
@@ -251,6 +264,7 @@ func runUpdateMode(
 		listedOpenPRViews,
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
+		loadedState.MergeStats,
 		loadedState.MessagePostedAt,
 		generatedAt,
 		cfg.ContentInputs,
@@ -367,6 +381,57 @@ func findRecentlyMergedPRs(
 		cfg.GetFiltersForRepository,
 		generatedAt.Add(-githubclient.RecentlyMergedWindow),
 		mergedPRCache,
+	)
+}
+
+// Returns nil, after a warning, when the stats cannot be computed over every merged PR: a median
+// over part of them would read as the whole week's.
+func computeMergeStats(
+	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+) *mergestats.MergeStats {
+	mergedPRs, err := findPRsMergedSince(githubClient, cfg, generatedAt)
+	if err != nil {
+		logWarning(fmt.Sprintf("Leaving the merge stats out, their merged PR fetch failed: %v", err))
+		return nil
+	}
+	if incompletePR, isFound := utilities.Find(mergedPRs, hasIncompleteReviewerInfo); isFound {
+		logWarning(fmt.Sprintf(
+			"Leaving the merge stats out, a merged PR came without complete reviewer info: %s#%d",
+			incompletePR.Repository.GetPath(), incompletePR.GetNumber(),
+		))
+		return nil
+	}
+	mergeStats := mergestats.FromMergedPRs(mergedPRs, generatedAt)
+	log.Printf(
+		"Merge stats: %d merged, median %s to first review, %s to merge",
+		mergeStats.MergedCount,
+		durationLogText(mergeStats.MedianTimeToFirstReview),
+		durationLogText(mergeStats.MedianTimeToMerge),
+	)
+	return &mergeStats
+}
+
+func hasIncompleteReviewerInfo(pr githubclient.PR) bool {
+	return !pr.HasCompleteReviewerInfo
+}
+
+func durationLogText(duration *time.Duration) string {
+	if duration == nil {
+		return "none"
+	}
+	return duration.String()
+}
+
+func findPRsMergedSince(
+	githubClient githubclient.Client, cfg config.Config, generatedAt time.Time,
+) ([]githubclient.PR, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), prFetchTimeout)
+	defer cancel()
+	return githubClient.FindPRsMergedSince(
+		ctx,
+		cfg.Repositories,
+		cfg.GetFiltersForRepository,
+		generatedAt.Add(-githubclient.RecentlyMergedWindow),
 	)
 }
 

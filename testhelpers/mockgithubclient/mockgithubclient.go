@@ -109,8 +109,9 @@ func MakeMockGitHubClientGetter(opts MockGitHubClientOptions) func(token, tokenF
 
 func NewReview(login, name, state string, userType ...string) *github.PullRequestReview {
 	return &github.PullRequestReview{
-		User:  newUser(login, name, userType...),
-		State: github.Ptr(state),
+		User:        newUser(login, name, userType...),
+		State:       github.Ptr(state),
+		SubmittedAt: &github.Timestamp{Time: time.Now().Add(-time.Hour)},
 	}
 }
 
@@ -413,10 +414,13 @@ func labelNodeJSON(label *github.Label) map[string]any {
 	return map[string]any{"name": label.GetName()}
 }
 
+// go-github's review has no CreatedAt, so SubmittedAt stands in for both times.
 func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
 	return map[string]any{
-		"state":  review.GetState(),
-		"author": authorNodeJSON(review.GetUser()),
+		"state":       review.GetState(),
+		"submittedAt": review.GetSubmittedAt().Time,
+		"createdAt":   review.GetSubmittedAt().Time,
+		"author":      authorNodeJSON(review.GetUser()),
 	}
 }
 

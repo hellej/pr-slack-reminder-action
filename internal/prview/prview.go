@@ -204,12 +204,12 @@ func isWeekdayAgeOver(pr githubclient.PR, thresholdHours int) bool {
 	if pr.ReadyForReviewAt().IsZero() {
 		return true
 	}
-	return weekdayTimeBetween(pr.ReadyForReviewAt(), time.Now()) > time.Duration(thresholdHours)*time.Hour
+	return WeekdayTimeBetween(pr.ReadyForReviewAt(), time.Now()) > time.Duration(thresholdHours)*time.Hour
 }
 
-// weekdayTimeBetween returns the part of from..to falling on Monday to Friday, UTC. It walks one
+// WeekdayTimeBetween returns the part of from..to falling on Monday to Friday, UTC. It walks one
 // day at a time, so a zero from would walk from year 1 and overflow: callers guard it.
-func weekdayTimeBetween(from, to time.Time) time.Duration {
+func WeekdayTimeBetween(from, to time.Time) time.Duration {
 	if !from.Before(to) {
 		return 0
 	}

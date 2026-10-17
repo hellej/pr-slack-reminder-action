@@ -1,6 +1,6 @@
 // Package githubclient provides GitHub API integration for reading PR data.
-// It lists open PRs, fetches PRs by reference, and searches recently merged ones,
-// enriching the first two with reviews and comments in concurrent batches. It applies
+// It lists open PRs, fetches PRs by reference, and searches merged ones, enriching
+// them with reviews and comments in concurrent batches. It applies
 // repository-specific and global filters, detects snooze comments, and fetches the
 // prior run's state from a GitHub Actions artifact.
 package githubclient
@@ -34,6 +34,12 @@ type Client interface {
 		getFiltersForRepository func(repo models.Repository) config.Filters,
 		mergedSince time.Time,
 		mergedPRCache []PR,
+	) ([]PR, error)
+	FindPRsMergedSince(
+		ctx context.Context,
+		repositories []models.Repository,
+		getFiltersForRepository func(repo models.Repository) config.Filters,
+		mergedSince time.Time,
 	) ([]PR, error)
 	GetPRs(
 		ctx context.Context,
@@ -176,17 +182,11 @@ func (c *client) FindRecentlyMergedPRs(
 ) ([]PR, error) {
 	log.Printf("Fetching recently merged pull requests for repositories: %v", repositories)
 
-	foundPRs, err := c.searchMergedPRs(ctx, repositories, mergedSince)
+	mergedPRs, err := c.findMergedPRResultsSince(ctx, repositories, getFiltersForRepository, mergedSince)
 	if err != nil {
 		return nil, err
 	}
-
-	// The search cutoff is a day, so it returns up to one extra day of merges.
-	inWindowPRs := utilities.Filter(foundPRs, isMergedSince(mergedSince))
-	mergedPRs := utilities.Filter(
-		inWindowPRs, getPRFilterFunc[PRResult](getFiltersForRepository, false),
-	)
-	mergedPRs = capMergedPRResultsToLimit(sortByMergeTimeNewestFirst(mergedPRs))
+	mergedPRs = capMergedPRResultsToLimit(mergedPRs)
 	logFoundMergedPRs(mergedPRs)
 
 	uncachedPRs := utilities.Filter(mergedPRs, func(result PRResult) bool {
@@ -206,6 +206,48 @@ func (c *client) FindRecentlyMergedPRs(
 		enrichedPR, _ := findPROfResult(enrichedPRs, result)
 		return enrichedPR
 	}), nil
+}
+
+// Returns every PR merged since the given moment, newest merge first, enriched with its
+// reviewers. Unlike FindRecentlyMergedPRs it has no cap and no cache. A query- or
+// repository-scoped enrichment failure fails the call, a PR-scoped one only clears that PR's
+// HasCompleteReviewerInfo. See githubclient.spec.md § Behaviour
+func (c *client) FindPRsMergedSince(
+	ctx context.Context,
+	repositories []models.Repository,
+	getFiltersForRepository func(repo models.Repository) config.Filters,
+	mergedSince time.Time,
+) ([]PR, error) {
+	log.Printf("Fetching every pull request merged since %s", mergedSince.Format(time.RFC3339))
+
+	mergedPRs, err := c.findMergedPRResultsSince(ctx, repositories, getFiltersForRepository, mergedSince)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Found %d pull requests merged since %s", len(mergedPRs), mergedSince.Format(time.RFC3339))
+	if len(mergedPRs) == 0 {
+		return []PR{}, nil
+	}
+	return c.enrichPRsWithReviewInfo(ctx, mergedPRs)
+}
+
+// The search cutoff is a day, so the exact window cut happens here. Search cannot order by merge
+// time either.
+func (c *client) findMergedPRResultsSince(
+	ctx context.Context,
+	repositories []models.Repository,
+	getFiltersForRepository func(repo models.Repository) config.Filters,
+	mergedSince time.Time,
+) ([]PRResult, error) {
+	foundPRs, err := c.searchMergedPRs(ctx, repositories, mergedSince)
+	if err != nil {
+		return nil, err
+	}
+	inWindowPRs := utilities.Filter(foundPRs, isMergedSince(mergedSince))
+	mergedPRs := utilities.Filter(
+		inWindowPRs, getPRFilterFunc[PRResult](getFiltersForRepository, false),
+	)
+	return sortByMergeTimeNewestFirst(mergedPRs), nil
 }
 
 // An empty slice makes enrichPRsWithReviewInfo log a fetch it never sends, so that case skips it.
@@ -233,7 +275,6 @@ func isMergedSince(mergedSince time.Time) func(result PRResult) bool {
 	}
 }
 
-// Search cannot order by merge time, so the order is made here.
 func sortByMergeTimeNewestFirst(mergedPRs []PRResult) []PRResult {
 	sorted := slices.Clone(mergedPRs)
 	slices.SortStableFunc(sorted, func(a, b PRResult) int {

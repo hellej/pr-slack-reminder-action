@@ -41,9 +41,19 @@ type labelNode struct {
 	Name string `json:"name"`
 }
 
+// submittedAt is nullable. See docs/third-party-facts.md § `PullRequestReview.submittedAt` is a nullable `DateTime`, and a scalar adds no GraphQL cost by the formula
 type reviewNode struct {
-	State  string      `json:"state"`
-	Author *authorNode `json:"author"`
+	State       string      `json:"state"`
+	SubmittedAt *time.Time  `json:"submittedAt"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	Author      *authorNode `json:"author"`
+}
+
+func (review reviewNode) submittedOrCreatedAt() time.Time {
+	if review.SubmittedAt != nil {
+		return *review.SubmittedAt
+	}
+	return review.CreatedAt
 }
 
 type commentNode struct {
@@ -188,7 +198,22 @@ func prWithReviewers(
 			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
 		),
 		FirstReadyForReviewEventAt: firstReadyForReviewEventAt(node),
+		FirstReviewAt:              firstReviewAt(submittedReviews, pullRequest.Author),
 	}
+}
+
+// The minimum, never the first node: reviews(last: 100) comes in an order GitHub doesn't document.
+func firstReviewAt(submittedReviews []reviewNode, prAuthor Collaborator) *time.Time {
+	reviewsByOthers := utilities.Filter(submittedReviews, func(review reviewNode) bool {
+		return reviewAuthor(review).Login != prAuthor.Login
+	})
+	if len(reviewsByOthers) == 0 {
+		return nil
+	}
+	earliest := slices.MinFunc(
+		utilities.Map(reviewsByOthers, reviewNode.submittedOrCreatedAt), time.Time.Compare,
+	)
+	return &earliest
 }
 
 func firstReadyForReviewEventAt(node pullRequestNode) *time.Time {

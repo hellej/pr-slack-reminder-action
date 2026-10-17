@@ -566,6 +566,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": "1970-01-01T00:00:00Z",
       "HasCompleteReviewerInfo": true
     },
     {
@@ -596,6 +597,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     },
     {
@@ -626,6 +628,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     },
     {
@@ -656,6 +659,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     }
   ]

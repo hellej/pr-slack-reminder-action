@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
@@ -25,6 +26,7 @@ type Content struct {
 	WaitingForAuthor    prview.PRSection
 	WaitingForReview    prview.PRSection
 	Merged              prview.PRSection
+	MergeStats          *mergestats.MergeStats
 	NoOpenPRsText       string
 	GeneratedAt         time.Time
 	GroupedByRepository bool
@@ -40,6 +42,7 @@ func GetContent(
 	openPRs []prview.PR,
 	trackedPRs []prview.PR,
 	recentlyMergedPRs []prview.PR,
+	mergeStats *mergestats.MergeStats,
 	messagePostedAt time.Time,
 	generatedAt time.Time,
 	contentInputs config.ContentInputs,
@@ -65,6 +68,7 @@ func GetContent(
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
 		Merged:              newPRSection(mergedPRs, contentInputs),
+		MergeStats:          mergeStats,
 		GeneratedAt:         generatedAt,
 		GroupedByRepository: contentInputs.GroupByRepository,
 	}

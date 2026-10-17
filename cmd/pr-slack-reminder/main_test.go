@@ -25,6 +25,7 @@ import (
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -701,7 +702,7 @@ func TestScenarios(t *testing.T) {
 				PostMessageError: tc.sendMessageError,
 			})
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
-			err := main.Run(getGitHubClient, getSlackClient)
+			err := main.Run(getGitHubClient, getSlackClient, false)
 
 			if tc.expectedErrorMsg == "" && err != nil {
 				t.Errorf("Expected no error, got: %v", err)
@@ -791,6 +792,7 @@ func TestPostModeSavesNoStateWhenSendFails(t *testing.T) {
 				PostMessageError: errors.New("error in sending Slack message"),
 			}),
 		),
+		false,
 	)
 
 	if err == nil {
@@ -823,6 +825,7 @@ func TestUpdateModeSavesTheLoadedState(t *testing.T) {
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 		),
+		false,
 	)
 
 	if err != nil {
@@ -939,6 +942,7 @@ func TestPostModeSavesTheRunsGeneratedAt(t *testing.T) {
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 		),
+		false,
 	)
 	runEnd := time.Now()
 
@@ -967,6 +971,7 @@ func TestUpdateModeSavesTheEditedMessage(t *testing.T) {
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 		),
+		false,
 	)
 	runEnd := time.Now()
 
@@ -1015,6 +1020,7 @@ func TestUpdateModeTracksTheListedPRsWhenSavingTheSentBlocksFails(t *testing.T) 
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 		),
+		false,
 	)
 
 	if err == nil {
@@ -1082,6 +1088,7 @@ func runPostModeOverPreviousState(t *testing.T, options postOverPreviousStateOpt
 			ListArtifactsError: options.listArtifactsError,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	return postOverPreviousStateResult{
@@ -1414,6 +1421,7 @@ func TestUpdateModeStateSavingOnEarlyReturns(t *testing.T) {
 						UpdateMessageError: tc.updateMessageError,
 					}),
 				),
+				false,
 			)
 
 			if !tc.expectRunError && err != nil {
@@ -1837,7 +1845,7 @@ func TestScenariosUpdateMode(t *testing.T) {
 			})
 			getSlackClient := mockslackclient.MakeSlackClientGetter(mockSlackAPI)
 
-			err := main.Run(getGitHubClient, getSlackClient)
+			err := main.Run(getGitHubClient, getSlackClient, false)
 
 			assertWarningAnnotations(t, logOutput, tc.expectedWarningLines)
 			if tc.expectedErrorMsg == "" && err != nil {
@@ -1929,6 +1937,7 @@ func TestUpdateModeFetchesOpenAndMergedPRsWithTheCanvasDisabled(t *testing.T) {
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -1980,6 +1989,7 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenTheStatePRsAreStillOpen(t *testing.
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2011,6 +2021,7 @@ func TestUpdateModeSkipsTheTrackedPRFetchWhenAStatePRMergedInsideTheWindow(t *te
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2049,6 +2060,7 @@ func TestUpdateModeFetchesOnlyTheStatePRsNeitherFetchResolved(t *testing.T) {
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2095,6 +2107,7 @@ func TestUpdateModeKeepsAStatePRTheMergedFetchResolvedPastTheUntrackedCap(t *tes
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2137,6 +2150,7 @@ func TestUpdateModeShowsEveryPRMergedSinceThePost(t *testing.T) {
 			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2172,6 +2186,7 @@ func TestUpdateModeEditsTheMessageWhenTheTrackedPRFetchFails(t *testing.T) {
 			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2199,6 +2214,7 @@ func TestUpdateModeKeepsTheMessageWhenTheTrackedPRFetchFailsAndNothingElseIsLeft
 			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2239,6 +2255,7 @@ func TestPostModeWarnsWhenTheRecentlyMergedPRFetchFails(t *testing.T) {
 					MergedPRsSearchError: errors.New("search failed"),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})),
+				false,
 			)
 
 			if (err != nil) != tc.expectRunError {
@@ -2315,6 +2332,7 @@ func TestUpdateModeTakesCachedMergedPRsInsteadOfFetchingThem(t *testing.T) {
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2401,6 +2419,7 @@ func TestUpdateModeCachesOnlyMergedPRsWithCompleteReviewerInfo(t *testing.T) {
 				mockslackclient.MakeSlackClientGetter(
 					mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 				),
+				false,
 			)
 
 			if err != nil {
@@ -2431,6 +2450,7 @@ func TestPostModeEnrichesMergedPRsDespiteACachedPreviousState(t *testing.T) {
 			Recording:         &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2468,6 +2488,7 @@ func TestUpdateModeRefreshesTheCanvasWhenTheStateFailsToLoad(t *testing.T) {
 			Recording:          &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err == nil || !strings.Contains(err.Error(), "failed to load state") {
@@ -2500,6 +2521,7 @@ func TestUpdateModeKeepsTheCachedTrackedPRsWhenTheTrackedPRFetchFails(t *testing
 			MockPreviousState: &loadedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -2529,6 +2551,7 @@ func TestPostModeCachesSameNumberedMergedPRsFromTwoRepositories(t *testing.T) {
 		mockslackclient.MakeSlackClientGetter(
 			mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{}),
 		),
+		false,
 	)
 
 	if err != nil {
@@ -2583,6 +2606,7 @@ func runWithMergedSectionHidden(
 			Recording:         recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 	return mockSlackAPI, err
 }
@@ -2672,6 +2696,7 @@ func TestHiddenMergedSectionLeavesNothingToShowWithoutOpenPRs(t *testing.T) {
 					MockPreviousState:    &loadedState,
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				false,
 			)
 
 			if tc.mergedPRsSearchError == nil && err != nil {
@@ -2692,4 +2717,171 @@ func TestHiddenMergedSectionLeavesNothingToShowWithoutOpenPRs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPostModeComputesTheMergeStatsOnlyOnAMergeStatsDay(t *testing.T) {
+	testCases := []struct {
+		name                           string
+		isMergeStatsDay                bool
+		expectedMergedPRFetches        int
+		expectsMergeStatsSavedAndShown bool
+	}{
+		{name: "another day", expectedMergedPRFetches: 1},
+		{name: "a merge stats day", isMergeStatsDay: true, expectedMergedPRFetches: 2, expectsMergeStatsSavedAndShown: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			overrides, _ := getFilePathOverrides(t)
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+			recording := mockgithubclient.FetchRecording{}
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs: []*github.PullRequest{
+						getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+					},
+					MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+						Number: 2, Title: "Merged PR", AuthorLogin: "bob",
+						State: "closed", Merged: true, MergedHoursAgo: 2,
+					})},
+					Recording: &recording,
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				tc.isMergeStatsDay,
+			)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			if recording.MergedPRFetches != tc.expectedMergedPRFetches {
+				t.Errorf("Expected %d merged PR fetches, got %d", tc.expectedMergedPRFetches, recording.MergedPRFetches)
+			}
+			savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string))
+			if (savedState.MergeStats != nil) != tc.expectsMergeStatsSavedAndShown {
+				t.Errorf("Expected merge stats saved: %t, got %+v", tc.expectsMergeStatsSavedAndShown, savedState.MergeStats)
+			}
+			if mockSlackAPI.SentMessage.Blocks.ContainsBlockWithID("merge_stats_line") != tc.expectsMergeStatsSavedAndShown {
+				t.Errorf("Expected the merge stats line: %t", tc.expectsMergeStatsSavedAndShown)
+			}
+		})
+	}
+}
+
+// The merged section is hidden and the canvas off, so the merge stats fetch is the only merged one.
+func TestPostModeLeavesTheMergeStatsOutWhenTheyCannotBeComputed(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		mergedPRsSearchError error
+		errByPRNumber        map[int]error
+		expectedWarningLine  string
+	}{
+		{
+			name:                 "the merged PR fetch fails",
+			mergedPRsSearchError: errors.New("search failed"),
+			expectedWarningLine: warningAnnotationPrefix + "Leaving the merge stats out, their merged PR fetch failed: " +
+				`error fetching merged pull requests: GraphQL request failed with status 403: unexpected response: {"message":"search failed"}`,
+		},
+		{
+			name:          "a merged PR comes without complete reviewer info",
+			errByPRNumber: map[int]error{2: errors.New("reviews unavailable")},
+			expectedWarningLine: warningAnnotationPrefix +
+				"Leaving the merge stats out, a merged PR came without complete reviewer info: test-org/test-repo#2",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logOutput := testhelpers.CaptureLog(t)
+			overrides, _ := getFilePathOverrides(t)
+			overrides[config.InputShowMergedPRsInMessage] = false
+			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+
+			err := main.Run(
+				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+					PRs: []*github.PullRequest{
+						getTestPR(GetTestPROptions{Number: 1, Title: "Open PR", AuthorLogin: "alice"}),
+					},
+					MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+						Number: 2, Title: "Merged PR", AuthorLogin: "bob",
+						State: "closed", Merged: true, MergedHoursAgo: 2,
+					})},
+					MergedPRsSearchError: tc.mergedPRsSearchError,
+					ErrByPRNumber:        tc.errByPRNumber,
+				}),
+				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				true,
+			)
+
+			if err != nil {
+				t.Fatalf("Expected Run to succeed, got error: %v", err)
+			}
+			assertWarningAnnotations(t, logOutput, []string{tc.expectedWarningLine})
+			sentBlocks := mockSlackAPI.SentMessage.Blocks
+			if !sentBlocks.SomePRItemContainsText("Open PR") || sentBlocks.ContainsBlockWithID("merge_stats_line") {
+				t.Errorf("Expected the open PR sent without the merge stats line, got items %v", sentBlocks.GetAllPRItemTexts())
+			}
+			if savedState := loadSavedState(t, overrides[config.EnvStateFilePath].(string)); savedState.MergeStats != nil {
+				t.Errorf("Expected no merge stats saved, got %+v", savedState.MergeStats)
+			}
+		})
+	}
+}
+
+func TestMergeStatsLineAloneIsNothingToShow(t *testing.T) {
+	t.Run("post sends nothing", func(t *testing.T) {
+		overrides, _ := getFilePathOverrides(t)
+		overrides[config.InputShowMergedPRsInMessage] = false
+		testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
+		mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+
+		err := main.Run(
+			mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+				MergedPRs: []*github.PullRequest{getTestPR(GetTestPROptions{
+					Number: 2, Title: "Merged PR", AuthorLogin: "bob",
+					State: "closed", Merged: true, MergedHoursAgo: 2,
+				})},
+			}),
+			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			true,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected Run to succeed, got error: %v", err)
+		}
+		if mockSlackAPI.SentMessage.ChannelID != "" {
+			t.Errorf("Expected no message sent, got %v", mockSlackAPI.SentMessage.Blocks)
+		}
+		stateFilePath := overrides[config.EnvStateFilePath].(string)
+		if _, statErr := os.Stat(stateFilePath); !os.IsNotExist(statErr) {
+			t.Errorf("Expected no state file at %s, got: %v", stateFilePath, statErr)
+		}
+	})
+
+	t.Run("update deletes the message", func(t *testing.T) {
+		setUpdateModeEnvironment(t)
+		loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
+		loadedState.MergeStats = &mergestats.MergeStats{MergedCount: 4}
+		mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
+
+		err := main.Run(
+			mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
+				PRsByNumber: map[int]*github.PullRequest{1: getTestPR(GetTestPROptions{
+					Number: 1, Title: "Closed without merging", AuthorLogin: "alice", State: "closed",
+				})},
+				MockPreviousState: &loadedState,
+			}),
+			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			false,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected Run to succeed, got error: %v", err)
+		}
+		if mockSlackAPI.DeletedMessage.Timestamp != "1623850245.000200" {
+			t.Errorf("Expected the loaded message deleted, got %+v", mockSlackAPI.DeletedMessage)
+		}
+	})
 }

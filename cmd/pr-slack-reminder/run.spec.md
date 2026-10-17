@@ -17,7 +17,8 @@ run modes and the pipeline order are in
   - The recently merged PR fetch failing, in either mode
   - The tracked PR fetch failing in update mode
   - The delete failing in update mode
-- `Run(getGitHubClient, getSlackClient)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
+  - The merge stats left out: their merged PR fetch failing, or a merged PR in it without complete reviewer info
+- `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - Update mode loads the previous state after the open-PR fetch and before the merged-PR fetch, which reads its merged PR cache. A load error still fails update mode only after the merged fetch and the canvas refresh
 - Update mode passes the loaded merged PR cache to the merged fetch, which returns a cached PR instead of enriching it. Post mode passes none, so it enriches every merged PR
 - With `show-merged-prs-in-message` false, the run skips the work only the message's merged section needs:
@@ -26,6 +27,12 @@ run modes and the pipeline order are in
 - With `show-merged-prs-in-message` false, update mode's delete decision ignores a failed merged fetch: it doesn't keep a message with nothing left to show
 - The open-PR fetch and the merged-PR fetch (bounded by `githubclient.RecentlyMergedWindow` before `generatedAt`) share one `generatedAt`, used for both the merged-PR window and the canvas footer
 - A failed merged-PR fetch does not fail the run: the message and canvas publish without merged rows, and the error is carried through so it can still reach the run's exit code and, in update mode, affect whether the message may be deleted
+- `main` passes `isMergeStatsDay` true when the run starts on a Monday in UTC
+- Post mode on a merge stats day fetches every PR merged in the `githubclient.RecentlyMergedWindow` before `generatedAt`, through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with `generatedAt` as their computed time, and logs them. The message carries them as its merge stats line and the new state saves them
+  - A failed fetch, or a merged PR in it without complete reviewer info, leaves them out with a warning. The run goes on
+  - On another day, and in update mode, no such fetch goes out
+- Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
+- The merge stats line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else deletes the message. It shows with `show-merged-prs-in-message` false too
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
 - After a successful send, post mode marks the previous post's message stale: it loads the previous state and edits that message into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s message marked stale, which opens with a staleness warning and drops the update-time footer an update run gave it, with the stored summary text
   - Skips when there is no previous state, when it does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
@@ -48,6 +55,7 @@ run modes and the pipeline order are in
 
 - Doesn't fail the whole run because the canvas refresh failed, or vice versa: each surfaces its own error independently
 - Doesn't mark the previous message stale when post mode sends nothing: it keeps reading as current
+- Doesn't tell a scheduled post from a manual one: every post on a Monday in UTC computes the merge stats
 - Doesn't tell apart two setups posting to the same channel under one state artifact name: each marks the other's message stale
 - Doesn't annotate an expected skip: no state artifact yet, no stored message in the previous state, the previous message in another channel, update mode keeping its message after a failed fetch (the fetch's own warning covers it)
 - Doesn't distinguish, for its own caller, "empty because there is truly nothing" from "empty because a fetch failed": that distinction only changes whether update mode deletes the message
@@ -62,4 +70,7 @@ run modes and the pipeline order are in
 - A tracked PR taken from the cache skips the current filters until the next post
 - A failed merged search drops its untracked PRs from the saved cache, so the next run re-enriches them
 - With `show-merged-prs-in-message` false, the saved merged PR cache holds only what the merged fetch returned, nothing when the canvas is off. Tracked PR refs are still saved and extended, so a later run showing the section again lists their merges, re-fetching what the cache lacks
+- A Monday post fetches the merge stats before it knows whether it has anything to send, so a post that sends nothing still spends that fetch
+- When later posts send nothing, Monday's merge stats line stays on a message read days later
+- A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied

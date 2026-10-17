@@ -8,9 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"slices"
+	"strings"
 	"time"
 
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
@@ -32,17 +35,30 @@ const (
 // when grouping by repository reaches it.
 const maximumBlocksInSlackMessage = 50
 
-const slotsForFooterOrStalenessWarning = 1
+const (
+	slotsForMergeStatsLine           = 1
+	slotsForFooterOrStalenessWarning = 1
+)
 
 const updateTimeFooterBlockID = "update_time_footer"
 
+const mergeStatsLineBlockID = "merge_stats_line"
+
 func BuildMessageToPost(content messagecontent.Content) (slack.Message, string) {
-	return slack.NewBlockMessage(buildContentBlocks(content)...), content.SummaryText
+	return slack.NewBlockMessage(buildMessageBodyBlocks(content)...), content.SummaryText
 }
 
 func BuildMessageWithUpdateTimeFooter(content messagecontent.Content) (slack.Message, string) {
-	blocks := append(buildContentBlocks(content), buildUpdateTimeFooterBlock(content.GeneratedAt))
+	blocks := append(buildMessageBodyBlocks(content), buildUpdateTimeFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
+}
+
+func buildMessageBodyBlocks(content messagecontent.Content) []slack.Block {
+	blocks := buildContentBlocks(content)
+	if content.MergeStats != nil {
+		blocks = append(blocks, buildMergeStatsLineBlock(*content.MergeStats))
+	}
+	return blocks
 }
 
 func buildContentBlocks(content messagecontent.Content) []slack.Block {
@@ -157,6 +173,46 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 	)
 }
 
+// A context block, like the footer, so the line reads as a note under the sections. Its text
+// holds none of the characters mrkdwn escapes: &, < and >.
+func buildMergeStatsLineBlock(stats mergestats.MergeStats) slack.Block {
+	return slack.NewContextBlock(
+		mergeStatsLineBlockID,
+		slack.NewTextBlockObject("mrkdwn", mergeStatsLineText(stats), false, false),
+	)
+}
+
+func mergeStatsLineText(stats mergestats.MergeStats) string {
+	mergedCountText := fmt.Sprintf("Last 7 days: %d merged", stats.MergedCount)
+	var medianTexts []string
+	if stats.MedianTimeToFirstReview != nil {
+		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToFirstReview)+" to first review")
+	}
+	if stats.MedianTimeToMerge != nil {
+		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToMerge)+" to merge")
+	}
+	if len(medianTexts) == 0 {
+		return mergedCountText
+	}
+	return mergedCountText + " · median " + strings.Join(medianTexts, ", ")
+}
+
+// See messagebuilder.spec.md § Oddities for the rounding at each switch.
+func mergeStatsDurationText(duration time.Duration) string {
+	switch {
+	case duration < time.Hour:
+		minutes := int(math.Round(duration.Minutes()))
+		if minutes == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", minutes)
+	case duration < 24*time.Hour:
+		return fmt.Sprintf("%.1f hours", duration.Hours())
+	default:
+		return fmt.Sprintf("%.1f days", duration.Hours()/24)
+	}
+}
+
 // <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a
 // client that cannot process it shows instead. A context block renders smaller and greyer than
 // a rich_text line, so the footer doesn't read as a fifth section.
@@ -211,7 +267,7 @@ func buildStalenessWarningBlock(generatedAt time.Time) slack.Block {
 }
 
 func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
-	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForFooterOrStalenessWarning
+	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForMergeStatsLine - slotsForFooterOrStalenessWarning
 	if len(blocks) <= maximumContentBlocks {
 		return blocks
 	}

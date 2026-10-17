@@ -3,6 +3,7 @@ package mockslackclient
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -95,6 +96,10 @@ func (b BlocksWrapper) ContainsHeading(heading string) bool {
 
 func (b BlocksWrapper) GetPRCount() int {
 	return len(b.GetAllPRItemTexts())
+}
+
+func (b BlocksWrapper) ContainsBlockWithID(blockID string) bool {
+	return slices.ContainsFunc(b.Blocks, func(block Block) bool { return block.BlockID == blockID })
 }
 
 type Block struct {
