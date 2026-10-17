@@ -27,6 +27,7 @@ status: draft
   - `MedianTimeToMerge`: nil when nothing merged
   - Both durations count from `PR.ReadyForReviewAt()`, the start a row's age uses. A first review before that time counts as 0
   - An even count takes the mean of the two middle values
+  - `ComputedAt`: the post run's `generatedAt`. Plan 018 finds the stats a week before by it
 - **First review** (`githubclient.PR.FirstReviewAt`): the earliest submitted review by a person other than the PR author, out of the reviews `isSubmittedUserReview` already keeps: not pending, not a bot. Its time is `submittedAt`, else `createdAt`. A PR conversation comment is not a review
 - **Merge stats day**: a run whose start falls on a Monday in UTC (`isMergeStatsDay`)
 - **Merge stats line**: a `context` block with block ID `merge_stats_line`, one plain `mrkdwn` element:
@@ -126,8 +127,8 @@ The line above the footer was probed live in the dev channel.
 ### Step 3: Merge stats package
 
 - New `internal/mergestats/` with `mergestats.spec.md`
-  - `MergeStats`: `MergedCount int`, `MedianTimeToFirstReview *time.Duration`, `MedianTimeToMerge *time.Duration`, JSON keys `mergedCount`, `medianTimeToFirstReview`, `medianTimeToMerge`, the pointers with `omitempty`
-  - `FromMergedPRs(prs []githubclient.PR) MergeStats`, pure, per § Target Shape
+  - `MergeStats`: `MergedCount int`, `MedianTimeToFirstReview *time.Duration`, `MedianTimeToMerge *time.Duration`, `ComputedAt time.Time`, JSON keys `mergedCount`, `medianTimeToFirstReview`, `medianTimeToMerge`, `computedAt`, the pointers with `omitempty`
+  - `FromMergedPRs(prs []githubclient.PR, computedAt time.Time) MergeStats`, pure, per § Target Shape
 - Table test: odd and even counts, input out of order, a first review before ready for review, PRs without a first review, none at all
 - AGENTS.md § Architecture: list the package under "Around the run"
 
@@ -152,10 +153,10 @@ The line above the footer was probed live in the dev channel.
 - `cmd/pr-slack-reminder/`:
   - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMergeStatsDay(time.Now())`, true on a Monday in UTC. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
   - Test call sites pass false, ~50 of them, mechanical
-  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
+  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
   - Post mode passes the stats to `GetContent` and `NewPostState`. Update mode passes the loaded state's
 - `internal/state` copies already carry the stats through an update's save, so update mode writes nothing new
-- Snapshots, read before re-recording:
+- Snapshots, read before re-recording. The normaliser adds `computedAt` to its time keys:
   - Post on a merge stats day: the line, with fixture reviews giving a review median and an even merge count
   - Post on a merge stats day with nothing merged: `Last 7 days: 0 merged`
   - Update with stats in the loaded state: the line above the update-time footer
