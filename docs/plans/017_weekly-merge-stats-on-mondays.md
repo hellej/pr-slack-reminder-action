@@ -9,7 +9,7 @@ status: draft
 - Goals:
   - Monday's message carries one line above the update-time footer: `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - Computed once, by the post run on a Monday in UTC. Update runs read it from state and render it again, unchanged, for as long as Monday's message is the live one
-  - Calendar time throughout: no working hours, no weekends left out
+  - Weekday time, as the old-PR check counts it: Saturdays and Sundays left out as whole UTC days. No working hours. The 7-day window stays calendar days
   - Every PR merged in the window counts, bot-authored ones included
 - Non-goals:
   - The canvas
@@ -25,7 +25,8 @@ status: draft
   - `MergedCount`
   - `MedianTimeToFirstReview`: over the PRs with a first review. Nil when none has one
   - `MedianTimeToMerge`: nil when nothing merged
-  - Both durations count from `PR.ReadyForReviewAt()`, the start a row's age uses. A first review before that time counts as 0
+  - Both durations are weekday time from `PR.ReadyForReviewAt()`, the start a row's age uses, through `prview.WeekdayTimeBetween`. A first review before that time counts as 0
+  - The line's text doesn't say weekdays. The README does, as it does for `old-pr-threshold-hours`
   - An even count takes the mean of the two middle values
   - `ComputedAt`: the post run's `generatedAt`. Plan 018 finds the stats a week before by it
 - **First review** (`githubclient.PR.FirstReviewAt`): the earliest submitted review by a person other than the PR author, out of the reviews `isSubmittedUserReview` already keeps: not pending, not a bot. Its time is `submittedAt`, else `createdAt`. A PR conversation comment is not a review
@@ -126,10 +127,12 @@ The line above the footer was probed live in the dev channel.
 
 ### Step 3: Merge stats package
 
+- `internal/prview/`: export `weekdayTimeBetween` as `WeekdayTimeBetween`, the old-PR check's weekday time. Its existing tests cover it. Update prview.spec.md
 - New `internal/mergestats/` with `mergestats.spec.md`
   - `MergeStats`: `MergedCount int`, `MedianTimeToFirstReview *time.Duration`, `MedianTimeToMerge *time.Duration`, `ComputedAt time.Time`, JSON keys `mergedCount`, `medianTimeToFirstReview`, `medianTimeToMerge`, `computedAt`, the pointers with `omitempty`
   - `FromMergedPRs(prs []githubclient.PR, computedAt time.Time) MergeStats`, pure, per § Target Shape
-- Table test: odd and even counts, input out of order, a first review before ready for review, PRs without a first review, none at all
+  - A PR with a zero `ReadyForReviewAt()` counts in `MergedCount` but in neither median: `WeekdayTimeBetween` walks from year 1 on a zero start, so its callers guard it, as `isWeekdayAgeOver` does
+- Table test: odd and even counts, input out of order, a first review before ready for review, a PR readied on Friday and merged on Monday, PRs without a first review, none at all
 - AGENTS.md § Architecture: list the package under "Around the run"
 
 ### Step 4: Merge stats in state
@@ -164,7 +167,7 @@ The line above the footer was probed live in the dev channel.
   - The Monday message marked stale: the line kept, the footer dropped
 - `main_test.go`: a post on another day sends no stats fetch (`FetchRecording`) and saves no `mergeStats`. A failed stats fetch warns, sends the message without the line and saves no `mergeStats`
 - `isMergeStatsDay`: internal table test, Sunday 23:59 and Monday 00:00 UTC
-- Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
+- Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
 - Live check, on a Monday in UTC: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, then the same with `run-mode=update`
   - Done when the post logs the computed stats, the dev channel's message shows the line, and the update keeps it above the footer
 
@@ -181,7 +184,8 @@ None
 
 ### Caveats
 
-- Calendar time: a PR readied on Friday and reviewed on Monday reads 3 days
+- Weekends are UTC days, so far from UTC they sit hours off local midnight, as for the old-PR check
+- Holidays count as weekdays
 - A week of 1 or 2 merges gives a median of 1 or 2 values
 - A team east of UTC+9 posting at 09:00 local time posts on Sunday in UTC, so its line lands on Tuesday
 - When later posts send nothing, Monday's line stays on a message read days later
