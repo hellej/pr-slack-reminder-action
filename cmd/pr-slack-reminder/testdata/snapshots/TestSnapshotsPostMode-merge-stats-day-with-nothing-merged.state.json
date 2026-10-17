@@ -91,5 +91,12 @@
     "mergedSince": "1970-01-01T00:00:00Z",
     "computedAt": "1970-01-01T00:00:00Z"
   },
+  "mergeStatsByDate": {
+    "<run date>": {
+      "mergedCount": 0,
+      "mergedSince": "1970-01-01T00:00:00Z",
+      "computedAt": "1970-01-01T00:00:00Z"
+    }
+  },
   "mergeStatsLastComputedAt": "1970-01-01T00:00:00Z"
 }

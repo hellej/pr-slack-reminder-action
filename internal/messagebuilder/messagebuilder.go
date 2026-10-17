@@ -56,7 +56,7 @@ func BuildMessageWithUpdateTimeFooter(content messagecontent.Content) (slack.Mes
 func buildMessageBodyBlocks(content messagecontent.Content) []slack.Block {
 	blocks := buildContentBlocks(content)
 	if content.MergeStats != nil {
-		blocks = append(blocks, buildMergeStatsLineBlock(*content.MergeStats))
+		blocks = append(blocks, buildMergeStatsLineBlock(*content.MergeStats, content.MergeStatsWeekBefore))
 	}
 	return blocks
 }
@@ -175,26 +175,65 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 
 // A context block, like the footer, so the line reads as a note under the sections. Its text
 // holds none of the characters mrkdwn escapes: &, < and >.
-func buildMergeStatsLineBlock(stats mergestats.MergeStats) slack.Block {
+func buildMergeStatsLineBlock(stats mergestats.MergeStats, weekBefore *mergestats.MergeStats) slack.Block {
 	return slack.NewContextBlock(
 		mergeStatsLineBlockID,
-		slack.NewTextBlockObject("mrkdwn", mergeStatsLineText(stats), false, false),
+		slack.NewTextBlockObject("mrkdwn", mergeStatsLineText(stats, weekBefore), false, false),
 	)
 }
 
-func mergeStatsLineText(stats mergestats.MergeStats) string {
+type shownMedian struct {
+	text          string
+	percentChange *int
+}
+
+func mergeStatsLineText(stats mergestats.MergeStats, weekBefore *mergestats.MergeStats) string {
 	mergedCountText := fmt.Sprintf("%s: %d merged", mergeStatsWindowText(stats), stats.MergedCount)
-	var medianTexts []string
-	if stats.MedianTimeToFirstReview != nil {
-		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToFirstReview)+" to first review")
-	}
-	if stats.MedianTimeToMerge != nil {
-		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToMerge)+" to merge")
-	}
-	if len(medianTexts) == 0 {
+	medians := shownMedians(stats, weekBefore)
+	if len(medians) == 0 {
 		return mergedCountText
 	}
-	return mergedCountText + " · median " + strings.Join(medianTexts, ", ")
+	medianTexts := utilities.Map(medians, func(median shownMedian) string { return median.text })
+	lineText := mergedCountText + " · median " + strings.Join(medianTexts, ", ")
+	if slices.ContainsFunc(medians, hasNoPercentChange) {
+		return lineText
+	}
+	percentChangeTexts := utilities.Map(medians, func(median shownMedian) string {
+		return percentChangeText(*median.percentChange)
+	})
+	return lineText + " (" + strings.Join(percentChangeTexts, ", ") + ")"
+}
+
+func shownMedians(stats mergestats.MergeStats, weekBefore *mergestats.MergeStats) []shownMedian {
+	var firstReviewChange, mergeChange *int
+	if weekBefore != nil {
+		firstReviewChange, mergeChange = mergestats.PercentChanges(stats, *weekBefore)
+	}
+	var medians []shownMedian
+	if stats.MedianTimeToFirstReview != nil {
+		medians = append(medians, shownMedian{
+			text:          mergeStatsDurationText(*stats.MedianTimeToFirstReview) + " to first review",
+			percentChange: firstReviewChange,
+		})
+	}
+	if stats.MedianTimeToMerge != nil {
+		medians = append(medians, shownMedian{
+			text:          mergeStatsDurationText(*stats.MedianTimeToMerge) + " to merge",
+			percentChange: mergeChange,
+		})
+	}
+	return medians
+}
+
+func hasNoPercentChange(median shownMedian) bool {
+	return median.percentChange == nil
+}
+
+func percentChangeText(percentChange int) string {
+	if percentChange > 0 {
+		return fmt.Sprintf("+%d %%", percentChange)
+	}
+	return fmt.Sprintf("%d %%", percentChange)
 }
 
 // A window under 12 hours rounds to 0 and reads as 1 day. See messagebuilder.spec.md § Oddities

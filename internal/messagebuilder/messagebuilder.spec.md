@@ -23,6 +23,8 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`
   - A nil median drops its part: `Last 7 days: 2 merged · median 1.0 days to merge`, and with both nil, `Last 7 days: 0 merged`
+  - With `Content.MergeStatsWeekBefore` set, the line ends with each shown median's change from [internal/mergestats](../mergestats/mergestats.spec.md)'s `PercentChanges`, in the medians' order: `… 1.3 days to merge (+15 %, -12 %)`, `… 1.0 days to merge (-20 %)`. A rise reads `+`, no change `0 %`
+  - Only when every shown median has a change: one without leaves the parenthetical out. A line without medians, such as `Last 1 day: 0 merged`, never gets one
   - A duration reads in whole minutes under an hour, in hours with one decimal under 24 hours, else in days with one decimal: `24 minutes`, `1 minute`, `4.0 hours`, `1.0 days`
 - The update-time footer is a `context` block with block ID `update_time_footer`, reading `_Live, updated <!date^…|HH:MM UTC>_`, built from `Content.GeneratedAt`. Slack renders it in each reader's own timezone, 12-hour or 24-hour by their own client setting, and the fallback after the pipe carries UTC
 - Content is capped at 48 blocks, dropped past the cap and logged, in both messages, with or without the merge stats line. The 2 slots left hold the merge stats line when set, and the update-time footer of an edited message or the staleness warning of a posted message marked stale
