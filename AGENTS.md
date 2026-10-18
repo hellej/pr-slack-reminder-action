@@ -41,6 +41,7 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 - Avoid filler words
 - Avoid duplication and overlap with what's already said or written
 - Avoid dashes as punctuation. Use a comma, a colon, or a new sentence
+- Short never beats unambiguous: a reader without the code must get one meaning
 
 ### Examples
 
@@ -88,6 +89,16 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
 - ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
+
+Don't leave a trailing clause to imply what it changes:
+
+- ✗ `...is the new stats' time, else the loaded state's, a failed fetch included`
+- ✓ `...is the new stats' time, else the loaded state's. A failed stats fetch keeps the loaded time too`
+
+Don't use a bare noun when two of its kind exist, or a count that doesn't add up:
+
+- ✗ `A failed fetch leaves them out` / `At most 50 blocks: capped at 48, plus the line`
+- ✓ `A failed stats fetch leaves the merge stats out` / `At most 50 blocks: 48 content blocks, the line and the staleness warning`
 
 ## References
 
