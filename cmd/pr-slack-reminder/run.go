@@ -23,7 +23,7 @@ import (
 // An open-PR fetch is a listing then one wave of enrichment batches, each call retried for up to 52s.
 const prFetchTimeout = 2 * time.Minute
 
-// Monday is the day weekday time starts counting again.
+// Monday's stats cover the whole work week before it.
 func isMondayInUTC(runStart time.Time) bool {
 	return runStart.UTC().Weekday() == time.Monday
 }

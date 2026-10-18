@@ -1,6 +1,7 @@
 // Package messagecontent structures PR views into the sections a reminder message shows: the
-// open PRs bucketed by next action, and the PRs that recently merged. It carries no rendering,
-// that belongs to messagebuilder.
+// open PRs bucketed by next action, and the PRs that recently merged. It also words the
+// message's texts, the merge stats line included. It carries no rendering, that belongs to
+// messagebuilder.
 package messagecontent
 
 import (
@@ -21,16 +22,15 @@ const MaxUntrackedPRsMergedBeforePost = 3
 const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
 
 type Content struct {
-	SummaryText          string
-	ReadyToMerge         prview.PRSection
-	WaitingForAuthor     prview.PRSection
-	WaitingForReview     prview.PRSection
-	Merged               prview.PRSection
-	MergeStats           *mergestats.MergeStats
-	MergeStatsWeekBefore *mergestats.MergeStats
-	NoOpenPRsText        string
-	GeneratedAt          time.Time
-	GroupedByRepository  bool
+	SummaryText         string
+	ReadyToMerge        prview.PRSection
+	WaitingForAuthor    prview.PRSection
+	WaitingForReview    prview.PRSection
+	Merged              prview.PRSection
+	MergeStatsText      string
+	NoOpenPRsText       string
+	GeneratedAt         time.Time
+	GroupedByRepository bool
 }
 
 func (c Content) HasPRs() bool {
@@ -65,15 +65,14 @@ func GetContent(
 	)
 
 	content := Content{
-		SummaryText:          getSummaryText(len(waitingForReview), len(waitingForAuthor), len(readyToMerge)),
-		ReadyToMerge:         newPRSection(readyToMerge, contentInputs),
-		WaitingForAuthor:     newPRSection(waitingForAuthor, contentInputs),
-		WaitingForReview:     newPRSection(waitingForReview, contentInputs),
-		Merged:               newPRSection(mergedPRs, contentInputs),
-		MergeStats:           mergeStats,
-		MergeStatsWeekBefore: mergeStatsWeekBefore,
-		GeneratedAt:          generatedAt,
-		GroupedByRepository:  contentInputs.GroupByRepository,
+		SummaryText:         getSummaryText(len(waitingForReview), len(waitingForAuthor), len(readyToMerge)),
+		ReadyToMerge:        newPRSection(readyToMerge, contentInputs),
+		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
+		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
+		Merged:              newPRSection(mergedPRs, contentInputs),
+		MergeStatsText:      mergeStatsText(mergeStats, mergeStatsWeekBefore),
+		GeneratedAt:         generatedAt,
+		GroupedByRepository: contentInputs.GroupByRepository,
 	}
 	if len(sortedOpenPRs) == 0 {
 		content.NoOpenPRsText = contentInputs.NoPRsMessage

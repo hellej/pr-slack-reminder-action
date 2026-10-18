@@ -10,4 +10,7 @@ Read `AGENTS.md` § Output Style now, in full, and apply it. The read is mandato
 
 Then re-read what you just wrote and cut every line those examples would reject.
 
+Then read each sentence again as someone without the code. Rewrite any with two readings: name
+which fetch, window or caller, and say what a trailing clause changes.
+
 If a task was given as an argument to this skill, apply these rules to it now.

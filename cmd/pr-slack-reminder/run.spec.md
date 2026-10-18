@@ -33,8 +33,8 @@ run modes and the pipeline order are in
 - Post mode uses that one load for the merge stats window, the week before and marking the previous message stale
 - A post computing the stats fetches every PR merged in the merge stats window through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with the window start and `generatedAt`, and logs them. The message carries them as its merge stats line and the new state saves them
   - The window starts at the loaded state's `MergeStatsLastComputedAt`, at most `githubclient.RecentlyMergedWindow` (7 days) before `generatedAt`, and at 7 days when the state did not load or has no such time. The recently merged fetch keeps its 7 days either way
-  - A failed fetch, or a merged PR in it without complete reviewer info, leaves them out with a warning. The run goes on
-  - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's, a failed fetch included
+  - A failed stats fetch, or a merged PR in it without complete reviewer info, leaves the merge stats out with a warning. The run goes on
+  - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's value. A failed stats fetch keeps the loaded value too
 - Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
 - The line compares against the week before: the entry of the loaded state's `MergeStatsByDate` dated 7 days before the shown stats' `ComputedAt`, through `state.MergeStatsWeekBefore`. See [internal/state](../../internal/state/state.spec.md)
   - Post mode looks it up for the stats it computed, so a second post the same day compares against the week before too, not the first post's entry. A post without a loaded previous state has none
@@ -80,7 +80,7 @@ run modes and the pipeline order are in
 - With `show-merged-prs-in-message` false, the saved merged PR cache holds only what the merged fetch returned, nothing when the canvas is off. Tracked PR refs are still saved and extended, so a later run showing the section again lists their merges, re-fetching what the cache lacks
 - A post fetches the merge stats, and loads the previous state, before it knows whether it has anything to send, so a post that sends nothing still spends both
 - Two posts computing the stats hours apart give the second a window of hours, read as `Last 1 day`
-- A post that sends nothing saves no state, so the next post's window still starts at the stats before it, and the recent merge stats it loaded are carried only as long as that artifact lives
+- A post that computes stats but sends nothing saves no state, so its stats are lost, and the next window starts at the last saved stats time. The recent merge stats it loaded are carried only as long as that artifact lives
 - When later posts send nothing, Monday's merge stats line stays on a message read days later
 - The week before's window can differ in length from the shown one, such as after `show-merge-stats-in-message` changes, and the medians are compared all the same
 - A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post

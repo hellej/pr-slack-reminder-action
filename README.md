@@ -17,8 +17,6 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot: #101 #102 #103`. The label links to a GitHub search for that author's PRs.
 
-A post run on a Monday (UTC) adds one line under the PRs: `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`. It counts every PR merged since the previous stats were computed, at most 7 days back, bot PRs included. Set `show-merge-stats-in-message` to put it on every post, or on none. Each time counts from when the PR was first marked ready for review, in weekday time: Saturdays and Sundays (UTC) are left out. When a post 7 days earlier computed the stats too, the line ends with each median's change since then: `(+15 %, -12 %)`. Update runs keep the line until the next post.
-
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
@@ -42,7 +40,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Weekends don't count towards the old-PR threshold: under a 48 hour threshold, a PR opened Friday morning isn't flagged old on Monday morning
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
-- Merge stats on Monday's message by default, or on every post with `show-merge-stats-in-message`: PRs merged since the previous stats, at most a week, their median time to a first review and to merge, and the change since a week before
+- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, their median time to a first review and to merge, and each median's change since a week before
 - More customizable message content
 - Global and repository specific filters
 - Anyone can set this up (no need to be a GitHub team maintainer)

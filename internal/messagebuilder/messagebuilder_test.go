@@ -9,7 +9,6 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
-	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagebuilder"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
@@ -453,7 +452,7 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
-		MergeStats:          &mergestats.MergeStats{MergedCount: 3},
+		MergeStatsText:      testMergeStatsText,
 		GeneratedAt:         generatedAt,
 	})
 
@@ -495,7 +494,7 @@ func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
-		MergeStats:          &mergestats.MergeStats{MergedCount: 3},
+		MergeStatsText:      testMergeStatsText,
 		GeneratedAt:         generatedAt,
 	})
 	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)

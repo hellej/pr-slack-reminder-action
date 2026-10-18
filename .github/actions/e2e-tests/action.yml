@@ -46,7 +46,7 @@ runs:
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
 
-    - name: Multi-repository run
+    - name: Multi-repository run with merge stats
       uses: ./
       with:
         github-token: ${{ steps.app-token.outputs.token }}
@@ -61,6 +61,7 @@ runs:
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
         old-pr-threshold-hours: 48
+        show-merge-stats-in-message: true
 
     - name: Run with canvas link
       uses: ./
@@ -97,7 +98,7 @@ runs:
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
 
-    - name: 'Run with filters and canvas link: post'
+    - name: 'Run with filters, canvas link and merge stats: post'
       uses: ./
       with:
         github-token: ${{ steps.app-token.outputs.token }}
@@ -118,6 +119,7 @@ runs:
           hellej/pr-slack-reminder-test-repo-1: {"ignored-authors": ["alice"]}
           hellej/pr-slack-reminder-test-repo-2: {}
         pr-tracker-canvas-link: https://hellej.slack.com/docs/T08SGDGNB2B/F0BSUKTNB3J
+        show-merge-stats-in-message: true
 
     - name: 'Run with filters and canvas link: upload post state'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7.0.2

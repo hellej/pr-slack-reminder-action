@@ -31,6 +31,20 @@ Check it against:
   slightly more explicit, is a `nit` naming it
 - AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
   docstrings. Each breach is a `nit`
+- Truth and one reading, over every spec bullet, comment, `README.md`, `action.yml` and
+  AGENTS.md line the change wrote or edited: it holds against the code as it now is, and a
+  reader without the code gets one meaning. Agents act on specs in place of code, so each
+  failure is a `medium` Fix. Watch for:
+  - A bare noun when two of its kind exist: "the fetch" in a spec naming two fetches
+  - A trailing clause that doesn't say what it changes: "…, a failed fetch included"
+  - A pronoun, or "the caller", with more than one candidate
+  - A count that doesn't add up
+- Stale prose: for each behaviour the change alters, grep AGENTS.md, the specs,
+  `README.md`, `action.yml` and comments for statements about it, outside the diff lines
+  too. One the change made false is a `medium` Fix
+- Live coverage: a new GitHub or Slack API path the Build E2E runs never execute, such as
+  one behind an input or a weekday, is a `medium` Fix naming the E2E scenario and the input
+  to set
 - Every comment the change added, production and test code, each with a verdict against
   AGENTS.md § Code Style's comment rule: keep, or what to rename or refactor so it can
   go. List them all, never a sample
@@ -138,7 +152,7 @@ Give every Fix a severity:
 
 - **high**: wrong behaviour, a failing or missing test, or a mandatory rule skipped
 - **medium**: works, but violates AGENTS.md § Code Style, including a comment that fails its
-  comment rule, or leaves dead code
+  comment rule, or leaves dead code, or prose that is false, stale or reads two ways
 - **nit**: naming, wording, formatting
 
 On a re-review, a finding may come back argued instead of fixed. Conceding is a legitimate

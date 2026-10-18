@@ -86,9 +86,8 @@ status: draft
 
 ### Step 3: The parenthetical
 
-- `internal/messagecontent/`: `Content.MergeStatsWeekBefore`, passed through by `GetContent`
-- `internal/messagebuilder/`: calls `mergestats.PercentChanges` on `Content.MergeStats` and `Content.MergeStatsWeekBefore`, and appends the parenthetical per § Target Shape
-- Update messagecontent.spec.md and messagebuilder.spec.md § Behaviour
+- `internal/messagecontent/`: `GetContent` takes the week before after the merge stats. The `Content.MergeStatsText` wording calls `mergestats.PercentChanges` on both and appends the parenthetical per § Target Shape. Plan 017 moved the line's wording here from `internal/messagebuilder/`, which renders the text as given
+- Update messagecontent.spec.md § Behaviour
 
 ### Step 4: Wire the week before into the run
 

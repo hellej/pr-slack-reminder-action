@@ -17,6 +17,8 @@ findings.
 - One whole plan per run. Its steps are the suggested implementation order, not review gates
 - Review mid-way only at a step the plan marks `(checkpoint)`. That review skips the whole-diff checks: dead code, the comment list, spec and plan consistency
 - The final review covers the whole diff against the base branch, with every check
+  - A follow-up run on a branch whose earlier commits were already reviewed too: the base is
+    the branch's base, such as `main`, never `HEAD`. The new change can make earlier prose false
 - Confirm the planned scope of the run with the user before starting
 - Branch per AGENTS.md § Git, a mandatory read, unless the plan says otherwise. If it is silent and the user
   has not said, ask it with that same confirmation, never once the work is under way
@@ -54,7 +56,10 @@ the diff, never re-record it.
 Work out where the regression net is blind before round 1 and give it to both agents:
 the implementer tests those spots, the reviewer mutates them.
 
-If the plan states no criteria, say so and carry on. Do not invent them.
+One criterion holds on every run, stated or not: prose describing behaviour the change
+alters stays true, specs and AGENTS.md above all.
+
+If the plan states no other criteria, say so and carry on. Do not invent them.
 
 A criterion a checkpoint cannot satisfy on its own is a briefing bug, not a finding: a lint
 target an uncalled function fails by construction. Check each is reachable before passing it on.

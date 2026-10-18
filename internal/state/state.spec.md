@@ -14,7 +14,10 @@ Persists and reloads the tracked PRs, Slack message reference, last written mess
 - `WithMergedPRCache()` returns a copy of a state with `MergedPRCache` replaced by the given PRs that are merged and have complete reviewer info, one per ref, the first kept
 - `WithRecentMergeStats(state, loadedMergeStatsByDate, newMergeStats, asOf)` returns a copy of a state with `MergeStatsByDate` set to the loaded entries plus `newMergeStats` when not nil and the loaded map has no entry of its date: the day's first stats stay, as a later post that day covers only the hours since. It drops every entry dated more than 7 days before the UTC date of `asOf`, so one exactly 7 days before stays. It leaves the loaded map unchanged
 - `MergeStatsWeekBefore(mergeStatsByDate, shown)` returns the entry dated exactly 7 days before the UTC date of `shown.ComputedAt`. Nil when `shown` is nil or there is no such entry
-- `MergeStatsLastComputedAt` is the `ComputedAt` of the last merge stats a post computed, which may be an earlier post's than this state's own `MergeStats`. The caller decides it
+- `MergeStats` is what this state's message shows. `MergeStatsLastComputedAt` is when any post last computed stats, where the next window starts
+  - When `MergeStats` is set, the two come from the same fetch: `MergeStatsLastComputedAt` equals `MergeStats.ComputedAt`
+  - A post computing no stats, or whose stats fetch failed, saves nil `MergeStats` and carries `MergeStatsLastComputedAt` forward from the loaded state
+  - `NewPostState` stores both as given. The run picks them: see [run.spec.md](../../cmd/pr-slack-reminder/run.spec.md) § Behaviour
 - The other `With*` copies carry `MergeStats`, `MergeStatsByDate` and `MergeStatsLastComputedAt` through unchanged
 - `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
 - `SaveSentSlackBlocksToFile()` separately writes a sent message's block array to a file, indented, for inspection
