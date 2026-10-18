@@ -205,7 +205,7 @@
     "elements": [
       {
         "type": "mrkdwn",
-        "text": "Last 1 day: 3 merged · median 2.5 days to first review, 5.0 days to merge"
+        "text": "_Last 1 day: 3 merged · median 2.5 days to first review, 5.0 days to merge_"
       }
     ]
   }

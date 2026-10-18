@@ -78,7 +78,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "Last 7 days: 0 merged"
+            "text": "_Last 7 days: 0 merged_"
           }
         ]
       }

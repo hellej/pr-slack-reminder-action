@@ -29,6 +29,8 @@ Check it against:
   its name, the reorder. A short, plain function needs none
 - Every name the change added or kept in code it touched: a clearer one, even only
   slightly more explicit, is a `nit` naming it
+  - A name that reads clearly only next to its comment, or only to someone who has read
+    the spec, is a `medium` Fix. A term coined in a spec doesn't make a name clear
 - AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
   docstrings. Each breach is a `nit`
 - Truth and one reading, over every spec bullet, comment, `README.md`, `action.yml` and

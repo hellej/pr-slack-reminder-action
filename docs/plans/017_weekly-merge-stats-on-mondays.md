@@ -39,7 +39,7 @@ status: draft
   - Update mode never reads it: it renders the loaded state's `mergeStats`, as before
 - **First review** (`githubclient.PR.FirstReviewAt`): the earliest submitted review by a person other than the PR author, out of the reviews `isSubmittedUserReview` already keeps: not pending, not a bot. Its time is `submittedAt`, else `createdAt`. A PR conversation comment is not a review
 - **Merge stats day**: a run whose start falls on a Monday in UTC (`isMondayInUTC`)
-- **Merge stats line**: a `context` block with block ID `merge_stats_line`, one plain `mrkdwn` element:
+- **Merge stats line**: a `context` block with block ID `merge_stats_line`, one `mrkdwn` element in italics, like the update-time footer:
   - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`. Examples below show a 7-day window
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - `Last 7 days: 2 merged · median 1.0 days to merge` when no merged PR had a first review
@@ -50,7 +50,8 @@ status: draft
   - An update run renders the line whenever the loaded state has `mergeStats`, and saves it back with the state. The line stays on Monday's message while it is the live one, until a later post replaces it
   - A post not computing the stats saves no `mergeStats`
   - The line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else left deletes the message, as today
-  - A failed stats fetch, or a merged PR in it without complete reviewer info, leaves the line out, with a `::warning` annotation. The run goes on
+  - A failed stats fetch leaves the line out, with a `::warning` annotation. The run goes on
+  - A merged PR without complete reviewer info counts in `MergedCount` but in neither median, with a `::warning` annotation naming it
 - `show-merged-prs-in-message: false` hides the merged section only. The line shows either way
 - One new optional input. No permission change
 
@@ -88,7 +89,7 @@ Marked stale by the next post, which drops the update-time footer and keeps the 
 Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge
 ```
 
-The line above the footer was probed live in the dev channel.
+The sketches show plain text: the merge stats line, the update-time footer and the staleness warning render in italics. The line above the footer was probed live in the dev channel.
 
 ### GitHub API Budget
 
@@ -157,8 +158,8 @@ The line above the footer was probed live in the dev channel.
 
 ### Step 5: The merge stats line
 
-- `internal/messagecontent/`: `Content.MergeStatsText`, the line's whole text per § Target Shape, built by `GetContent` from a new `mergeStats` parameter, ~2 callers. Empty without stats. It never feeds `HasPRs`
-- `internal/messagebuilder/`: both message builders render `Content.MergeStatsText` as the merge stats line after the sections, before the update-time footer, when it is non-empty. The builder decides the block, not the wording
+- `internal/messagecontent/`: `Content.MergeStatsText`, the line's wording per § Target Shape as plain text without markup, built by `GetContent` from a new `mergeStats` parameter, ~2 callers. Empty without stats. It never feeds `HasPRs`
+- `internal/messagebuilder/`: both message builders render `Content.MergeStatsText` as the merge stats line after the sections, before the update-time footer, when it is non-empty. The builder decides the block and its italics, not the wording
   - The content cap drops to 48 blocks, always, leaving a slot for the line and one for the footer or staleness warning
   - `BuildMessageMarkedStale` needs no change: it keeps every stored block but the update-time footer
 - Package tests: messagecontent, the minutes-to-hours switch at 1 hour and the hours-to-days switch at 24 hours. messagebuilder, the 48-block cap with the line present, and no line for an empty text
@@ -169,7 +170,7 @@ The line above the footer was probed live in the dev channel.
 - `cmd/pr-slack-reminder/`:
   - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMondayInUTC(time.Now())`. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
   - Test call sites pass false, 51 of them, mechanical
-  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
+  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error logs a `::warning` and leaves the stats nil. For each PR without `HasCompleteReviewerInfo`, `runPostMode` logs a `::warning` naming the PR, and `FromMergedPRs` leaves that PR out of the medians
   - `runPostMode` passes the stats to `GetContent` and `NewPostState`. Update mode passes the loaded state's
 - `internal/state` copies already carry the stats through an update's save, so update mode writes nothing new
 - Snapshots, read before re-recording. The normaliser adds `computedAt` to its time keys:
@@ -181,7 +182,7 @@ The line above the footer was probed live in the dev channel.
   - The Monday message, edited by an update run, then marked stale: the line kept, the footer dropped
 - `main_test.go`:
   - A post on another day sends no stats fetch (`FetchRecording`) and saves no `mergeStats`
-  - A failed stats fetch, and a merged PR without complete reviewer info, each warn, send the message without the line and save no `mergeStats`. The merged section is hidden and the canvas off, so the stats search is the run's only merged one
+  - A failed stats fetch warns, sends the message without the line and saves no `mergeStats`. Two merged PRs without complete reviewer info each warn, and the line shows with them in the count. The merged section is hidden and the canvas off, so the stats search is the run's only merged one
   - A Monday post with only the line to show sends nothing, and an update with only the line deletes the message
 - `isMondayInUTC`: internal table test, Sunday 23:59 and Monday 00:00 UTC, plus a local weekday that differs from UTC's
 - Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"

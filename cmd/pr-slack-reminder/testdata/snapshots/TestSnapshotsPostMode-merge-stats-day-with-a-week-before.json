@@ -205,7 +205,7 @@
     "elements": [
       {
         "type": "mrkdwn",
-        "text": "Last 7 days: 4 merged · median 2.5 days to first review, 7.5 days to merge (+20 %, -10 %)"
+        "text": "_Last 7 days: 4 merged · median 2.5 days to first review, 7.5 days to merge (+20 %, -10 %)_"
       }
     ]
   }

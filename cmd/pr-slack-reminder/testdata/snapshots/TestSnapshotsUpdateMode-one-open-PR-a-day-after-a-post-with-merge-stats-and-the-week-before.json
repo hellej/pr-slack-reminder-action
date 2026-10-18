@@ -60,7 +60,7 @@
     "elements": [
       {
         "type": "mrkdwn",
-        "text": "Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge (-8 %, +30 %)"
+        "text": "_Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge (-8 %, +30 %)_"
       }
     ]
   },

@@ -441,8 +441,6 @@ func findRecentlyMergedPRs(
 	)
 }
 
-// Returns nil, after a warning, when the stats cannot be computed over every merged PR: a median
-// over part of them would read as the whole window's.
 func computeMergeStats(
 	githubClient githubclient.Client, cfg config.Config, mergedSince, generatedAt time.Time,
 ) *mergestats.MergeStats {
@@ -451,12 +449,11 @@ func computeMergeStats(
 		logWarning(fmt.Sprintf("Leaving the merge stats out, their merged PR fetch failed: %v", err))
 		return nil
 	}
-	if incompletePR, isFound := utilities.Find(mergedPRs, hasIncompleteReviewerInfo); isFound {
+	for _, incompletePR := range utilities.Filter(mergedPRs, hasIncompleteReviewerInfo) {
 		logWarning(fmt.Sprintf(
-			"Leaving the merge stats out, a merged PR came without complete reviewer info: %s#%d",
+			"Leaving a merged PR out of the merge stats medians, it came without complete reviewer info: %s#%d",
 			incompletePR.Repository.GetPath(), incompletePR.GetNumber(),
 		))
-		return nil
 	}
 	mergeStats := mergestats.FromMergedPRs(mergedPRs, mergedSince, generatedAt)
 	log.Printf(

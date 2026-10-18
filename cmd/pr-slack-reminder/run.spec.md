@@ -17,7 +17,8 @@ run modes and the pipeline order are in
   - The recently merged PR fetch failing, in either mode
   - The tracked PR fetch failing in update mode
   - The delete failing in update mode
-  - The merge stats left out: their merged PR fetch failing, or a merged PR in it without complete reviewer info
+  - The merge stats left out: their merged PR fetch failing
+  - A merged PR in the merge stats fetch without complete reviewer info, one warning per PR naming it. It stays in the line's merged count
 - `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. A load error still fails update mode only after the merged fetch and the canvas refresh
 - Post mode loads it whether or not it then sends. A missing artifact logs, and any other load error warns, before the send: post mode goes on without the previous state
@@ -33,7 +34,8 @@ run modes and the pipeline order are in
 - Post mode uses that one load for the merge stats window, the week before and marking the previous message stale
 - A post computing the stats fetches every PR merged in the merge stats window through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with the window start and `generatedAt`, and logs them. The message carries them as its merge stats line and the new state saves them
   - The window starts at the loaded state's `MergeStatsLastComputedAt`, at most `githubclient.RecentlyMergedWindow` (7 days) before `generatedAt`, and at 7 days when the state did not load or has no such time. The recently merged fetch keeps its 7 days either way
-  - A failed stats fetch, or a merged PR in it without complete reviewer info, leaves the merge stats out with a warning. The run goes on
+  - A failed stats fetch leaves the merge stats out with a warning. The run goes on
+  - A merged PR without complete reviewer info stays in the merged count and out of both medians, per [internal/mergestats](../../internal/mergestats/mergestats.spec.md), with a warning naming it
   - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's value. A failed stats fetch keeps the loaded value too
 - Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
 - The line compares against the week before: the entry of the loaded state's `MergeStatsByDate` dated 7 days before the shown stats' `ComputedAt`, through `state.MergeStatsWeekBefore`. See [internal/state](../../internal/state/state.spec.md)
