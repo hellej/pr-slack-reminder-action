@@ -30,7 +30,7 @@ type State struct {
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
 	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
-	// The ComputedAt of the last stats a post computed. See state.spec.md § Behaviour
+	// When any post last computed stats. Equals MergeStats.ComputedAt when that is set. See state.spec.md § Behaviour
 	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
 

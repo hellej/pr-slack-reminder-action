@@ -29,7 +29,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - `BuildMessageMarkedStale(sentBlocks, generatedAt)` rebuilds a sent message from its stored block array:
   - First, a staleness warning, a `context` block reading `_⚠️ Stale, updated <!date^…^{date_pretty} at {time}|Jan 2 15:04 UTC>_`
   - Then every stored block except the one with block ID `update_time_footer`, re-sent as stored, the merge stats line included. A posted message never had that footer, an edited one did. No footer replaces it
-  - At most 50 blocks: the stored content was capped at 48, plus the line
+  - At most 50 blocks: 48 content blocks, the line and the staleness warning
   - `{date_pretty}` reads `Today` or `Yesterday`, capitalised even mid-sentence, when it applies, otherwise a date; the fallback after the pipe carries the date and time in UTC
   - Errors on blocks that do not parse, on an empty array or `null`, and on a content block without a `type`
 
