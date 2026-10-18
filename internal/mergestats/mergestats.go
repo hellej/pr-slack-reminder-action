@@ -35,12 +35,7 @@ func FromMergedPRs(prs []githubclient.PR, mergedSince, computedAt time.Time) Mer
 }
 
 func isCountedInMedians(pr githubclient.PR) bool {
-	return pr.HasCompleteReviewerInfo && hasReadyForReviewTime(pr) && pr.GetMergedAt() != nil
-}
-
-// WeekdayTimeBetween walks from year 1 on a zero start. See mergestats.spec.md § Oddities
-func hasReadyForReviewTime(pr githubclient.PR) bool {
-	return !pr.ReadyForReviewAt().IsZero()
+	return pr.HasCompleteReviewerInfo && pr.HasReadyForReviewTime() && pr.GetMergedAt() != nil
 }
 
 // A review before the PR turned ready for review counts as 0. See mergestats.spec.md § Behaviour

@@ -118,6 +118,10 @@ func (p PR) ReadyForReviewAt() time.Time {
 	return p.GetCreatedAt()
 }
 
+func (p PR) HasReadyForReviewTime() bool {
+	return !p.ReadyForReviewAt().IsZero()
+}
+
 type PRResult struct {
 	pr         *PullRequest
 	repository models.Repository

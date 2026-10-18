@@ -22,4 +22,4 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 
 ## Oddities
 
-- A PR without complete reviewer info, a zero ready-for-review time or no merge time counts in `MergedCount` but in neither median, so the medians can cover fewer PRs than `MergedCount`. Without complete reviewer info, the PR may lack its reviews and its ready-for-review event. A zero ready-for-review time would make `prview.WeekdayTimeBetween` walk from year 1
+- A PR without complete reviewer info, a zero ready-for-review time or no merge time counts in `MergedCount` but in neither median, so the medians can cover fewer PRs than `MergedCount`. Without complete reviewer info, the PR may lack its reviews and its ready-for-review event

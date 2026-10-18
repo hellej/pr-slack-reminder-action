@@ -24,6 +24,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - A team request, or a requested reviewer GitHub reports as null, matches no review
 - Each returned PR carries `FirstReadyForReviewEventAt`, the time of its first switch from draft to ready for review, read off the earliest `ReadyForReviewEvent` in its timeline. Nil when there is no such event. GitHub records none for a PR opened as non-draft. See docs/third-party-facts.md § GitHub records a `ReadyForReviewEvent` on each draft-to-ready switch, never when a PR is opened as non-draft
   - `PR.ReadyForReviewAt()` returns that time, else the creation time
+  - `PR.HasReadyForReviewTime()` is false when `ReadyForReviewAt()` is zero: no ready-for-review event and a zero creation time
 - Each returned PR carries `FirstReviewAt`, the earliest time among the submitted reviews `ApprovedByUsers` and `CommentedByUsers` read, not pending and not a bot's, minus the PR author's own. A review's time is `submittedAt`, else `createdAt`. Nil without such a review. A timeline comment is not a review
   - The minimum over the reviews, never the first node: `reviews(last: 100)` comes in an order GitHub doesn't document
 - The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
