@@ -188,6 +188,7 @@ The line above the footer was probed live in the dev channel.
 - Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
 - Live check, on a Monday in UTC: `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, then the same with `run-mode=update`
   - Done when the post logs the computed stats, the dev channel's message shows the line, and the update keeps it above the footer
+- Build E2E: the post with filters and canvas link sets `show-merge-stats-in-message: true`, so every PR's E2E runs the stats fetch live and its log shows that query's `rateLimit.cost`. Its update run keeps the line
 
 ### Step 7: The `show-merge-stats-in-message` input
 
