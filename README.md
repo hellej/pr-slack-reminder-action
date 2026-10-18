@@ -40,7 +40,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Weekends don't count towards the old-PR threshold: under a 48 hour threshold, a PR opened Friday morning isn't flagged old on Monday morning
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
-- Weekly merge stats on Monday's message: PRs merged in the past week, and their median time to a first review and to merge
+- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, and their median time to a first review and to merge
 - More customizable message content
 - Global and repository specific filters
 - Anyone can set this up (no need to be a GitHub team maintainer)

@@ -429,7 +429,7 @@ func findRecentlyMergedPRs(
 }
 
 // Returns nil, after a warning, when the stats cannot be computed over every merged PR: a median
-// over part of them would read as the whole week's.
+// over part of them would read as the whole window's.
 func computeMergeStats(
 	githubClient githubclient.Client, cfg config.Config, mergedSince, generatedAt time.Time,
 ) *mergestats.MergeStats {

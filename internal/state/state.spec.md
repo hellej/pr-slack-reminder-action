@@ -11,7 +11,9 @@ Persists and reloads the tracked PRs, Slack message reference, last written mess
 - `WithLastWrittenMessage()` returns a copy of a state with `LastWrittenMessage` replaced by an edit's blocks, summary text and `generatedAt`
 - `WithTrackedPRsAdded()` returns a copy of a state with an edit's listed PR views added to the tracked PRs: loaded refs keep their order, refs not already tracked append in the views' order
 - `WithMergedPRCache()` returns a copy of a state with `MergedPRCache` replaced by the given PRs that are merged and have complete reviewer info, one per ref, the first kept
-- `MergeStatsLastComputedAt` is the `ComputedAt` of the last merge stats a post computed, which may be an earlier post's than this state's own `MergeStats`. The caller decides it
+- `MergeStats` is what this state's message shows. `MergeStatsLastComputedAt` is when any post last computed stats, where the next window starts
+  - When `MergeStats` is set, the two come from the same fetch: `MergeStatsLastComputedAt` equals `MergeStats.ComputedAt`
+  - A post computing no stats, or whose stats fetch failed, saves nil `MergeStats` and carries `MergeStatsLastComputedAt` forward from the loaded state. The caller decides both
 - The `With*` copies carry `MergeStats` and `MergeStatsLastComputedAt` through unchanged
 - `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
 - `SaveSentSlackBlocksToFile()` separately writes a sent message's block array to a file, indented, for inspection
