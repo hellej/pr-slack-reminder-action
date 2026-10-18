@@ -31,19 +31,13 @@ Check it against:
   slightly more explicit, is a `nit` naming it
   - A name that reads clearly only next to its comment, or only to someone who has read
     the spec, is a `medium` Fix. A term coined in a spec doesn't make a name clear
-- AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
-  docstrings. Each breach is a `nit`
-- Truth and one reading, over every spec bullet, comment, `README.md`, `action.yml` and
-  AGENTS.md line the change wrote or edited: it holds against the code as it now is, and a
-  reader without the code gets one meaning. Agents act on specs in place of code, so each
-  failure is a `medium` Fix. Watch for:
-  - A bare noun when two of its kind exist: "the fetch" in a spec naming two fetches
-  - A trailing clause that doesn't say what it changes: "…, a failed fetch included"
-  - A pronoun, or "the caller", with more than one candidate
-  - A count that doesn't add up
-- Stale prose: for each behaviour the change alters, grep AGENTS.md, the specs,
-  `README.md`, `action.yml` and comments for statements about it, outside the diff lines
-  too. One the change made false is a `medium` Fix
+- Whether any prose is true is not yours to check: `prose-truth-checker` checks every
+  spec, comment and doc claim against the code, references and stale claims included
+- How Markdown and YAML prose reads is not yours either: `prose-cold-reader` checks it
+- Go comments and docstrings the change wrote stay yours for wording, since
+  `prose-cold-reader` doesn't read Go. An AGENTS.md § Output Style breach is a `nit`. A
+  sentence with two readings is a `medium` Fix. The comment rule
+  below stays yours too
 - Live coverage: a new GitHub or Slack API path the Build E2E runs never execute, such as
   one behind an input or a weekday, is a `medium` Fix naming the E2E scenario and the input
   to set
@@ -54,10 +48,6 @@ Check it against:
     field, fixture or test case, the extracted helper, or the expression written the other
     way round
   - Read each comment against the code it sits on, never on its own
-- Every reference the change adds or edits, in code comments and Markdown alike: `§`
-  section pointers, links, skill and agent names. Each resolves and its target says what
-  it claims. A broken one is `medium`. `make check-style` already catches the forms in
-  AGENTS.md § References that don't resolve, but not a target that says something else
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially
@@ -154,7 +144,7 @@ Give every Fix a severity:
 
 - **high**: wrong behaviour, a failing or missing test, or a mandatory rule skipped
 - **medium**: works, but violates AGENTS.md § Code Style, including a comment that fails its
-  comment rule, or leaves dead code, or prose that is false, stale or reads two ways
+  comment rule, or leaves dead code
 - **nit**: naming, wording, formatting
 
 On a re-review, a finding may come back argued instead of fixed. Conceding is a legitimate

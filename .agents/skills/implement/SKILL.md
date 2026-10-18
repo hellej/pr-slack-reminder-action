@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Run an implementer and reviewer sub-agent loop over a whole plan, up to four rounds, until the reviewer returns PASS. Use when: implementing a plan file or a task, or the user runs /implement."
+description: "Run an implementer and reviewer sub-agent loop over a whole plan, up to four rounds, until the reviewing agents return PASS. Use when: implementing a plan file or a task, or the user runs /implement."
 argument-hint: "The plan file, e.g. .local/plans/001_GraphQL-migration.md, or a task with no plan"
 ---
 
@@ -22,7 +22,7 @@ findings.
 - Confirm the planned scope of the run with the user before starting
 - Branch per AGENTS.md § Git, a mandatory read, unless the plan says otherwise. If it is silent and the user
   has not said, ask it with that same confirmation, never once the work is under way
-- `git status` before round 1. Name any unrelated work to both agents as off-limits: do
+- `git status` before round 1. Name any unrelated work to every agent as off-limits: do
   not stage it, revert it, or fold it into the change
 - Fetch the base branch before round 1 and note how far behind the working branch is. If
   behind, bring the base in first, so the plan's claims and the review run against current code
@@ -40,7 +40,7 @@ Write one. The rest of this skill reads a plan.
 ## Acceptance Criteria
 
 Before round 1, read the plan and pull out what must hold when it is done. Pass it to
-both agents, and check it yourself before handing back.
+the implementer and the reviewer, and check it yourself before handing back.
 
 A step often ends in an `Acceptance:` line, but steps state criteria in passing too, so read
 the whole plan:
@@ -53,7 +53,7 @@ the whole plan:
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
 
-Work out where the regression net is blind before round 1 and give it to both agents:
+Work out where the regression net is blind before round 1 and give it to the implementer and the reviewer:
 the implementer tests those spots, the reviewer mutates them.
 
 One criterion holds on every run, stated or not: prose describing behaviour the change
@@ -74,24 +74,38 @@ implementer where the plan has gone stale.
    - The plan file path, the checkpoints, and the acceptance criteria
    - What is already landed, by file and symbol
    - Findings carried forward from a checkpoint review
-2. When it reports, spawn the `reviewer` agent. Give it the plan, the implementer's
-   report, and the blind spots above. Tell it to check the report's claims against the
-   tree. A mock renders whatever the code asks it for, so a wrong query shape or page
-   size passes it
-3. Read the verdict:
+2. At the final review only: when the implementer reports, spawn `prose-cold-reader` and
+   give it the base. Send its medium findings to the implementer and wait for the fixes.
+   Its nits wait for § Nits On a Pass. This does not spend a round
+3. Spawn the reviewing agents in parallel, in one message:
+   - At a checkpoint, the `reviewer` only
+   - At the final review, the `reviewer`, a new `prose-truth-checker`, and the
+     `prose-cold-reader` from step 2, continued with `SendMessage`
+   - Brief the `reviewer` with the plan, the implementer's report, and the blind spots
+     above. Tell it to check the report's claims against the tree. A mock renders
+     whatever the code asks it for, so a wrong query shape or page size passes it
+   - Brief `prose-truth-checker` with the base, the behaviours the change alters, and the
+     plan files to sweep. Brief `prose-cold-reader` with the base again
+4. Merge the reports into one verdict. It is `CHANGES NEEDED` when any report holds a high
+   or medium Fix, or a Document finding, else `PASS`. Every report's nits go to § Nits On a
+   Pass. Each claim `prose-truth-checker` marks `unverifiable` goes to the hand-back
    - `PASS`: clear any open nits as below, then stop
-   - `CHANGES NEEDED`: send the findings to the implementer, then ask the reviewer to
-     re-review. Give it the implementer's answers, including any finding it rejected and
-     why, otherwise nothing surfaces a deadlock. That is one more round
-4. Four rounds maximum. At the cap, hand back with the open findings named and the code
+   - `CHANGES NEEDED`: send every high and medium Fix and Document finding to the
+     implementer in one batch. Nits wait for § Nits On a Pass. Then ask each agent of
+     step 3 to re-review. Give each agent the implementer's answers, including any finding
+     the implementer rejected and why. Otherwise nothing surfaces a deadlock. That is one
+     more round
+5. Four rounds maximum. At the cap, hand back with the open findings named and the code
    as it stands
 
-Spawn both agents with `run_in_background: false`.
+The prose agents are `prose-truth-checker` and `prose-cold-reader`. Spawn every agent
+with `run_in_background: false`.
 
-Agent definitions load at session start. If `implementer` or `reviewer` is not registered
+Agent definitions load at session start. If an agent this section names is not registered
 yet, spawn `general-purpose`, paste the agent file's body into the prompt, and tell it to
-invoke the `coding` skill first. `general-purpose` gets neither the body nor the `skills:`
-preload, so the TDD, spec-sync and mutation rules arrive no other way.
+invoke each skill its `skills:` line lists first. `general-purpose` gets neither the body
+nor the `skills:` preload, so the TDD, spec-sync, mutation and writing rules arrive no other
+way.
 
 ### Nits On a Pass
 
@@ -106,14 +120,15 @@ The size of the fix decides what follows, not whether to make it.
 
 - A line or two: stop when the implementer reports, with no re-review. Check `make test`
   and the acceptance criteria yourself, since a nit fix still edits the code
-- Larger: the reviewer reviews it. That does not spend a round, since the verdict was
+- Larger: the reviewer reviews the fix, and so do the prose agents when the fix changes
+  prose. That does not spend a round, since the verdict was
   already `PASS`. Never land a real change that no reviewer sees. If that review returns
   `CHANGES NEEDED`, hand back instead of starting another cycle
 
 ## Continue Agents, Never Respawn
 
-- After round 1, always continue the existing `implementer` and `reviewer` with
-  `SendMessage`
+- After round 1, always continue the existing `implementer`, `reviewer` and prose agents
+  with `SendMessage`
 - A fresh spawn starts cold. The implementer re-derives the plan and often redoes work.
   The reviewer re-raises findings it already got fixed
 - One exception, an agent that cannot resume at all. See § Interruptions
@@ -158,7 +173,7 @@ Cancel it once the run is done.
 
 Stop and hand back to the user when:
 
-- The implementer rejects a finding and the reviewer repeats it. That is a deadlock, and
+- The implementer rejects a finding and the agent that raised it repeats it. That is a deadlock, and
   a further round will not break it
 - The plan turns out to be wrong or blocked
 - Tests fail for a reason outside the plan
@@ -172,11 +187,12 @@ Report to the user:
 
 - The verdict and how many rounds it took
 - Each acceptance criterion, and whether it holds. Check them yourself, do not relay
-  either agent's word for it
+  any agent's word for it
 - What changed, by file
 - Each deviation from the plan, and how the plan now reads
 - Nits, cleared or left, and why any was left
-- Any finding the implementer rejected, and any the reviewer labelled `unverified`
+- Any finding the implementer rejected, any the reviewer labelled `unverified`, and any claim `prose-truth-checker` marked
+  `unverifiable`
 - The reviewer's Outside this change items, for the user to fold into this change or queue
   as a separate task
 
@@ -193,10 +209,10 @@ Last, two lists. Evidence from this run only.
 **Lessons.** What this run showed about the loop. One line each, three at most. Examples:
 
 - A round spent on something the brief could have prevented
-- A finding the reviewer has raised more than once
+- A finding a reviewing agent has raised more than once
 - An agent asking you for context it should have been briefed with
 - Work an agent redid after a handover
-- A rule either agent ignored, or that made the work worse
+- A rule any agent ignored, or that made the work worse
 
 **Proposed changes.** Only where a file edit would have prevented a lesson above.
 
