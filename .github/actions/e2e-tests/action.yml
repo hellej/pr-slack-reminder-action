@@ -46,7 +46,7 @@ runs:
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
 
-    - name: Multi-repository run
+    - name: Multi-repository run with merge stats
       uses: ./
       with:
         github-token: ${{ steps.app-token.outputs.token }}
@@ -61,6 +61,7 @@ runs:
           hellej: U08SZJTJF0U
           bob: U08EVPGNWER
         old-pr-threshold-hours: 48
+        show-merge-stats-in-message: true
 
     - name: Run with canvas link
       uses: ./
