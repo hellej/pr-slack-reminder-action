@@ -21,7 +21,7 @@ type MergeStats struct {
 }
 
 func FromMergedPRs(prs []githubclient.PR, mergedSince, computedAt time.Time) MergeStats {
-	timedPRs := utilities.Filter(prs, hasReadyForReviewAndMergeTimes)
+	timedPRs := utilities.Filter(prs, isTimedPR)
 	reviewedPRs := utilities.Filter(timedPRs, func(pr githubclient.PR) bool {
 		return pr.FirstReviewAt != nil
 	})
@@ -34,10 +34,10 @@ func FromMergedPRs(prs []githubclient.PR, mergedSince, computedAt time.Time) Mer
 	}
 }
 
-// WeekdayTimeBetween walks from year 1 on a zero start, so a PR without a known start is
-// left out of both medians.
-func hasReadyForReviewAndMergeTimes(pr githubclient.PR) bool {
-	return !pr.ReadyForReviewAt().IsZero() && pr.GetMergedAt() != nil
+// Without complete reviewer info, the review and ready-for-review times may be missing. And
+// WeekdayTimeBetween walks from year 1 on a zero start. See mergestats.spec.md § Oddities
+func isTimedPR(pr githubclient.PR) bool {
+	return pr.HasCompleteReviewerInfo && !pr.ReadyForReviewAt().IsZero() && pr.GetMergedAt() != nil
 }
 
 // A review before the PR turned ready for review counts as 0. See mergestats.spec.md § Behaviour

@@ -25,6 +25,8 @@ type mergedPROptions struct {
 	firstReviewAt *time.Time
 	mergedAt      time.Time
 	authorLogin   string
+	// Left false, the PR came with complete reviewer info
+	incompleteReviewerInfo bool
 }
 
 func mergedPR(options mergedPROptions) githubclient.PR {
@@ -37,6 +39,7 @@ func mergedPR(options mergedPROptions) githubclient.PR {
 		},
 		FirstReadyForReviewEventAt: options.readiedAt,
 		FirstReviewAt:              options.firstReviewAt,
+		HasCompleteReviewerInfo:    !options.incompleteReviewerInfo,
 	}
 }
 
@@ -158,9 +161,38 @@ func TestFromMergedPRs(t *testing.T) {
 		{
 			name: "a PR without a merge time counts as merged, in neither median",
 			prs: []githubclient.PR{
-				{PullRequest: &githubclient.PullRequest{CreatedAt: at(6, 9), Merged: true}, FirstReviewAt: timePtr(at(6, 10))},
+				{
+					PullRequest:   &githubclient.PullRequest{CreatedAt: at(6, 9), Merged: true},
+					FirstReviewAt: timePtr(at(6, 10)), HasCompleteReviewerInfo: true,
+				},
 			},
 			expected: mergestats.MergeStats{MergedCount: 1, ComputedAt: computedAt},
+		},
+		{
+			// Counting it would give 3 values, medians 3 hours to first review and 4 to merge.
+			name: "a PR without complete reviewer info counts as merged, in neither median",
+			prs: []githubclient.PR{
+				mergedPR(mergedPROptions{createdAt: at(6, 9), firstReviewAt: timePtr(at(6, 10)), mergedAt: at(6, 11)}),
+				mergedPR(mergedPROptions{
+					createdAt: at(6, 9), firstReviewAt: timePtr(at(6, 18)), mergedAt: at(6, 21),
+					incompleteReviewerInfo: true,
+				}),
+				mergedPR(mergedPROptions{createdAt: at(6, 9), firstReviewAt: timePtr(at(6, 12)), mergedAt: at(6, 13)}),
+			},
+			expected: mergestats.MergeStats{
+				MergedCount:             3,
+				MedianTimeToFirstReview: durationPtr(2 * time.Hour),
+				MedianTimeToMerge:       durationPtr(3 * time.Hour),
+				ComputedAt:              computedAt,
+			},
+		},
+		{
+			name: "every PR without complete reviewer info gives the count only",
+			prs: []githubclient.PR{
+				mergedPR(mergedPROptions{createdAt: at(6, 9), mergedAt: at(6, 11), incompleteReviewerInfo: true}),
+				mergedPR(mergedPROptions{createdAt: at(6, 9), mergedAt: at(6, 13), incompleteReviewerInfo: true}),
+			},
+			expected: mergestats.MergeStats{MergedCount: 2, ComputedAt: computedAt},
 		},
 	}
 

@@ -6,8 +6,9 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 
 - `FromMergedPRs(prs, mergedSince, computedAt)` returns a `MergeStats` over the given merged PRs. Pure: it reads no clock, and the window is the caller's
 - `MergedCount` is the number of PRs given, bot-authored ones included
-- `MedianTimeToMerge` is the median time from `githubclient.PR.ReadyForReviewAt()` to the merge. Nil when no given PR has both times
-- `MedianTimeToFirstReview` is the median time from the same start to `githubclient.PR.FirstReviewAt`, over the PRs that have one. Nil when none has
+- The medians cover only the timed PRs: those with `HasCompleteReviewerInfo`, a ready-for-review time and a merge time
+- `MedianTimeToMerge` is the median time from `githubclient.PR.ReadyForReviewAt()` to the merge, over the timed PRs. Nil when none is timed
+- `MedianTimeToFirstReview` is the median time from the same start to `githubclient.PR.FirstReviewAt`, over the timed PRs that have one. Nil when none has
   - A first review before the ready-for-review time counts as 0
 - Both are weekday time, through `prview.WeekdayTimeBetween`: Saturdays and Sundays left out as whole UTC days. See [internal/prview](../prview/prview.spec.md)
 - An even count takes the mean of the two middle values
@@ -17,8 +18,8 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 ## Doesn't Do
 
 - Doesn't render the stats: the line's text is [internal/messagecontent](../messagecontent/messagecontent.spec.md)'s, and its block [internal/messagebuilder](../messagebuilder/messagebuilder.spec.md)'s
-- Doesn't check that a PR is merged or within any window, nor that its reviewer info is complete: the caller passes what it fetched
+- Doesn't check that a PR is merged or within any window: the caller passes what it fetched
 
 ## Oddities
 
-- A PR with a zero ready-for-review time, or no merge time, counts in `MergedCount` but in neither median
+- A PR without complete reviewer info, a zero ready-for-review time or no merge time counts in `MergedCount` but in neither median, so the medians can cover fewer PRs than `MergedCount`. Without complete reviewer info, the PR may lack its reviews and its ready-for-review event

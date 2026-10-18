@@ -50,7 +50,8 @@ status: draft
   - An update run renders the line whenever the loaded state has `mergeStats`, and saves it back with the state. The line stays on Monday's message while it is the live one, until a later post replaces it
   - A post not computing the stats saves no `mergeStats`
   - The line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else left deletes the message, as today
-  - A failed stats fetch, or a merged PR in it without complete reviewer info, leaves the line out, with a `::warning` annotation. The run goes on
+  - A failed stats fetch leaves the line out, with a `::warning` annotation. The run goes on
+  - A merged PR without complete reviewer info counts in `MergedCount` but in neither median, with a `::warning` annotation naming it
 - `show-merged-prs-in-message: false` hides the merged section only. The line shows either way
 - One new optional input. No permission change
 
@@ -169,7 +170,7 @@ The line above the footer was probed live in the dev channel.
 - `cmd/pr-slack-reminder/`:
   - `Run` takes `isMergeStatsDay bool`. `main.go` passes `isMondayInUTC(time.Now())`. See [Justification § `Run` takes whether it is a merge stats day](#run-takes-whether-it-is-a-merge-stats-day)
   - Test call sites pass false, 51 of them, mechanical
-  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error, or a PR without `HasCompleteReviewerInfo`, logs a `::warning` and leaves the stats nil
+  - `runPostMode` on a merge stats day calls `FindPRsMergedSince` over the window before `generatedAt`, then `mergestats.FromMergedPRs` with `generatedAt`, and logs the result. A fetch error logs a `::warning` and leaves the stats nil. For each PR without `HasCompleteReviewerInfo`, `runPostMode` logs a `::warning` naming the PR, and `FromMergedPRs` leaves that PR out of the medians
   - `runPostMode` passes the stats to `GetContent` and `NewPostState`. Update mode passes the loaded state's
 - `internal/state` copies already carry the stats through an update's save, so update mode writes nothing new
 - Snapshots, read before re-recording. The normaliser adds `computedAt` to its time keys:
@@ -181,7 +182,7 @@ The line above the footer was probed live in the dev channel.
   - The Monday message, edited by an update run, then marked stale: the line kept, the footer dropped
 - `main_test.go`:
   - A post on another day sends no stats fetch (`FetchRecording`) and saves no `mergeStats`
-  - A failed stats fetch, and a merged PR without complete reviewer info, each warn, send the message without the line and save no `mergeStats`. The merged section is hidden and the canvas off, so the stats search is the run's only merged one
+  - A failed stats fetch warns, sends the message without the line and saves no `mergeStats`. Two merged PRs without complete reviewer info each warn, and the line shows with them in the count. The merged section is hidden and the canvas off, so the stats search is the run's only merged one
   - A Monday post with only the line to show sends nothing, and an update with only the line deletes the message
 - `isMondayInUTC`: internal table test, Sunday 23:59 and Monday 00:00 UTC, plus a local weekday that differs from UTC's
 - Update run.spec.md § Behaviour: the Monday fetch, the warning, the stats' path through state. README: one feature bullet, the line under the message description with its weekday time, and the `show-merged-prs-in-message` row reworded from "list open PRs only" to "hide the merged section"
