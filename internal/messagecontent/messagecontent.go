@@ -1,6 +1,7 @@
 // Package messagecontent structures PR views into the sections a reminder message shows: the
-// open PRs bucketed by next action, and the PRs that recently merged. It carries no rendering,
-// that belongs to messagebuilder.
+// open PRs bucketed by next action, and the PRs that recently merged. It also words the
+// message's texts, the merge stats line included. It carries no rendering, that belongs to
+// messagebuilder.
 package messagecontent
 
 import (
@@ -26,7 +27,7 @@ type Content struct {
 	WaitingForAuthor    prview.PRSection
 	WaitingForReview    prview.PRSection
 	Merged              prview.PRSection
-	MergeStats          *mergestats.MergeStats
+	MergeStatsText      string
 	NoOpenPRsText       string
 	GeneratedAt         time.Time
 	GroupedByRepository bool
@@ -68,7 +69,7 @@ func GetContent(
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
 		Merged:              newPRSection(mergedPRs, contentInputs),
-		MergeStats:          mergeStats,
+		MergeStatsText:      mergeStatsText(mergeStats),
 		GeneratedAt:         generatedAt,
 		GroupedByRepository: contentInputs.GroupByRepository,
 	}

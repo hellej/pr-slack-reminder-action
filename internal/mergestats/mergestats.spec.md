@@ -16,7 +16,7 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 
 ## Doesn't Do
 
-- Doesn't render the stats: the line's text is [internal/messagebuilder](../messagebuilder/messagebuilder.spec.md)'s
+- Doesn't render the stats: the line's text is [internal/messagecontent](../messagecontent/messagecontent.spec.md)'s, and its block [internal/messagebuilder](../messagebuilder/messagebuilder.spec.md)'s
 - Doesn't check that a PR is merged or within any window, nor that its reviewer info is complete: the caller passes what it fetched
 
 ## Oddities

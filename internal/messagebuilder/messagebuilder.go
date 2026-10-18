@@ -8,12 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"slices"
-	"strings"
 	"time"
 
-	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/messagecontent"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
@@ -55,8 +52,8 @@ func BuildMessageWithUpdateTimeFooter(content messagecontent.Content) (slack.Mes
 
 func buildMessageBodyBlocks(content messagecontent.Content) []slack.Block {
 	blocks := buildContentBlocks(content)
-	if content.MergeStats != nil {
-		blocks = append(blocks, buildMergeStatsLineBlock(*content.MergeStats))
+	if content.MergeStatsText != "" {
+		blocks = append(blocks, buildMergeStatsLineBlock(content.MergeStatsText))
 	}
 	return blocks
 }
@@ -173,53 +170,13 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 	)
 }
 
-// A context block, like the footer, so the line reads as a note under the sections. Its text
-// holds none of the characters mrkdwn escapes: &, < and >.
-func buildMergeStatsLineBlock(stats mergestats.MergeStats) slack.Block {
+// A context block, like the footer, so the line reads as a note under the sections. The text is
+// sent unescaped: messagecontent's merge stats wording holds none of &, < and >.
+func buildMergeStatsLineBlock(mergeStatsText string) slack.Block {
 	return slack.NewContextBlock(
 		mergeStatsLineBlockID,
-		slack.NewTextBlockObject("mrkdwn", mergeStatsLineText(stats), false, false),
+		slack.NewTextBlockObject("mrkdwn", mergeStatsText, false, false),
 	)
-}
-
-func mergeStatsLineText(stats mergestats.MergeStats) string {
-	mergedCountText := fmt.Sprintf("%s: %d merged", mergeStatsWindowText(stats), stats.MergedCount)
-	var medianTexts []string
-	if stats.MedianTimeToFirstReview != nil {
-		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToFirstReview)+" to first review")
-	}
-	if stats.MedianTimeToMerge != nil {
-		medianTexts = append(medianTexts, mergeStatsDurationText(*stats.MedianTimeToMerge)+" to merge")
-	}
-	if len(medianTexts) == 0 {
-		return mergedCountText
-	}
-	return mergedCountText + " · median " + strings.Join(medianTexts, ", ")
-}
-
-// A window under 12 hours rounds to 0 and reads as 1 day. See messagebuilder.spec.md § Oddities
-func mergeStatsWindowText(stats mergestats.MergeStats) string {
-	windowDays := max(1, int(math.Round(stats.ComputedAt.Sub(stats.MergedSince).Hours()/24)))
-	if windowDays == 1 {
-		return "Last 1 day"
-	}
-	return fmt.Sprintf("Last %d days", windowDays)
-}
-
-// See messagebuilder.spec.md § Oddities for the rounding at each switch.
-func mergeStatsDurationText(duration time.Duration) string {
-	switch {
-	case duration < time.Hour:
-		minutes := int(math.Round(duration.Minutes()))
-		if minutes == 1 {
-			return "1 minute"
-		}
-		return fmt.Sprintf("%d minutes", minutes)
-	case duration < 24*time.Hour:
-		return fmt.Sprintf("%.1f hours", duration.Hours())
-	default:
-		return fmt.Sprintf("%.1f days", duration.Hours()/24)
-	}
 }
 
 // <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a

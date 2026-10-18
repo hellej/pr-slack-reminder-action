@@ -157,13 +157,12 @@ The line above the footer was probed live in the dev channel.
 
 ### Step 5: The merge stats line
 
-- `internal/messagecontent/`: `Content.MergeStats`, passed through by `GetContent` from a new parameter, ~2 callers. It never feeds `HasPRs`
-- `internal/messagebuilder/`: both message builders render the merge stats line after the sections, before the update-time footer, when `Content.MergeStats` is set
-  - The text, per § Target Shape, is this package's
+- `internal/messagecontent/`: `Content.MergeStatsText`, the line's whole text per § Target Shape, built by `GetContent` from a new `mergeStats` parameter, ~2 callers. Empty without stats. It never feeds `HasPRs`
+- `internal/messagebuilder/`: both message builders render `Content.MergeStatsText` as the merge stats line after the sections, before the update-time footer, when it is non-empty. The builder decides the block, not the wording
   - The content cap drops to 48 blocks, always, leaving a slot for the line and one for the footer or staleness warning
   - `BuildMessageMarkedStale` needs no change: it keeps every stored block but the update-time footer
-- Package tests: the minutes-to-hours switch at 1 hour, the hours-to-days switch at 24 hours, and the 48-block cap with the line present
-- Update messagecontent.spec.md and messagebuilder.spec.md § Behaviour. messagebuilder § Oddities: grouped, 5 repositories with PRs in all four sections still fit at 44 content blocks, and 6 build 52, of which 4 are now dropped; 59.6 minutes reads `60 minutes` and 23.96 hours `24.0 hours`
+- Package tests: messagecontent, the minutes-to-hours switch at 1 hour and the hours-to-days switch at 24 hours. messagebuilder, the 48-block cap with the line present, and no line for an empty text
+- Update messagecontent.spec.md and messagebuilder.spec.md § Behaviour. messagebuilder § Oddities: grouped, 5 repositories with PRs in all four sections still fit at 44 content blocks, and 6 build 52, of which 4 are now dropped. messagecontent § Oddities: 59.6 minutes reads `60 minutes` and 23.96 hours `24.0 hours`
 
 ### Step 6: Wire the Monday stats into the run
 
@@ -212,9 +211,9 @@ The line above the footer was probed live in the dev channel.
   - `runPostMode` loads the previous state once, before the stats fetch, and hands the state and the load error to `markPreviousMessageStale` instead of a second load. The outcomes for marking stale stay as they are. The artifact fetch's own log lines now print before the send; the stale-marking decision logs and the load warning stay after it
   - The window start per § Target Shape. `findPRsMergedSince` takes it in place of the fixed 7 days. `findRecentlyMergedPRs` keeps its 7 days
   - `NewPostState` gets the new stats' `ComputedAt` when stats were computed, else the loaded state's `MergeStatsLastComputedAt`
-- `internal/messagebuilder/`: the line's window text, `Last 1 day` singular, else `Last N days`
+- `internal/messagecontent/`: the line's window text, `Last 1 day` singular, else `Last N days`
 - Tests:
-  - `messagebuilder` package test: windows of 1 day, 2.4 days reading `Last 2 days`, 2.6 days reading `Last 3 days`, 7 days, and under 12 hours reading `Last 1 day`
+  - `messagecontent` package test: windows of 1 day, 2.4 days reading `Last 2 days`, 2.6 days reading `Last 3 days`, 7 days, and under 12 hours reading `Last 1 day`
   - `main_test.go`: previous state with `mergeStatsLastComputedAt` 1 day before the run: the stats fetch's `mergedSince` is that time, the line reads `Last 1 day`. 10 days before: capped, `Last 7 days`. Absent: `Last 7 days`
   - `main_test.go`: a post not computing stats carries `mergeStatsLastComputedAt` forward. A post computing stats saves its own `ComputedAt`. A failed stats fetch carries the old value
   - `main_test.go`: post mode downloads the state artifact once. `FetchRecording` gains `StateArtifactDownloads` and `MergedPRSearchQueries`: the mock search only sees a day, so the window tests check that day plus the merged count in the line
@@ -222,7 +221,7 @@ The line above the footer was probed live in the dev channel.
   - Snapshot: a post with `true` and previous stats 1 day old, showing `Last 1 day`
 - Existing message snapshots keep `Last 7 days`: their runs load no previous stats. A changed message snapshot means a bug. The merge stats `.state.json` snapshots gain `mergedSince` and `mergeStatsLastComputedAt`. The normaliser adds both to its time keys
   - The stale snapshot's second post loads the first post's stats from moments before, so its own saved message reads `Last 1 day: 0 merged`, per § Caveats
-- Update mergestats.spec.md, state.spec.md, messagebuilder.spec.md, run.spec.md. Oddities: a window under 12 hours reads `Last 1 day`
+- Update mergestats.spec.md, state.spec.md, messagecontent.spec.md, run.spec.md. messagecontent § Oddities: a window under 12 hours reads `Last 1 day`
 
 ## Consequences
 
