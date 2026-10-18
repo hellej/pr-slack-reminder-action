@@ -6,9 +6,9 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 
 - `FromMergedPRs(prs, mergedSince, computedAt)` returns a `MergeStats` over the given merged PRs. Pure: it reads no clock, and the window is the caller's
 - `MergedCount` is the number of PRs given, bot-authored ones included
-- The medians cover only the timed PRs: those with `HasCompleteReviewerInfo`, a ready-for-review time and a merge time
-- `MedianTimeToMerge` is the median time from `githubclient.PR.ReadyForReviewAt()` to the merge, over the timed PRs. Nil when none is timed
-- `MedianTimeToFirstReview` is the median time from the same start to `githubclient.PR.FirstReviewAt`, over the timed PRs that have one. Nil when none has
+- The PRs counted in the medians are those with `HasCompleteReviewerInfo`, a ready-for-review time and a merge time
+- `MedianTimeToMerge` is the median time from `githubclient.PR.ReadyForReviewAt()` to the merge, over the PRs counted in the medians. Nil when no PR is counted in the medians
+- `MedianTimeToFirstReview` is the median time from the same start to `githubclient.PR.FirstReviewAt`. It covers the PRs counted in the medians whose `FirstReviewAt` is set. Nil when no PR counted in the medians has `FirstReviewAt` set
   - A first review before the ready-for-review time counts as 0
 - Both are weekday time, through `prview.WeekdayTimeBetween`: Saturdays and Sundays left out as whole UTC days. See [internal/prview](../prview/prview.spec.md)
 - An even count takes the mean of the two middle values
@@ -22,4 +22,4 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 
 ## Oddities
 
-- A PR without complete reviewer info, a zero ready-for-review time or no merge time counts in `MergedCount` but in neither median, so the medians can cover fewer PRs than `MergedCount`. Without complete reviewer info, the PR may lack its reviews and its ready-for-review event
+- A PR without complete reviewer info, a zero ready-for-review time or no merge time counts in `MergedCount` but in neither median, so the medians can cover fewer PRs than `MergedCount`. Without complete reviewer info, the PR may lack its reviews and its ready-for-review event. A zero ready-for-review time would make `prview.WeekdayTimeBetween` walk from year 1
