@@ -12,7 +12,7 @@ import (
 
 const testMergeStatsText = "Last 7 days: 3 merged"
 
-func TestMergeStatsLineIsOneMrkdwnElementHoldingTheGivenText(t *testing.T) {
+func TestMergeStatsLineIsOneMrkdwnElementHoldingTheGivenTextInItalics(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		MergeStatsText: "Last 2 days: 5 merged · median 1.0 days to merge",
 		GeneratedAt:    generatedAt,
@@ -24,8 +24,8 @@ func TestMergeStatsLineIsOneMrkdwnElementHoldingTheGivenText(t *testing.T) {
 		t.Fatalf("expected one element in the merge stats line, got %d", len(line.ContextElements.Elements))
 	}
 	text := line.ContextElements.Elements[0].(*slack.TextBlockObject)
-	if text.Type != "mrkdwn" || text.Text != "Last 2 days: 5 merged · median 1.0 days to merge" {
-		t.Errorf("expected the given text as mrkdwn, got %q as %q", text.Text, text.Type)
+	if text.Type != "mrkdwn" || text.Text != "_Last 2 days: 5 merged · median 1.0 days to merge_" {
+		t.Errorf("expected the given text in mrkdwn italics, got %q as %q", text.Text, text.Type)
 	}
 }
 

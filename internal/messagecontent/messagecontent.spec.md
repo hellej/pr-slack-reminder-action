@@ -24,7 +24,7 @@ Structures PR views into the sections a reminder message shows, and words its su
   - `"Nothing waiting for review 🎉"` when no open PR is listed
 - `NoOpenPRsText` carries the configured `no-prs-message`, set only when no open PR is listed
 - `GeneratedAt` carries the run timestamp through for the footer
-- `MergeStatsText` is the merge stats line's whole text, built from the given merge stats whatever `ShowMergedPRsInMessage` says. Empty when the stats are nil
+- `MergeStatsText` is the merge stats line's wording, plain text without markup ([internal/messagebuilder](../messagebuilder/messagebuilder.spec.md) sets it in italics), built from the given merge stats whatever `ShowMergedPRsInMessage` says. Empty when the stats are nil
   - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
   - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`
   - A nil median drops its part: `Last 7 days: 2 merged · median 1.0 days to merge`, and with both nil, `Last 7 days: 0 merged`

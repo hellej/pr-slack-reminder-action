@@ -170,12 +170,13 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 	)
 }
 
-// A context block, like the footer, so the line reads as a note under the sections. The text is
-// sent unescaped: messagecontent's merge stats wording holds none of &, < and >.
+// A context block in italics, like the footer, so the line reads as a note under the sections.
+// The text is sent unescaped: messagecontent's merge stats wording holds none of &, < and >, nor
+// an _ that would end the italics early.
 func buildMergeStatsLineBlock(mergeStatsText string) slack.Block {
 	return slack.NewContextBlock(
 		mergeStatsLineBlockID,
-		slack.NewTextBlockObject("mrkdwn", mergeStatsText, false, false),
+		slack.NewTextBlockObject("mrkdwn", "_"+mergeStatsText+"_", false, false),
 	)
 }
 

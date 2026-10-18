@@ -223,7 +223,7 @@
         "elements": [
           {
             "type": "mrkdwn",
-            "text": "Last 1 day: 0 merged"
+            "text": "_Last 1 day: 0 merged_"
           }
         ]
       }

@@ -2839,7 +2839,7 @@ func TestUpdateModeRendersTheLoadedMergeStatsWhateverTheInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
-	if text := mockSlackAPI.UpdatedMessage.Blocks.ContextBlockText("merge_stats_line"); text != "Last 7 days: 4 merged" {
+	if text := mockSlackAPI.UpdatedMessage.Blocks.ContextBlockText("merge_stats_line"); text != "_Last 7 days: 4 merged_" {
 		t.Errorf("Expected the loaded merge stats line, got %q", text)
 	}
 }
@@ -2862,15 +2862,15 @@ func TestPostModeMergeStatsWindowStartsAtThePreviousStats(t *testing.T) {
 			name:                           "previous stats a day ago",
 			previousComputedAgo:            24 * time.Hour,
 			expectsWindowFromPreviousStats: true,
-			expectedLineStart:              "Last 1 day: 1 merged",
+			expectedLineStart:              "_Last 1 day: 1 merged",
 		},
-		{name: "previous stats 10 days ago", previousComputedAgo: 10 * 24 * time.Hour, expectedLineStart: "Last 7 days: 2 merged"},
-		{name: "no previous stats", expectedLineStart: "Last 7 days: 2 merged"},
+		{name: "previous stats 10 days ago", previousComputedAgo: 10 * 24 * time.Hour, expectedLineStart: "_Last 7 days: 2 merged"},
+		{name: "no previous stats", expectedLineStart: "_Last 7 days: 2 merged"},
 		{
 			name:                   "previous stats a day ago, but the state fails to load",
 			previousComputedAgo:    24 * time.Hour,
 			previousStateLoadError: errors.New("artifact listing failed"),
-			expectedLineStart:      "Last 7 days: 2 merged",
+			expectedLineStart:      "_Last 7 days: 2 merged",
 		},
 	}
 
@@ -3048,7 +3048,7 @@ func TestPostModeLeavesMergedPRsWithIncompleteReviewerInfoOutOfTheMedians(t *tes
 		warningAnnotationPrefix + "Leaving a merged PR out of the merge stats medians, it came without complete reviewer info: test-org/test-repo#3",
 	})
 	line := mockSlackAPI.SentMessage.Blocks.ContextBlockText("merge_stats_line")
-	if !strings.HasPrefix(line, "Last 7 days: 3 merged · median ") || !strings.Contains(line, " to first review, ") {
+	if !strings.HasPrefix(line, "_Last 7 days: 3 merged · median ") || !strings.Contains(line, " to first review, ") {
 		t.Errorf("Expected 3 merged with both medians, got %q", line)
 	}
 	if savedState.MergeStats == nil || savedState.MergeStats.MergedCount != 3 {
