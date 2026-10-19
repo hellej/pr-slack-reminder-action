@@ -112,9 +112,11 @@ way.
 Send the nits to the implementer in one batch. `nit` is a severity, not a size: a rename
 worth doing can touch many files.
 
-On a wording nit, name what is wrong and stop there. Replacement phrasing you supply
-outranks the style rules the implementer already carries, so a nit answered literally can
-breach them.
+On a wording nit, name what is wrong and add no wording of your own. Replacement phrasing
+you write outranks the style rules the implementer already carries, so a nit answered
+literally can breach them. A prose agent's sketches are the exception: forward every one
+unchanged, with its label. The implementer chooses among them, and applies
+AGENTS.md § Output Style to the sentence it writes.
 
 The size of the fix decides what follows, not whether to make it.
 
