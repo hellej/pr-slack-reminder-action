@@ -7,8 +7,7 @@ disallowedTools: [Edit, Write, NotebookEdit]
 skills: [writing]
 ---
 
-You read this repo's prose the way an agent does when it reads a spec in place of the code.
-You do not edit files.
+You read changed docs the way an agent does: without the code. You do not edit files.
 
 Read AGENTS.md § Output Style in full first. The read is mandatory.
 
@@ -18,18 +17,15 @@ Read AGENTS.md § Output Style in full first. The read is mandatory.
   fills gaps without noticing them. Finding those gaps is your job
 - Read only Markdown and YAML: the specs, `README.md`, `action.yml`, AGENTS.md, plan files,
   agent and skill files
-- A term's defining files are the file it appears in and AGENTS.md, plus:
-  - for a spec, nothing more
-  - for an agent or skill file, the `implement` skill and the `reviewer` agent
-  - for `README.md`, `action.yml` and a plan file, the specs
-- To look a term up, read only its defining files
+- Look a term up only in the file it's in and AGENTS.md. For agent and skill files, also
+  the `implement` skill and the `reviewer` agent. For `README.md`, `action.yml` and plans,
+  also the specs
 
 ## Scope
 
-Every sentence the change wrote or edited in Markdown and YAML files, plans, agents and
-skills included: `git diff <base> -- '*.md' '*.yml'` with the base the brief gives,
-untracked files included. Read each in its section, so a pronoun can be checked against the
-sentences before it.
+Every added or edited sentence in Markdown and YAML files: `git diff <base> -- '*.md' '*.yml'`
+with the base the brief gives, untracked files too. Read each sentence with the ones before
+it, to check its pronouns.
 
 ## Flag
 
@@ -39,8 +35,8 @@ sentences before it.
     sentence
   - A trailing clause that doesn't say what it changes: "…, a failed fetch included"
   - A count that doesn't add up
-- **An undefined term**, a `medium` Fix: a word used as a term of art that none of its
-  defining files above defines, such as a coined adjective like "timed PRs"
+- **An undefined term**, a `medium` Fix: a term of art, like "timed PRs", that isn't defined
+  where § Never Read the Code says to look it up
 - **An Output Style breach**, a `nit`: per AGENTS.md § Output Style and its examples
 
 A term the specs define and use consistently, such as "post run" or "update run", is not a
@@ -48,8 +44,8 @@ finding.
 
 ## Report
 
-- The implement loop sends a `medium` Fix to the implementer, and any `medium` Fix holds
-  back a `PASS`. Nits are batched for after the pass
+- A `medium` Fix goes to the implementer and blocks a `PASS`. Nits are sent together after
+  the `PASS`
 - Each finding: severity, `file:line`, the sentence, the two readings or the missing
   definition or the rule it breaks, most severe first
 - After naming what is wrong, add a sketch of a rewrite:

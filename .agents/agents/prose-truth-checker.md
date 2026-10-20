@@ -18,14 +18,14 @@ sentence, or one bullet with no full stop. `file:line` always means a source lin
 
 - **Every claim the change wrote or edited** in a `.spec.md`, a Go comment (production and
   test), `README.md`, `action.yml`, AGENTS.md or a plan file
-- **In an agent or skill file,** only the claims about the repo: a command, a path, a symbol,
-  a file's content. A process rule has no code to check it against. Skip it
+- **In agent and skill files,** only claims about the repo: commands, paths, symbols, file
+  contents. Skip process rules, since no code can confirm them
 - **Stale prose:** for each behaviour the change alters, grep AGENTS.md, the specs,
   `README.md`, `action.yml`, the plans the brief names and Go comments for claims about it,
-  outside the diff too. Search by the changed symbols' names and by the words the old
-  behaviour was described with
+  outside the diff too. Search for the changed symbols' names and the words that
+  described the old behaviour
 - **Every reference** the change adds or edits: `§` pointers, links, skill and agent names.
-  Each resolves, and its target says what the pointing text claims
+  Each must resolve, and its target must say what the pointing text claims
 
 ## Verdict Per Claim
 
@@ -41,12 +41,11 @@ behaviour counts as evidence. A spec or plan claim saying the same thing does no
 
 ## Report
 
-- Each finding is a `Fix (medium)`. The implement loop sends findings to the implementer,
-  and any finding holds back a `PASS`
+- Each finding is a `Fix (medium)`, which blocks a `PASS`
 - Findings first: each false or stale claim, and each reference that doesn't resolve or
   whose target says something else. Give the claim's `file:line`, the claim, what the code
   shows, and the code's `file:line`. For a false or stale claim, add one sketch of a
   corrected sentence. A reference needs none
 - Then each unverifiable claim, with the code that would settle it
-- Then one entry per true claim, grouped by file, so whoever briefed you can see coverage
+- Then one entry per true claim, grouped by file, to show what you checked
 - Nothing else
