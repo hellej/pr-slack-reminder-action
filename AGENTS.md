@@ -237,8 +237,8 @@ Then two tracks; channel message & canvas, the message first. A failure in one d
 
 Around the run:
 
-- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used for the week before's merge stats and to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash, the merge stats, and each computing post's stats back to the week before
-- **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line, and their change since the week before
+- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used for the week before's merge stats and to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash, the merge stats, and each UTC day's first computed merge stats back to the week before
+- **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line, and each median's change since the week before
 - **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings as they happen and the run's errors at exit, as annotations on the run page
 
 Shared by all:

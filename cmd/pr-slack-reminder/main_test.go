@@ -3171,14 +3171,14 @@ func mergeStatsKeyedByDate(entries ...mergestats.MergeStats) map[string]mergesta
 
 func mergeStatsComputedDaysBeforeTheRun(days ...int) func(runStart time.Time) []mergestats.MergeStats {
 	return func(runStart time.Time) []mergestats.MergeStats {
-		return utilities.Map(days, func(days int) mergestats.MergeStats {
-			return mergeStatsComputedDaysBefore(runStart, days)
+		return utilities.Map(days, func(daysBefore int) mergestats.MergeStats {
+			return mergeStatsComputedDaysBefore(runStart, daysBefore)
 		})
 	}
 }
 
-// Builds the previous post's merge stats off the clock read right before the run, so the run's
-// own date is theirs too.
+// Builds the previous post's merge stats off the clock read right before the run, so their days
+// back count from the run's own date.
 func runPostModeAfterAPostWithMergeStats(
 	t *testing.T, previousMergeStats func(runStart time.Time) []mergestats.MergeStats, isMergeStatsDay bool,
 ) state.State {

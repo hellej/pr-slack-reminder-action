@@ -64,7 +64,7 @@ func withFixedStateTimestamps(stateJSON []byte) []byte {
 
 var jsonKeyHoldingADate = regexp.MustCompile(`"(\d{4}-\d{2}-\d{2})": \{`)
 
-// Run keys each recent merge stats entry by its UTC date, and the fixtures date theirs off the
+// A run keys each recent merge stats entry by its UTC date, and the fixtures date theirs off the
 // real clock, so the keys move with it. runStart is the clock read the fixtures were built from.
 func withRunRelativeMergeStatsDateKeys(stateJSON []byte, runStart time.Time) []byte {
 	runDate := runStart.UTC().Truncate(24 * time.Hour)
@@ -171,7 +171,6 @@ type snapshotScenario struct {
 	previousPostStateAt                  func(runStart time.Time) state.State
 }
 
-// Nil when the scenario sets no previous post, as most post scenarios run without one.
 func (scenario snapshotScenario) previousPostState(runStart time.Time) *state.State {
 	if scenario.previousPostStateAt == nil {
 		return nil

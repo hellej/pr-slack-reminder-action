@@ -40,7 +40,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Weekends don't count towards the old-PR threshold: under a 48 hour threshold, a PR opened Friday morning isn't flagged old on Monday morning
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
-- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, their median time to a first review and to merge, and each median's change since a week before
+- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, their median time to a first review and to merge, and each median's change against the week before
 - More customizable message content
 - Global and repository specific filters
 - Anyone can set this up (no need to be a GitHub team maintainer)
@@ -175,7 +175,7 @@ jobs:
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                                                                                               |
 | `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads for the previous message and merge stats. Only needed if the default github-token misses permissions. |
 | `run-mode`                          | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                                                                                                   |
-| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous run (used when `run-mode` is `update`, and by `post` to mark the previous message stale and compare the merge stats against the week before)<br>Default: `pr-slack-reminder-state` |
+| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous runs (required when `run-mode` is `update`; `post` reads it to mark the previous message stale and compare the merge stats against the week before)<br>Default: `pr-slack-reminder-state` |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)                                                                                                                                        |
 | `slack-channel-id`                  | ❌       | Slack channel ID (use this OR `slack-channel-name`)<br>Example: `C1234567890`                                                                                                              |
 | `github-repositories`               | ❌       | Repositories to monitor (max 30) - defaults to current repo<br>Example:<br>`owner/repo1`<br>`owner/repo2`                                                                                  |

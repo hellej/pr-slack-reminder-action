@@ -1,6 +1,6 @@
 # mergestats
 
-Computes the merge stats a post's message shows: the PRs merged in a window and how long they took, and their change against the week before. See [AGENTS.md](../../AGENTS.md) for its place in the run.
+Computes the merge stats a post's message shows: the PRs merged in a window and how long they took, and each median's change against the week before. See [AGENTS.md](../../AGENTS.md) for its place in the run.
 
 ## Behaviour
 
@@ -13,7 +13,7 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 - Both are weekday time, through `prview.WeekdayTimeBetween`: Saturdays and Sundays left out as whole UTC days. See [internal/prview](../prview/prview.spec.md)
 - An even count takes the mean of the two middle values
 - `MergedSince` and `ComputedAt` carry the given window start and `computedAt`, so the window can be rendered again later
-- `PercentChanges(shown, weekBefore)` returns the first review and the merge median's change from `weekBefore` to `shown`, as `100 × (shown − weekBefore) / weekBefore` rounded half away from zero to a whole percent. Pure
+- `PercentChanges(shown, weekBefore)` returns two changes from `weekBefore` to `shown`: of the median time to first review, and of the median time to merge. Each is `100 × (shown − weekBefore) / weekBefore`, rounded half away from zero to a whole percent. Pure
   - Nil for a median either week lacks, or whose week-before value is 0
   - Computed from the stored durations, so two weeks reading the same rounded text can still differ
   - Compares the medians whatever each window's length

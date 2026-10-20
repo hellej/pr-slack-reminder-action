@@ -8,7 +8,7 @@ status: draft
 - The merge stats line, from plan 017, shows each median's relative change against the stats a post computed 7 days before: `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge (+15 %, +38 %)`
 - Goals:
   - Compare only against stats a post computed exactly 7 days earlier: on Mondays by default, on any day with `show-merge-stats-in-message` true
-  - Last week's stats ride along in state, carried forward by every post
+  - Last week's stats ride along in state, carried forward by every post that saves state
   - Plain text, like the rest of the line
 - Non-goals:
   - A change for the merged count
@@ -24,7 +24,7 @@ status: draft
 ## Target Shape
 
 - **Recent merge stats** (`State.MergeStatsByDate`, JSON key `mergeStatsByDate`, `omitempty`): `map[string]mergestats.MergeStats`, keyed by the UTC date (`2006-01-02`) of each entry's `ComputedAt`
-  - Every post saves the loaded map, plus its own stats when it computes them and the map holds no entry of that day, minus entries dated more than 7 days before its run. A Sunday post still carries the previous Monday's entry. The map holds at most 2 entries by default, 8 when every post computes the stats
+  - The state a post saves holds the loaded map, plus the post's own stats when it computes them and the map holds no entry of that day, minus entries dated more than 7 days before the post's run. A Sunday post still carries the previous Monday's entry. The map holds at most 2 entries by default, 8 when every post computes the stats
   - Update runs carry it unchanged, through the existing `With*` copies
 - **Week before**: the entry keyed 7 days before the date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or its state didn't reach this run
 - **Percent change**: `(shown − week before) / week before`, from the stored durations, never the rounded text. Rounded to a whole percent, rendered `+15 %`, `-12 %`, `0 %`
@@ -37,7 +37,7 @@ status: draft
   - Without a week before: the plan 017 line, unchanged
 - Post mode loads the previous state before building its message, once, for both the week-before lookup and marking the previous message stale. Same warnings as today on a failed load
 - A second post on the same day finds the week before in the map, not the first post's entry from today. It keeps the first post's entry: its own window covers only the hours since
-- No change to action inputs or permissions, and no GraphQL change. A post that sends nothing, or whose send fails, now loads state too: one artifact list and download
+- No change to action inputs or permissions, and no GraphQL change. A post that sends nothing, or whose send fails, now warns on a failed state load. It loaded state before too, so its API calls don't change
 
 ### Message States
 
@@ -48,7 +48,7 @@ status: draft
 ## Breaking Change
 
 - Non-breaking, minor: a new part of an existing line, no input change
-- A state saved before has no `mergeStatsByDate`. The stats a week after upgrading are the first to show a change
+- A state saved before this change has no `mergeStatsByDate`. The stats a week after upgrading are the first to show a change
 - A downgrade ignores the key: `state.Load` decodes with `json.Unmarshal`, which skips unknown keys
 
 ## Summary
@@ -64,11 +64,11 @@ status: draft
 ### Step R1: Load post mode's previous state first
 
 - `cmd/pr-slack-reminder/`: `Run` loads the previous state before the merged fetch in post mode too, as it does in update mode
-  - Post mode turns the load result into the previous post's state or nil (`previousPostStateOrNil`), logging the skip or warning right after the load, so a post that sends nothing warns too. Same texts as today
+  - Post mode turns the load result into the previous post's state or nil (`previousPostStateOrNil`), logging the skip or warning after the merged-PR fetch, before the stats fetch and the send, so a post that sends nothing warns too. Same texts as today
   - `markPreviousMessageStale` takes that loaded state instead of loading, and runs only when there is one
   - Post mode still passes no merged PR cache to the merged fetch: `Run` would pass the loaded cache whenever state is loaded, so `mergedPRCacheToReuse(runMode, loadedState)` tells the modes apart
-- Behaviour changes only in the load order, and in a post that sends nothing, or whose send fails, now loading state. A failed load there warns too. Existing tests and snapshots pass unchanged
-- Update run.spec.md § Behaviour: the load order, and the load on a post that sends nothing
+- Behaviour changes only in the load order, and in a post that sends nothing, or whose send fails, now warning on a failed state load. Existing tests and snapshots pass unchanged
+- Update run.spec.md § Behaviour: the load order, and the warning on a post that sends nothing
 
 ### Step 1: Percent changes
 
@@ -86,7 +86,7 @@ status: draft
 
 ### Step 3: The parenthetical
 
-- `internal/messagecontent/`: `GetContent` takes the week before after the merge stats. The `Content.MergeStatsText` wording calls `mergestats.PercentChanges` on both and appends the parenthetical per § Target Shape. Plan 017 moved the line's wording here from `internal/messagebuilder/`, which renders the text as given
+- `internal/messagecontent/`: `GetContent` takes a new `mergeStatsWeekBefore` parameter, right after `mergeStats`. The `Content.MergeStatsText` wording calls `mergestats.PercentChanges` on both and appends the parenthetical per § Target Shape. Plan 017 moved the line's wording here from `internal/messagebuilder/`, which renders the text as given
 - Update messagecontent.spec.md § Behaviour
 
 ### Step 4: Wire the week before into the run
@@ -122,10 +122,10 @@ None
 
 - A week of 1 or 2 merges swings the change widely
 - A broken state chain loses the week before for one post: no saved run for over 4 days at the README's retention, or a post whose state load failed or found no artifact
-- A week with no first review, after one that had one, shows no parenthetical at all
+- A week with a first review median, after a week without one, shows no parenthetical at all
 
 ### Neutral
 
 - State carries up to 2 small entries by default, up to 8 when every post computes the stats
 - Post mode loads state earlier in the run, which changes the log line order
-- A post that sends nothing now loads state, so a failed load warns on a run that posts nothing
+- A failed state load now warns on a post that sends nothing

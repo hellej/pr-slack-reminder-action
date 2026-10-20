@@ -20,7 +20,7 @@ run modes and the pipeline order are in
   - The merge stats left out: their merged PR fetch failing
   - A merged PR in the merge stats fetch without complete reviewer info, one warning per PR naming it. It stays in the line's merged count
 - `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
-- Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. A load error still fails update mode only after the merged fetch and the canvas refresh
+- Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. In update mode, a load error fails the run, but only after the merged fetch and the canvas refresh have run
 - Post mode loads it whether or not it then sends. A missing artifact logs, and any other load error warns, before the send: post mode goes on without the previous state
 - Update mode passes the loaded merged PR cache to the merged fetch, which returns a cached PR instead of enriching it. Post mode passes none, so it enriches every merged PR
 - With `show-merged-prs-in-message` false, the run skips the work only the message's merged section needs:
@@ -44,7 +44,7 @@ run modes and the pipeline order are in
 - Every post state saved goes through `state.WithRecentMergeStats`, with the loaded map, the post's own stats (nil when it computes none, or leaves them out) and `generatedAt`. So a post on any day carries the map forward and prunes it. Update mode saves the map back unchanged
 - The merge stats line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else deletes the message. It shows with `show-merged-prs-in-message` false too
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
-- After a successful send, post mode marks the previous post's message stale: it edits the message the loaded previous state records into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s message marked stale, which opens with a staleness warning and drops the update-time footer an update run gave it, with the stored summary text
+- After a successful send, post mode marks the previous post's message stale: it edits the message recorded in the loaded previous state into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s message marked stale, sending the stored summary text with it. That message opens with a staleness warning and drops any update-time footer an update run gave it
   - Skips when there is no previous state, when it does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
   - Any other failure joins the run's error. The new state is still saved
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
@@ -55,7 +55,7 @@ run modes and the pipeline order are in
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
 - State is saved carrying whichever canvas content hash is now current:
-  - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs and keeping the recent merge stats
+  - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `state.WithRecentMergeStats`
   - Update mode saves it whenever the previous state loaded
     - After a successful edit: it records the edited message, adds the PRs the edit listed to the tracked PRs, and replaces the merged PR cache with the merged and tracked PRs this run used. See [internal/state](../../internal/state/state.spec.md) for which of them are kept
       - Also when saving the sent blocks then fails
