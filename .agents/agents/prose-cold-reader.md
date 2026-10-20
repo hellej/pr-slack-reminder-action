@@ -1,6 +1,6 @@
 ---
 name: prose-cold-reader
-description: Reads the prose a change wrote without reading the code, and flags every sentence with more than one reading, every undefined term and every Output Style breach. Use beside the reviewer in the implement loop, and on an implementer's first report.
+description: Reads the added/edited prose without reading the code, and flags every sentence with more than one reading, every undefined term and every Output Style breach. Use beside the reviewer in the implement loop, and on an implementer's first report.
 model: sonnet
 effort: medium
 disallowedTools: [Edit, Write, NotebookEdit]
