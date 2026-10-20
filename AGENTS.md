@@ -42,6 +42,7 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 - Avoid duplication and overlap with what's already said or written
 - Avoid dashes as punctuation. Use a comma, a colon, or a new sentence
 - Short never beats unambiguous: a reader without the code must get one meaning
+- Say it plainly: of two sentences with the same meaning, pick the one you'd say to a colleague
 
 ### Examples
 
@@ -94,6 +95,11 @@ Don't leave a trailing clause to imply what it changes:
 
 - ✗ `...is the new stats' time, else the loaded state's, a failed fetch included`
 - ✓ `...is the new stats' time, else the loaded state's. A failed stats fetch keeps the loaded time too`
+
+Don't write a sentence stiffer than you'd say it:
+
+- ✗ `The implement loop sends a medium Fix to the implementer, and any medium Fix holds back a PASS`
+- ✓ `A medium Fix goes to the implementer and blocks a PASS`
 
 Don't use a bare noun when two of its kind exist, or a count that doesn't add up:
 

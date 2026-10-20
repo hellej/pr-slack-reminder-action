@@ -37,7 +37,8 @@ it, to check its pronouns.
   - A count that doesn't add up
 - **An undefined term**, a `medium` Fix: a term of art, like "timed PRs", that isn't defined
   where § Never Read the Code says to look it up
-- **An Output Style breach**, a `nit`: per AGENTS.md § Output Style and its examples
+- **An Output Style breach**, a `nit`: per AGENTS.md § Output Style and its examples, a
+  sentence you could say more plainly included
 
 A term the specs define and use consistently, such as "post run" or "update run", is not a
 finding.
@@ -52,5 +53,5 @@ finding.
   - For a sentence with several readings, one sketch per reading, each labelled with the
     reading it serves. You don't read the code, so never choose between them. The
     implementer keeps the reading the code matches, and writes the final sentence
-  - For an undefined term or an Output Style breach, one sketch
+  - For any other finding, one sketch
 - Nothing else. When there is nothing to flag, say so in one line
