@@ -1,6 +1,6 @@
 ---
 name: prose-truth-checker
-description: Checks if every spec, comment and doc claim related to a change are still true. Use beside the reviewer in the implement loop, or before committing a change that touched specs, comments or docs.
+description: Checks whether every spec, comment and doc claim related to a change is true of the code: the claims it adds and the ones it makes stale. Use beside the reviewer in the implement loop, or before committing a change that touched specs, comments or docs.
 model: sonnet
 effort: medium
 disallowedTools: [Edit, Write, NotebookEdit]
