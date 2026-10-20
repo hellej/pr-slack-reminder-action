@@ -87,7 +87,7 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 		}),
 	}
 
-	content := GetContent(openPRs, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
 
 	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.Rows), []int{2})
 	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{3, 5})
@@ -102,7 +102,7 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 		testPR(testPROptions{number: 3, repository: "zebra", createdAt: generatedAt.Add(-2 * time.Hour)}),
 	}
 
-	content := GetContent(openPRs, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
 
 	waitingForReview := content.WaitingForReview
 	if len(waitingForReview.Rows) != 0 {
@@ -126,7 +126,7 @@ func TestGetContentGivesEachRepositoryGroupItsWholeRepository(t *testing.T) {
 		testPR(testPROptions{number: 2, owner: "alpha-owner", repository: "alpha", createdAt: generatedAt.Add(-4 * time.Hour)}),
 	}
 
-	content := GetContent(openPRs, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
 
 	assertEqual(
 		t, "repository paths",
@@ -154,7 +154,7 @@ func TestGetContentMergesTrackedPRsWithTheNewestUntrackedOnes(t *testing.T) {
 	}
 
 	content := GetContent(
-		nil, trackedPRs, recentlyMergedPRs, nil, time.Time{}, generatedAt,
+		nil, trackedPRs, recentlyMergedPRs, nil, nil, time.Time{}, generatedAt,
 		config.ContentInputs{ShowMergedPRsInMessage: true},
 	)
 
@@ -182,7 +182,7 @@ func TestGetContentShowsEveryPRMergedSinceThePost(t *testing.T) {
 	}
 
 	content := GetContent(
-		nil, []prview.PR{trackedMergedSincePost}, recentlyMergedPRs, nil, messagePostedAt, generatedAt,
+		nil, []prview.PR{trackedMergedSincePost}, recentlyMergedPRs, nil, nil, messagePostedAt, generatedAt,
 		config.ContentInputs{ShowMergedPRsInMessage: true},
 	)
 
@@ -194,7 +194,7 @@ func TestGetContentLeavesClosedButNotMergedTrackedPRsOut(t *testing.T) {
 	closedPR.PullRequest.State = "closed"
 
 	content := GetContent(
-		nil, []prview.PR{closedPR}, nil, nil, time.Time{}, generatedAt,
+		nil, []prview.PR{closedPR}, nil, nil, nil, time.Time{}, generatedAt,
 		config.ContentInputs{ShowMergedPRsInMessage: true},
 	)
 
@@ -268,7 +268,7 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			content := GetContent(
-				tc.openPRs, tc.trackedPRs, nil, nil, time.Time{}, generatedAt,
+				tc.openPRs, tc.trackedPRs, nil, nil, nil, time.Time{}, generatedAt,
 				config.ContentInputs{NoPRsMessage: "All caught up", ShowMergedPRsInMessage: true},
 			)
 
@@ -283,7 +283,7 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 }
 
 func TestGetContentCarriesTheRunTimestamp(t *testing.T) {
-	content := GetContent(nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
+	content := GetContent(nil, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
 
 	if !content.GeneratedAt.Equal(generatedAt) {
 		t.Errorf("expected generated at %v, got %v", generatedAt, content.GeneratedAt)

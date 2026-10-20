@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 )
@@ -440,5 +442,82 @@ func TestWithTrackedPRsAddedAppendsNewlyListedRefsAfterTheLoadedOnes(t *testing.
 	}
 	if loadedState.TrackedPRs[:cap(loadedState.TrackedPRs)][3] != (models.PullRequestRef{}) {
 		t.Errorf("Wrote into the loaded state's spare capacity: %+v", loadedState.TrackedPRs[:cap(loadedState.TrackedPRs)])
+	}
+}
+
+func TestWithRecentMergeStats(t *testing.T) {
+	utcPlus3 := time.FixedZone("UTC+3", 3*60*60)
+	mergeStatsComputedAt := func(computedAt time.Time) mergestats.MergeStats {
+		return mergestats.MergeStats{MergedCount: computedAt.Day(), ComputedAt: computedAt}
+	}
+	statsOf12th := mergeStatsComputedAt(time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC))
+	statsOf11th := mergeStatsComputedAt(time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC))
+	statsOf10th := mergeStatsComputedAt(time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC))
+
+	tests := []struct {
+		name                   string
+		loadedMergeStatsByDate map[string]mergestats.MergeStats
+		newMergeStats          *mergestats.MergeStats
+		asOf                   time.Time
+		expected               map[string]mergestats.MergeStats
+	}{
+		{
+			name:                   "keeps an entry 7 days old, drops one 8 days old, adds the new one",
+			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-12": statsOf12th, "2026-10-11": statsOf11th},
+			newMergeStats:          new(mergeStatsComputedAt(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC))),
+			asOf:                   time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC),
+			expected: map[string]mergestats.MergeStats{
+				"2026-10-12": statsOf12th,
+				"2026-10-19": mergeStatsComputedAt(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			name:                   "without new stats, only prunes",
+			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-12": statsOf12th, "2026-10-11": statsOf11th},
+			asOf:                   time.Date(2026, 10, 19, 23, 59, 0, 0, time.UTC),
+			expected:               map[string]mergestats.MergeStats{"2026-10-12": statsOf12th},
+		},
+		{
+			name:                   "dates an asOf outside UTC by its UTC date",
+			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-11": statsOf11th, "2026-10-10": statsOf10th},
+			asOf:                   time.Date(2026, 10, 19, 1, 0, 0, 0, utcPlus3),
+			expected:               map[string]mergestats.MergeStats{"2026-10-11": statsOf11th},
+		},
+		{
+			name:          "keys new stats computed outside UTC by their UTC date",
+			newMergeStats: new(mergeStatsComputedAt(time.Date(2026, 10, 19, 1, 0, 0, 0, utcPlus3))),
+			asOf:          time.Date(2026, 10, 18, 22, 0, 0, 0, time.UTC),
+			expected: map[string]mergestats.MergeStats{
+				"2026-10-18": mergeStatsComputedAt(time.Date(2026, 10, 19, 1, 0, 0, 0, utcPlus3)),
+			},
+		},
+		{
+			name:                   "a loaded entry of the same date stays over the new stats",
+			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-12": statsOf12th},
+			newMergeStats:          new(mergeStatsComputedAt(time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC))),
+			asOf:                   time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC),
+			expected:               map[string]mergestats.MergeStats{"2026-10-12": statsOf12th},
+		},
+		{
+			name:                   "every entry pruned leaves none",
+			loadedMergeStatsByDate: map[string]mergestats.MergeStats{"2026-10-11": statsOf11th},
+			asOf:                   time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC),
+			expected:               map[string]mergestats.MergeStats{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loadedEntryCount := len(tt.loadedMergeStatsByDate)
+
+			result := WithRecentMergeStats(createTestState(), tt.loadedMergeStatsByDate, tt.newMergeStats, tt.asOf)
+
+			if !maps.Equal(result.MergeStatsByDate, tt.expected) {
+				t.Errorf("MergeStatsByDate: got %+v, want %+v", result.MergeStatsByDate, tt.expected)
+			}
+			if len(tt.loadedMergeStatsByDate) != loadedEntryCount {
+				t.Errorf("Changed the loaded map: %+v", tt.loadedMergeStatsByDate)
+			}
+		})
 	}
 }

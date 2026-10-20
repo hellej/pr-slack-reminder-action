@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,14 +23,15 @@ import (
 const CurrentSchemaVersion = 1
 
 type State struct {
-	SchemaVersion                 int                     `json:"schemaVersion"`
-	MessagePostedAt               time.Time               `json:"messagePostedAt"`
-	MessageRef                    SlackRef                `json:"messageRef"`
-	TrackedPRs                    []models.PullRequestRef `json:"trackedPRs"`
-	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
-	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
-	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
-	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
+	SchemaVersion                 int                              `json:"schemaVersion"`
+	MessagePostedAt               time.Time                        `json:"messagePostedAt"`
+	MessageRef                    SlackRef                         `json:"messageRef"`
+	TrackedPRs                    []models.PullRequestRef          `json:"trackedPRs"`
+	LastWrittenCanvasMarkdownHash string                           `json:"canvasContentHash"`
+	LastWrittenMessage            LastWrittenMessage               `json:"lastWrittenMessage"`
+	MergedPRCache                 []githubclient.PR                `json:"mergedPRCache,omitempty"`
+	MergeStats                    *mergestats.MergeStats           `json:"mergeStats,omitempty"`
+	MergeStatsByDate              map[string]mergestats.MergeStats `json:"mergeStatsByDate,omitempty"`
 	// When any post last computed stats. Equals MergeStats.ComputedAt when that is set. See state.spec.md § Behaviour
 	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
@@ -156,6 +158,54 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 	})
 	s.MergedPRCache = utilities.UniqueFunc(cacheablePRs, isSamePullRequest)
 	return s
+}
+
+const daysInAWeek = 7
+
+// Keeps the entries back to the week before, the oldest a later run looks up. A day's first
+// entry stays: a later post that day covers only the hours since. See state.spec.md § Behaviour
+func WithRecentMergeStats(
+	s State,
+	loadedMergeStatsByDate map[string]mergestats.MergeStats,
+	newMergeStats *mergestats.MergeStats,
+	asOf time.Time,
+) State {
+	recentMergeStatsByDate := map[string]mergestats.MergeStats{}
+	maps.Copy(recentMergeStatsByDate, loadedMergeStatsByDate)
+	if newMergeStats != nil {
+		dateKey := mergeStatsDateKey(newMergeStats.ComputedAt)
+		if _, hasEntryOfTheDay := recentMergeStatsByDate[dateKey]; !hasEntryOfTheDay {
+			recentMergeStatsByDate[dateKey] = *newMergeStats
+		}
+	}
+	oldestKeptDateKey := weekBeforeDateKey(asOf)
+	// The keys are ISO dates, which sort as text.
+	maps.DeleteFunc(recentMergeStatsByDate, func(dateKey string, _ mergestats.MergeStats) bool {
+		return dateKey < oldestKeptDateKey
+	})
+	s.MergeStatsByDate = recentMergeStatsByDate
+	return s
+}
+
+func MergeStatsWeekBefore(
+	mergeStatsByDate map[string]mergestats.MergeStats, shown *mergestats.MergeStats,
+) *mergestats.MergeStats {
+	if shown == nil {
+		return nil
+	}
+	weekBefore, isFound := mergeStatsByDate[weekBeforeDateKey(shown.ComputedAt)]
+	if !isFound {
+		return nil
+	}
+	return &weekBefore
+}
+
+func mergeStatsDateKey(t time.Time) string {
+	return t.UTC().Format(time.DateOnly)
+}
+
+func weekBeforeDateKey(t time.Time) string {
+	return mergeStatsDateKey(t.UTC().AddDate(0, 0, -daysInAWeek))
 }
 
 func isSamePullRequest(a, b githubclient.PR) bool {

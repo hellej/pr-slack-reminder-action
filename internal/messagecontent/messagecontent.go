@@ -44,6 +44,7 @@ func GetContent(
 	trackedPRs []prview.PR,
 	recentlyMergedPRs []prview.PR,
 	mergeStats *mergestats.MergeStats,
+	mergeStatsWeekBefore *mergestats.MergeStats,
 	messagePostedAt time.Time,
 	generatedAt time.Time,
 	contentInputs config.ContentInputs,
@@ -69,7 +70,7 @@ func GetContent(
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
 		Merged:              newPRSection(mergedPRs, contentInputs),
-		MergeStatsText:      mergeStatsText(mergeStats),
+		MergeStatsText:      mergeStatsText(mergeStats, mergeStatsWeekBefore),
 		GeneratedAt:         generatedAt,
 		GroupedByRepository: contentInputs.GroupByRepository,
 	}
