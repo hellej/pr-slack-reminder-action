@@ -201,7 +201,7 @@ func isWeekdayAgeOver(pr githubclient.PR, thresholdHours int) bool {
 	if thresholdHours == 0 {
 		return false
 	}
-	if pr.ReadyForReviewAt().IsZero() {
+	if !pr.HasReadyForReviewTime() {
 		return true
 	}
 	return WeekdayTimeBetween(pr.ReadyForReviewAt(), time.Now()) > time.Duration(thresholdHours)*time.Hour
