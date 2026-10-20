@@ -33,9 +33,9 @@ Check it against:
     the spec, is a `medium` Fix. A term coined in a spec doesn't make a name clear
 - Whether any prose is true is not yours to check: `prose-truth-checker` checks every
   spec, comment and doc claim against the code, references and stale claims included
-- How Markdown and YAML prose reads is not yours either: `prose-cold-reader` checks it
+- How Markdown and YAML prose reads is not yours either: `prose-clarity-checker` checks it
 - Go comments and docstrings the change wrote stay yours for wording, since
-  `prose-cold-reader` doesn't read Go. An AGENTS.md § Output Style breach is a `nit`. A
+  `prose-clarity-checker` doesn't read Go. An AGENTS.md § Output Style breach is a `nit`. A
   sentence with two readings is a `medium` Fix. The comment rule
   below stays yours too
 - Live coverage: a new GitHub or Slack API path the Build E2E runs never execute, such as

@@ -74,18 +74,18 @@ implementer where the plan has gone stale.
    - The plan file path, the checkpoints, and the acceptance criteria
    - What is already landed, by file and symbol
    - Findings carried forward from a checkpoint review
-2. At the final review only: when the implementer reports, spawn `prose-cold-reader` and
+2. At the final review only: when the implementer reports, spawn `prose-clarity-checker` and
    give it the base. Send its medium findings to the implementer and wait for the fixes.
    Its nits wait for § Nits On a Pass. This does not spend a round
 3. Spawn the reviewing agents in parallel, in one message:
    - At a checkpoint, the `reviewer` only
    - At the final review, the `reviewer`, a new `prose-truth-checker`, and the
-     `prose-cold-reader` from step 2, continued with `SendMessage`
+     `prose-clarity-checker` from step 2, continued with `SendMessage`
    - Brief the `reviewer` with the plan, the implementer's report, and the blind spots
      above. Tell it to check the report's claims against the tree. A mock renders
      whatever the code asks it for, so a wrong query shape or page size passes it
    - Brief `prose-truth-checker` with the base, the behaviours the change alters, and the
-     plan files to sweep. Brief `prose-cold-reader` with the base again
+     plan files to sweep. Brief `prose-clarity-checker` with the base again
 4. Merge the reports into one verdict. It is `CHANGES NEEDED` when any report holds a high
    or medium Fix, or a Document finding, else `PASS`. Every report's nits go to § Nits On a
    Pass. Each claim `prose-truth-checker` marks `unverifiable` goes to the hand-back
@@ -98,7 +98,7 @@ implementer where the plan has gone stale.
 5. Four rounds maximum. At the cap, hand back with the open findings named and the code
    as it stands
 
-The prose agents are `prose-truth-checker` and `prose-cold-reader`. Spawn every agent
+The prose agents are `prose-truth-checker` and `prose-clarity-checker`. Spawn every agent
 with `run_in_background: false`.
 
 Agent definitions load at session start. If an agent this section names is not registered
