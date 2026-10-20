@@ -447,10 +447,12 @@ func groupedOverRepositories(count int) prview.PRSection {
 
 const repositoriesBuildingSixtyOneContentBlocks = 30
 
+// 48 content blocks end on the 24th repository's sub-heading, its list dropped.
 func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
+		MergeStatsText:      testMergeStatsText,
 		GeneratedAt:         generatedAt,
 	})
 
@@ -459,8 +461,8 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 		t.Fatalf("expected 50 blocks, got %d", len(blocks))
 	}
 	ids := blockIDs(blocks)
-	if ids[47] != "section_waiting_for_review_repository_24_sub_heading" || ids[48] != "section_waiting_for_review_repository_24" {
-		t.Errorf("expected the 24th repository's sub-heading and list before the footer, got %s and %s", ids[47], ids[48])
+	if ids[47] != "section_waiting_for_review_repository_24_sub_heading" || ids[48] != "merge_stats_line" {
+		t.Errorf("expected the 24th repository's sub-heading and the merge stats line before the footer, got %s and %s", ids[47], ids[48])
 	}
 	footer, isContextBlock := blocks[49].(*slack.ContextBlock)
 	if !isContextBlock {
@@ -472,10 +474,27 @@ func TestMessageWithUpdateTimeFooterIsCappedAtFiftyBlocksWithTheFooterLast(t *te
 	}
 }
 
+func TestMessageWithoutMergeStatsLeavesItsSlotEmptyAtTheCap(t *testing.T) {
+	message, _ := messagebuilder.BuildMessageWithUpdateTimeFooter(messagecontent.Content{
+		GroupedByRepository: true,
+		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
+		GeneratedAt:         generatedAt,
+	})
+
+	blocks := message.Blocks.BlockSet
+	if len(blocks) != 49 {
+		t.Fatalf("expected 49 blocks, got %d", len(blocks))
+	}
+	if ids := blockIDs(blocks); ids[47] != "section_waiting_for_review_repository_24_sub_heading" {
+		t.Errorf("expected the 24th repository's sub-heading before the footer, got %s", ids[47])
+	}
+}
+
 func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T) {
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		GroupedByRepository: true,
 		WaitingForReview:    groupedOverRepositories(repositoriesBuildingSixtyOneContentBlocks),
+		MergeStatsText:      testMergeStatsText,
 		GeneratedAt:         generatedAt,
 	})
 	sentBlocks, err := json.Marshal(message.Blocks.BlockSet)
@@ -505,7 +524,7 @@ func TestPostedMessageAtTheCapStaysWithinFiftyBlocksWhenMarkedStale(t *testing.T
 	if markedMessageBlocks[48].BlockID != "section_waiting_for_review_repository_24_sub_heading" || markedMessageBlocks[48].Type != "context" {
 		t.Errorf("expected the 24th repository's sub-heading second to last, got %+v", markedMessageBlocks[48])
 	}
-	if markedMessageBlocks[49].BlockID != "section_waiting_for_review_repository_24" || markedMessageBlocks[49].Type != "rich_text" {
-		t.Errorf("expected the 24th repository's list last, got %+v", markedMessageBlocks[49])
+	if markedMessageBlocks[49].BlockID != "merge_stats_line" || markedMessageBlocks[49].Type != "context" {
+		t.Errorf("expected the merge stats line last, got %+v", markedMessageBlocks[49])
 	}
 }

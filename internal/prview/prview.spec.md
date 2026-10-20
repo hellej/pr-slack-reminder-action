@@ -8,6 +8,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
 - A PR's age counts from its ready-for-review time, `githubclient.PR.ReadyForReviewAt()`: its first switch from draft to ready, else its creation
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR's weekday age is past it. Weekday age leaves out Saturdays and Sundays, whole UTC days, so a PR that turned ready on a weekend starts counting Monday 00:00 UTC
+- `WeekdayTimeBetween(from, to)` is that weekday time, also read by [internal/mergestats](../mergestats/mergestats.spec.md). Zero when `from` is not before `to`. It walks one day at a time, so on a zero `from` it walks from year 1: callers guard it
 - Everything else, the age text included, reads calendar time
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards

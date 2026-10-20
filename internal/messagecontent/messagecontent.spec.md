@@ -1,10 +1,10 @@
 # messagecontent
 
-Structures PR views into the sections a reminder message shows, as a `Content` value ready for `messagebuilder`.
+Structures PR views into the sections a reminder message shows, and words its summary, no-open-PRs and merge stats texts, as a `Content` value ready for `messagebuilder`.
 
 ## Behaviour
 
-- `GetContent(openPRs, trackedPRs, recentlyMergedPRs, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
+- `GetContent(openPRs, trackedPRs, recentlyMergedPRs, mergeStats, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
 - `openPRs` are open right now and already draft-filtered by the caller; `trackedPRs` are the PRs the message has listed in an open section since it was posted, as re-fetched, in whatever state they are now
 - Open sections: `openPRs` sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest`, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
 - Merged section, ordered newest merge first:
@@ -24,7 +24,12 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
   - `"Nothing waiting for review 🎉"` when no open PR is listed
 - `NoOpenPRsText` carries the configured `no-prs-message`, set only when no open PR is listed
 - `GeneratedAt` carries the run timestamp through for the footer
-- `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included
+- `MergeStatsText` is the merge stats line's wording, plain text without markup ([internal/messagebuilder](../messagebuilder/messagebuilder.spec.md) sets it in italics), built from the given merge stats whatever `ShowMergedPRsInMessage` says. Empty when the stats are nil
+  - `Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge`
+  - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`
+  - A nil median drops its part: `Last 7 days: 2 merged · median 1.0 days to merge`, and with both nil, `Last 7 days: 0 merged`
+  - A duration reads in whole minutes under an hour, in hours with one decimal under 24 hours, else in days with one decimal: `24 minutes`, `1 minute`, `4.0 hours`, `1.0 days`
+- `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included. `MergeStatsText` never counts
 
 ## Doesn't Do
 
@@ -34,4 +39,6 @@ Structures PR views into the sections a reminder message shows, as a `Content` v
 ## Oddities
 
 - A section fills `Rows` or `Groups`, never both, so a reader has to know which by `Content.GroupedByRepository`
+- A merge stats window under 12 hours rounds to 0 days and reads `Last 1 day`, as does any window from 12 to 36 hours
+- The merge stats durations' rounding can read one unit past a switch: 59.6 minutes reads `60 minutes`, and 23.96 hours `24.0 hours`
 - A merged PR with no merge timestamp sorts last among the merged rows, since an unknown time reads as unknown rather than old. It counts as merged before the post

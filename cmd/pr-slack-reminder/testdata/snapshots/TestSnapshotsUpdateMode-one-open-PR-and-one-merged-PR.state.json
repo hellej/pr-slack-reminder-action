@@ -177,6 +177,7 @@
       "Conflicting": false,
       "HasOutstandingChangesRequest": false,
       "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
     }
   ]

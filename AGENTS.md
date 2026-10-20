@@ -41,6 +41,8 @@ Applies to all agent output: chat answers, docstrings, plans, and text written t
 - Avoid filler words
 - Avoid duplication and overlap with what's already said or written
 - Avoid dashes as punctuation. Use a comma, a colon, or a new sentence
+- Short never beats unambiguous: a reader without the code must get one meaning
+- Say it plainly: of two sentences with the same meaning, pick the one you'd say to a colleague
 
 ### Examples
 
@@ -88,6 +90,21 @@ Don't use a pronoun when an earlier noun in the same sentence could equally be i
 
 - ✗ `...every PR in the tracked set, plus the newest 3 entries of the fetch that are not already in it`
 - ✓ `...every PR in the tracked set, plus the newest 3 entries of the fetch not already in that set`
+
+Don't leave a trailing clause to imply what it changes:
+
+- ✗ `...is the new stats' time, else the loaded state's, a failed fetch included`
+- ✓ `...is the new stats' time, else the loaded state's. A failed stats fetch keeps the loaded time too`
+
+Don't write a sentence stiffer than you'd say it:
+
+- ✗ `The implement loop sends a medium Fix to the implementer, and any medium Fix holds back a PASS`
+- ✓ `A medium Fix goes to the implementer and blocks a PASS`
+
+Don't use a bare noun when two of its kind exist, or a count that doesn't add up:
+
+- ✗ `A failed fetch leaves them out` / `At most 50 blocks: capped at 48, plus the line`
+- ✓ `A failed stats fetch leaves the merge stats out` / `At most 50 blocks: 48 content blocks, the line and the staleness warning`
 
 ## References
 
@@ -220,7 +237,8 @@ Then two tracks; channel message & canvas, the message first. A failure in one d
 
 Around the run:
 
-- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: after sending, to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message and the canvas markdown hash
+- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash and the merge stats
+- **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line
 - **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings as they happen and the run's errors at exit, as annotations on the run page
 
 Shared by all:

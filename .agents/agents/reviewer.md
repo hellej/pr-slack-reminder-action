@@ -29,8 +29,18 @@ Check it against:
   its name, the reorder. A short, plain function needs none
 - Every name the change added or kept in code it touched: a clearer one, even only
   slightly more explicit, is a `nit` naming it
-- AGENTS.md § Output Style, over the prose this change wrote: spec bullets, comments,
-  docstrings. Each breach is a `nit`
+  - A name that reads clearly only next to its comment, or only to someone who has read
+    the spec, is a `medium` Fix. A term coined in a spec doesn't make a name clear
+- Whether any prose is true is not yours to check: `prose-truth-checker` checks every
+  spec, comment and doc claim against the code, references and stale claims included
+- How Markdown and YAML prose reads is not yours either: `prose-clarity-checker` checks it
+- Go comments and docstrings the change wrote stay yours for wording, since
+  `prose-clarity-checker` doesn't read Go. An AGENTS.md § Output Style breach is a `nit`. A
+  sentence with two readings is a `medium` Fix. The comment rule
+  below stays yours too
+- Live coverage: a new GitHub or Slack API path the Build E2E runs never execute, such as
+  one behind an input or a weekday, is a `medium` Fix naming the E2E scenario and the input
+  to set
 - Every comment the change added, production and test code, each with a verdict against
   AGENTS.md § Code Style's comment rule: keep, or what to rename or refactor so it can
   go. List them all, never a sample
@@ -38,10 +48,6 @@ Check it against:
     field, fixture or test case, the extracted helper, or the expression written the other
     way round
   - Read each comment against the code it sits on, never on its own
-- Every reference the change adds or edits, in code comments and Markdown alike: `§`
-  section pointers, links, skill and agent names. Each resolves and its target says what
-  it claims. A broken one is `medium`. `make check-style` already catches the forms in
-  AGENTS.md § References that don't resolve, but not a target that says something else
 - Dead code: anything this change left unreachable, unused, or superseded, including
   stale tests and helpers
 - Simplification: code the change could have reused instead of adding, especially

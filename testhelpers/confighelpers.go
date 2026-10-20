@@ -93,6 +93,8 @@ func setEnvFromConfig(t *testing.T, c TestConfig, overrides *map[string]any) {
 	setInputEnv(t, overrides, config.InputCollapsePRsFromAuthors, c.ContentInputs.CollapsePRsFromAuthors)
 	// Left unset unless overridden: TestConfig's zero-valued field would hide the merged section.
 	setInputEnv(t, overrides, config.InputShowMergedPRsInMessage, nil)
+	// Left unset unless overridden: unset defers to the merge stats day.
+	setInputEnv(t, overrides, config.InputShowMergeStatsInMessage, nil)
 }
 
 func setEnv(t *testing.T, overrides *map[string]any, envName string, value any) {

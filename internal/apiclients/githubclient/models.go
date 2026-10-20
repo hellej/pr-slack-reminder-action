@@ -95,12 +95,13 @@ type PR struct {
 	SnoozedUntil     *time.Time
 	// An unresolved review thread whose last comment is neither the author's nor a bot's. A
 	// thread with no comments, or one whose last commenter GitHub no longer reports, counts too.
-	HasThreadWaitingForAuthor bool
-	Conflicting               bool // cannot be merged as it stands
-	// A changes request by someone other than the author, whose reviewer is not requested again.
+	HasThreadWaitingForAuthor    bool
+	Conflicting                  bool // cannot be merged as it stands
 	HasOutstandingChangesRequest bool
 	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
 	FirstReadyForReviewEventAt *time.Time
+	// Nil without a submitted review by a person other than the author. See githubclient.spec.md § Behaviour
+	FirstReviewAt *time.Time
 	// False after a failed enrichment. See githubclient.spec.md § Behaviour
 	HasCompleteReviewerInfo bool
 }
@@ -114,6 +115,10 @@ func (p PR) ReadyForReviewAt() time.Time {
 		return *p.FirstReadyForReviewEventAt
 	}
 	return p.GetCreatedAt()
+}
+
+func (p PR) HasReadyForReviewTime() bool {
+	return !p.ReadyForReviewAt().IsZero()
 }
 
 type PRResult struct {

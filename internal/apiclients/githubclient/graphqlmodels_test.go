@@ -605,3 +605,74 @@ func TestPRWithReviewersDerivesFlagsFromDecodedJSON(t *testing.T) {
 		})
 	}
 }
+
+// The earliest review comes last: reviews(last: 100) arrives in an order GitHub doesn't document.
+func TestPRWithReviewersTakesTheEarliestHumanReviewAsTheFirstReview(t *testing.T) {
+	tests := []struct {
+		name        string
+		reviewsJSON string
+		expected    *time.Time
+	}{
+		{
+			name: "the earliest review by someone other than the author, among bot, self and pending ones",
+			reviewsJSON: `[
+				{"state":"COMMENTED","submittedAt":"2026-10-07T10:00:00Z","createdAt":"2026-10-07T10:00:00Z",
+					"author":{"login":"carol","__typename":"User","name":"Carol"}},
+				{"state":"COMMENTED","submittedAt":"2026-10-06T08:00:00Z","createdAt":"2026-10-06T08:00:00Z",
+					"author":{"login":"linter","__typename":"Bot"}},
+				{"state":"COMMENTED","submittedAt":"2026-10-06T08:30:00Z","createdAt":"2026-10-06T08:30:00Z",
+					"author":{"login":"alice","__typename":"User","name":"Alice"}},
+				{"state":"PENDING","submittedAt":null,"createdAt":"2026-10-06T08:45:00Z",
+					"author":{"login":"dave","__typename":"User","name":"Dave"}},
+				{"state":"APPROVED","submittedAt":"2026-10-06T09:00:00Z","createdAt":"2026-10-06T09:00:00Z",
+					"author":{"login":"bob","__typename":"User","name":"Bob"}}
+			]`,
+			expected: timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)),
+		},
+		{
+			name: "a review without a submittedAt takes its createdAt",
+			reviewsJSON: `[
+				{"state":"APPROVED","submittedAt":"2026-10-07T10:00:00Z","createdAt":"2026-10-07T10:00:00Z",
+					"author":{"login":"carol","__typename":"User","name":"Carol"}},
+				{"state":"COMMENTED","submittedAt":null,"createdAt":"2026-10-06T09:00:00Z",
+					"author":{"login":"bob","__typename":"User","name":"Bob"}}
+			]`,
+			expected: timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)),
+		},
+		{
+			name: "a review's submittedAt wins over an earlier createdAt",
+			reviewsJSON: `[
+				{"state":"APPROVED","submittedAt":"2026-10-06T09:00:00Z","createdAt":"2026-10-06T07:00:00Z",
+					"author":{"login":"bob","__typename":"User","name":"Bob"}}
+			]`,
+			expected: timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)),
+		},
+		{
+			name: "only the author's own and a bot's reviews",
+			reviewsJSON: `[
+				{"state":"COMMENTED","submittedAt":"2026-10-06T08:30:00Z","createdAt":"2026-10-06T08:30:00Z",
+					"author":{"login":"alice","__typename":"User","name":"Alice"}},
+				{"state":"COMMENTED","submittedAt":"2026-10-06T08:00:00Z","createdAt":"2026-10-06T08:00:00Z",
+					"author":{"login":"linter","__typename":"Bot"}}
+			]`,
+		},
+		{name: "no reviews", reviewsJSON: `[]`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeJSON := `{"author":{"login":"alice","__typename":"User","name":"Alice"},` +
+				`"reviews":{"nodes":` + tt.reviewsJSON + `}}`
+			var node pullRequestNode
+			if err := json.Unmarshal([]byte(nodeJSON), &node); err != nil {
+				t.Fatalf("unable to decode pull request node: %v", err)
+			}
+
+			pr := prWithReviewers(pullRequestFromNode(node), models.Repository{}, node)
+
+			if !reflect.DeepEqual(pr.FirstReviewAt, tt.expected) {
+				t.Errorf("FirstReviewAt = %v, expected %v", pr.FirstReviewAt, tt.expected)
+			}
+		})
+	}
+}

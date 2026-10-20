@@ -64,6 +64,7 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
    - A live check names the exact dispatch or edit that sets it up. Check the workflow can actually take it
    - Before planning a live check, see whether the Build workflow's E2E runs already cover it (AGENTS.md § Development Commands). Plan one only for what they miss, such as `GITHUB_TOKEN`
+     - A new GitHub or Slack API path gets an E2E scenario that executes it. When it runs only on a condition CI won't meet, such as a weekday, plan the input an E2E scenario sets to reach it
      - When a check needs a situation the E2E setup lacks, such as a PR in a given review state, ask the user whether they can add it to the test repositories or the E2E inputs. The E2E runs then cover it on every PR
 6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing
    - **Negative** is for effects that leave the repo worse off than not implementing the plan at all

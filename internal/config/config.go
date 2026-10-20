@@ -39,6 +39,7 @@ const (
 	InputPRTrackerCanvasLink         string = "pr-tracker-canvas-link"
 	InputCollapsePRsFromAuthors      string = "collapse-prs-from-authors"
 	InputShowMergedPRsInMessage      string = "show-merged-prs-in-message"
+	InputShowMergeStatsInMessage     string = "show-merge-stats-in-message"
 
 	MaxRepositories int = 30
 
@@ -81,6 +82,8 @@ type ContentInputs struct {
 	GroupByRepository           bool
 	CollapsePRsFromAuthors      []string
 	ShowMergedPRsInMessage      bool
+	// Nil leaves the choice to the run. See config.spec.md § Behaviour
+	ShowMergeStatsInMessage *bool
 }
 
 func (c Config) Print() {
@@ -129,9 +132,10 @@ func GetConfig() (Config, error) {
 		func(login string) bool { return login != "" },
 	)
 	showMergedPRsInMessage, err12 := inputhelpers.GetInputBoolOr(InputShowMergedPRsInMessage, true)
+	showMergeStatsInMessage, err13 := inputhelpers.GetInputOptionalBool(InputShowMergeStatsInMessage)
 
 	if err := errors.Join(
-		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10, err11, err12,
+		err1, err2, err3, err4, err5, err6, err7, err8, err9, err10, err11, err12, err13,
 	); err != nil {
 		return Config{}, err
 	}
@@ -168,6 +172,7 @@ func GetConfig() (Config, error) {
 			GroupByRepository:           groupByRepository,
 			CollapsePRsFromAuthors:      collapsePRsFromAuthors,
 			ShowMergedPRsInMessage:      showMergedPRsInMessage,
+			ShowMergeStatsInMessage:     showMergeStatsInMessage,
 		},
 		PRTrackerCanvasID: prTrackerCanvasID,
 	}
