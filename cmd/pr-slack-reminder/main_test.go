@@ -3051,13 +3051,13 @@ func mergedTestPR(number int) *github.PullRequest {
 
 func TestPostModeLeavesTheMergeStatsOutWhenTheirFetchFails(t *testing.T) {
 	weekBefore := mergeStatsComputedDaysBefore(time.Now(), 7)
-	previousPost := getTestState(GetTestStateOptions{})
-	previousPost.MergeStatsByDate = mergeStatsKeyedByDate(weekBefore)
+	previousPostState := getTestState(GetTestStateOptions{})
+	previousPostState.MergeStatsByDate = mergeStatsKeyedByDate(weekBefore)
 
 	logOutput, mockSlackAPI, savedState := runMergeStatsPostWithMergedSectionHidden(t, mockgithubclient.MockGitHubClientOptions{
 		MergedPRs:            []*github.PullRequest{mergedTestPR(2)},
 		MergedPRsSearchError: errors.New("search failed"),
-		MockPreviousState:    &previousPost,
+		MockPreviousState:    &previousPostState,
 	})
 
 	assertWarningAnnotations(t, logOutput, []string{
@@ -3186,8 +3186,8 @@ func runPostModeAfterAPostWithMergeStats(
 	overrides, _ := getFilePathOverrides(t)
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 	runStart := time.Now()
-	previousPost := getTestState(GetTestStateOptions{})
-	previousPost.MergeStatsByDate = mergeStatsKeyedByDate(previousMergeStats(runStart)...)
+	previousPostState := getTestState(GetTestStateOptions{})
+	previousPostState.MergeStatsByDate = mergeStatsKeyedByDate(previousMergeStats(runStart)...)
 
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
@@ -3196,7 +3196,7 @@ func runPostModeAfterAPostWithMergeStats(
 				Number: 2, Title: "Merged PR", AuthorLogin: "bob", AgeHours: 30,
 				State: "closed", Merged: true, MergedHoursAgo: 2,
 			})},
-			MockPreviousState: &previousPost,
+			MockPreviousState: &previousPostState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})),
 		isMergeStatsDay,

@@ -175,8 +175,8 @@ func (scenario snapshotScenario) previousPostState(runStart time.Time) *state.St
 	if scenario.previousPostStateAt == nil {
 		return nil
 	}
-	previousPost := scenario.previousPostStateAt(runStart)
-	return &previousPost
+	previousPostState := scenario.previousPostStateAt(runStart)
+	return &previousPostState
 }
 
 // Every span is a whole number of weeks, or a review before the PR turned ready, so the weekday
@@ -213,9 +213,9 @@ func previousMergeStatsADayAgoScenario() snapshotScenario {
 	)
 	scenario.isMergeStatsDay = false
 	scenario.previousPostStateAt = func(runStart time.Time) state.State {
-		previousPost := getTestState(GetTestStateOptions{})
-		previousPost.MergeStatsLastComputedAt = github.Ptr(runStart.Add(-24 * time.Hour))
-		return previousPost
+		previousPostState := getTestState(GetTestStateOptions{})
+		previousPostState.MergeStatsLastComputedAt = github.Ptr(runStart.Add(-24 * time.Hour))
+		return previousPostState
 	}
 	return scenario
 }
@@ -282,8 +282,8 @@ func mergeStatsDayWithAWeekBeforeScenario() snapshotScenario {
 	scenario := mergeStatsDayScenario("merge stats day with a week before", nil)
 	scenario.previousPostStateAt = func(runStart time.Time) state.State {
 		weekBeforeComputedAt := runStart.Add(-7 * 24 * time.Hour)
-		previousPost := getTestState(GetTestStateOptions{})
-		previousPost.MergeStatsByDate = map[string]mergestats.MergeStats{
+		previousPostState := getTestState(GetTestStateOptions{})
+		previousPostState.MergeStatsByDate = map[string]mergestats.MergeStats{
 			utcDateKey(weekBeforeComputedAt): {
 				MergedCount:             6,
 				MedianTimeToFirstReview: github.Ptr(50 * time.Hour),
@@ -292,7 +292,7 @@ func mergeStatsDayWithAWeekBeforeScenario() snapshotScenario {
 				ComputedAt:              weekBeforeComputedAt,
 			},
 		}
-		return previousPost
+		return previousPostState
 	}
 	return scenario
 }

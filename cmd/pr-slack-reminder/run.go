@@ -78,10 +78,10 @@ func Run(
 
 	switch cfg.RunMode {
 	case config.RunModePost:
-		previousPost := previousPostStateOrLogWhyMissing(loadedState, loadStateErr)
-		mergeStats := mergeStatsForThisPost(githubClient, cfg, previousPost, isMergeStatsDay, generatedAt)
+		previousPostState := previousPostStateOrLogWhyMissing(loadedState, loadStateErr)
+		mergeStats := mergeStatsForThisPost(githubClient, cfg, previousPostState, isMergeStatsDay, generatedAt)
 		stateToSave, messageErr = runPostMode(
-			slackClient, cfg, previousPost, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
+			slackClient, cfg, previousPostState, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
 		)
 	case config.RunModeUpdate:
 		if loadStateErr != nil {
@@ -119,7 +119,7 @@ func Run(
 func runPostMode(
 	slackClient slackclient.Client,
 	cfg config.Config,
-	previousPost *state.State,
+	previousPostState *state.State,
 	openPRs githubclient.OpenPRsResult,
 	mergedPRs []githubclient.PR,
 	mergeStats *mergestats.MergeStats,
@@ -127,7 +127,7 @@ func runPostMode(
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
 	prViews := buildNonDraftPRViews(openPRs, cfg)
-	mergeStatsByDateOfPreviousPost := mergeStatsByDateOf(previousPost)
+	mergeStatsByDateOfPreviousPost := mergeStatsByDateOf(previousPostState)
 	content := messagecontent.GetContent(
 		prViews,
 		nil,
@@ -151,13 +151,13 @@ func runPostMode(
 
 	postState := state.NewPostState(
 		prViews, sentMessageInfo, summaryText, generatedAt,
-		mergeStats, mergeStatsLastComputedAt(mergeStats, previousPost),
+		mergeStats, mergeStatsLastComputedAt(mergeStats, previousPostState),
 	)
 	postState = state.WithMergedPRCache(postState, mergedPRs)
 	postState = state.WithRecentMergeStats(postState, mergeStatsByDateOfPreviousPost, mergeStats, generatedAt)
 	var markAsStaleErr error
-	if previousPost != nil {
-		markAsStaleErr = markPreviousMessageStale(slackClient, *previousPost, sentMessageInfo.ChannelID)
+	if previousPostState != nil {
+		markAsStaleErr = markPreviousMessageStale(slackClient, *previousPostState, sentMessageInfo.ChannelID)
 	}
 	return &postState, errors.Join(sentMessageHandler(sentMessageInfo), markAsStaleErr)
 }
@@ -175,11 +175,11 @@ func previousPostStateOrLogWhyMissing(loadedState *state.State, loadStateErr err
 	return loadedState
 }
 
-func mergeStatsByDateOf(previousPost *state.State) map[string]mergestats.MergeStats {
-	if previousPost == nil {
+func mergeStatsByDateOf(previousPostState *state.State) map[string]mergestats.MergeStats {
+	if previousPostState == nil {
 		return nil
 	}
-	return previousPost.MergeStatsByDate
+	return previousPostState.MergeStatsByDate
 }
 
 // Nil when this post computes none, or fails to.
