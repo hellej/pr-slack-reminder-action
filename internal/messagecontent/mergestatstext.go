@@ -62,7 +62,7 @@ func hasNoPercentChange(median shownMedian) bool {
 }
 
 func percentChangeText(percentChange int) string {
-	if percentChange > 0 {
+	if percentChange >= 0 {
 		return fmt.Sprintf("+%d %%", percentChange)
 	}
 	return fmt.Sprintf("%d %%", percentChange)

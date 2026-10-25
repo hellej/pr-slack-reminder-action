@@ -154,10 +154,10 @@ func TestGetContentMergeStatsTextAgainstTheWeekBefore(t *testing.T) {
 			expected: "Last 7 days: 2 merged · median 1.0 days to merge (-20 %)",
 		},
 		{
-			name:       "a small drop reads 0 %",
+			name:       "a small drop rounding to no change reads +0 %",
 			stats:      mergestats.MergeStats{MergedCount: 2, MedianTimeToMerge: durationPtr(999 * time.Hour)},
 			weekBefore: mergestats.MergeStats{MergedCount: 2, MedianTimeToMerge: durationPtr(1000 * time.Hour)},
-			expected:   "Last 7 days: 2 merged · median 41.6 days to merge (0 %)",
+			expected:   "Last 7 days: 2 merged · median 41.6 days to merge (+0 %)",
 		},
 		{
 			name: "a shown median without a change leaves the parenthetical out",

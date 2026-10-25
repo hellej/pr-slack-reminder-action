@@ -29,7 +29,7 @@ Structures PR views into the sections a reminder message shows, and words its su
   - The window reads in whole days, `ComputedAt` minus `MergedSince` rounded to the nearest day, at least 1: `Last 1 day`, `Last 3 days`, `Last 7 days`
   - A nil median drops its part: `Last 7 days: 2 merged · median 1.0 days to merge`, and with both nil, `Last 7 days: 0 merged`
   - A duration reads in whole minutes under an hour, in hours with one decimal under 24 hours, else in days with one decimal: `24 minutes`, `1 minute`, `4.0 hours`, `1.0 days`
-  - With the week before given, the line ends with each shown median's change from [internal/mergestats](../mergestats/mergestats.spec.md)'s `PercentChanges`, in the medians' order: `… 1.3 days to merge (+15 %, -12 %)`, `… 1.0 days to merge (-20 %)`. A rise reads `+`, no change `0 %`
+  - With the week before given, the line ends with each shown median's change from [internal/mergestats](../mergestats/mergestats.spec.md)'s `PercentChanges`, in the medians' order: `… 1.3 days to merge (+15 %, -12 %)`, `… 1.0 days to merge (-20 %)`. A rise or no change reads `+`: `+15 %`, `+0 %`
   - The parenthetical shows only when every shown median has a change. A median without a change drops the whole parenthetical. A line without medians, such as `Last 1 day: 0 merged`, never gets a parenthetical
 - `Content.HasPRs()` reports whether any of the four sections has a row, collapsed rows included. `MergeStatsText` never counts
 

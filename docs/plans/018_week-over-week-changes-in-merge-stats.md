@@ -27,7 +27,7 @@ status: draft
   - The state a post saves holds the loaded map, plus the post's own stats when it computes them and the map holds no entry of that day, minus entries dated more than 7 days before the post's run. A Sunday post still carries the previous Monday's entry. The map holds at most 2 entries by default, 8 when every post computes the stats
   - Update runs carry it unchanged, through the existing `With*` copies
 - **Week before**: the entry keyed 7 days before the date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or when the state that post saved was not loaded in this run (expired artifact, failed load)
-- **Percent change**: `(shown − week before) / week before`, from the stored durations, never the rounded text. Rounded to a whole percent, rendered `+15 %`, `-12 %`, `0 %`
+- **Percent change**: `(shown − week before) / week before`, from the stored durations, never the rounded text. Rounded to a whole percent, rendered `+15 %`, `-12 %`, `+0 %`
   - Only for a median both weeks have, with a week-before value above 0
   - The parenthetical shows only when every median the line shows has a change
 - The merge stats line:
