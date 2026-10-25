@@ -367,7 +367,7 @@
       "HasCompleteReviewerInfo": true
     }
   ],
-  "mergeStats": {
+  "shownMergeStats": {
     "mergedCount": 3,
     "medianTimeToFirstReview": 216000000000000,
     "medianTimeToMerge": 432000000000000,

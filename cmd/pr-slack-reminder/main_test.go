@@ -2838,8 +2838,8 @@ func TestPostModeComputesTheMergeStatsPerTheInputAndTheDay(t *testing.T) {
 			if run.recording.MergedPRFetches != tc.expectedMergedPRFetches {
 				t.Errorf("Expected %d merged PR fetches, got %d", tc.expectedMergedPRFetches, run.recording.MergedPRFetches)
 			}
-			if (run.savedState.MergeStats != nil) != tc.expectsMergeStatsSavedAndShown {
-				t.Errorf("Expected merge stats saved: %t, got %+v", tc.expectsMergeStatsSavedAndShown, run.savedState.MergeStats)
+			if (run.savedState.ShownMergeStats != nil) != tc.expectsMergeStatsSavedAndShown {
+				t.Errorf("Expected merge stats saved: %t, got %+v", tc.expectsMergeStatsSavedAndShown, run.savedState.ShownMergeStats)
 			}
 			if run.mockSlackAPI.SentMessage.Blocks.ContainsBlockWithID("merge_stats_line") != tc.expectsMergeStatsSavedAndShown {
 				t.Errorf("Expected the merge stats line: %t", tc.expectsMergeStatsSavedAndShown)
@@ -2854,7 +2854,7 @@ func TestUpdateModeRendersTheLoadedMergeStatsWhateverTheInput(t *testing.T) {
 		config.InputShowMergeStatsInMessage: "false",
 	})
 	loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
-	loadedState.MergeStats = &mergestats.MergeStats{
+	loadedState.ShownMergeStats = &mergestats.MergeStats{
 		MergedCount: 4, MergedSince: now.Add(-7 * 24 * time.Hour), ComputedAt: now,
 	}
 	mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
@@ -3004,8 +3004,8 @@ func TestPostModeSavesWhenTheMergeStatsWereLastComputed(t *testing.T) {
 				}
 				return
 			}
-			if run.savedState.MergeStats == nil || !saved.Equal(run.savedState.MergeStats.ComputedAt) || saved.Equal(previousComputedAt) {
-				t.Errorf("Expected the new stats' time, got %v with stats %+v", saved, run.savedState.MergeStats)
+			if run.savedState.ShownMergeStats == nil || !saved.Equal(run.savedState.ShownMergeStats.ComputedAt) || saved.Equal(previousComputedAt) {
+				t.Errorf("Expected the new stats' time, got %v with stats %+v", saved, run.savedState.ShownMergeStats)
 			}
 		})
 	}
@@ -3025,7 +3025,7 @@ func TestPostModeDownloadsThePreviousStateOnce(t *testing.T) {
 	if run.mockSlackAPI.UpdatedMessage.Timestamp != "1788253200.000100" {
 		t.Errorf("Expected the previous message marked stale, got %+v", run.mockSlackAPI.UpdatedMessage)
 	}
-	if run.savedState.MergeStats == nil {
+	if run.savedState.ShownMergeStats == nil {
 		t.Error("Expected merge stats saved")
 	}
 }
@@ -3082,8 +3082,8 @@ func TestPostModeLeavesTheMergeStatsOutWhenTheirFetchFails(t *testing.T) {
 	if !sentBlocks.SomePRItemContainsText("Open PR") || sentBlocks.ContainsBlockWithID("merge_stats_line") {
 		t.Errorf("Expected the open PR sent without the merge stats line, got items %v", sentBlocks.GetAllPRItemTexts())
 	}
-	if savedState.MergeStats != nil {
-		t.Errorf("Expected no merge stats saved, got %+v", savedState.MergeStats)
+	if savedState.ShownMergeStats != nil {
+		t.Errorf("Expected no merge stats saved, got %+v", savedState.ShownMergeStats)
 	}
 	if len(savedState.RecentMergeStats) != 1 || savedState.RecentMergeStats[0].MergedCount != 7 {
 		t.Errorf("Expected the saved merge stats to hold the week before alone, got %+v", savedState.RecentMergeStats)
@@ -3105,8 +3105,8 @@ func TestPostModeLeavesMergedPRsWithIncompleteReviewerInfoOutOfTheMedians(t *tes
 	if !strings.HasPrefix(line, "_Last 7 days: 3 merged · median ") || !strings.Contains(line, " to first review, ") {
 		t.Errorf("Expected 3 merged with both medians, got %q", line)
 	}
-	if savedState.MergeStats == nil || savedState.MergeStats.MergedCount != 3 {
-		t.Errorf("Expected merge stats over 3 merged PRs saved, got %+v", savedState.MergeStats)
+	if savedState.ShownMergeStats == nil || savedState.ShownMergeStats.MergedCount != 3 {
+		t.Errorf("Expected merge stats over 3 merged PRs saved, got %+v", savedState.ShownMergeStats)
 	}
 }
 
@@ -3143,7 +3143,7 @@ func TestMergeStatsLineAloneIsNothingToShow(t *testing.T) {
 	t.Run("update deletes the message", func(t *testing.T) {
 		setUpdateModeEnvironment(t)
 		loadedState := getTestState(GetTestStateOptions{PRNumbers: []int{1}})
-		loadedState.MergeStats = &mergestats.MergeStats{MergedCount: 4}
+		loadedState.ShownMergeStats = &mergestats.MergeStats{MergedCount: 4}
 		mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 
 		err := main.Run(

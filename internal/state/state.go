@@ -29,7 +29,7 @@ type State struct {
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
-	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
+	ShownMergeStats               *mergestats.MergeStats  `json:"shownMergeStats,omitempty"`
 	RecentMergeStats              RecentMergeStats        `json:"recentMergeStats,omitempty"`
 }
 
@@ -112,7 +112,7 @@ func NewPostState(
 	messageInfo slackclient.SentMessageInfo,
 	summaryText string,
 	generatedAt time.Time,
-	mergeStats *mergestats.MergeStats,
+	shownMergeStats *mergestats.MergeStats,
 ) State {
 	return State{
 		SchemaVersion:   CurrentSchemaVersion,
@@ -123,7 +123,7 @@ func NewPostState(
 		},
 		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
 		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
-		MergeStats:         mergeStats,
+		ShownMergeStats:    shownMergeStats,
 	}
 }
 

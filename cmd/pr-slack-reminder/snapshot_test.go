@@ -1017,7 +1017,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			runStart := time.Now()
 			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
 			if tc.mergeStatsOfState != nil {
-				mockState.MergeStats, mockState.RecentMergeStats = tc.mergeStatsOfState(runStart)
+				mockState.ShownMergeStats, mockState.RecentMergeStats = tc.mergeStatsOfState(runStart)
 			}
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 				PRsByNumber:                       tc.prByNumber,
