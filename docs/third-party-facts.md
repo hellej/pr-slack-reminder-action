@@ -960,3 +960,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Measured against this action's state file:
   - A dev run's state minus `lastWrittenMessage` was 4358 bytes minified, over the limit with 1 tracked PR: `mergedPRCache` alone was 4018 bytes for 6 PRs
   - Tracked PR refs only, plus a 64 character hash: 40 refs took 3121 bytes and fit, 60 refs took 4621 bytes and were dropped
+
+## A user mention in a bot's `canvases.edit` replace notifies the user on every write [2026-10-25]
+
+- Source: manual probe on `pr-reminders-test` with the `slack-message-probe` and `slack-canvas-probe` skills, one human checking. Notifications were "Everything", the canvas closed in their client
+- A `chat.postMessage` with `<@U…>` notified the user
+- A `canvases.edit` replace with `![](@U…)` notified the user
+- 3 more replaces 90 seconds apart, each rewriting the same mention, notified the user each time
+- So a canvas that mentions people re-notifies them on every refresh. `canvasbuilder` names people instead
+- Not tested: an edit that leaves an existing mention untouched, since every write replaced the whole content
