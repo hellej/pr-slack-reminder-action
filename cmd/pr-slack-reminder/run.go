@@ -78,7 +78,7 @@ func Run(
 
 	switch cfg.RunMode {
 	case config.RunModePost:
-		previousPost := previousPostStateOrNil(loadedState, loadStateErr)
+		previousPost := previousPostStateOrLogWhyMissing(loadedState, loadStateErr)
 		mergeStats := mergeStatsForThisPost(githubClient, cfg, previousPost, isMergeStatsDay, generatedAt)
 		stateToSave, messageErr = runPostMode(
 			slackClient, cfg, previousPost, openPRs, mergedPRs, mergeStats, generatedAt, sentMessageHandler,
@@ -149,16 +149,12 @@ func runPostMode(
 		return nil, err
 	}
 
-	postState := state.WithRecentMergeStats(
-		state.WithMergedPRCache(
-			state.NewPostState(
-				prViews, sentMessageInfo, summaryText, generatedAt,
-				mergeStats, mergeStatsLastComputedAt(mergeStats, previousPost),
-			),
-			mergedPRs,
-		),
-		mergeStatsByDateOfPreviousPost, mergeStats, generatedAt,
+	postState := state.NewPostState(
+		prViews, sentMessageInfo, summaryText, generatedAt,
+		mergeStats, mergeStatsLastComputedAt(mergeStats, previousPost),
 	)
+	postState = state.WithMergedPRCache(postState, mergedPRs)
+	postState = state.WithRecentMergeStats(postState, mergeStatsByDateOfPreviousPost, mergeStats, generatedAt)
 	var markAsStaleErr error
 	if previousPost != nil {
 		markAsStaleErr = markPreviousMessageStale(slackClient, *previousPost, sentMessageInfo.ChannelID)
@@ -167,7 +163,7 @@ func runPostMode(
 }
 
 // This run's own state is uploaded after it ends, so the load finds the previous post's.
-func previousPostStateOrNil(loadedState *state.State, loadStateErr error) *state.State {
+func previousPostStateOrLogWhyMissing(loadedState *state.State, loadStateErr error) *state.State {
 	if errors.Is(loadStateErr, githubclient.ErrNoArtifactFound) {
 		log.Printf("Not marking the previous message stale, there is no previous state: %v", loadStateErr)
 		return nil

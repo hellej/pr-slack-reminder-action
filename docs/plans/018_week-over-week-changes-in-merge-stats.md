@@ -26,7 +26,7 @@ status: draft
 - **Recent merge stats** (`State.MergeStatsByDate`, JSON key `mergeStatsByDate`, `omitempty`): `map[string]mergestats.MergeStats`, keyed by the UTC date (`2006-01-02`) of each entry's `ComputedAt`
   - The state a post saves holds the loaded map, plus the post's own stats when it computes them and the map holds no entry of that day, minus entries dated more than 7 days before the post's run. A Sunday post still carries the previous Monday's entry. The map holds at most 2 entries by default, 8 when every post computes the stats
   - Update runs carry it unchanged, through the existing `With*` copies
-- **Week before**: the entry keyed 7 days before the date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or its state didn't reach this run
+- **Week before**: the entry keyed 7 days before the date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or when the state that post saved was not loaded in this run (expired artifact, failed load)
 - **Percent change**: `(shown − week before) / week before`, from the stored durations, never the rounded text. Rounded to a whole percent, rendered `+15 %`, `-12 %`, `0 %`
   - Only for a median both weeks have, with a week-before value above 0
   - The parenthetical shows only when every median the line shows has a change
@@ -36,7 +36,7 @@ status: draft
   - `Last 7 days: 0 merged`: no change
   - Without a week before: the plan 017 line, unchanged
 - Post mode loads the previous state before building its message, once, for both the week-before lookup and marking the previous message stale. Same warnings as today on a failed load
-- A second post on the same day finds the week before in the map, not the first post's entry from today. It keeps the first post's entry: its own window covers only the hours since
+- A second post on the same day finds the week before in the map, not the first post's entry from today. The saved map keeps the first post's entry, because the second post's window covers only the hours since the first post
 - No change to action inputs or permissions, and no GraphQL change. A post that sends nothing, or whose send fails, now warns on a failed state load. It loaded state before too, so its API calls don't change
 
 ### Message States
@@ -48,7 +48,7 @@ status: draft
 ## Breaking Change
 
 - Non-breaking, minor: a new part of an existing line, no input change
-- A state saved before this change has no `mergeStatsByDate`. The stats a week after upgrading are the first to show a change
+- A state saved before this change has no `mergeStatsByDate`. The first post to show a change is the one 7 days after the first post that saved its stats in the map
 - A downgrade ignores the key: `state.Load` decodes with `json.Unmarshal`, which skips unknown keys
 
 ## Summary
@@ -64,7 +64,7 @@ status: draft
 ### Step R1: Load post mode's previous state first
 
 - `cmd/pr-slack-reminder/`: `Run` loads the previous state before the merged fetch in post mode too, as it does in update mode
-  - Post mode turns the load result into the previous post's state or nil (`previousPostStateOrNil`), logging the skip or warning after the merged-PR fetch, before the stats fetch and the send, so a post that sends nothing warns too. Same texts as today
+  - Post mode turns the load result into the previous post's state or nil (`previousPostStateOrLogWhyMissing`), logging the skip or warning after the merged-PR fetch, before the stats fetch and the send, so a post that sends nothing warns too. Same texts as today
   - `markPreviousMessageStale` takes that loaded state instead of loading, and runs only when there is one
   - Post mode still passes no merged PR cache to the merged fetch: `Run` would pass the loaded cache whenever state is loaded, so `mergedPRCacheToReuse(runMode, loadedState)` tells the modes apart
 - Behaviour changes only in the load order, and in a post that sends nothing, or whose send fails, now warning on a failed state load. Existing tests and snapshots pass unchanged
@@ -96,7 +96,7 @@ status: draft
   - Update mode looks up the week before off the loaded `MergeStats.ComputedAt`
 - Snapshots, read before re-recording. The normaliser, which today rewrites values only, also rewrites the `mergeStatsByDate` keys to placeholders relative to the run, such as `<run date>` and `<run date - 7>`:
   - Monday post with a week before
-  - An update run's edit a day after a Monday post: its stats computed a day before the run, the week before 8 days before, so a lookup off the run's clock misses it
+  - An update run's edit a day after a Monday post: the shown stats were computed the day before the run, so the week before is dated 8 days before the run. A lookup off the run's clock (7 days back) misses it
   - Monday post without a week before: the existing merge stats snapshots, their messages unchanged, their states gaining the map
   - A second Monday post the same day, marking the first stale: the stale message keeps the parenthetical. The second post's window starts at the first post, so its own line has no medians, and its saved map keeps the first post's entry
 - `main_test.go`:

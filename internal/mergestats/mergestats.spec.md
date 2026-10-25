@@ -14,6 +14,7 @@ Computes the merge stats a post's message shows: the PRs merged in a window and 
 - An even count takes the mean of the two middle values
 - `MergedSince` and `ComputedAt` carry the given window start and `computedAt`, so the window can be rendered again later
 - `PercentChanges(shown, weekBefore)` returns two changes from `weekBefore` to `shown`: of the median time to first review, and of the median time to merge. Each is `100 × (shown − weekBefore) / weekBefore`, rounded half away from zero to a whole percent. Pure
+  - `weekBefore` is the stats a post computed 7 days before the UTC date of `shown.ComputedAt`, picked by the caller through `state.MergeStatsWeekBefore`. See [internal/state](../state/state.spec.md)
   - Nil for a median either week lacks, or whose week-before value is 0
   - Computed from the stored durations, so two weeks reading the same rounded text can still differ
   - Compares the medians whatever each window's length

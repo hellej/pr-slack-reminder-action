@@ -162,8 +162,7 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 
 const daysInAWeek = 7
 
-// Keeps the entries back to the week before, the oldest a later run looks up. A day's first
-// entry stays: a later post that day covers only the hours since. See state.spec.md § Behaviour
+// A later post the same day covers only the hours since the first. See state.spec.md § Behaviour
 func WithRecentMergeStats(
 	s State,
 	loadedMergeStatsByDate map[string]mergestats.MergeStats,
