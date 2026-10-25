@@ -367,10 +367,23 @@
       "HasCompleteReviewerInfo": true
     }
   ],
-  "mergeStats": {
+  "shownMergeStats": {
     "mergedCount": 0,
     "mergedSince": "1970-01-01T00:00:00Z",
     "computedAt": "1970-01-01T00:00:00Z"
   },
-  "mergeStatsLastComputedAt": "1970-01-01T00:00:00Z"
+  "recentMergeStats": [
+    {
+      "mergedCount": 4,
+      "medianTimeToFirstReview": 216000000000000,
+      "medianTimeToMerge": 648000000000000,
+      "mergedSince": "1970-01-01T00:00:00Z",
+      "computedAt": "1970-01-01T00:00:00Z"
+    },
+    {
+      "mergedCount": 0,
+      "mergedSince": "1970-01-01T00:00:00Z",
+      "computedAt": "1970-01-01T00:00:00Z"
+    }
+  ]
 }

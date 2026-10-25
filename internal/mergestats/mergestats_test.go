@@ -221,3 +221,89 @@ func describe(stats mergestats.MergeStats) string {
 		durationText(stats.MedianTimeToMerge), stats.MergedSince, stats.ComputedAt,
 	)
 }
+
+func TestPercentChanges(t *testing.T) {
+	tests := []struct {
+		name                      string
+		shown                     mergestats.MergeStats
+		weekBefore                mergestats.MergeStats
+		expectedFirstReviewChange *int
+		expectedMergeChange       *int
+	}{
+		{
+			name:                      "a rise and a drop",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(23 * time.Hour), MedianTimeToMerge: durationPtr(34 * time.Hour)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(20 * time.Hour), MedianTimeToMerge: durationPtr(40 * time.Hour)},
+			expectedFirstReviewChange: new(15),
+			expectedMergeChange:       new(-15),
+		},
+		{
+			name:                      "half values round away from zero",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(9 * time.Hour), MedianTimeToMerge: durationPtr(7 * time.Hour)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(8 * time.Hour), MedianTimeToMerge: durationPtr(8 * time.Hour)},
+			expectedFirstReviewChange: new(13),
+			expectedMergeChange:       new(-13),
+		},
+		{
+			name:                      "from the stored durations, not the rounded text: both read 1.0 days",
+			shown:                     mergestats.MergeStats{MedianTimeToMerge: durationPtr(24*time.Hour + 72*time.Minute)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToMerge: durationPtr(24 * time.Hour)},
+			expectedFirstReviewChange: nil,
+			expectedMergeChange:       new(5),
+		},
+		{
+			name:                      "small changes round to 0",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(999 * time.Hour), MedianTimeToMerge: durationPtr(1001 * time.Hour)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(1000 * time.Hour), MedianTimeToMerge: durationPtr(1000 * time.Hour)},
+			expectedFirstReviewChange: new(0),
+			expectedMergeChange:       new(0),
+		},
+		{
+			name:                      "a week-before value of 0",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(time.Hour), MedianTimeToMerge: durationPtr(0)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(0), MedianTimeToMerge: durationPtr(0)},
+			expectedFirstReviewChange: nil,
+			expectedMergeChange:       nil,
+		},
+		{
+			name:                      "a shown value of 0 is a drop of 100",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(0)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(4 * time.Hour)},
+			expectedFirstReviewChange: new(-100),
+			expectedMergeChange:       nil,
+		},
+		{
+			name:                      "missing this week",
+			shown:                     mergestats.MergeStats{MedianTimeToMerge: durationPtr(2 * time.Hour)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(time.Hour), MedianTimeToMerge: durationPtr(4 * time.Hour)},
+			expectedFirstReviewChange: nil,
+			expectedMergeChange:       new(-50),
+		},
+		{
+			name:                      "missing the week before",
+			shown:                     mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(3 * time.Hour), MedianTimeToMerge: durationPtr(2 * time.Hour)},
+			weekBefore:                mergestats.MergeStats{MedianTimeToFirstReview: durationPtr(time.Hour)},
+			expectedFirstReviewChange: new(200),
+			expectedMergeChange:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			firstReviewChange, mergeChange := mergestats.PercentChanges(tt.shown, tt.weekBefore)
+			if !reflect.DeepEqual(firstReviewChange, tt.expectedFirstReviewChange) {
+				t.Errorf("Expected the first review change %s, got %s", percentText(tt.expectedFirstReviewChange), percentText(firstReviewChange))
+			}
+			if !reflect.DeepEqual(mergeChange, tt.expectedMergeChange) {
+				t.Errorf("Expected the merge change %s, got %s", percentText(tt.expectedMergeChange), percentText(mergeChange))
+			}
+		})
+	}
+}
+
+func percentText(change *int) string {
+	if change == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%d %%", *change)
+}

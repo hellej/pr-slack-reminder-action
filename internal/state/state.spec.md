@@ -1,21 +1,24 @@
 # state
 
-Persists and reloads the tracked PRs, Slack message reference, last written message, merged PR cache and merge stats, so "update" mode can find and edit that message without re-enriching merged PRs, and the next "post" can mark it stale. See [AGENTS.md](../../AGENTS.md) for the two run-modes' overall flow.
+Persists and reloads the tracked PRs, Slack message reference, last written message, merged PR cache and recent merge stats, so "update" mode can find and edit that message without re-enriching merged PRs, and the next "post" can mark it stale and compare its merge stats against the week before. See [AGENTS.md](../../AGENTS.md) for the two run-modes' overall flow.
 
 ## Behaviour
 
 - State carries a schema version, `MessagePostedAt`, `MessageRef` (the sent Slack message's channel/timestamp), the tracked PRs (every PR the message has listed in an open section since it was posted), the hash of the markdown last written to the PR tracker canvas, and `LastWrittenMessage`: the message's blocks as last sent or edited, its summary text, and the `generatedAt` its content was built at
-- State also carries `MergedPRCache`, merged PRs as enriched, and `MergeStats`, the [internal/mergestats](../mergestats/mergestats.spec.md) value the post computed, nil when it computed none
+- State also carries `MergedPRCache`, merged PRs as enriched, and `ShownMergeStats`, the [internal/mergestats](../mergestats/mergestats.spec.md) value the post computed, nil when it computed none
+- `RecentMergeStats` (type `RecentMergeStats`, a slice of `mergestats.MergeStats`) holds the recent merge stats, oldest `ComputedAt` first, so a post computing stats finds the week before. An entry's date is the UTC date of its `ComputedAt`
 - `Load()` fetches the most recent saved state for a repository (via a GitHub Actions artifact)
-- `NewPostState()` builds state from a "post" run's PR views, Slack send result, summary text, `generatedAt`, merge stats and `MergeStatsLastComputedAt`. The only place stamping the schema version and `MessagePostedAt`, and it leaves the canvas hash empty for the caller to fill in
+- `NewPostState()` builds state from a "post" run's PR views, Slack send result, summary text, `generatedAt` and merge stats. The only place stamping the schema version and `MessagePostedAt`, and it leaves the canvas hash empty for the caller to fill in
 - `WithLastWrittenMessage()` returns a copy of a state with `LastWrittenMessage` replaced by an edit's blocks, summary text and `generatedAt`
 - `WithTrackedPRsAdded()` returns a copy of a state with an edit's listed PR views added to the tracked PRs: loaded refs keep their order, refs not already tracked append in the views' order
 - `WithMergedPRCache()` returns a copy of a state with `MergedPRCache` replaced by the given PRs that are merged and have complete reviewer info, one per ref, the first kept
-- `MergeStats` is what this state's message shows. `MergeStatsLastComputedAt` is when any post last computed stats, where the next window starts
-  - When `MergeStats` is set, the two come from the same fetch: `MergeStatsLastComputedAt` equals `MergeStats.ComputedAt`
-  - A post computing no stats, or whose stats fetch failed, saves nil `MergeStats` and carries `MergeStatsLastComputedAt` forward from the loaded state
-  - `NewPostState` stores both as given. The run picks them: see [run.spec.md](../../cmd/pr-slack-reminder/run.spec.md) § Behaviour
-- The `With*` copies carry `MergeStats` and `MergeStatsLastComputedAt` through unchanged
+- `RecentMergeStats.WithAdded(newMergeStats, asOf)` returns a new slice: the receiver's entries plus `newMergeStats` when it is not nil, appended last. It drops every entry dated more than 7 days before the UTC date of `asOf`, so one exactly 7 days before stays. It leaves the slice it is called on unchanged
+  - The slice stays oldest first only because `newMergeStats` is always the newest: the run passes its own stats
+- `RecentMergeStats.WeekBefore(shown)` returns the first entry dated exactly 7 days before the UTC date of `shown.ComputedAt`. Nil when `shown` is nil or there is no such entry
+  - The first entry wins, since a later post that day covers only the hours since the first
+- `RecentMergeStats.LastComputedAt()` returns the `ComputedAt` of the last entry, the time a post last computed stats. Nil without entries
+- `ShownMergeStats` is what this state's message shows, nil when the post computed none or its stats fetch failed. When set, it is also the last entry of `RecentMergeStats`
+- The `With*` copies carry `ShownMergeStats` and `RecentMergeStats` through unchanged
 - `Save()` writes a state value to a file, for later reloading by `Load()`, and logs what it wrote
 - `SaveSentSlackBlocksToFile()` separately writes a sent message's block array to a file, indented, for inspection
   - Errors on empty blocks rather than writing an empty record
@@ -31,9 +34,9 @@ Persists and reloads the tracked PRs, Slack message reference, last written mess
 - `LastWrittenCanvasMarkdownHash` (JSON key `canvasContentHash`) was added without bumping `CurrentSchemaVersion`. An artifact saved before it decodes an empty hash, which reads as "write the canvas"
 - `LastWrittenMessage` was added the same way. An artifact saved before it decodes an empty `LastWrittenMessage`, and an empty one saves and loads back empty
 - `MergedPRCache` (JSON key `mergedPRCache`) was added the same way. An artifact saved before it decodes no cache, and an empty cache saves no key
-- `MergeStats` (JSON key `mergeStats`) was added the same way. An artifact saved before it decodes no stats, and nil stats save no key
-- `MergeStatsLastComputedAt` (JSON key `mergeStatsLastComputedAt`) was added the same way. An artifact saved before it decodes nil, and nil saves no key
-- An update run rewrites only `LastWrittenMessage`, the canvas hash, the tracked PRs and the merged PR cache. `MessageRef`, `MessagePostedAt`, `MergeStats` and `MergeStatsLastComputedAt` stay the post run's
+- `ShownMergeStats` (JSON key `shownMergeStats`) was added the same way. An artifact saved before it decodes no stats, and nil stats save no key
+- `RecentMergeStats` (JSON key `recentMergeStats`) was added the same way. An artifact saved before it decodes no entries, and an empty slice saves no key
+- An update run rewrites only `LastWrittenMessage`, the canvas hash, the tracked PRs and the merged PR cache. `MessageRef`, `MessagePostedAt`, `ShownMergeStats` and `RecentMergeStats` stay the post run's
 - `Save()` indents the stored blocks with the rest of the file, so they load back with the same JSON but not the same bytes as sent
 - `MessagePostedAt`, `MessageRef` and `TrackedPRs` save as `messagePostedAt`, `messageRef` and `trackedPRs`. Loading still reads the keys older releases wrote, `createdAt`, `slackMessage` and `pullRequests`, when the new key is absent or empty. A later release drops that fallback
 - A PR ref's repository saves as `"Owner"` and `"Name"`, capitalised: `models.Repository` has no JSON tags. A merged PR cache entry is a `githubclient.PR` saved the same way, its keys its Go field names. The state snapshots in `cmd/pr-slack-reminder` pin these keys. Renaming one of those Go fields decodes it empty from older state files

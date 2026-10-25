@@ -1,0 +1,77 @@
+[
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": "👀 Waiting for review",
+      "emoji": true
+    },
+    "block_id": "heading_waiting_for_review",
+    "level": 2
+  },
+  {
+    "type": "rich_text",
+    "block_id": "section_waiting_for_review",
+    "elements": [
+      {
+        "type": "rich_text_list",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/71",
+                "text": "The only open PR",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 4 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Alice Anderson",
+                "style": {}
+              }
+            ]
+          }
+        ],
+        "style": "bullet",
+        "indent": 0,
+        "border": 0,
+        "offset": 0
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "block_id": "merge_stats_line",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_Last 7 days: 11 merged · median 3.7 hours to first review, 1.3 days to merge (-8 %, +30 %)_"
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "block_id": "update_time_footer",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
+      }
+    ]
+  }
+]

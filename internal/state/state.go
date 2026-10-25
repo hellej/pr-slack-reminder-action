@@ -29,9 +29,8 @@ type State struct {
 	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
 	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
-	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
-	// When any post last computed stats. Equals MergeStats.ComputedAt when that is set. See state.spec.md § Behaviour
-	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
+	ShownMergeStats               *mergestats.MergeStats  `json:"shownMergeStats,omitempty"`
+	RecentMergeStats              RecentMergeStats        `json:"recentMergeStats,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -113,8 +112,7 @@ func NewPostState(
 	messageInfo slackclient.SentMessageInfo,
 	summaryText string,
 	generatedAt time.Time,
-	mergeStats *mergestats.MergeStats,
-	mergeStatsLastComputedAt *time.Time,
+	shownMergeStats *mergestats.MergeStats,
 ) State {
 	return State{
 		SchemaVersion:   CurrentSchemaVersion,
@@ -123,10 +121,9 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		TrackedPRs:               utilities.Map(prViews, PRToPullRequestRef),
-		LastWrittenMessage:       newLastWrittenMessage(messageInfo, summaryText, generatedAt),
-		MergeStats:               mergeStats,
-		MergeStatsLastComputedAt: mergeStatsLastComputedAt,
+		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
+		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
+		ShownMergeStats:    shownMergeStats,
 	}
 }
 
@@ -156,6 +153,59 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 	})
 	s.MergedPRCache = utilities.UniqueFunc(cacheablePRs, isSamePullRequest)
 	return s
+}
+
+const daysInAWeek = 7
+
+// Oldest first. See state.spec.md § Behaviour.
+type RecentMergeStats []mergestats.MergeStats
+
+func (r RecentMergeStats) WithAdded(newMergeStats *mergestats.MergeStats, asOf time.Time) RecentMergeStats {
+	oldestKeptDate := utcDateAWeekBefore(asOf)
+	recentMergeStats := utilities.Filter(r, func(entry mergestats.MergeStats) bool {
+		return !utcDate(entry.ComputedAt).Before(oldestKeptDate)
+	})
+	if newMergeStats != nil {
+		recentMergeStats = append(recentMergeStats, *newMergeStats)
+	}
+	return recentMergeStats
+}
+
+// A date's first entry wins, as a later post that day covers only the hours since the first.
+// See state.spec.md § Behaviour
+func (r RecentMergeStats) WeekBefore(shown *mergestats.MergeStats) *mergestats.MergeStats {
+	if shown == nil {
+		return nil
+	}
+	weekBeforeDate := utcDateAWeekBefore(shown.ComputedAt)
+	weekBefore, isFound := utilities.Find(r, isComputedOn(weekBeforeDate))
+	if !isFound {
+		return nil
+	}
+	return &weekBefore
+}
+
+func (r RecentMergeStats) LastComputedAt() *time.Time {
+	if len(r) == 0 {
+		return nil
+	}
+	lastComputedAt := r[len(r)-1].ComputedAt
+	return &lastComputedAt
+}
+
+func isComputedOn(utcDay time.Time) func(mergestats.MergeStats) bool {
+	return func(entry mergestats.MergeStats) bool {
+		return utcDate(entry.ComputedAt).Equal(utcDay)
+	}
+}
+
+func utcDateAWeekBefore(t time.Time) time.Time {
+	return utcDate(t).AddDate(0, 0, -daysInAWeek)
+}
+
+func utcDate(t time.Time) time.Time {
+	year, month, day := t.UTC().Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func isSamePullRequest(a, b githubclient.PR) bool {

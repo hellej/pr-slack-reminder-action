@@ -168,6 +168,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
   - Drop a parameter, branch or field no caller needs any more
 - **Intent-driven naming over comments:** Names must reveal *why* a variable or function exists (e.g., `activeSubscribers` over `filteredUsers`). If code feels complex enough to need a comment, refactor and/or rename instead. A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment.
   - Name a UI element by what it shows: `updateTimeFooter`, not `liveFooter`. Don't put an adjective before a noun it doesn't describe: the edit marking a message stale is a `markAsStaleEdit`, not a `staleEdit`
+  - Name a variable for the value it holds, not for where it came from: the previous post's `state.State` is `previousPostState`, not `previousPost`
   - Short-lived names may be short: receivers, loop variables, a value used within a few lines. Maps still follow `<value>By<key>`
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
   - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// An artifact saved before this field decodes an empty hash. See state.spec.md § Oddities`
@@ -238,8 +239,8 @@ Then two tracks; channel message & canvas, the message first. A failure in one d
 
 Around the run:
 
-- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash and the merge stats
-- **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line
+- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used to look up the merge stats of 7 days before and to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash, the merge stats, and the merge stats of every post that computed them in the 7 days before the run
+- **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line, and each median's change against the stats from 7 days before
 - **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings as they happen and the run's errors at exit, as annotations on the run page
 
 Shared by all:

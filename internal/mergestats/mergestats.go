@@ -3,6 +3,7 @@
 package mergestats
 
 import (
+	"math"
 	"slices"
 	"time"
 
@@ -58,4 +59,18 @@ func median(durations []time.Duration) *time.Duration {
 	}
 	mean := (sorted[middle-1] + sorted[middle]) / 2
 	return &mean
+}
+
+// See mergestats.spec.md § Behaviour.
+func PercentChanges(shown, weekBefore MergeStats) (firstReviewChange, mergeChange *int) {
+	return percentChange(shown.MedianTimeToFirstReview, weekBefore.MedianTimeToFirstReview),
+		percentChange(shown.MedianTimeToMerge, weekBefore.MedianTimeToMerge)
+}
+
+func percentChange(shown, weekBefore *time.Duration) *int {
+	if shown == nil || weekBefore == nil || *weekBefore == 0 {
+		return nil
+	}
+	change := int(math.Round(100 * float64(*shown-*weekBefore) / float64(*weekBefore)))
+	return &change
 }

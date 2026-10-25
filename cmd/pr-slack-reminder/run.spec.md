@@ -20,7 +20,8 @@ run modes and the pipeline order are in
   - The merge stats left out: their merged PR fetch failing
   - A merged PR in the merge stats fetch without complete reviewer info, one warning per PR naming it. It stays in the line's merged count
 - `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
-- Update mode loads the previous state after the open-PR fetch and before the merged-PR fetch, which reads its merged PR cache. A load error still fails update mode only after the merged fetch and the canvas refresh
+- Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. In update mode, a load error fails the run, but only after the merged fetch and the canvas refresh have run
+- Post mode loads it whether or not it then sends. A missing artifact logs, and any other load error warns, before the send: post mode goes on without the previous state
 - Update mode passes the loaded merged PR cache to the merged fetch, which returns a cached PR instead of enriching it. Post mode passes none, so it enriches every merged PR
 - With `show-merged-prs-in-message` false, the run skips the work only the message's merged section needs:
   - the merged-PR fetch, unless the canvas is enabled, which still lists merged PRs
@@ -30,16 +31,20 @@ run modes and the pipeline order are in
 - A failed merged-PR fetch does not fail the run: the message and canvas publish without merged rows, and the error is carried through so it can still reach the run's exit code and, in update mode, affect whether the message may be deleted
 - `main` passes `isMergeStatsDay` true when the run starts on a Monday in UTC
 - Post mode computes the merge stats when `show-merge-stats-in-message` is `true`, or when it is unset on a merge stats day. `false` never does. Update mode never reads the input
-- Post mode loads the previous state once, before the stats fetch, and marks the previous message stale from that same load
+- Post mode uses that one load for the merge stats window, the week before and marking the previous message stale
 - A post computing the stats fetches every PR merged in the merge stats window through `FindPRsMergedSince`, computes the [internal/mergestats](../../internal/mergestats/mergestats.spec.md) stats with the window start and `generatedAt`, and logs them. The message carries them as its merge stats line and the new state saves them
-  - The window starts at the loaded state's `MergeStatsLastComputedAt`, at most `githubclient.RecentlyMergedWindow` (7 days) before `generatedAt`, and at 7 days when the state did not load or has no such time. The recently merged fetch keeps its 7 days either way
+  - The window starts at the loaded state's `RecentMergeStats.LastComputedAt()`, at most `githubclient.RecentlyMergedWindow` (7 days) before `generatedAt`, and at 7 days when the state did not load or has no recent merge stats. The recently merged fetch keeps its 7 days either way
   - A failed stats fetch leaves the merge stats out with a warning. The run goes on
   - A merged PR without complete reviewer info stays in the merged count and out of both medians, per [internal/mergestats](../../internal/mergestats/mergestats.spec.md), with a warning naming it
-  - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's value. A failed stats fetch keeps the loaded value too
+  - A post computing no stats, or whose stats fetch failed, adds no entry, so the next window still starts at the loaded `RecentMergeStats.LastComputedAt()`
 - Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
+- The line compares against the week before: the entry of the loaded state's `RecentMergeStats` dated 7 days before the shown stats' `ComputedAt`, through `RecentMergeStats.WeekBefore`. See [internal/state](../../internal/state/state.spec.md)
+  - Post mode looks up the week before for the stats it computed. A second post the same day compares against the earliest entry dated 7 days before, not against the entry from the first post today. A post without a loaded previous state has no week before
+  - Update mode looks up the week before off the `ComputedAt` of the loaded `ShownMergeStats`, not off the run's clock, so an update on a later day still finds it
+- Every post state saved sets `RecentMergeStats` to `WithAdded` called on the previous post state's entries (none when it did not load), with the post's own stats (nil when it computes none, or leaves them out) and `generatedAt`. So a post on any day carries the recent merge stats forward and prunes them. Update mode saves them back unchanged
 - The merge stats line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else deletes the message. It shows with `show-merged-prs-in-message` false too
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
-- After a successful send, post mode marks the previous post's message stale: it loads the previous state and edits that message into [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)'s message marked stale, which opens with a staleness warning and drops the update-time footer an update run gave it, with the stored summary text
+- After a successful send, post mode marks the previous post's message stale: it edits the message recorded in the loaded previous state into the message marked stale (see [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)), and sends the stored summary text with the edit. The marked-stale message opens with a staleness warning and drops any update-time footer an update run gave it
   - Skips when there is no previous state, when it does not load, when it records no sent message, or when Slack says the message cannot be edited (`slackclient.ErrMessageNotEditable`)
   - Any other failure joins the run's error. The new state is still saved
   - Marks only a previous message in the channel the new message went to, both channel IDs as Slack returned them from the send. Another channel's message belongs to another setup sharing the state artifact name, so it skips with a log line naming both channels
@@ -50,7 +55,7 @@ run modes and the pipeline order are in
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
 - State is saved carrying whichever canvas content hash is now current:
-  - Post mode saves it only when the message was sent, recording the new message and caching its merged PRs
+  - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `RecentMergeStats.WithAdded`
   - Update mode saves it whenever the previous state loaded
     - After a successful edit: it records the edited message, adds the PRs the edit listed to the tracked PRs, and replaces the merged PR cache with the merged and tracked PRs this run used. See [internal/state](../../internal/state/state.spec.md) for which of them are kept
       - Also when saving the sent blocks then fails
@@ -77,7 +82,8 @@ run modes and the pipeline order are in
 - With `show-merged-prs-in-message` false, the saved merged PR cache holds only what the merged fetch returned, nothing when the canvas is off. Tracked PR refs are still saved and extended, so a later run showing the section again lists their merges, re-fetching what the cache lacks
 - A post fetches the merge stats, and loads the previous state, before it knows whether it has anything to send, so a post that sends nothing still spends both
 - Two posts computing the stats hours apart give the second a window of hours, read as `Last 1 day`
-- A post that computes stats but sends nothing saves no state, so its stats are lost, and the next window starts at the last saved stats time
+- A post that computes stats but sends nothing saves no state, so its stats are lost, and the next window starts at the last saved stats' `ComputedAt`. The recent merge stats it loaded stay only in the state artifact it loaded them from, until that artifact expires
 - When later posts send nothing, Monday's merge stats line stays on a message read days later
+- The week before's window can differ in length from the shown one, such as after `show-merge-stats-in-message` changes. The medians are still compared
 - A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied

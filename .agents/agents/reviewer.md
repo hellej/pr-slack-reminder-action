@@ -150,6 +150,8 @@ Give every Fix a severity:
 On a re-review, a finding may come back argued instead of fixed. Conceding is a legitimate
 outcome: drop it from the report. Repeat it only if the argument is wrong, and say why.
 
+A comment you rated keep stays keep on a re-review, unless the code under it changed.
+
 Report back:
 
 - **Verdict**: `CHANGES NEEDED` if any high or medium Fix, or any Document finding.

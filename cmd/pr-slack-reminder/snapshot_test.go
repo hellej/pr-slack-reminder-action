@@ -47,7 +47,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 
 // The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
 var stateTimestampField = regexp.MustCompile(
-	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince|mergeStatsLastComputedAt)": "[^"]*"`,
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince)": "[^"]*"`,
 )
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
@@ -143,7 +143,15 @@ type snapshotScenario struct {
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
-	previousStateForPostMode             *state.State
+	previousPostStateAt                  func(runStart time.Time) state.State
+}
+
+func (scenario snapshotScenario) previousPostState(runStart time.Time) *state.State {
+	if scenario.previousPostStateAt == nil {
+		return nil
+	}
+	previousPostState := scenario.previousPostStateAt(runStart)
+	return &previousPostState
 }
 
 // Every span is a whole number of weeks, or a review before the PR turned ready, so the weekday
@@ -179,9 +187,15 @@ func previousMergeStatsADayAgoScenario() snapshotScenario {
 		map[string]any{config.InputShowMergeStatsInMessage: true},
 	)
 	scenario.isMergeStatsDay = false
-	previousState := getTestState(GetTestStateOptions{})
-	previousState.MergeStatsLastComputedAt = github.Ptr(now.Add(-24 * time.Hour))
-	scenario.previousStateForPostMode = &previousState
+	scenario.previousPostStateAt = func(runStart time.Time) state.State {
+		previousPostState := getTestState(GetTestStateOptions{})
+		previousPostState.RecentMergeStats = state.RecentMergeStats{{
+			MergedCount: 3,
+			MergedSince: runStart.Add(-8 * 24 * time.Hour),
+			ComputedAt:  runStart.Add(-24 * time.Hour),
+		}}
+		return previousPostState
+	}
 	return scenario
 }
 
@@ -239,6 +253,25 @@ func mergeStatsDayScenario(name string, configOverrides map[string]any) snapshot
 			},
 		},
 	}
+}
+
+// Against mergeStatsDayScenario's medians of 2.5 days to first review and 7.5 to merge: +20 %
+// and -10 %.
+func mergeStatsDayWithAWeekBeforeScenario() snapshotScenario {
+	scenario := mergeStatsDayScenario("merge stats day with a week before", nil)
+	scenario.previousPostStateAt = func(runStart time.Time) state.State {
+		weekBeforeComputedAt := runStart.Add(-7 * 24 * time.Hour)
+		previousPostState := getTestState(GetTestStateOptions{})
+		previousPostState.RecentMergeStats = state.RecentMergeStats{{
+			MergedCount:             6,
+			MedianTimeToFirstReview: github.Ptr(50 * time.Hour),
+			MedianTimeToMerge:       github.Ptr(200 * time.Hour),
+			MergedSince:             weekBeforeComputedAt.Add(-7 * 24 * time.Hour),
+			ComputedAt:              weekBeforeComputedAt,
+		}}
+		return previousPostState
+	}
+	return scenario
 }
 
 // Dependabot and Renovate PRs over two repositories, collapsing or not by section and group:
@@ -621,6 +654,7 @@ func snapshotScenarios() []snapshotScenario {
 		mergeStatsDayScenario("merge stats day, merged section hidden", map[string]any{
 			config.InputShowMergedPRsInMessage: false,
 		}),
+		mergeStatsDayWithAWeekBeforeScenario(),
 		{
 			name:            "merge stats day with nothing merged",
 			isMergeStatsDay: true,
@@ -670,7 +704,8 @@ func TestSnapshotsPostMode(t *testing.T) {
 			maps.Copy(overrides, scenario.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runSnapshotScenario(t, scenario, scenario.previousStateForPostMode, "")
+			runStart := time.Now()
+			runSnapshotScenario(t, scenario, scenario.previousPostState(runStart), "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
@@ -693,6 +728,10 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 			editedByUpdateRun: true,
 		},
 		{
+			name:         "merge stats day with a week before, marked stale by a second post that day",
+			scenarioName: "merge stats day with a week before",
+		},
+		{
 			name:              "every section under load, edited by an update run",
 			scenarioName:      "every section under load",
 			editedByUpdateRun: true,
@@ -712,7 +751,8 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 			stateFilePath := overrides[config.EnvStateFilePath].(string)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runSnapshotScenario(t, scenario, nil, "1234567890.123456")
+			runStart := time.Now()
+			runSnapshotScenario(t, scenario, scenario.previousPostState(runStart), "1234567890.123456")
 			previousState := loadSavedState(t, stateFilePath)
 			if tc.editedByUpdateRun {
 				updateOverrides := maps.Clone(overrides)
@@ -741,6 +781,27 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 	}
 }
 
+// The week before is 8 days before the run: one looked up off the run's clock misses it.
+// -8 % and +30 %.
+func mergeStatsOfAPostADayBeforeTheRun(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats) {
+	postedMergeStats := mergestats.MergeStats{
+		MergedCount:             11,
+		MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
+		MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+		MergedSince:             runStart.Add(-8 * 24 * time.Hour),
+		ComputedAt:              runStart.Add(-24 * time.Hour),
+	}
+	weekBeforeComputedAt := runStart.Add(-8 * 24 * time.Hour)
+	weekBefore := mergestats.MergeStats{
+		MergedCount:             6,
+		MedianTimeToFirstReview: github.Ptr(4 * time.Hour),
+		MedianTimeToMerge:       github.Ptr(24 * time.Hour),
+		MergedSince:             weekBeforeComputedAt.Add(-7 * 24 * time.Hour),
+		ComputedAt:              weekBeforeComputedAt,
+	}
+	return &postedMergeStats, state.RecentMergeStats{weekBefore, postedMergeStats}
+}
+
 func TestSnapshotsUpdateMode(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -754,7 +815,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		mergedPRsFromSearch               []*github.PullRequest
 		reviewsByPRNumber                 map[int][]*github.PullRequestReview
 		requestedReviewerLoginsByPRNumber map[int][]string
-		mergeStats                        *mergestats.MergeStats
+		mergeStatsOfState                 func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
 		deletesTheMessage                 bool
 	}{
 		{
@@ -862,13 +923,28 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					AgeHours: 4, State: "open",
 				}),
 			},
-			mergeStats: &mergestats.MergeStats{
-				MergedCount:             11,
-				MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
-				MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
-				MergedSince:             time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
-				ComputedAt:              time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC),
+			mergeStatsOfState: func(time.Time) (*mergestats.MergeStats, state.RecentMergeStats) {
+				return &mergestats.MergeStats{
+					MergedCount:             11,
+					MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
+					MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+					MergedSince:             time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
+					ComputedAt:              time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC),
+				}, nil
 			},
+		},
+		{
+			name:           "one open PR, a day after a post with merge stats and the week before",
+			statePRNumbers: []int{71},
+			openPRNumbers:  []int{71},
+			prByNumber: map[int]*github.PullRequest{
+				71: getTestPR(GetTestPROptions{
+					Number: 71, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/71",
+					AgeHours: 4, State: "open",
+				}),
+			},
+			mergeStatsOfState: mergeStatsOfAPostADayBeforeTheRun,
 		},
 		{
 			// Saved state: see run.spec.md § Oddities.
@@ -938,8 +1014,11 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			maps.Copy(overrides, tc.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
+			runStart := time.Now()
 			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
-			mockState.MergeStats = tc.mergeStats
+			if tc.mergeStatsOfState != nil {
+				mockState.ShownMergeStats, mockState.RecentMergeStats = tc.mergeStatsOfState(runStart)
+			}
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 				PRsByNumber:                       tc.prByNumber,
 				PRs:                               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
