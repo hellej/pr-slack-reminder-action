@@ -148,6 +148,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 
 - Never amend commits or force push
 - Work on `main` by default. Branch only if the user asks for a branch or mentions a PR
+- Merge the latest `main` into a feature branch before each push and before its PR merges. Resolve conflicts, never rebase
 - Stage only the files for the task you were given. Another agent may have unrelated work
   in the same working tree, so never use `git add -A` or `git commit -a`
 - Commit with an explicit pathspec: `git commit -m "..." -- <paths>`. The index is shared too, so a bare `git commit` takes what another agent staged
