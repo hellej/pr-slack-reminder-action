@@ -31,8 +31,6 @@ type State struct {
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
 	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
 	RecentMergeStats              RecentMergeStats        `json:"recentMergeStats,omitempty"`
-	// When any post last computed stats. Equals MergeStats.ComputedAt when that is set. See state.spec.md § Behaviour
-	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -115,7 +113,6 @@ func NewPostState(
 	summaryText string,
 	generatedAt time.Time,
 	mergeStats *mergestats.MergeStats,
-	mergeStatsLastComputedAt *time.Time,
 ) State {
 	return State{
 		SchemaVersion:   CurrentSchemaVersion,
@@ -124,10 +121,9 @@ func NewPostState(
 			ChannelID: messageInfo.ChannelID,
 			MessageTS: messageInfo.Timestamp,
 		},
-		TrackedPRs:               utilities.Map(prViews, PRToPullRequestRef),
-		LastWrittenMessage:       newLastWrittenMessage(messageInfo, summaryText, generatedAt),
-		MergeStats:               mergeStats,
-		MergeStatsLastComputedAt: mergeStatsLastComputedAt,
+		TrackedPRs:         utilities.Map(prViews, PRToPullRequestRef),
+		LastWrittenMessage: newLastWrittenMessage(messageInfo, summaryText, generatedAt),
+		MergeStats:         mergeStats,
 	}
 }
 
@@ -164,22 +160,19 @@ const daysInAWeek = 7
 // Oldest first. See state.spec.md § Behaviour.
 type RecentMergeStats []mergestats.MergeStats
 
-// A later post the same day covers only the hours since the first. See state.spec.md § Behaviour
 func (r RecentMergeStats) WithAdded(newMergeStats *mergestats.MergeStats, asOf time.Time) RecentMergeStats {
 	oldestKeptDate := utcDateAWeekBefore(asOf)
 	recentMergeStats := utilities.Filter(r, func(entry mergestats.MergeStats) bool {
 		return !utcDate(entry.ComputedAt).Before(oldestKeptDate)
 	})
-	if newMergeStats == nil {
-		return recentMergeStats
-	}
-	newMergeStatsDate := utcDate(newMergeStats.ComputedAt)
-	if !slices.ContainsFunc(recentMergeStats, isComputedOn(newMergeStatsDate)) {
+	if newMergeStats != nil {
 		recentMergeStats = append(recentMergeStats, *newMergeStats)
 	}
 	return recentMergeStats
 }
 
+// A date's first entry wins, as a later post that day covers only the hours since the first.
+// See state.spec.md § Behaviour
 func (r RecentMergeStats) WeekBefore(shown *mergestats.MergeStats) *mergestats.MergeStats {
 	if shown == nil {
 		return nil
@@ -190,6 +183,14 @@ func (r RecentMergeStats) WeekBefore(shown *mergestats.MergeStats) *mergestats.M
 		return nil
 	}
 	return &weekBefore
+}
+
+func (r RecentMergeStats) LastComputedAt() *time.Time {
+	if len(r) == 0 {
+		return nil
+	}
+	lastComputedAt := r[len(r)-1].ComputedAt
+	return &lastComputedAt
 }
 
 func isComputedOn(utcDay time.Time) func(mergestats.MergeStats) bool {

@@ -24,9 +24,10 @@ status: draft
 ## Target Shape
 
 - **Recent merge stats** (`State.RecentMergeStats`, JSON key `recentMergeStats`, `omitempty`): `type RecentMergeStats []mergestats.MergeStats`, oldest `ComputedAt` first. An entry's date is the UTC date of its `ComputedAt`
-  - The state a post saves holds the loaded entries, plus the post's own stats when it computes them and no entry has that day's date, minus entries dated more than 7 days before the post's run. A Sunday post still carries the previous Monday's entry. The slice holds at most 2 entries by default, 8 when every post computes the stats
+  - The state a post saves holds the loaded entries, plus the post's own stats when it computes them, minus entries dated more than 7 days before the post's run. A Sunday post still carries the previous Monday's entry. The slice holds one entry per post that computed stats, over at most 8 UTC dates
+  - The last entry's `ComputedAt` is where the next merge stats window starts, so plan 017's `State.MergeStatsLastComputedAt` goes. The window is capped at 7 days anyway, so an entry pruned after 7 days loses nothing
   - Update runs carry it unchanged, through the existing `With*` copies
-- **Week before**: the entry dated 7 days before the UTC date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or when the state that post saved was not loaded in this run (expired artifact, failed load)
+- **Week before**: the first entry dated 7 days before the UTC date of the shown stats' `ComputedAt`. Absent when no post computed stats that day, or when the state that post saved was not loaded in this run (expired artifact, failed load)
 - **Percent change**: `(shown − week before) / week before`, from the stored durations, never the rounded text. Rounded to a whole percent, rendered `+15 %`, `-12 %`, `+0 %`
   - Only for a median both weeks have, with a week-before value above 0
   - The parenthetical shows only when every median the line shows has a change
@@ -36,7 +37,7 @@ status: draft
   - `Last 7 days: 0 merged`: no change
   - Without a week before: the plan 017 line, unchanged
 - Post mode loads the previous state before building its message, once, for both the week-before lookup and marking the previous message stale. Same warnings as today on a failed load
-- A second post on the same day finds the week before in the recent merge stats, not the first post's entry from today. The second post's saved recent merge stats keep the first post's entry, because the second post's window covers only the hours since the first post
+- A second post on the same day finds the week before in the recent merge stats, not the first post's entry from today. When a date has several entries, the lookup takes the first, because a later post that day covers only the hours since the first post
 - No change to action inputs or permissions, and no GraphQL change. A post that sends nothing, or whose send fails, now warns on a failed state load. It loaded state before too, so its API calls don't change
 
 ### Message States
@@ -50,6 +51,7 @@ status: draft
 - Non-breaking, minor: a new part of an existing line, no input change
 - A state saved before this change has no `recentMergeStats`. The first post to show a change is the one 7 days after the first post that saved its stats there
 - A downgrade ignores the key: `state.Load` decodes with `json.Unmarshal`, which skips unknown keys
+- Dropping `mergeStatsLastComputedAt` needs no fallback: no release wrote it
 
 ## Summary
 
@@ -79,9 +81,10 @@ status: draft
 ### Step 2: Recent merge stats in state
 
 - `internal/state/`: add the type `RecentMergeStats []mergestats.MergeStats` and `State.RecentMergeStats`
-- `RecentMergeStats.WithAdded(newMergeStats, asOf)`: returns a new slice, adding the new entry when there is one and the day has none yet, dropping entries dated more than 7 days before `asOf`
-- `RecentMergeStats.WeekBefore(shown)`: the entry dated 7 days before `shown.ComputedAt`, so the UTC dating stays in this package
-- Package test: the prune boundary at 7 and 8 days, by UTC date for an `asOf` and a `ComputedAt` outside UTC, the day's first entry staying, and the slice it is called on left unchanged
+- `RecentMergeStats.WithAdded(newMergeStats, asOf)`: returns a new slice, adding the new entry when there is one, dropping entries dated more than 7 days before `asOf`
+- `RecentMergeStats.WeekBefore(shown)`: the first entry dated 7 days before `shown.ComputedAt`, so the UTC dating stays in this package
+- `RecentMergeStats.LastComputedAt()`: the last entry's `ComputedAt`, nil without entries. Replaces `State.MergeStatsLastComputedAt` and `NewPostState`'s parameter for it
+- Package test: the prune boundary at 7 and 8 days, by UTC date for an `asOf` and a `ComputedAt` outside UTC, a same-day entry added, the slice it is called on left unchanged, the lookup taking a date's first entry, and `LastComputedAt` with and without entries
 - Update state.spec.md § Behaviour, and § Oddities: added without a schema bump
 
 ### Step 3: The parenthetical
@@ -94,14 +97,16 @@ status: draft
 - `cmd/pr-slack-reminder/`:
   - Post mode computing the stats looks up the week before through the loaded `RecentMergeStats.WeekBefore`. Every saved post state sets `RecentMergeStats` through `WithAdded`
   - Update mode looks up the week before off the loaded `MergeStats.ComputedAt`
+  - The merge stats window starts at the loaded `RecentMergeStats.LastComputedAt()`, at most 7 days back
 - Snapshots, read before re-recording. The normaliser already rewrites each entry's `computedAt`, so the recent merge stats need nothing new. The fixtures date each entry off a clock read right before the run, so their days back count from the run's UTC date. Only a midnight in the milliseconds before `Run` reads its own clock can still shift them. The scenarios:
   - Monday post with a week before
   - An update run's edit a day after a Monday post: the shown stats were computed the day before the run, so the week before is dated 8 days before the run. A lookup off the run's clock (7 days back) misses it
   - Monday post without a week before: the existing merge stats snapshots, their messages unchanged, their states gaining `recentMergeStats`
-  - A second Monday post the same day, marking the first stale: the stale message keeps the parenthetical. The second post's window starts at the first post, so its own line has no medians, and its saved recent merge stats keep the first post's entry
+  - A second Monday post the same day, marking the first stale: the stale message keeps the parenthetical. The second post's window starts at the first post, so its own line has no medians, and its saved recent merge stats gain its entry after the first post's
 - `main_test.go`:
   - A post computing no stats carries the recent merge stats and prunes them
-  - An entry 6 or 8 days old is not used, one 7 days old is, also next to today's entry from an earlier post
+  - An entry 6 or 8 days old is not used, one 7 days old is
+  - The window starts at the last entry, not the first, and a post that computes no stats, or whose stats fetch fails, keeps the previous start
   - A Monday whose stats are left out carries the recent merge stats without a new entry
 - Update run.spec.md § Behaviour, AGENTS.md § Architecture's state line, README's line description, the `action.yml` descriptions of `github-token-for-state` and `state-artifact-name` with their README inputs rows, and the README `actions: read` comment: post now reads state for the merge stats too
 - Live check, after release: `pr-reminder.yml`'s scheduled daily posts to the `github` dev channel, which run the binary committed on `main`
@@ -126,6 +131,6 @@ None
 
 ### Neutral
 
-- State carries up to 2 small entries by default, up to 8 when every post computes the stats
+- State carries one small entry per post that computed stats, dated up to 7 days before the latest post: 2 with the default Monday stats and one post a Monday, 8 when one post a day computes them
 - Post mode loads state earlier in the run, which changes the log line order
 - A failed state load now warns on a post that sends nothing

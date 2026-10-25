@@ -47,7 +47,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 
 // The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
 var stateTimestampField = regexp.MustCompile(
-	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince|mergeStatsLastComputedAt)": "[^"]*"`,
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince)": "[^"]*"`,
 )
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
@@ -189,7 +189,11 @@ func previousMergeStatsADayAgoScenario() snapshotScenario {
 	scenario.isMergeStatsDay = false
 	scenario.previousPostStateAt = func(runStart time.Time) state.State {
 		previousPostState := getTestState(GetTestStateOptions{})
-		previousPostState.MergeStatsLastComputedAt = github.Ptr(runStart.Add(-24 * time.Hour))
+		previousPostState.RecentMergeStats = state.RecentMergeStats{{
+			MergedCount: 3,
+			MergedSince: runStart.Add(-8 * 24 * time.Hour),
+			ComputedAt:  runStart.Add(-24 * time.Hour),
+		}}
 		return previousPostState
 	}
 	return scenario

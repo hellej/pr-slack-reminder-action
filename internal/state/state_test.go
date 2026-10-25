@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -483,18 +484,14 @@ func TestRecentMergeStatsWithAdded(t *testing.T) {
 			expected: RecentMergeStats{statsOf11th},
 		},
 		{
-			name:          "dates new stats computed outside UTC by their UTC date",
-			loaded:        RecentMergeStats{mergeStatsComputedAt(time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC))},
-			newMergeStats: new(mergeStatsComputedAt(time.Date(2026, 10, 19, 1, 0, 0, 0, utcPlus3))),
-			asOf:          time.Date(2026, 10, 18, 22, 0, 0, 0, time.UTC),
-			expected:      RecentMergeStats{mergeStatsComputedAt(time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC))},
-		},
-		{
-			name:          "a loaded entry of the same date stays over the new stats",
+			name:          "adds new stats after a loaded entry of the same date",
 			loaded:        RecentMergeStats{statsOf12th},
 			newMergeStats: new(mergeStatsComputedAt(time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC))),
 			asOf:          time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC),
-			expected:      RecentMergeStats{statsOf12th},
+			expected: RecentMergeStats{
+				statsOf12th,
+				mergeStatsComputedAt(time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)),
+			},
 		},
 		{
 			name:     "every entry pruned leaves none",
@@ -517,6 +514,71 @@ func TestRecentMergeStatsWithAdded(t *testing.T) {
 			}
 			if !slices.Equal(loadedWithSpareCapacity[:cap(loadedWithSpareCapacity)], loadedBefore) {
 				t.Errorf("Changed the loaded entries or wrote into their spare capacity: %+v", loadedWithSpareCapacity[:cap(loadedWithSpareCapacity)])
+			}
+		})
+	}
+}
+
+func TestRecentMergeStatsWeekBefore(t *testing.T) {
+	utcPlus3 := time.FixedZone("UTC+3", 3*60*60)
+	firstOf12th := mergestats.MergeStats{MergedCount: 1, ComputedAt: time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)}
+	secondOf12th := mergestats.MergeStats{MergedCount: 2, ComputedAt: time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)}
+	lastOf11th := mergestats.MergeStats{MergedCount: 3, ComputedAt: time.Date(2026, 10, 11, 23, 0, 0, 0, time.UTC)}
+	recentMergeStats := RecentMergeStats{lastOf11th, firstOf12th, secondOf12th}
+
+	tests := []struct {
+		name     string
+		shown    *mergestats.MergeStats
+		expected *mergestats.MergeStats
+	}{
+		{
+			name:     "the first of several entries dated 7 days before",
+			shown:    &mergestats.MergeStats{ComputedAt: time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)},
+			expected: &firstOf12th,
+		},
+		{
+			name:     "dates shown stats computed outside UTC by their UTC date",
+			shown:    &mergestats.MergeStats{ComputedAt: time.Date(2026, 10, 19, 1, 0, 0, 0, utcPlus3)},
+			expected: &lastOf11th,
+		},
+		{
+			name:  "no entry dated 7 days before",
+			shown: &mergestats.MergeStats{ComputedAt: time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)},
+		},
+		{name: "no shown stats"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			weekBefore := recentMergeStats.WeekBefore(tt.shown)
+
+			if !reflect.DeepEqual(weekBefore, tt.expected) {
+				t.Errorf("got %+v, want %+v", weekBefore, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRecentMergeStatsLastComputedAt(t *testing.T) {
+	earlier := mergestats.MergeStats{ComputedAt: time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)}
+	later := mergestats.MergeStats{ComputedAt: time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)}
+
+	tests := []struct {
+		name             string
+		recentMergeStats RecentMergeStats
+		expected         *time.Time
+	}{
+		{name: "the last entry's", recentMergeStats: RecentMergeStats{earlier, later}, expected: &later.ComputedAt},
+		{name: "none without entries", recentMergeStats: RecentMergeStats{}},
+		{name: "none for a nil slice"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lastComputedAt := tt.recentMergeStats.LastComputedAt()
+
+			if !reflect.DeepEqual(lastComputedAt, tt.expected) {
+				t.Errorf("got %v, want %v", lastComputedAt, tt.expected)
 			}
 		})
 	}

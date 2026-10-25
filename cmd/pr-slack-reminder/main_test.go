@@ -2885,7 +2885,8 @@ func mergedSinceQualifier(mergedSince time.Time) string {
 func TestPostModeMergeStatsWindowStartsAtThePreviousStats(t *testing.T) {
 	testCases := []struct {
 		name                           string
-		previousComputedAgo            time.Duration // 0: the previous state has no merge stats time
+		previousComputedAgo            time.Duration // 0: the previous state has no recent merge stats
+		earlierComputedAgo             time.Duration // 0: no entry before the previous stats
 		previousStateLoadError         error
 		expectsWindowFromPreviousStats bool // else 7 days before the run
 		expectedLineStart              string
@@ -2893,6 +2894,13 @@ func TestPostModeMergeStatsWindowStartsAtThePreviousStats(t *testing.T) {
 		{
 			name:                           "previous stats a day ago",
 			previousComputedAgo:            24 * time.Hour,
+			expectsWindowFromPreviousStats: true,
+			expectedLineStart:              "_Last 1 day: 1 merged",
+		},
+		{
+			name:                           "previous stats a day ago, after earlier ones 5 days ago",
+			previousComputedAgo:            24 * time.Hour,
+			earlierComputedAgo:             5 * 24 * time.Hour,
 			expectsWindowFromPreviousStats: true,
 			expectedLineStart:              "_Last 1 day: 1 merged",
 		},
@@ -2910,8 +2918,11 @@ func TestPostModeMergeStatsWindowStartsAtThePreviousStats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			previousComputedAt := now.Add(-tc.previousComputedAgo)
 			previousState := getTestState(GetTestStateOptions{})
+			if tc.earlierComputedAgo != 0 {
+				previousState.RecentMergeStats = state.RecentMergeStats{{ComputedAt: now.Add(-tc.earlierComputedAgo)}}
+			}
 			if tc.previousComputedAgo != 0 {
-				previousState.MergeStatsLastComputedAt = &previousComputedAt
+				previousState.RecentMergeStats = append(previousState.RecentMergeStats, mergestats.MergeStats{ComputedAt: previousComputedAt})
 			}
 			sevenDaysBeforeTheRun := time.Now().Add(-7 * 24 * time.Hour)
 			expectedMergedSince := sevenDaysBeforeTheRun
@@ -2951,8 +2962,11 @@ func recentlyMergedSearchQuery(mergedSince time.Time) string {
 	return "repo:test-org/test-repo is:pr is:merged " + mergedSinceQualifier(mergedSince)
 }
 
+// The loaded stats were computed at the start of the run's UTC day, so stats the run computes
+// are a second entry of that day.
 func TestPostModeSavesWhenTheMergeStatsWereLastComputed(t *testing.T) {
-	previousComputedAt := now.Add(-3 * 24 * time.Hour).UTC()
+	year, month, day := time.Now().UTC().Date()
+	previousComputedAt := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 	testCases := []struct {
 		name                    string
 		showMergeStatsInMessage string
@@ -2971,7 +2985,7 @@ func TestPostModeSavesWhenTheMergeStatsWereLastComputed(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			previousState := getTestState(GetTestStateOptions{})
-			previousState.MergeStatsLastComputedAt = &previousComputedAt
+			previousState.RecentMergeStats = state.RecentMergeStats{{ComputedAt: previousComputedAt}}
 
 			run := runMergeStatsPost(t, mergeStatsPostOptions{
 				showMergeStatsInMessage: new(tc.showMergeStatsInMessage),
@@ -2980,7 +2994,7 @@ func TestPostModeSavesWhenTheMergeStatsWereLastComputed(t *testing.T) {
 				mergedSectionHidden:     true,
 			})
 
-			saved := run.savedState.MergeStatsLastComputedAt
+			saved := run.savedState.RecentMergeStats.LastComputedAt()
 			if saved == nil {
 				t.Fatal("Expected a saved merge stats time, got none")
 			}
@@ -3217,14 +3231,6 @@ func TestPostModeComparesOnlyAgainstMergeStatsComputedExactlyAWeekBefore(t *test
 		{name: "6 days ago", previousMergeStats: mergeStatsComputedDaysBeforeTheRun(6)},
 		{name: "7 days ago", previousMergeStats: mergeStatsComputedDaysBeforeTheRun(7), expectsAPercentChange: true},
 		{name: "8 days ago", previousMergeStats: mergeStatsComputedDaysBeforeTheRun(8)},
-		{
-			name: "7 days ago, and an earlier post today without medians",
-			previousMergeStats: func(runStart time.Time) state.RecentMergeStats {
-				earlierPostTodayWithoutMedians := mergestats.MergeStats{ComputedAt: runStart}
-				return state.RecentMergeStats{mergeStatsComputedDaysBefore(runStart, 7), earlierPostTodayWithoutMedians}
-			},
-			expectsAPercentChange: true,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -3232,7 +3238,7 @@ func TestPostModeComparesOnlyAgainstMergeStatsComputedExactlyAWeekBefore(t *test
 			savedState := runPostModeAfterAPostWithMergeStats(t, tc.previousMergeStats, true)
 
 			sentBlocks := string(savedState.LastWrittenMessage.Blocks)
-			if !strings.Contains(sentBlocks, "Last 7 days: 1 merged") {
+			if !strings.Contains(sentBlocks, ": 1 merged") {
 				t.Fatalf("Expected the merge stats line, got %s", sentBlocks)
 			}
 			if strings.Contains(sentBlocks, " %)") != tc.expectsAPercentChange {

@@ -149,10 +149,7 @@ func runPostMode(
 		return nil, err
 	}
 
-	postState := state.NewPostState(
-		prViews, sentMessageInfo, summaryText, generatedAt,
-		mergeStats, mergeStatsLastComputedAt(mergeStats, previousPostState),
-	)
+	postState := state.NewPostState(prViews, sentMessageInfo, summaryText, generatedAt, mergeStats)
 	postState = state.WithMergedPRCache(postState, mergedPRs)
 	postState.RecentMergeStats = recentMergeStatsOfPreviousPost.WithAdded(mergeStats, generatedAt)
 	var markAsStaleErr error
@@ -186,14 +183,14 @@ func recentMergeStatsOf(previousPostState *state.State) state.RecentMergeStats {
 func mergeStatsForThisPost(
 	githubClient githubclient.Client,
 	cfg config.Config,
-	previousState *state.State,
+	previousPostState *state.State,
 	isMergeStatsDay bool,
 	generatedAt time.Time,
 ) *mergestats.MergeStats {
 	if !shouldComputeMergeStats(cfg.ContentInputs.ShowMergeStatsInMessage, isMergeStatsDay) {
 		return nil
 	}
-	return computeMergeStats(githubClient, cfg, mergeStatsWindowStart(previousState, generatedAt), generatedAt)
+	return computeMergeStats(githubClient, cfg, mergeStatsWindowStart(previousPostState, generatedAt), generatedAt)
 }
 
 func shouldComputeMergeStats(showMergeStatsInMessage *bool, isMergeStatsDay bool) bool {
@@ -203,26 +200,13 @@ func shouldComputeMergeStats(showMergeStatsInMessage *bool, isMergeStatsDay bool
 	return isMergeStatsDay
 }
 
-func mergeStatsWindowStart(previousState *state.State, generatedAt time.Time) time.Time {
+func mergeStatsWindowStart(previousPostState *state.State, generatedAt time.Time) time.Time {
 	longestWindowStart := generatedAt.Add(-githubclient.RecentlyMergedWindow)
-	if previousState == nil || previousState.MergeStatsLastComputedAt == nil {
-		return longestWindowStart
-	}
-	if previousState.MergeStatsLastComputedAt.After(longestWindowStart) {
-		return *previousState.MergeStatsLastComputedAt
+	previousStatsComputedAt := recentMergeStatsOf(previousPostState).LastComputedAt()
+	if previousStatsComputedAt != nil && previousStatsComputedAt.After(longestWindowStart) {
+		return *previousStatsComputedAt
 	}
 	return longestWindowStart
-}
-
-// A post computing no stats, or failing to, carries the loaded time forward.
-func mergeStatsLastComputedAt(mergeStats *mergestats.MergeStats, previousState *state.State) *time.Time {
-	if mergeStats != nil {
-		return &mergeStats.ComputedAt
-	}
-	if previousState == nil {
-		return nil
-	}
-	return previousState.MergeStatsLastComputedAt
 }
 
 // Channel check: see run.spec.md § Behaviour.
