@@ -85,7 +85,9 @@ implementer where the plan has gone stale.
      above. Tell it to check the report's claims against the tree. A mock renders
      whatever the code asks it for, so a wrong query shape or page size passes it
    - Brief `prose-truth-checker` with the base, the behaviours the change alters, and the
-     plan files to sweep. Brief `prose-clarity-checker` with the base again
+     plan file being implemented. Never name a merged plan to sweep: it records what it
+     built, so a later change never makes it stale. Brief `prose-clarity-checker` with the
+     base again
 4. Merge the reports into one verdict. It is `CHANGES NEEDED` when any report holds a high
    or medium Fix, or a Document finding, else `PASS`. Every report's nits go to § Nits On a
    Pass. Each claim `prose-truth-checker` marks `unverifiable` goes to the hand-back
