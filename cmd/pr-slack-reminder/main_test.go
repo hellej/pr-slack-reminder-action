@@ -3052,7 +3052,7 @@ func mergedTestPR(number int) *github.PullRequest {
 func TestPostModeLeavesTheMergeStatsOutWhenTheirFetchFails(t *testing.T) {
 	weekBefore := mergeStatsComputedDaysBefore(time.Now(), 7)
 	previousPostState := getTestState(GetTestStateOptions{})
-	previousPostState.MergeStatsByDate = mergeStatsKeyedByDate(weekBefore)
+	previousPostState.RecentMergeStats = state.RecentMergeStats{weekBefore}
 
 	logOutput, mockSlackAPI, savedState := runMergeStatsPostWithMergedSectionHidden(t, mockgithubclient.MockGitHubClientOptions{
 		MergedPRs:            []*github.PullRequest{mergedTestPR(2)},
@@ -3071,8 +3071,8 @@ func TestPostModeLeavesTheMergeStatsOutWhenTheirFetchFails(t *testing.T) {
 	if savedState.MergeStats != nil {
 		t.Errorf("Expected no merge stats saved, got %+v", savedState.MergeStats)
 	}
-	if _, isSaved := savedState.MergeStatsByDate[utcDateKey(weekBefore.ComputedAt)]; len(savedState.MergeStatsByDate) != 1 || !isSaved {
-		t.Errorf("Expected the saved merge stats to hold the week before alone, got %+v", savedState.MergeStatsByDate)
+	if len(savedState.RecentMergeStats) != 1 || savedState.RecentMergeStats[0].MergedCount != 7 {
+		t.Errorf("Expected the saved merge stats to hold the week before alone, got %+v", savedState.RecentMergeStats)
 	}
 }
 
@@ -3161,16 +3161,8 @@ func mergeStatsComputedDaysBefore(runStart time.Time, days int) mergestats.Merge
 	}
 }
 
-func mergeStatsKeyedByDate(entries ...mergestats.MergeStats) map[string]mergestats.MergeStats {
-	mergeStatsByDate := map[string]mergestats.MergeStats{}
-	for _, entry := range entries {
-		mergeStatsByDate[utcDateKey(entry.ComputedAt)] = entry
-	}
-	return mergeStatsByDate
-}
-
-func mergeStatsComputedDaysBeforeTheRun(days ...int) func(runStart time.Time) []mergestats.MergeStats {
-	return func(runStart time.Time) []mergestats.MergeStats {
+func mergeStatsComputedDaysBeforeTheRun(days ...int) func(runStart time.Time) state.RecentMergeStats {
+	return func(runStart time.Time) state.RecentMergeStats {
 		return utilities.Map(days, func(daysBefore int) mergestats.MergeStats {
 			return mergeStatsComputedDaysBefore(runStart, daysBefore)
 		})
@@ -3180,14 +3172,14 @@ func mergeStatsComputedDaysBeforeTheRun(days ...int) func(runStart time.Time) []
 // Builds the previous post's merge stats off the clock read right before the run, so their days
 // back count from the run's own date.
 func runPostModeAfterAPostWithMergeStats(
-	t *testing.T, previousMergeStats func(runStart time.Time) []mergestats.MergeStats, isMergeStatsDay bool,
+	t *testing.T, previousMergeStats func(runStart time.Time) state.RecentMergeStats, isMergeStatsDay bool,
 ) state.State {
 	t.Helper()
 	overrides, _ := getFilePathOverrides(t)
 	testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 	runStart := time.Now()
 	previousPostState := getTestState(GetTestStateOptions{})
-	previousPostState.MergeStatsByDate = mergeStatsKeyedByDate(previousMergeStats(runStart)...)
+	previousPostState.RecentMergeStats = previousMergeStats(runStart)
 
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
@@ -3211,16 +3203,15 @@ func runPostModeAfterAPostWithMergeStats(
 func TestPostModeOnAnotherDayCarriesTheRecentMergeStatsAndPrunesThem(t *testing.T) {
 	savedState := runPostModeAfterAPostWithMergeStats(t, mergeStatsComputedDaysBeforeTheRun(7, 8), false)
 
-	savedEntries := slices.Collect(maps.Values(savedState.MergeStatsByDate))
-	if len(savedEntries) != 1 || savedEntries[0].MergedCount != 7 {
-		t.Errorf("Expected the saved merge stats to hold the entry 7 days old alone, got %+v", savedState.MergeStatsByDate)
+	if len(savedState.RecentMergeStats) != 1 || savedState.RecentMergeStats[0].MergedCount != 7 {
+		t.Errorf("Expected the saved merge stats to hold the entry 7 days old alone, got %+v", savedState.RecentMergeStats)
 	}
 }
 
 func TestPostModeComparesOnlyAgainstMergeStatsComputedExactlyAWeekBefore(t *testing.T) {
 	testCases := []struct {
 		name                  string
-		previousMergeStats    func(runStart time.Time) []mergestats.MergeStats
+		previousMergeStats    func(runStart time.Time) state.RecentMergeStats
 		expectsAPercentChange bool
 	}{
 		{name: "6 days ago", previousMergeStats: mergeStatsComputedDaysBeforeTheRun(6)},
@@ -3228,9 +3219,9 @@ func TestPostModeComparesOnlyAgainstMergeStatsComputedExactlyAWeekBefore(t *test
 		{name: "8 days ago", previousMergeStats: mergeStatsComputedDaysBeforeTheRun(8)},
 		{
 			name: "7 days ago, and an earlier post today without medians",
-			previousMergeStats: func(runStart time.Time) []mergestats.MergeStats {
+			previousMergeStats: func(runStart time.Time) state.RecentMergeStats {
 				earlierPostTodayWithoutMedians := mergestats.MergeStats{ComputedAt: runStart}
-				return []mergestats.MergeStats{earlierPostTodayWithoutMedians, mergeStatsComputedDaysBefore(runStart, 7)}
+				return state.RecentMergeStats{mergeStatsComputedDaysBefore(runStart, 7), earlierPostTodayWithoutMedians}
 			},
 			expectsAPercentChange: true,
 		},

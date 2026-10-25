@@ -38,10 +38,10 @@ run modes and the pipeline order are in
   - A merged PR without complete reviewer info stays in the merged count and out of both medians, per [internal/mergestats](../../internal/mergestats/mergestats.spec.md), with a warning naming it
   - The new state's `MergeStatsLastComputedAt` is the new stats' `ComputedAt`, else the loaded state's value. A failed stats fetch keeps the loaded value too
 - Update mode renders the loaded state's merge stats, when it has them, and saves them back with the state, so the line stays on the message until the next post replaces it
-- The line compares against the week before: the entry of the loaded state's `MergeStatsByDate` dated 7 days before the shown stats' `ComputedAt`, through `state.MergeStatsWeekBefore`. See [internal/state](../../internal/state/state.spec.md)
+- The line compares against the week before: the entry of the loaded state's `RecentMergeStats` dated 7 days before the shown stats' `ComputedAt`, through `RecentMergeStats.WeekBefore`. See [internal/state](../../internal/state/state.spec.md)
   - Post mode looks up the week before for the stats it computed. A second post the same day compares against the entry 7 days back, not against the first post's entry from today. A post without a loaded previous state has no week before
   - Update mode looks up the week before off the `ComputedAt` of the loaded `MergeStats`, not off the run's clock, so an update on a later day still finds it
-- Every post state saved goes through `state.WithRecentMergeStats`, with the loaded map, the post's own stats (nil when it computes none, or leaves them out) and `generatedAt`. So a post on any day carries the map forward and prunes it. Update mode saves the map back unchanged
+- Every post state saved sets `RecentMergeStats` to `WithAdded` called on the previous post state's entries (none when it did not load), with the post's own stats (nil when it computes none, or leaves them out) and `generatedAt`. So a post on any day carries the recent merge stats forward and prunes them. Update mode saves them back unchanged
 - The merge stats line never counts as something to show: a post with nothing else sends nothing, and an update with nothing else deletes the message. It shows with `show-merged-prs-in-message` false too
 - Post mode builds the message from the run's own open-PR fetch (drafts dropped) and the merged fetch, without a footer, sends it, and returns the state to persist, nil when there is nothing to send, so nothing is written and no message goes out
 - After a successful send, post mode marks the previous post's message stale: it edits the message recorded in the loaded previous state into the message marked stale (see [internal/messagebuilder](../../internal/messagebuilder/messagebuilder.spec.md)), and sends the stored summary text with the edit. The marked-stale message opens with a staleness warning and drops any update-time footer an update run gave it
@@ -55,7 +55,7 @@ run modes and the pipeline order are in
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
 - State is saved carrying whichever canvas content hash is now current:
-  - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `state.WithRecentMergeStats`
+  - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `RecentMergeStats.WithAdded`
   - Update mode saves it whenever the previous state loaded
     - After a successful edit: it records the edited message, adds the PRs the edit listed to the tracked PRs, and replaces the merged PR cache with the merged and tracked PRs this run used. See [internal/state](../../internal/state/state.spec.md) for which of them are kept
       - Also when saving the sent blocks then fails

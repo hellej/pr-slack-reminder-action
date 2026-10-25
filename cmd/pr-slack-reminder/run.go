@@ -127,13 +127,13 @@ func runPostMode(
 	sentMessageHandler func(slackclient.SentMessageInfo) error,
 ) (*state.State, error) {
 	prViews := buildNonDraftPRViews(openPRs, cfg)
-	mergeStatsByDateOfPreviousPost := mergeStatsByDateOf(previousPostState)
+	recentMergeStatsOfPreviousPost := recentMergeStatsOf(previousPostState)
 	content := messagecontent.GetContent(
 		prViews,
 		nil,
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		mergeStats,
-		state.MergeStatsWeekBefore(mergeStatsByDateOfPreviousPost, mergeStats),
+		recentMergeStatsOfPreviousPost.WeekBefore(mergeStats),
 		time.Time{},
 		generatedAt,
 		cfg.ContentInputs,
@@ -154,7 +154,7 @@ func runPostMode(
 		mergeStats, mergeStatsLastComputedAt(mergeStats, previousPostState),
 	)
 	postState = state.WithMergedPRCache(postState, mergedPRs)
-	postState = state.WithRecentMergeStats(postState, mergeStatsByDateOfPreviousPost, mergeStats, generatedAt)
+	postState.RecentMergeStats = recentMergeStatsOfPreviousPost.WithAdded(mergeStats, generatedAt)
 	var markAsStaleErr error
 	if previousPostState != nil {
 		markAsStaleErr = markPreviousMessageStale(slackClient, *previousPostState, sentMessageInfo.ChannelID)
@@ -175,11 +175,11 @@ func previousPostStateOrLogWhyMissing(loadedState *state.State, loadStateErr err
 	return loadedState
 }
 
-func mergeStatsByDateOf(previousPostState *state.State) map[string]mergestats.MergeStats {
+func recentMergeStatsOf(previousPostState *state.State) state.RecentMergeStats {
 	if previousPostState == nil {
 		return nil
 	}
-	return previousPostState.MergeStatsByDate
+	return previousPostState.RecentMergeStats
 }
 
 // Nil when this post computes none, or fails to.
@@ -317,7 +317,7 @@ func runUpdateMode(
 		prview.BuildPRViews(trackedPRs, cfg.ContentInputs),
 		prview.BuildPRViews(mergedPRs, cfg.ContentInputs),
 		loadedState.MergeStats,
-		state.MergeStatsWeekBefore(loadedState.MergeStatsByDate, loadedState.MergeStats),
+		loadedState.RecentMergeStats.WeekBefore(loadedState.MergeStats),
 		loadedState.MessagePostedAt,
 		generatedAt,
 		cfg.ContentInputs,

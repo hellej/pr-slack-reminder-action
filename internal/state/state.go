@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,15 +22,15 @@ import (
 const CurrentSchemaVersion = 1
 
 type State struct {
-	SchemaVersion                 int                              `json:"schemaVersion"`
-	MessagePostedAt               time.Time                        `json:"messagePostedAt"`
-	MessageRef                    SlackRef                         `json:"messageRef"`
-	TrackedPRs                    []models.PullRequestRef          `json:"trackedPRs"`
-	LastWrittenCanvasMarkdownHash string                           `json:"canvasContentHash"`
-	LastWrittenMessage            LastWrittenMessage               `json:"lastWrittenMessage"`
-	MergedPRCache                 []githubclient.PR                `json:"mergedPRCache,omitempty"`
-	MergeStats                    *mergestats.MergeStats           `json:"mergeStats,omitempty"`
-	MergeStatsByDate              map[string]mergestats.MergeStats `json:"mergeStatsByDate,omitempty"`
+	SchemaVersion                 int                     `json:"schemaVersion"`
+	MessagePostedAt               time.Time               `json:"messagePostedAt"`
+	MessageRef                    SlackRef                `json:"messageRef"`
+	TrackedPRs                    []models.PullRequestRef `json:"trackedPRs"`
+	LastWrittenCanvasMarkdownHash string                  `json:"canvasContentHash"`
+	LastWrittenMessage            LastWrittenMessage      `json:"lastWrittenMessage"`
+	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
+	MergeStats                    *mergestats.MergeStats  `json:"mergeStats,omitempty"`
+	RecentMergeStats              RecentMergeStats        `json:"recentMergeStats,omitempty"`
 	// When any post last computed stats. Equals MergeStats.ComputedAt when that is set. See state.spec.md § Behaviour
 	MergeStatsLastComputedAt *time.Time `json:"mergeStatsLastComputedAt,omitempty"`
 }
@@ -162,49 +161,50 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 
 const daysInAWeek = 7
 
+// Oldest first. See state.spec.md § Behaviour.
+type RecentMergeStats []mergestats.MergeStats
+
 // A later post the same day covers only the hours since the first. See state.spec.md § Behaviour
-func WithRecentMergeStats(
-	s State,
-	loadedMergeStatsByDate map[string]mergestats.MergeStats,
-	newMergeStats *mergestats.MergeStats,
-	asOf time.Time,
-) State {
-	recentMergeStatsByDate := map[string]mergestats.MergeStats{}
-	maps.Copy(recentMergeStatsByDate, loadedMergeStatsByDate)
-	if newMergeStats != nil {
-		dateKey := mergeStatsDateKey(newMergeStats.ComputedAt)
-		if _, hasEntryOfTheDay := recentMergeStatsByDate[dateKey]; !hasEntryOfTheDay {
-			recentMergeStatsByDate[dateKey] = *newMergeStats
-		}
-	}
-	oldestKeptDateKey := weekBeforeDateKey(asOf)
-	// The keys are ISO dates, which sort as text.
-	maps.DeleteFunc(recentMergeStatsByDate, func(dateKey string, _ mergestats.MergeStats) bool {
-		return dateKey < oldestKeptDateKey
+func (r RecentMergeStats) WithAdded(newMergeStats *mergestats.MergeStats, asOf time.Time) RecentMergeStats {
+	oldestKeptDate := utcDateAWeekBefore(asOf)
+	recentMergeStats := utilities.Filter(r, func(entry mergestats.MergeStats) bool {
+		return !utcDate(entry.ComputedAt).Before(oldestKeptDate)
 	})
-	s.MergeStatsByDate = recentMergeStatsByDate
-	return s
+	if newMergeStats == nil {
+		return recentMergeStats
+	}
+	newMergeStatsDate := utcDate(newMergeStats.ComputedAt)
+	if !slices.ContainsFunc(recentMergeStats, isComputedOn(newMergeStatsDate)) {
+		recentMergeStats = append(recentMergeStats, *newMergeStats)
+	}
+	return recentMergeStats
 }
 
-func MergeStatsWeekBefore(
-	mergeStatsByDate map[string]mergestats.MergeStats, shown *mergestats.MergeStats,
-) *mergestats.MergeStats {
+func (r RecentMergeStats) WeekBefore(shown *mergestats.MergeStats) *mergestats.MergeStats {
 	if shown == nil {
 		return nil
 	}
-	weekBefore, isFound := mergeStatsByDate[weekBeforeDateKey(shown.ComputedAt)]
+	weekBeforeDate := utcDateAWeekBefore(shown.ComputedAt)
+	weekBefore, isFound := utilities.Find(r, isComputedOn(weekBeforeDate))
 	if !isFound {
 		return nil
 	}
 	return &weekBefore
 }
 
-func mergeStatsDateKey(t time.Time) string {
-	return t.UTC().Format(time.DateOnly)
+func isComputedOn(utcDay time.Time) func(mergestats.MergeStats) bool {
+	return func(entry mergestats.MergeStats) bool {
+		return utcDate(entry.ComputedAt).Equal(utcDay)
+	}
 }
 
-func weekBeforeDateKey(t time.Time) string {
-	return mergeStatsDateKey(t.UTC().AddDate(0, 0, -daysInAWeek))
+func utcDateAWeekBefore(t time.Time) time.Time {
+	return utcDate(t).AddDate(0, 0, -daysInAWeek)
+}
+
+func utcDate(t time.Time) time.Time {
+	year, month, day := t.UTC().Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func isSamePullRequest(a, b githubclient.PR) bool {

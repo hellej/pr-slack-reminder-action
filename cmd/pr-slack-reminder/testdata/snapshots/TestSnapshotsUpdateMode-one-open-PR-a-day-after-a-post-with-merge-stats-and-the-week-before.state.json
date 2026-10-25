@@ -103,20 +103,20 @@
     "mergedSince": "1970-01-01T00:00:00Z",
     "computedAt": "1970-01-01T00:00:00Z"
   },
-  "mergeStatsByDate": {
-    "<run date - 8>": {
+  "recentMergeStats": [
+    {
       "mergedCount": 6,
       "medianTimeToFirstReview": 14400000000000,
       "medianTimeToMerge": 86400000000000,
       "mergedSince": "1970-01-01T00:00:00Z",
       "computedAt": "1970-01-01T00:00:00Z"
     },
-    "<run date - 1>": {
+    {
       "mergedCount": 11,
       "medianTimeToFirstReview": 13320000000000,
       "medianTimeToMerge": 112320000000000,
       "mergedSince": "1970-01-01T00:00:00Z",
       "computedAt": "1970-01-01T00:00:00Z"
     }
-  }
+  ]
 }
