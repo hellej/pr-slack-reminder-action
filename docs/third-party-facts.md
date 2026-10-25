@@ -739,6 +739,13 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - An `allow` list replaces the default for its whole update entry, so the tools module needs an entry of its own
 - Unverified: whether `dependency-type: "all"` with no `dependency-name` covers them too
 
+## Dependabot never bumps the go.mod `toolchain` directive, so a Go standard library fix needs a manual bump [2026-10-25]
+
+- Source: [dependabot/dependabot-core#13520](https://github.com/dependabot/dependabot-core/issues/13520), a feature request open since 2025-11-11 with no maintainer reply
+- Neither version updates nor security updates touch `toolchain`. No Dependabot alert flags a vulnerable `toolchain` either
+- `govulncheck` in CI is the only signal: it fails on a standard library vulnerability fixed in a newer patch release
+- `actions/setup-go` v7 with `go-version-file: go.mod` installs the `toolchain` version and sets `GOTOOLCHAIN: local` (CI job log, run 40186074161)
+
 ## `go-github` v78 never retries a 5xx or network error, and sets no HTTP timeout [2026-09-26]
 
 - Source: `go-github/v78@v78.0.0/github/github.go` in the module cache: `bareDo`, `NewClient`
@@ -953,3 +960,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Measured against this action's state file:
   - A dev run's state minus `lastWrittenMessage` was 4358 bytes minified, over the limit with 1 tracked PR: `mergedPRCache` alone was 4018 bytes for 6 PRs
   - Tracked PR refs only, plus a 64 character hash: 40 refs took 3121 bytes and fit, 60 refs took 4621 bytes and were dropped
+
+## A user mention in a bot's `canvases.edit` replace notifies the user on every write [2026-10-25]
+
+- Source: manual probe on `pr-reminders-test` with the `slack-message-probe` and `slack-canvas-probe` skills, one human checking. Notifications were "Everything", the canvas closed in their client
+- A `chat.postMessage` with `<@U…>` notified the user
+- A `canvases.edit` replace with `![](@U…)` notified the user
+- 3 more replaces 90 seconds apart, each rewriting the same mention, notified the user each time
+- So a canvas that mentions people re-notifies them on every refresh. `canvasbuilder` names people instead
+- Not tested: an edit that leaves an existing mention untouched, since every write replaced the whole content
