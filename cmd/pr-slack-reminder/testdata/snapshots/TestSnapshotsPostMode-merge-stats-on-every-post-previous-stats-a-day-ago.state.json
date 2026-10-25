@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
+    "channelId": "C12345678",
+    "messageTs": "1234567890.123456"
+  },
+  "trackedPRs": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 105
+    }
+  ],
+  "canvasContentHash": "",
+  "lastWrittenMessage": {
+    "blocks": [
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "👀 Waiting for review",
+          "emoji": true
+        },
+        "block_id": "heading_waiting_for_review",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_waiting_for_review",
+        "elements": [
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/105",
+                    "text": "Fix coach video calls drop on cellular handoff",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 6 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Lilo",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "🚀 Recently merged",
+          "emoji": true
+        },
+        "block_id": "heading_merged",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_merged",
+        "elements": [
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/101",
+                    "text": "Add live tide and surf report widget",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " merged 2 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Nani",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " (✅ ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Jumba",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ")",
+                    "style": {}
+                  }
+                ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/102",
+                    "text": "Fix the hula schedule time zones",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " merged 5 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Lilo",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " (💬 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Nani",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ")",
+                    "style": {}
+                  }
+                ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/103",
+                    "text": "Bump the surf API client",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " merged 8 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "dependabot[bot]",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "context",
+        "block_id": "merge_stats_line",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": "_Last 1 day: 3 merged · median 2.5 days to first review, 5.0 days to merge_"
+          }
+        ]
+      }
+    ],
+    "summaryText": "1 PR to review 👀",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  },
+  "mergedPRCache": [
+    {
+      "Number": 101,
+      "Title": "Add live tide and surf report widget",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/101",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "nani",
+        "Name": "Nani"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": [
+        {
+          "Login": "jumba",
+          "Name": "Jumba"
+        }
+      ],
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": "1970-01-01T00:00:00Z",
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 102,
+      "Title": "Fix the hula schedule time zones",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/102",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "lilo",
+        "Name": "Lilo"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": [
+        {
+          "Login": "nani",
+          "Name": "Nani"
+        }
+      ],
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": "1970-01-01T00:00:00Z",
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 103,
+      "Title": "Bump the surf API client",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/103",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "dependabot[bot]",
+        "Name": ""
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
+      "HasCompleteReviewerInfo": true
+    },
+    {
+      "Number": 104,
+      "Title": "Retire the old luau booking form",
+      "HTMLURL": "https://github.com/test-org/test-repo/pull/104",
+      "CreatedAt": "1970-01-01T00:00:00Z",
+      "UpdatedAt": "0001-01-01T00:00:00Z",
+      "State": "closed",
+      "Merged": true,
+      "Draft": false,
+      "Labels": [
+        "label-no-filter-names"
+      ],
+      "Author": {
+        "Login": "jumba",
+        "Name": "Jumba"
+      },
+      "MergedAt": "1970-01-01T00:00:00Z",
+      "Repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "ApprovedByUsers": null,
+      "CommentedByUsers": null,
+      "SnoozedUntil": null,
+      "HasThreadWaitingForAuthor": false,
+      "Conflicting": false,
+      "HasOutstandingChangesRequest": false,
+      "FirstReadyForReviewEventAt": null,
+      "FirstReviewAt": null,
+      "HasCompleteReviewerInfo": true
+    }
+  ],
+  "mergeStats": {
+    "mergedCount": 3,
+    "medianTimeToFirstReview": 216000000000000,
+    "medianTimeToMerge": 432000000000000,
+    "mergedSince": "1970-01-01T00:00:00Z",
+    "computedAt": "1970-01-01T00:00:00Z"
+  },
+  "mergeStatsLastComputedAt": "1970-01-01T00:00:00Z"
+}

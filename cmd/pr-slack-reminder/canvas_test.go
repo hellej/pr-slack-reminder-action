@@ -93,6 +93,7 @@ func TestPostModeCanvasRefresh(t *testing.T) {
 					MergedPRs: canvasTestMergedPRs(),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				false,
 			)
 
 			if err != nil {
@@ -181,6 +182,7 @@ func TestPostModeCanvasReportsCappedFetch(t *testing.T) {
 			err := main.Run(
 				mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{PRs: prs}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				false,
 			)
 
 			if err != nil {
@@ -205,6 +207,7 @@ func TestPostModeCanvasIsNotRefreshedWhenFetchFails(t *testing.T) {
 			PRServiceError:        errors.New("unable to fetch PRs"),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err == nil {
@@ -255,6 +258,7 @@ func TestUpdateModeOpenPRFetchFailureStopsTheRun(t *testing.T) {
 					PRServiceError:        errors.New("unable to fetch PRs"),
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				false,
 			)
 
 			if err == nil {
@@ -289,6 +293,7 @@ func TestPostModeCanvasIsRefreshedWhenNoPRsAreFound(t *testing.T) {
 	err := main.Run(
 		mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -315,6 +320,7 @@ func TestCanvasIsNotRefreshedWhenLinkIsUnset(t *testing.T) {
 			PRs: canvasTestPRs(),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -352,6 +358,7 @@ func TestUpdateModeCanvasShowsCurrentlyOpenPRs(t *testing.T) {
 			MockPreviousState: &mockState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -404,6 +411,7 @@ func TestCanvasLeavesOutMergesOlderThanTheWindow(t *testing.T) {
 			},
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -438,6 +446,7 @@ func TestCanvasAppliesRepositoryFiltersToMergedPRs(t *testing.T) {
 			},
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -461,6 +470,7 @@ func TestCanvasIsWrittenWhenTheMergedFetchFails(t *testing.T) {
 			MergedPRsSearchError: errors.New("unable to search merged PRs"),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err == nil {
@@ -495,6 +505,7 @@ func TestCanvasAndMessageFailuresAreIsolated(t *testing.T) {
 				PRs: canvasTestPRs(),
 			}),
 			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			false,
 		)
 
 		if err == nil {
@@ -527,6 +538,7 @@ func TestCanvasAndMessageFailuresAreIsolated(t *testing.T) {
 				PRs: canvasTestPRs(),
 			}),
 			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			false,
 		)
 
 		if err == nil {
@@ -554,6 +566,7 @@ func TestCanvasAndMessageFailuresAreIsolated(t *testing.T) {
 				PRs: canvasTestPRs(),
 			}),
 			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			false,
 		)
 
 		if err == nil {
@@ -585,6 +598,7 @@ func runPostModeAndLoadSavedState(t *testing.T, prs []*github.PullRequest) state
 			MergedPRs: canvasTestMergedPRs(),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 	if err != nil {
 		t.Fatalf("Expected the post run to succeed, got error: %v", err)
@@ -625,6 +639,7 @@ func TestPostModeSavesTheHashOfTheWrittenCanvasMarkdown(t *testing.T) {
 			MergedPRs: canvasTestMergedPRs(),
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -673,6 +688,7 @@ func TestUpdateModeSkipsTheCanvasWriteWhenTheContentIsUnchanged(t *testing.T) {
 			MockPreviousState: &seedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -739,6 +755,7 @@ func TestUpdateModeWritesTheCanvasWhenTheSeededHashDoesNotMatch(t *testing.T) {
 					MockPreviousState: &seedState,
 				}),
 				mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+				false,
 			)
 
 			if err != nil {
@@ -788,6 +805,7 @@ func TestUpdateModeCarriesTheSeededHashWhenNothingIsWritten(t *testing.T) {
 			MockPreviousState: &seedStateForRun,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -833,6 +851,7 @@ func TestUpdateModeKeepsTheSeededHashWhenTheCanvasWriteFails(t *testing.T) {
 			MockPreviousState: &seedState,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err == nil {
@@ -865,6 +884,7 @@ func TestCanvasDoesNotChangeMessageBlocks(t *testing.T) {
 				PRs: canvasTestPRs(),
 			}),
 			mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+			false,
 		)
 		if err != nil {
 			t.Fatalf("Expected Run to succeed, got error: %v", err)
@@ -915,6 +935,7 @@ func TestMergedPRFetchFailureDoesNotFailACanvasDisabledRun(t *testing.T) {
 			Recording:            &recording,
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {
@@ -952,6 +973,7 @@ func TestCanvasCountsOpenPRAgeFromTheReadyForReviewTime(t *testing.T) {
 			FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{1: now.Add(-3 * time.Hour)},
 		}),
 		mockslackclient.MakeSlackClientGetter(mockSlackAPI),
+		false,
 	)
 
 	if err != nil {

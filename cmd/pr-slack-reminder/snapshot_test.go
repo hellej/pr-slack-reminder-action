@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-github/v78/github"
 	main "github.com/hellej/pr-slack-reminder-action/cmd/pr-slack-reminder"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
+	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/state"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers"
@@ -46,7 +47,7 @@ func withFixedMessageTimestamps(blocks []byte) []byte {
 
 // The capitalised keys are the merged PR cache's, whose fixture times come off the real clock.
 var stateTimestampField = regexp.MustCompile(
-	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt)": "[^"]*"`,
+	`"(messagePostedAt|generatedAt|CreatedAt|UpdatedAt|MergedAt|SnoozedUntil|FirstReadyForReviewEventAt|FirstReviewAt|computedAt|mergedSince|mergeStatsLastComputedAt)": "[^"]*"`,
 )
 
 var neverSetTimeJSON = []byte(`"0001-01-01T00:00:00Z"`)
@@ -141,6 +142,103 @@ type snapshotScenario struct {
 	timelineCommentsByPRNumber map[int][]*github.IssueComment
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
+	isMergeStatsDay                      bool
+	previousStateForPostMode             *state.State
+}
+
+// Every span is a whole number of weeks, or a review before the PR turned ready, so the weekday
+// time is the same whatever day the test runs: 5 weekdays a week.
+type mergeStatsPROptions struct {
+	number                int
+	title                 string
+	authorLogin           string
+	authorType            string // "Bot" for a GitHub App; left unset, the author is a "User"
+	weeksReadyBeforeMerge int
+	mergedHoursAgo        int
+}
+
+func mergeStatsPR(options mergeStatsPROptions) *github.PullRequest {
+	mergedAt := now.Add(-time.Duration(options.mergedHoursAgo) * time.Hour)
+	pr := getTestPR(GetTestPROptions{
+		Number: options.number, Title: options.title,
+		AuthorLogin: options.authorLogin, AuthorType: options.authorType,
+		HTMLURL: fmt.Sprintf("https://github.com/test-org/test-repo/pull/%d", options.number),
+		State:   "closed", Merged: true, MergedHoursAgo: float32(options.mergedHoursAgo),
+	})
+	pr.MergedAt = &github.Timestamp{Time: mergedAt}
+	pr.CreatedAt = &github.Timestamp{
+		Time: mergedAt.Add(-time.Duration(options.weeksReadyBeforeMerge) * 7 * 24 * time.Hour),
+	}
+	return pr
+}
+
+// #104 merged 30 hours ago, before the window, so 3 PRs count. To merge: 10, 5 and 5 weekdays.
+func previousMergeStatsADayAgoScenario() snapshotScenario {
+	scenario := mergeStatsDayScenario(
+		"merge stats on every post, previous stats a day ago",
+		map[string]any{config.InputShowMergeStatsInMessage: true},
+	)
+	scenario.isMergeStatsDay = false
+	previousState := getTestState(GetTestStateOptions{})
+	previousState.MergeStatsLastComputedAt = github.Ptr(now.Add(-24 * time.Hour))
+	scenario.previousStateForPostMode = &previousState
+	return scenario
+}
+
+func reviewSubmittedAt(review *github.PullRequestReview, submittedAt time.Time) *github.PullRequestReview {
+	review.SubmittedAt = &github.Timestamp{Time: submittedAt}
+	return review
+}
+
+// Four merges, the newest three shown. To first review: 5 weekdays (#101) and 0 for a review
+// before the PR turned ready (#102), a median of 2.5 days. #103 has no review, #104 only its
+// author's and a bot's. To merge: 10, 5, 5 and 15 weekdays, a median of 7.5 days.
+func mergeStatsDayScenario(name string, configOverrides map[string]any) snapshotScenario {
+	mergedPRs := []*github.PullRequest{
+		mergeStatsPR(mergeStatsPROptions{
+			number: 101, title: "Add live tide and surf report widget", authorLogin: "nani",
+			weeksReadyBeforeMerge: 2, mergedHoursAgo: 2,
+		}),
+		mergeStatsPR(mergeStatsPROptions{
+			number: 102, title: "Fix the hula schedule time zones", authorLogin: "lilo",
+			weeksReadyBeforeMerge: 1, mergedHoursAgo: 5,
+		}),
+		mergeStatsPR(mergeStatsPROptions{
+			number: 103, title: "Bump the surf API client", authorLogin: "dependabot", authorType: "Bot",
+			weeksReadyBeforeMerge: 1, mergedHoursAgo: 8,
+		}),
+		mergeStatsPR(mergeStatsPROptions{
+			number: 104, title: "Retire the old luau booking form", authorLogin: "jumba",
+			weeksReadyBeforeMerge: 3, mergedHoursAgo: 30,
+		}),
+	}
+	return snapshotScenario{
+		name:            name,
+		configOverrides: configOverrides,
+		isMergeStatsDay: true,
+		prs: []*github.PullRequest{
+			getTestPR(GetTestPROptions{
+				Number: 105, Title: "Fix coach video calls drop on cellular handoff", AuthorLogin: "lilo",
+				AuthorName: "Lilo", HTMLURL: "https://github.com/test-org/test-repo/pull/105",
+				AgeHours: 6,
+			}),
+		},
+		mergedPRs: mergedPRs,
+		reviewsByPRNumber: map[int][]*github.PullRequestReview{
+			101: {reviewSubmittedAt(
+				mockgithubclient.NewReview("jumba", "Jumba", "APPROVED"),
+				mergedPRs[0].GetCreatedAt().Add(7*24*time.Hour),
+			)},
+			102: {reviewSubmittedAt(
+				mockgithubclient.NewReview("nani", "Nani", "COMMENTED"),
+				mergedPRs[1].GetCreatedAt().Add(-time.Hour),
+			)},
+			104: {
+				reviewSubmittedAt(mockgithubclient.NewReview("jumba", "Jumba", "COMMENTED"), mergedPRs[3].GetCreatedAt().Add(time.Hour)),
+				reviewSubmittedAt(mockgithubclient.NewReview("linter", "", "COMMENTED", "Bot"), mergedPRs[3].GetCreatedAt().Add(time.Hour)),
+			},
+		},
+	}
 }
 
 // Dependabot and Renovate PRs over two repositories, collapsing or not by section and group:
@@ -518,6 +616,22 @@ func snapshotScenarios() []snapshotScenario {
 				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
 			},
 		},
+		mergeStatsDayScenario("merge stats day", nil),
+		previousMergeStatsADayAgoScenario(),
+		mergeStatsDayScenario("merge stats day, merged section hidden", map[string]any{
+			config.InputShowMergedPRsInMessage: false,
+		}),
+		{
+			name:            "merge stats day with nothing merged",
+			isMergeStatsDay: true,
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 106, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/106",
+					AgeHours: 4,
+				}),
+			},
+		},
 	}
 }
 
@@ -543,7 +657,7 @@ func runSnapshotScenario(
 		PostMessageTimestamp: postedMessageTimestamp,
 	})
 
-	if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
+	if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI), scenario.isMergeStatsDay); err != nil {
 		t.Fatalf("Expected Run to succeed, got error: %v", err)
 	}
 	return mockSlackAPI
@@ -556,7 +670,7 @@ func TestSnapshotsPostMode(t *testing.T) {
 			maps.Copy(overrides, scenario.configOverrides)
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
-			runSnapshotScenario(t, scenario, nil, "")
+			runSnapshotScenario(t, scenario, scenario.previousStateForPostMode, "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
@@ -573,6 +687,11 @@ func TestSnapshotsPreviousMessageMarkedStale(t *testing.T) {
 		{name: "every section under load", scenarioName: "every section under load"},
 		{name: "grouped by repository over two repositories", scenarioName: "grouped by repository over two repositories"},
 		{name: "collapse PRs from authors", scenarioName: "collapse PRs from authors"},
+		{
+			name:              "merge stats day, edited by an update run",
+			scenarioName:      "merge stats day",
+			editedByUpdateRun: true,
+		},
 		{
 			name:              "every section under load, edited by an update run",
 			scenarioName:      "every section under load",
@@ -635,6 +754,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		mergedPRsFromSearch               []*github.PullRequest
 		reviewsByPRNumber                 map[int][]*github.PullRequestReview
 		requestedReviewerLoginsByPRNumber map[int][]string
+		mergeStats                        *mergestats.MergeStats
 		deletesTheMessage                 bool
 	}{
 		{
@@ -732,6 +852,25 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			},
 		},
 		{
+			name:           "one open PR with merge stats in the state",
+			statePRNumbers: []int{71},
+			openPRNumbers:  []int{71},
+			prByNumber: map[int]*github.PullRequest{
+				71: getTestPR(GetTestPROptions{
+					Number: 71, Title: "The only open PR", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/71",
+					AgeHours: 4, State: "open",
+				}),
+			},
+			mergeStats: &mergestats.MergeStats{
+				MergedCount:             11,
+				MedianTimeToFirstReview: github.Ptr(3*time.Hour + 42*time.Minute),
+				MedianTimeToMerge:       github.Ptr(31*time.Hour + 12*time.Minute),
+				MergedSince:             time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC),
+				ComputedAt:              time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC),
+			},
+		},
+		{
 			// Saved state: see run.spec.md § Oddities.
 			name: "one open PR and a tracked PR merged since the post, merged section hidden",
 			configOverrides: map[string]any{
@@ -800,6 +939,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
 			mockState := getTestState(GetTestStateOptions{PRNumbers: tc.statePRNumbers})
+			mockState.MergeStats = tc.mergeStats
 			getGitHubClient := mockgithubclient.MakeMockGitHubClientGetter(mockgithubclient.MockGitHubClientOptions{
 				PRsByNumber:                       tc.prByNumber,
 				PRs:                               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
@@ -810,7 +950,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
 
-			if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI)); err != nil {
+			if err := main.Run(getGitHubClient, mockslackclient.MakeSlackClientGetter(mockSlackAPI), false); err != nil {
 				t.Fatalf("Expected Run to succeed, got error: %v", err)
 			}
 

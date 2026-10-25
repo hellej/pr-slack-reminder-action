@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/githubclient"
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/slackclient"
@@ -14,7 +15,7 @@ func main() {
 	// See docs/third-party-facts.md § The runner parses workflow commands from stderr as well as stdout, but only at a line's start
 	log.SetFlags(0)
 	log.Println("Starting PR Slack reminder action")
-	err := Run(githubclient.GetAuthenticatedClient, slackclient.GetAuthenticatedClient)
+	err := Run(githubclient.GetAuthenticatedClient, slackclient.GetAuthenticatedClient, isMondayInUTC(time.Now()))
 	if err != nil {
 		logError(err)
 		os.Exit(1)

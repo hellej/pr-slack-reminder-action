@@ -15,6 +15,7 @@ Parses and validates GitHub Action inputs into a `Config`. See [AGENTS.md](../..
 - A non-empty canvas link that has no `docs` path segment followed by an `F[A-Z0-9]+` segment is a parse error, joined with the other input parse errors
 - `ContentInputs.CollapsePRsFromAuthors` lists the GitHub logins from `collapse-prs-from-authors`, empty items dropped (e.g. the one in `a;;b`). Go applies no default: `action.yml` carries it, so an unset input and an explicit `""` both mean nothing collapses
 - `ContentInputs.ShowMergedPRsInMessage` comes from `show-merged-prs-in-message`. Unset or empty means `true`, so Go applies the same default as `action.yml`
+- `ContentInputs.ShowMergeStatsInMessage` comes from `show-merge-stats-in-message`: nil when unset or empty, leaving the choice to the run ([run.spec.md](../../cmd/pr-slack-reminder/run.spec.md)), else the parsed bool. `action.yml` has no default for it
 - `Config.Print()` logs the config as JSON with all tokens redacted
 - Input getters (string/int/bool/list/mapping) treat an input as required or optional depending on which getter is called
 
@@ -23,7 +24,7 @@ Parses and validates GitHub Action inputs into a `Config`. See [AGENTS.md](../..
 - Doesn't verify repositories, channels, labels, or usernames actually exist: validation is structural only
 - Doesn't check that the canvas exists or that the bot can write to it: the link is only parsed for its shape
 - `Filters` validation rejects `Authors`+`IgnoredAuthors` together and overlapping `Labels`/`IgnoredLabels`, but doesn't check filter values against anything real
-- Integer/boolean inputs default to their zero value (`0`/`false`) when unset, not an error, except `show-merged-prs-in-message`. Only an unparsable non-empty value errors
+- Integer/boolean inputs default to their zero value (`0`/`false`) when unset, not an error, except `show-merged-prs-in-message` (`true`) and `show-merge-stats-in-message` (nil). Only an unparsable non-empty value errors
 
 ## Oddities
 

@@ -32,17 +32,30 @@ const (
 // when grouping by repository reaches it.
 const maximumBlocksInSlackMessage = 50
 
-const slotsForFooterOrStalenessWarning = 1
+const (
+	slotsForMergeStatsLine           = 1
+	slotsForFooterOrStalenessWarning = 1
+)
 
 const updateTimeFooterBlockID = "update_time_footer"
 
+const mergeStatsLineBlockID = "merge_stats_line"
+
 func BuildMessageToPost(content messagecontent.Content) (slack.Message, string) {
-	return slack.NewBlockMessage(buildContentBlocks(content)...), content.SummaryText
+	return slack.NewBlockMessage(buildMessageBodyBlocks(content)...), content.SummaryText
 }
 
 func BuildMessageWithUpdateTimeFooter(content messagecontent.Content) (slack.Message, string) {
-	blocks := append(buildContentBlocks(content), buildUpdateTimeFooterBlock(content.GeneratedAt))
+	blocks := append(buildMessageBodyBlocks(content), buildUpdateTimeFooterBlock(content.GeneratedAt))
 	return slack.NewBlockMessage(blocks...), content.SummaryText
+}
+
+func buildMessageBodyBlocks(content messagecontent.Content) []slack.Block {
+	blocks := buildContentBlocks(content)
+	if content.MergeStatsText != "" {
+		blocks = append(blocks, buildMergeStatsLineBlock(content.MergeStatsText))
+	}
+	return blocks
 }
 
 func buildContentBlocks(content messagecontent.Content) []slack.Block {
@@ -157,6 +170,16 @@ func buildNoOpenPRsBlock(noOpenPRsText string) slack.Block {
 	)
 }
 
+// A context block in italics, like the footer, so the line reads as a note under the sections.
+// The text is sent unescaped: messagecontent's merge stats wording holds none of &, < and >, nor
+// an _ that would end the italics early.
+func buildMergeStatsLineBlock(mergeStatsText string) slack.Block {
+	return slack.NewContextBlock(
+		mergeStatsLineBlockID,
+		slack.NewTextBlockObject("mrkdwn", "_"+mergeStatsText+"_", false, false),
+	)
+}
+
 // <!date^…> renders the time in each reader's own timezone, and the pipe fallback is what a
 // client that cannot process it shows instead. A context block renders smaller and greyer than
 // a rich_text line, so the footer doesn't read as a fifth section.
@@ -211,7 +234,7 @@ func buildStalenessWarningBlock(generatedAt time.Time) slack.Block {
 }
 
 func limitMaximumMessageSize(blocks []slack.Block) []slack.Block {
-	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForFooterOrStalenessWarning
+	maximumContentBlocks := maximumBlocksInSlackMessage - slotsForMergeStatsLine - slotsForFooterOrStalenessWarning
 	if len(blocks) <= maximumContentBlocks {
 		return blocks
 	}

@@ -40,6 +40,7 @@ You may not need this action; GitHub provides [built-in scheduled reminders for 
 - PR age counts from when it was first marked ready for review, so draft time doesn't count
 - Weekends don't count towards the old-PR threshold: under a 48 hour threshold, a PR opened Friday morning isn't flagged old on Monday morning
 - Concise review status info for each PR with emojis (incl. approvers & commenters)
+- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, and their median time to a first review and to merge
 - More customizable message content
 - Global and repository specific filters
 - Anyone can set this up (no need to be a GitHub team maintainer)
@@ -185,7 +186,8 @@ jobs:
 | `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft. The hours are weekday hours: Saturdays and Sundays (UTC) are left out |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `collapse-prs-from-authors`         | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
-| `show-merged-prs-in-message`        | ❌       | Show the recently merged PRs section in the message (defaults to `true`). Set it to `false` to list open PRs only. The [PR Tracker Canvas](#pr-tracker-canvas) keeps its merged section either way |
+| `show-merged-prs-in-message`        | ❌       | Show the recently merged PRs section in the message (defaults to `true`). Set it to `false` to hide the merged section. The [PR Tracker Canvas](#pr-tracker-canvas) keeps its merged section either way |
+| `show-merge-stats-in-message`       | ❌       | Post mode only. Unset, posts on a Monday (UTC) carry the merge stats line. `true` puts it on every post, `false` on none. Update runs keep whatever line the post had |
 | `pr-tracker-canvas-link`            | ❌       | Link to a Slack canvas to keep updated with a live tracker of open, draft and recently merged PRs (see [PR Tracker Canvas](#pr-tracker-canvas)). Leave empty to disable (default).              |
 
 ### Filter Options

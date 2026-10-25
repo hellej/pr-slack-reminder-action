@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/apiclients/retry"
 	"github.com/hellej/pr-slack-reminder-action/internal/config"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 	"github.com/hellej/pr-slack-reminder-action/testhelpers/retryhelpers"
 )
 
@@ -560,5 +562,103 @@ func TestFindRecentlyMergedPRsKeepsCachedPRsWhenEnrichingTheRestFails(t *testing
 	}
 	if prs[1].GetNumber() != 1 || prs[1].ApprovedByUsers != nil || prs[1].HasCompleteReviewerInfo {
 		t.Errorf("PR 1 = %+v, expected it without reviewer info", prs[1])
+	}
+}
+
+// 30 merges: past MaxMergedPRsToFetch, and past one enrichment batch of 25.
+func TestFindPRsMergedSinceEnrichesEveryMergeInTheWindow(t *testing.T) {
+	mergedAts := make([]string, 30)
+	for index := range mergedAts {
+		mergedAts[index] = fmt.Sprintf("2026-08-16T%02d:%02d:00Z", index/2, 30*(index%2))
+	}
+	mergedBeforeTheWindow := mergedPullRequestNodeJSON(31, "Merged before the window", "2026-08-15T08:00:00Z")
+	testClient, enrich := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": len(mergedAts) + 1},
+			map[string][]string{"s0": append(mergedNodesSinceJSON(mergedAts...), mergedBeforeTheWindow)},
+		),
+		reviewedAndCommentedFixtures(len(mergedAts), nil),
+		retry.DefaultPolicy(),
+	)
+
+	prs, err := testClient.FindPRsMergedSince(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedNumbersNewestFirst := numbersUpTo(len(mergedAts))
+	slices.Reverse(expectedNumbersNewestFirst)
+	assertPRNumbers(t, prs, expectedNumbersNewestFirst)
+	for _, pr := range prs {
+		if !pr.HasCompleteReviewerInfo {
+			t.Errorf("PR %d has no complete reviewer info, expected every PR enriched", pr.GetNumber())
+		}
+	}
+	batchSizes := utilities.Map(enrich.requestedNumbers, func(batch []int) int { return len(batch) })
+	slices.Sort(batchSizes)
+	if !reflect.DeepEqual(batchSizes, []int{5, 25}) {
+		t.Errorf("enrichment batch sizes = %v, expected [5 25]", batchSizes)
+	}
+}
+
+func TestFindPRsMergedSinceAppliesFilters(t *testing.T) {
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 2},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z", "2026-08-21T12:00:00Z")},
+		),
+		nil,
+		retry.DefaultPolicy(),
+	)
+
+	prs, err := testClient.FindPRsMergedSince(
+		context.Background(),
+		testRepositories[:1],
+		func(models.Repository) config.Filters { return config.Filters{IgnoredTerms: []string{"PR 2"}} },
+		testMergedSince,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if numbers := prNumbersOf(prs); !reflect.DeepEqual(numbers, []int{1}) {
+		t.Errorf("PR numbers = %v, expected [1]", numbers)
+	}
+}
+
+// Unlike FindRecentlyMergedPRs, which falls back to rows without reviewers: a median over
+// unenriched PRs would be wrong.
+func TestFindPRsMergedSinceFailsWhenEnrichmentFails(t *testing.T) {
+	retryPolicy, _ := retryhelpers.SkipAndRecordWaits()
+	testClient, _ := mergedFetchClient(
+		searchResponseJSON(
+			map[string]int{"s0": 2},
+			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z", "2026-08-21T12:00:00Z")},
+		),
+		map[int]enrichFixture{1: {requestStatus: 500}},
+		retryPolicy,
+	)
+
+	prs, err := testClient.FindPRsMergedSince(
+		context.Background(), testRepositories[:1], noTestFilters, testMergedSince,
+	)
+	if err == nil || !strings.Contains(err.Error(), "status 500") {
+		t.Fatalf("error = %v with %d PRs, expected the enrichment failure", err, len(prs))
+	}
+}
+
+func TestFindPRsMergedSinceFailsWhenTheSearchFails(t *testing.T) {
+	transport := &recordingTransport{
+		status:       200,
+		responseBody: `{"data":null,"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`,
+	}
+	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}
+
+	_, err := testClient.FindPRsMergedSince(
+		context.Background(), testRepositories, noTestFilters, testMergedSince,
+	)
+	if err == nil || !strings.Contains(err.Error(), "error fetching merged pull requests") {
+		t.Errorf("error = %v, expected the search failure", err)
 	}
 }
