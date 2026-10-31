@@ -114,7 +114,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
 - A rollup with `hasNextPage` true is classified on its first 100 contexts, and logged
 - Log the phase's `rateLimit.cost` through `logRateLimit`, and one line per requested PR with its flag. A failed batch logs its error there too
-- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged and by-ref fetches share the constant and get the longer limit too, which the comment says in one line
+- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged list, merge stats and by-ref fetches share the constant and get the longer limit too, which the comment says in one line
 - `mockgithubclient`:
   - The transport routes a query containing `statusCheckRollup` before its `pullRequest(number:` branch. The default answer is a null rollup, so existing fixtures with an approved PR keep their buckets
   - `MockGitHubClientOptions.FailingRequiredCheckPRNumbers []int` makes those PRs' required check fail
