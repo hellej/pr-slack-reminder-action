@@ -969,3 +969,24 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - 3 more replaces 90 seconds apart, each rewriting the same mention, notified the user each time
 - So a canvas that mentions people re-notifies them on every refresh. `canvasbuilder` names people instead
 - Not tested: an edit that leaves an existing mention untouched, since every write replaced the whole content
+
+## `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository [2026-10-31]
+
+- Source: PR Reminder run 41196901365 (workflow dispatch on the plan branch, since reverted). Two probe jobs ran the same queries against closed PR 99 of this repository, one with `pull-requests: read` alone (log: `Metadata: read`, `PullRequests: read`), one with `checks: read` and `statuses: read` added
+- Both jobs returned identical data, so `checks: read` and `statuses: read` made no difference here
+- `pullRequest { statusCheckRollup { state contexts(first: 100) { totalCount pageInfo { hasNextPage } nodes { __typename ... on CheckRun { name status conclusion isRequired(pullRequestNumber: $n) } ... on StatusContext { context state isRequired(pullRequestNumber: $n) } } } } }` worked directly on `PullRequest`
+  - The `commits(last: 1) { nodes { commit { statusCheckRollup ... } } }` path returned the same contexts
+- PR 99 read `state: SUCCESS` with 5 contexts, all `CheckRun`:
+  - `build` (twice) and `lint & unit tests`: `isRequired: true`
+  - `reminder`: `isRequired: false`
+  - `publish coverage`: `conclusion: SKIPPED`, `isRequired: false`
+  - So `isRequired` marks required checks per context, and the rollup `state` was not enough to tell which
+- Each probe query cost 1 point (`rateLimit.cost`), single PR
+- `mergeStateStatus` and `mergeable` both read `UNKNOWN` on that closed PR, and `reviewDecision` still read `REVIEW_REQUIRED`: none of the three is worth reading off a merged PR
+- Open PR 3, which has no checks, read `statusCheckRollup: null` (probe run by the repository owner with their own `gh` login, same day, `mergeStateStatus: DIRTY`)
+  - So a PR with no checks reads a null rollup, not an empty `contexts`
+- `build` appears twice in PR 99's contexts, as two distinct check runs, so a consumer keyed by check name would merge them
+- Not shown by this run:
+  - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer
+  - Where this repository's required checks come from, branch protection or a ruleset
+  - A failing or pending required check, or a branch with no protection
