@@ -168,6 +168,19 @@ Report to the user:
 Leave `status: draft` unless the user said `ready`. Do not start implementing: that is a
 separate run of the [implement skill](../implement/SKILL.md).
 
+### The Plan's PR
+
+When the plan lands on a feature branch and a PR (round 0), open the PR as a draft, after
+pushing the final plan:
+
+- The description links the plan file on the PR's branch, so a reviewer opens it from the
+  description:
+  `[Plan 019](https://github.com/<owner>/<repo>/blob/<branch>/docs/plans/<file>.md)`
+- It summarizes the plan in a few bullets, and lists what is still open before implementing
+- It does not copy the plan
+- Keep the link under 150 characters. The GitHub MCP tools store a longer URL wrapped in backticks, which breaks the link (seen on plan 019: 145 characters stayed intact, 152 did not). Name the plan file short enough, and read the stored description back after writing it
+- A plan file renamed or moved later means editing the link in the description
+
 ## What the Run Taught
 
 Last, report what this run showed about the loop itself. Evidence from this run only.
