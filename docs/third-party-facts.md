@@ -990,3 +990,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer
   - Where this repository's required checks come from, branch protection or a ruleset
   - A failing or pending required check, or a branch with no protection
+
+## GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree [2026-10-31]
+
+- Source: research over [GraphQL commits reference](https://docs.github.com/en/graphql/reference/commits), [REST check runs](https://docs.github.com/en/rest/checks/runs), [REST check suites](https://docs.github.com/en/rest/checks/suites), [re-running workflows and jobs](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs). No live check
+- `contexts` is described only as "A list of status contexts and check runs for this commit", and the rollup `state` as "The combined status for the commit"
+- No page says whether a re-run replaces the failed attempt or lists beside it, nor whether the rollup `state` ignores a superseded attempt
+- REST's list endpoints take `filter=latest|all`, and GitHub limits same-name check runs to 1000 per suite. Neither says what "latest" means for a re-run
+- Third-party reports contradict each other: one says only the latest attempt is listed, another says the rollup `state` stays `FAILURE` after a successful re-run
+- Unverified: settling it needs a live PR whose required check failed and then passed on a re-run
