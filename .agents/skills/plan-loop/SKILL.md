@@ -178,6 +178,7 @@ pushing the final plan:
   `[Plan 019](https://github.com/<owner>/<repo>/blob/<branch>/docs/plans/<file>.md)`
 - It summarizes the plan in a few bullets, and lists what is still open before implementing
 - It does not copy the plan
+- Keep the link under 150 characters. The GitHub MCP tools store a longer URL wrapped in backticks, which breaks the link (seen on plan 019: 145 characters stayed intact, 152 did not). Name the plan file short enough, and read the stored description back after writing it
 - A plan file renamed or moved later means editing the link in the description
 
 ## What the Run Taught

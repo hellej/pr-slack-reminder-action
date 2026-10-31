@@ -1,4 +1,4 @@
-# Demote approved PRs with failing required checks
+# Demote approved PRs with failing checks
 
 date: 2026-10-31
 status: draft
