@@ -95,8 +95,9 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 
 Touches `internal/apiclients/githubclient` (`graphqlquery.go`, `openprsfetch.go`, `getprsbyreffetch.go`). Refactor, no behaviour change, ~2 call sites.
 
-- `buildPullRequestsQuery` takes a `pullRequestSelection`, `func(numberVariable string) string`, instead of a `pullRequestFragment`, and builds each alias body from it
-- `pullRequestFragment` gains a method returning the `pullRequestSelection` that spreads it, so both existing callers keep their query text byte for byte
+- `buildPullRequestsQuery` takes a `pullRequestSelection` instead of a `pullRequestFragment`. It is a small struct holding the fragment definitions text, empty when there is none, and a `body` func from the number variable to the alias body
+- `pullRequestFragment` gains a method returning the `pullRequestSelection` that carries its definition and spreads it, so both existing callers keep their query text byte for byte
+- The check status selection has no definitions and an inline body
 - The existing query tests and the snapshots are the regression net
 
 ### 1. Fetch required check status for approved PRs (checkpoint)
@@ -113,7 +114,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
 - A rollup with `hasNextPage` true is classified on its first 100 contexts, and logged
 - Log the phase's `rateLimit.cost` through `logRateLimit`, and one line per requested PR with its flag. A failed batch logs its error there too
-- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s
+- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged and by-ref fetches share the constant and get the longer limit too, which the comment says in one line
 - `mockgithubclient`:
   - The transport routes a query containing `statusCheckRollup` before its `pullRequest(number:` branch. The default answer is a null rollup, so existing fixtures with an approved PR keep their buckets
   - `MockGitHubClientOptions.FailingRequiredCheckPRNumbers []int` makes those PRs' required check fail
@@ -169,10 +170,10 @@ Touches no files. The step 1 fixture PR is the setup.
 
 Touches `README.md`.
 
-- The bucket paragraph under [PR Tracker Canvas](#pr-tracker-canvas): "ready to merge" is an approved PR with nothing outstanding and no failing required check, and a failing required check puts an approved PR under waiting for the author, with a `❌ checks failing` marker
+- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check, and a failing required check puts an approved PR under waiting for the author, with a `❌ checks failing` marker
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
-- Say once that check status needs nothing beyond `pull-requests: read`, once step 1 has shown it
+- `README.md` § Required Permissions: one line saying check status needs nothing beyond `pull-requests: read`, once step 1 has shown it
 
 ## Consequences
 
@@ -194,7 +195,7 @@ Touches `README.md`.
 - `isRequired` reads only contexts that have reported. A required check that never started is not seen, so such a PR stays ready
 - More than 100 contexts on a commit: only the first 100 are read
 - Not covered by a fixture: a failed check followed by a successful re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree. If it does, a fixed PR stays demoted until a new commit
-- Not verified for a fine-grained PAT or a classic PAT: both are expected to behave like the App token, and a failure degrades to the warning
+- Unverified for a fine-grained PAT and a classic PAT. A token lacking the permission either fails the request, which degrades to the warning, or gets a null rollup without an error, which leaves every PR unflagged with no warning. See docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
 
 ### Neutral
 
