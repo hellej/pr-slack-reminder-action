@@ -17,6 +17,7 @@ One known setup as an example. It's not the only supported one. Use it to weigh 
 
 - One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
 - A monorepo the team owns, plus PRs the team has open in repos owned by others
+- The repositories are mostly private. A change that reads a new GitHub field is checked against a private repository, never only a public one
 - 0 to 8 open PRs at a time. A weekly Dependabot batch adds ~5 at once
 - A draft PR with recent activity is a real WIP signal. A quiet one is just left open
 - Human approval gates merges: every PR needs an approving review from a human other than its author, bot-authored PRs included
