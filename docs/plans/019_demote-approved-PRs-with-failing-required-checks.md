@@ -112,6 +112,8 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
   - A query, repository or transport error leaves every PR of that batch unflagged
   - A per-PR error (`pullRequestError`, as `failsOnlyOnePullRequest` reads it) leaves only that PR unflagged
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
+  - Batches fail independently: unlike `enrichPRsWithReviewInfo`'s `errgroup.WithContext`, one failed batch does not cancel the others
+  - A decode error and an expired context count as a failed batch too. Nothing in the phase returns an error from `FindOpenPRs`
 - A rollup with `hasNextPage` true is classified on its first 100 contexts, and logged
 - Log the phase's `rateLimit.cost` through `logRateLimit`, and one line per requested PR with its flag. A failed batch logs its error there too
 - `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged list, merge stats and by-ref fetches share the constant and get the longer limit too, which the comment says in one line
