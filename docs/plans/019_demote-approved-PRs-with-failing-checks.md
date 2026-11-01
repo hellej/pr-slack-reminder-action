@@ -24,7 +24,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
 
 ### Non-goals
 
-- No `❌ CI` entry on unreviewed PRs, or on approved PRs already in "waiting for author" for another reason
+- No `❌ CI` entry on an unapproved PR: its check status is not fetched, only remembered from the state
 - No new workflow trigger in this repository's own workflows. The README gains an optional one
 - No change to "waiting for review": a PR nobody approved stays there, whatever its checks say
 - No change to merged, draft or collapsed rows
@@ -63,14 +63,17 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Where it sets the canvas hash on the state to save, sets `FailingRequiredCheckPRs` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
-- `prview.PR.IsHeldBackByFailingChecks()` is true when the failing check alone keeps an approved PR out of "ready to merge": approved, no waiting thread, no conflict, `RequiredChecksFailing`. It is what the `❌ CI` entry reads
+- `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
+- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecks` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `❌ CI` entry reads
+  - An unapproved PR gets no `CI`: on it, a failing status can only be one the state remembers
+  - `MergeBlockers()` returns nil on a PR whose embedded `githubclient.PR` is nil
 - `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
-  - `prview.GetReviewersTextSegments` gains a `hasFailingChecks bool` parameter and renders ` / ❌ CI` before the closing parenthesis, so both builders share it
-  - With no approvers or commenters it renders ` (❌ CI)`. A held-back PR is approved, so no held-back row reaches that case
-  - Only open rows pass `IsHeldBackByFailingChecks()`. Draft and merged rows pass false
+  - `prview.GetReviewersTextSegments` gains a `mergeBlockers []MergeBlocker` parameter and renders ` / ❌ ` and the blockers joined by `, ` before the closing parenthesis, so both builders share it
+  - With no approvers or commenters it renders ` (❌ CI)`. A PR with `CI` is approved, so no row reaches that case before plan 020
+  - Only open rows pass `MergeBlockers()`. Draft and merged rows pass nil
 - Action inputs: none new. Permissions: none new
   - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
-  - Step 1's checkpoint covers a private repository under the E2E App token
+  - Step 1's checkpoint covers a required check set by a ruleset in this public repository, and an approved PR without required checks in a private repository under the E2E App token
 
 Message states for an approved PR whose required check fails, then gets a fix:
 
@@ -152,27 +155,31 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
   - `make test`, and the new phase's request carries exactly the approved non-draft refs
-  - The repository owner sets up a PR in one of the private test repositories that the E2E runs list: approved by a human other than its author, with a failing required check. The check is required through a ruleset, the case docs/third-party-facts.md does not cover yet
-  - Its author is not `alice` if it is in `pr-slack-reminder-test-repo-1`, where the grouped runs filter out PRs by `alice`. It carries no `ignore-reminder` label
-  - The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
-  - After pushing the branch, the Build job log shows, for the fixture PR: its status line reading `failing`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line
-  - If an error line shows, stop and raise it with the user: a permission is needed and the plan has to say which
+  - The owner's free GitHub plan cannot require checks through a ruleset in a private repository. See docs/third-party-facts.md § Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one. So the fixture lives in this public repository, `hellej/pr-slack-reminder-action`. The repository owner sets it up as a standing fixture, kept after this plan for [plan 020](020_show-merge-blockers-on-PR-rows.md):
+    - A base branch `fixture/required-check-base`, cut from `main`, and a ruleset targeting only that branch that requires a status check named `fixture-check`. That is the ruleset case docs/third-party-facts.md does not cover yet
+    - A PR into that base branch, approved by a human other than its author, carrying no `ignore-reminder` label
+    - A failing `fixture-check` status on the PR's head commit, posted by hand: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=failure -f context=fixture-check`. No workflow file is added
+  - The owner also keeps an approved, non-draft open PR in `hellej/pr-slack-reminder-test-repo-1`, a Dependabot one, so the Build E2E runs read `statusCheckRollup` in a private repository, per AGENTS.md § Reference Deployment. Dependabot closes a PR a newer version supersedes, so the owner replaces it when that happens
+  - After pushing the implementation branch, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. Its job log, under `GITHUB_TOKEN`, shows the fixture PR's status line reading `failing` and no check status error line
+  - The Build job log, under the E2E App token, shows the Dependabot PR's status line reading `unknown`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line. The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
+  - If an error line shows in either log, stop and raise it with the user: a permission is needed and the plan has to say which
   - Add what this confirms to docs/third-party-facts.md, and amend the "not shown" list of docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
 
 ### 2. Keep failing PRs out of "ready to merge" in `prview`
 
 Touches `internal/prview`.
 
-- `GetNextAction` and `IsHeldBackByFailingChecks()` as in § Target shape. Size: one condition, one method
-- Update `prview.spec.md`: the list of conditions, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
+- `GetNextAction`, `MergeBlocker` and `MergeBlockers()` as in § Target shape. Size: one condition, one type, one method
+- A package test on `MergeBlockers()` for what the snapshots do not reach: an unapproved PR with a remembered failing status, and a nil embedded PR
+- Update `prview.spec.md`: a `MergeBlocker` and `MergeBlockers()` line, the list of conditions, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
 
 ### 3. Render `❌ CI` in the reviewer list
 
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
-- `prview.GetReviewersTextSegments` takes `hasFailingChecks`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers`, the canvas's WIP row and the canvas's merged row
-- `messagebuilder.buildOpenPRBulletPoint` and `canvasbuilder.renderOpenPRRow` pass `IsHeldBackByFailingChecks()`. The other callers pass false
-- `❌ CI` is part of the glue segments, so neither builder escapes or styles it as a name
+- `prview.GetReviewersTextSegments` takes `mergeBlockers`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers`, the canvas's WIP row and the canvas's merged row
+- `messagebuilder.buildOpenPRBulletPoint` and `canvasbuilder.renderOpenPRRow` pass `MergeBlockers()`. The other callers pass nil
+- `❌ CI` is part of the glue segments, so neither builder styles it as a name
 - Collapsed rows carry no reviewer list, so no `❌ CI`
 - Update `prview.spec.md`'s `GetReviewersTextSegments` line, `messagebuilder.spec.md` and `canvasbuilder.spec.md`
 - Add a failing-check PR to three fixture sets, then `make update-test-snapshots`:
@@ -209,10 +216,12 @@ Touches `cmd/pr-slack-reminder` (`run.go`), `run.spec.md`.
 
 Touches no files. The step 1 fixture PR is the setup.
 
-- `pr-reminder.yml` lists this repository only, so it cannot show the fixture PR. Read the branch's Build E2E runs instead:
-  - The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the message and on the canvas
+- After step 5, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. It shows the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the dev channel's message and on its canvas
+- Then the owner posts a pending status on the fixture's head commit: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=pending -f context=fixture-check`
+- Right after, dispatch the same with `-f run-mode=update`. The edited message still shows `❌ CI`, and the job log has the line naming the fixture PR as made failing from the state
+  - Run the two dispatches back to back: an event-driven `pr-reminder.yml` run in between uses the released binary, and saves a state without `failingRequiredCheckPRs`
+- Last, the owner posts `-f state=failure` again, so the fixture stays red for plan 020
 - Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
-- The remembered failing status is not checked live: the fixture's check would have to run during the E2E job. `main_test.go` covers it
 
 ### 7. Docs
 
@@ -250,6 +259,7 @@ Touches `README.md`.
 ### Caveats
 
 - Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
+- The fixture PR stays open in this repository, so it shows in the dev `github` channel's daily reminder and on that channel's canvas. The PR's base is not `main`, so `build.yml` never runs on it
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - A context carries `isRequired` only once it has reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
