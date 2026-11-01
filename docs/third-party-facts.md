@@ -982,7 +982,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - `publish coverage`: `conclusion: SKIPPED`, `isRequired: false`
   - So `isRequired` marks required checks per context, and the rollup `state` was not enough to tell which
 - Each probe query cost 1 point (`rateLimit.cost`), single PR
-- `mergeStateStatus` and `mergeable` both read `UNKNOWN` on that closed PR, and `reviewDecision` still read `REVIEW_REQUIRED`: none of the three is worth reading off a merged PR
+- `mergeStateStatus` and `mergeable` both read `UNKNOWN` on that closed PR. `reviewDecision` read `REVIEW_REQUIRED` because PR 99 merged without an approval: on this repository merged PRs with an approval on the head commit (57, 59, 63, 89, 97) read `APPROVED`, admin-merged ones without (61, 65, 78, 83, 92, 95, 99, 101) read `REVIEW_REQUIRED`, PR 85 reads null (`gh api graphql`, 2026-11-01)
 - Open PR 3, which has no checks, read `statusCheckRollup: null` (probe run by the repository owner with their own `gh` login, same day, `mergeStateStatus: DIRTY`)
   - So a PR with no checks reads a null rollup, not an empty `contexts`
 - `build` appears twice in PR 99's contexts, as two distinct check runs, so a consumer keyed by check name would merge them
@@ -1030,6 +1030,65 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets), the availability callout, read with `curl`: WebFetch's markdown conversion drops it
 - "Rulesets are available in public repositories with GitHub Free and GitHub Free for organizations, and in public and private repositories with GitHub Pro, GitHub Team, and GitHub Enterprise Cloud"
 - So on a free plan, a check required through a ruleset can only be set up in a public repository
+- The API agrees: `gh api repos/hellej/pr-slack-reminder-test-repo-1/rulesets`, `.../rules/branches/main` and `.../branches/main/protection` all answer 403, "Upgrade to GitHub Pro or make this repository public to enable this feature." Branch protection is gated the same way, so the private E2E test repositories cannot reproduce any review rule
+
+## A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set [2026-11-01]
+
+- Source: `gh api graphql` against `hellej/pr-slack-reminder-action` PRs 5, 6, 19 and 52, whose ruleset sets `dismiss_stale_reviews_on_push: true`
+- The dismissed review's `state` reads `DISMISSED`. Its `commit` is the older commit the approval was made on
+- `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])` returns one event per dismissal, with `previousReviewState: APPROVED`, a non-null `pullRequestCommit` (the pushed commit), `dismissalMessage: null`, and the pusher as `actor` (`dependabot` on all four, without a `[bot]` suffix)
+- The schema describes `pullRequestCommit` as "the commit which caused the review to become stale". No page says it is null on a manual dismissal. Unverified
+- Every official wording of the rule names approvals only ([about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches): "the approving review is dismissed as stale")
+- A `CHANGES_REQUESTED` review survives the push: PR 6 of `hellej/pr-slack-reminder-test-repo-3`, under ruleset 26307879 (`dismiss_stale_reviews_on_push: true`), kept its review `CHANGES_REQUESTED` after a later push, with no `ReviewDismissedEvent` (`gh api graphql`, 2026-11-01). The reviewer was the `github-actions` bot. Its approval on PR 1 of the same repository was dismissed by a push under the same ruleset
+- The rule also fires on **Update branch** and when the merge base gains changes, per the same page
+
+## With "Require approval of the most recent reviewable push", older approvals stay `APPROVED`, and what `reviewDecision` reports is undocumented [2026-11-01]
+
+- Source: [about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches); [2022-10-20 changelog](https://github.blog/changelog/2022-10-20-new-branch-protections-last-pusher-and-locked-branch/)
+- The page says stale reviews "are not dismissed" under this rule, and the push must be approved by someone other than its pusher
+- No page defines a "reviewable push". A third-party report ([community discussion 37266](https://github.com/orgs/community/discussions/37266)) saw a conflict-free rebase keep the approvals valid
+- Undocumented, but measured: `reviewDecision` reads `REVIEW_REQUIRED` while the latest push is unapproved. PR 2 of public `hellej/pr-slack-reminder-test-repo-3`, under ruleset 26307880 (`require_last_push_approval: true`, `dismiss_stale_reviews_on_push: false`), keeps its approval `APPROVED` on an older commit and reads `REVIEW_REQUIRED`. PR 4, approved on its head commit under the same ruleset, reads `APPROVED` (`gh api graphql`, 2026-11-01)
+- A `github-actions` bot approval counts toward the ruleset's required approvals: PR 4's only approval is the bot's
+- Unverified: whether `REVIEW_REQUIRED` also reads for a required approval count not yet met
+- No `PullRequest` field says whether the latest push is approved. `Ref.rules` exposes `PullRequestParameters.requireLastPushApproval`, with an undocumented token permission
+
+## Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query [2026-11-01]
+
+- Source: the enrichment query as `buildPullRequestsQuery` builds it, over the 18 open PRs of `hellej/pr-slack-reminder-test-repo-1` and `-2`, under the owner's `gh` token, `rateLimit { cost }` and `rateLimit(dryRun: true) { cost }`
+- 19 points as-is and 19 with the additions, `errors: null`
+- The added connection was `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 20)`, under its own alias beside the existing unaliased one
+- At `last: 100`, selecting `previousReviewState dismissalMessage review { author { login __typename ... on User { name } } }`, over 25 PRs of `pr-slack-reminder-test-repo-1`, `-2`, `-3` and this repository, under the owner's `gh` token: 26 points without the connection, 27 with it, `errors: null` (2026-11-01)
+- Says nothing about `GITHUB_TOKEN` or an App token: see § Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented
+
+## A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository [2026-11-01]
+
+- Source: PR Reminder run 41298863967 (workflow dispatch on branch `plan-020-stale-approvals`, since reverted). One probe job with `pull-requests: read` alone (log: `Metadata: read`, `PullRequests: read`), querying closed PR 52 of this repository
+- Every field came back populated, no errors, cost 1 point:
+  - `headRefOid`, `reviewDecision: APPROVED`
+  - `reviews(last: 100) { nodes { state commit { oid } } }`: a `DISMISSED` review on the older commit, then a fresh `APPROVED` review by the same user on `headRefOid`
+  - `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100)` under its own alias: `previousReviewState: APPROVED`, a non-null `pullRequestCommit { id }`, and `review { author { login __typename ... on User { name } } }`
+- Doesn't carry over to a private repository, where the review's `commit` is `FORBIDDEN`: see § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
+
+## On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id` [2026-11-01]
+
+- Source: runs 41299479257 and 41299564373 in private `hellej/pr-slack-reminder-test-repo-1`, branch `probe-stale-approval-fields` (since deleted), one job with `permissions: pull-requests: read` (log: `Metadata: read`, `PullRequests: read`), against PRs 1 and 2
+- GraphQL answers HTTP 200 with the field null and a `FORBIDDEN` error, "Resource not accessible by integration", at:
+  - `reviews.nodes[].commit`
+  - `pullRequest.baseRef`, so `Ref.rules` is out of reach too
+  - `timelineItems(itemTypes: [PULL_REQUEST_COMMIT])`'s node itself, even selecting only `url`
+- Populated in the same query, no error: `headRefOid`, `reviewDecision` (null, no rules on a free private repository), the review's `state` and `author`, and an empty `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])`
+- A `ReviewDismissedEvent` node populates on a private repository under `pull-requests: read` alone: PR 7 of `hellej/pr-slack-reminder-test-repo-1`, with a manual dismissal, returned `previousReviewState`, `dismissalMessage` and `review { author { login __typename ... on User { name } } }`, no error. Source: the probe reported in [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7), branch `probe-review-dismissed-event` (since deleted), job log `Metadata: read`, `PullRequests: read`
+- REST under the same token: `GET /repos/{o}/{r}/pulls/2/reviews` returns each review's `commit_id`, and `GET /repos/{o}/{r}/pulls/2` returns `head.sha`
+- So a public repository is no test of a GraphQL field's permission: § A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository does not carry over
+- `Ref.rules` read from another repository's workflow token on public `hellej/pr-slack-reminder-action` returned its ruleset, `requireLastPushApproval: true` and `dismissStaleReviewsOnPush: true`
+
+## A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage` [2026-11-01]
+
+- Source: [dismiss a review for a pull request](https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request): `message` is required, "The message for the pull request review dismissal"
+- The four push dismissals in § A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set all read `dismissalMessage: null`
+- Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
+- Unverified: what GraphQL returns for a manual dismissal sent with an empty string
+- The same page's "List reviews for a pull request" response carries `commit_id`, string or null
 
 ## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
 
