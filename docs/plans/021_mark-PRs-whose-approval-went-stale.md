@@ -7,7 +7,8 @@ Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on 
 
 ## Requirements
 
-- An open or merged row names each approver whose approval a push dismissed in a `♻️` group of its reviewer list, in the message and on the canvas: `(♻️ Dana Davis / 💬 Erin Evans)`
+- A row in "waiting for review", or a merged row, names each approver whose approval a push dismissed in a `♻️` group of its reviewer list, in the message and on the canvas: `(♻️ Dana Davis / 💬 Erin Evans)`
+- A row in "waiting for author" or "ready to merge" lists them under `💬` instead: the next move is not their re-stamp. Examples: a PR with a changes request, or with a thread waiting for its author
 - A push dismisses an approval under the "Dismiss stale pull request approvals when new commits are pushed" rule: in branch protection, or `dismiss_stale_reviews_on_push` in a ruleset
 - An approver who approves again is a current approver: `✅`, not `♻️`
 - A manually dismissed approval is not stale: its reviewer stays under `💬`, as today
@@ -39,7 +40,8 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
   - Populates under `pull-requests: read` on `GITHUB_TOKEN`, in a public and a private repository
 - `prview.PR` gains `StaleApprovers []Collaborator`, with Slack IDs attached as for `Approvers`
 - `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders the groups `✅`, `♻️`, `💬`, then the merge blockers, in that order, separated by ` / `: `(✅ Dana Davis / ♻️ Erin Evans / 💬 Frank Fisher / CI failing)`
-  - Open and merged rows pass `StaleApprovers`. Draft rows pass none, as they pass no approvers
+  - `prview.PR.ReviewerGroupsForOpenRow() (staleApprovers, commenters []Collaborator)` splits them for an open row: `StaleApprovers` and `Commenters` when `GetNextAction()` is `NextActionWaitingForReview`, else no stale approvers and `Commenters` followed by `StaleApprovers`. Both builders' open rows call it
+  - Merged rows pass `StaleApprovers` and `Commenters` as they are. Draft rows pass no stale approvers, as they pass no approvers
 - `GetNextAction` doesn't change
 - Action inputs: none new. Permissions: none new
 
@@ -112,9 +114,12 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`.
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
 - `prview.PR.StaleApprovers` and `GetReviewersTextSegments` as in § Target shape
-- Call sites: the message's `getReviewersElements`, which serves open and merged rows, and the canvas's `renderReviewers`, whose open and merged rows pass `StaleApprovers` and whose draft row passes none
-- Update `prview.spec.md`'s `GetReviewersTextSegments` line, `messagebuilder.spec.md` and `canvasbuilder.spec.md`
-- In the post, update-mode and canvas snapshot fixtures, give one PR that has a commenter a push-dismissed approver. In the canvas fixtures, also give one merged PR a push-dismissed approver. Then `make update-test-snapshots`. Read each diff before re-recording: only those PRs' rows change
+- `ReviewerGroupsForOpenRow` as in § Target shape
+- Call sites: the message's `getReviewersElements`, shared by open and merged rows, takes the stale approvers and commenters from its callers, as it takes `mergeBlockers`. Never call `ReviewerGroupsForOpenRow` inside it: a merged PR with an approver reads `NextActionReadyToMerge`, so its merged row would lose `♻️`
+- The canvas's `renderReviewers` already takes its groups from its callers: open, merged and draft rows
+- Open rows read `ReviewerGroupsForOpenRow`, merged rows `StaleApprovers` and `Commenters`, draft rows no stale approvers
+- Update `prview.spec.md`: the `GetReviewersTextSegments` line, and a § Behaviour line for `ReviewerGroupsForOpenRow` and its rule. Update `messagebuilder.spec.md` and `canvasbuilder.spec.md`
+- In the post, update-mode and canvas snapshot fixtures, give one PR that has a commenter a push-dismissed approver. In the post and canvas fixtures, also give one merged PR a push-dismissed approver, and one PR in "waiting for author" a push-dismissed approver and a thread waiting for its author. Then `make update-test-snapshots`. Read each diff before re-recording: only those PRs' rows change
 - Expect every state snapshot with a cached merged PR to gain the `StaleApprovedByUsers` key
 
 ### 3. Check the rows live
@@ -132,7 +137,7 @@ Touches no files. Step 1's repo-3 PRs are the setup.
 
 Touches `README.md`.
 
-- `README.md` § Example Output, beside the paragraph on collapsed rows: an approval a push dismissed is listed under `♻️` instead of `💬`, in the message and on the canvas, until the reviewer approves again
+- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `♻️` instead of `💬`, in the message and on the canvas, until the reviewer approves again
 - Done means `make check-style` passes
 
 ## Consequences
@@ -153,7 +158,7 @@ Touches `README.md`.
 - Collapsed rows have no reviewer list, so a collapsed Dependabot PR shows no `♻️`
 - A draft row drops a push-dismissed approver, who read under `💬` on that row before
 - A manual dismissal sent with an empty message may read as push-dismissed
-- A push-dismissed approver who then requested changes reads under `♻️` only, while the PR sits in "waiting for author"
+- In "waiting for author", every push-dismissed approver reads under `💬`, also one whose only open item is the re-stamp, while another reviewer's thread holds the PR
 - A PR with over 100 dismissals is judged on the newest 100
 
 ### Neutral
