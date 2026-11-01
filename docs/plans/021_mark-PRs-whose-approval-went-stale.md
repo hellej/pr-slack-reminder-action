@@ -88,22 +88,22 @@ Non-breaking, **minor**. Row text changes, with no input or permission change.
 
 Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.github/actions/e2e-tests/action.yml`, `docs/third-party-facts.md`.
 
-- First, before any code, check the event on a private repository:
-  - The repository owner approves an open Dependabot PR in private `hellej/pr-slack-reminder-test-repo-1`, then dismisses that approval with a message. The dismissal stays, so every E2E run reads a private-repo `ReviewDismissedEvent`
-  - A temporary workflow on a throwaway branch of that repository, with `permissions: pull-requests: read` only, runs `gh api graphql` with the § Target shape connection on that PR, as runs 41299479257 and 41299564373 did. Delete the branch afterwards
+- First, before any code, check the event on a private repository. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) sets it up:
+  - `hellej` approves an open Dependabot PR in private `hellej/pr-slack-reminder-test-repo-1`, then dismisses that approval with a message. The dismissal stays, so every E2E run reads a private-repo `ReviewDismissedEvent`
+  - A temporary workflow on a throwaway branch of that repository, with `permissions: pull-requests: read` only, runs `gh api graphql` with the § Target shape connection on that PR
   - Record the result in docs/third-party-facts.md
   - If the node comes back `FORBIDDEN` or null, stop and raise it with the user: a field error under `timelineItems` costs that PR all its reviewer info
 - `pullRequestNode` gains `ReviewDismissals`. The existing `timelineItems` field keeps its name
 - `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
 - Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
 - `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR
-- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. The repository owner sets it up:
-  - PR 1, approved by a human other than its author, then a push: push-dismissed
-  - PR 5, approved the same way, then dismissed with a message: manual
-  - PR 3, approved the same way: current
-  - Today these approvals come from `github-actions`, a bot, which the action ignores. A human approver replaces the bot on PRs 1, 3 and 5
-  - PRs 2, 4 and 6 stay as they are
-  - The E2E GitHub App is installed on it
+- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. Issue #7 there sets up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
+  - **push-dismissed**: approved, then a push
+  - **manually dismissed**: approved, then dismissed with a message
+  - **current approval**: approved
+  - **re-approved**: approved, a push, then approved again
+  - Not Dependabot: 2 or more Dependabot PRs in a section collapse into one row without a reviewer list
+  - The repository owner installs the E2E GitHub App on it
 - Update `githubclient.spec.md`: `StaleApprovedByUsers`, the new connection, the `CommentedByUsers` line, the `FirstReviewAt` line, which still counts a dismissed review, and the PR-scoped field lists of the `FindOpenPRs` and `GetPRs` lines under § Doesn't Do, which gain `reviewDismissals`
 - Verifying it done:
   - `make test`
@@ -125,9 +125,9 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 Touches no files. Step 1's repo-3 PRs are the setup.
 
 - The implementation PR's Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show, under repo-3:
-  - PR 1 under "Waiting for review" with the approver under `♻️`
-  - PR 5 under "Waiting for review" with the approver under `💬`
-  - PR 3 under "Ready to merge" with the approver under `✅`
+  - **push-dismissed** under "Waiting for review" with `hellej` under `♻️`
+  - **manually dismissed** under "Waiting for review" with `hellej` under `💬`
+  - **current approval** and **re-approved** under "Ready to merge" with `hellej` under `✅`
 - Done means the message and the canvas both show those rows
 
 ### 4. Docs

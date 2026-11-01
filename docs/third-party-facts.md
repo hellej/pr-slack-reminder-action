@@ -1046,7 +1046,9 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches); [2022-10-20 changelog](https://github.blog/changelog/2022-10-20-new-branch-protections-last-pusher-and-locked-branch/)
 - The page says stale reviews "are not dismissed" under this rule, and the push must be approved by someone other than its pusher
 - No page defines a "reviewable push". A third-party report ([community discussion 37266](https://github.com/orgs/community/discussions/37266)) saw a conflict-free rebase keep the approvals valid
-- Undocumented: whether `reviewDecision` reads `REVIEW_REQUIRED` while the latest push is unapproved, and whether it also does so for a required approval count not yet met
+- Undocumented, but measured: `reviewDecision` reads `REVIEW_REQUIRED` while the latest push is unapproved. PR 2 of public `hellej/pr-slack-reminder-test-repo-3`, under ruleset 26307880 (`require_last_push_approval: true`, `dismiss_stale_reviews_on_push: false`), keeps its approval `APPROVED` on an older commit and reads `REVIEW_REQUIRED`. PR 4, approved on its head commit under the same ruleset, reads `APPROVED` (`gh api graphql`, 2026-11-01)
+- A `github-actions` bot approval counts toward the ruleset's required approvals: PR 4's only approval is the bot's
+- Unverified: whether `REVIEW_REQUIRED` also reads for a required approval count not yet met
 - No `PullRequest` field says whether the latest push is approved. `Ref.rules` exposes `PullRequestParameters.requireLastPushApproval`, with an undocumented token permission
 
 ## Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query [2026-11-01]
