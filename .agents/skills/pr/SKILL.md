@@ -19,10 +19,13 @@ argument-hint: "Optional: draft, or what the PR is for"
 - When the PR resolves an issue, start with `Closes #<issue>`. Use `Fixes #<issue>` for a bug
 - Under `## Docs`, link every `.md` file the PR adds or changes, on the PR's branch:
   `[019_x.md](https://github.com/<owner>/<repo>/blob/<branch>/<path>)`
+- Under `## Related`, link the issues, PRs and `.md` files the PR doesn't change but a reviewer needs, such as a docs/third-party-facts.md entry
+  - Start each issue or PR with its state: `Open issue #12`, `Closed issue #7`, `Merged PR #95`, `Closed PR #90`
 - Drop a template section that would be empty
 - [checkprdescription.spec.md](../../../.github/scripts/checkprdescription/checkprdescription.spec.md) has the word and link limits
 
 ## Later Changes
 
 - A linked file renamed or moved means editing its link
+- A related issue or PR closing or merging means editing its state
 - A plan's draft PR usually gets the implementation pushed onto it later. Then rewrite the description to cover the whole PR: the summary, every `.md` file such as the specs, and what is still open

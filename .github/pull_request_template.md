@@ -16,6 +16,12 @@
 
 -
 
+## Related
+
+<!-- Issues, PRs and docs this PR doesn't change, e.g. "Open issue #12: <title>", "Merged PR #95", a docs/third-party-facts.md entry. Delete if none -->
+
+-
+
 ## Open
 
 <!-- What is still undecided or unverified. Delete if none -->

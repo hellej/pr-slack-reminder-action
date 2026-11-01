@@ -92,6 +92,28 @@ func TestProblems(t *testing.T) {
 			wantProblems: []string{"summary is 81 words, want at most 80"},
 		},
 		{
+			name: "related issues and PRs start with their state",
+			description: validDescription + "\n## Related\n\n" +
+				"- Open issue #3: flaky E2E\n" +
+				"- Closed issue #4\n" +
+				"- Merged PR #5\n" +
+				"- Closed PR https://github.com/o/r/pull/6\n" +
+				"- [facts](https://github.com/o/r/blob/b/docs/third-party-facts.md)\n",
+			wantProblems: nil,
+		},
+		{
+			name: "related issue or PR without its state",
+			description: validDescription + "\n## Related\n\n" +
+				"- Issue #3: flaky E2E\n" +
+				"- See https://github.com/o/r/pull/6\n" +
+				"- Opened PR #7\n",
+			wantProblems: []string{
+				"## Related: start with Open, Closed or Merged: Issue #3: flaky E2E",
+				"## Related: start with Open, Closed or Merged: See https://github.com/o/r/pull/6",
+				"## Related: start with Open, Closed or Merged: Opened PR #7",
+			},
+		},
+		{
 			name:         "link over 150 characters",
 			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 132) + ")\n",
 			wantProblems: []string{"link over 150 characters: https://github.com/" + strings.Repeat("a", 132)},

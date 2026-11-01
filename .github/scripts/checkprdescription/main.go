@@ -30,6 +30,13 @@ var summarySections = []summarySection{
 
 var markdownLinkURL = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
+const relatedHeading = "## Related"
+
+var (
+	issueOrPRReference = regexp.MustCompile(`#\d+|/(issues|pull)/\d+`)
+	issueOrPRState     = regexp.MustCompile(`^- (Open|Closed|Merged) `)
+)
+
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Fprintln(os.Stderr, "usage: checkprdescription <description file>")
@@ -61,7 +68,24 @@ func problems(description string) []string {
 	if summaryWords > maxSummaryWords {
 		found = append(found, fmt.Sprintf("summary is %d words, want at most %d", summaryWords, maxSummaryWords))
 	}
+	found = append(found, relatedWithoutState(lines)...)
 	return append(found, longLinks(description)...)
+}
+
+// A reader can't tell an open issue or PR from a closed one by its number alone.
+func relatedWithoutState(lines []string) []string {
+	headingIndex := slices.Index(lines, relatedHeading)
+	if headingIndex == -1 {
+		return nil
+	}
+	var found []string
+	for _, line := range linesUntilNextHeading(lines[headingIndex+1:]) {
+		trimmed := strings.TrimSpace(line)
+		if issueOrPRReference.MatchString(trimmed) && !issueOrPRState.MatchString(trimmed) {
+			found = append(found, relatedHeading+": start with Open, Closed or Merged: "+strings.TrimPrefix(trimmed, "- "))
+		}
+	}
+	return found
 }
 
 // Returns the section's problems and the word count of its bullets.
