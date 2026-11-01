@@ -15,6 +15,8 @@ Improve a software team's development velocity and flow.
 
 One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
 
+Most users run the action on private repositories. Docs and examples assume a private repository: a public-only difference is the side note.
+
 - One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
 - A monorepo the team owns, plus PRs the team has open in repos owned by others
 - The repositories are mostly private. A change that reads a new GitHub field is checked against a private repository, never only a public one
