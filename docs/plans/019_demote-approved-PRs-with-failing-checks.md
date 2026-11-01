@@ -239,9 +239,9 @@ Touches `README.md`.
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
 - `README.md` § Required Permissions: `checks: read` in the permissions block, commented as not needed in a public repository. The update-mode example's `permissions:` block gains it too. One short side note: commits carrying commit statuses also need `statuses: read`, and a missing permission shows as a warning on the run page
-- `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, listing the workflows that run the required checks. Its own comment explains it, with no text under the example:
+- `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, listing the workflows that run the required checks. Only the `workflows` line carries a comment, with no text under the example:
   ```yaml
-    workflow_run: # optional: runs an update when a listed workflow completes
+    workflow_run:
       workflows: ["CI"] # the workflows running your required checks
       types: [completed]
   ```
