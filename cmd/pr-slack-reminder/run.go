@@ -20,8 +20,10 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// An open-PR fetch is a listing then one wave of enrichment batches, each call retried for up to 52s.
-const prFetchTimeout = 2 * time.Minute
+// An open-PR fetch is a listing, a wave of enrichment batches and a wave of check status batches,
+// each call retried for up to 52s. The merged list, merge stats and by-ref fetches each get a limit
+// this long too.
+const prFetchTimeout = 3 * time.Minute
 
 // Monday's stats cover the whole work week before it.
 func isMondayInUTC(runStart time.Time) bool {
@@ -60,7 +62,11 @@ func Run(
 	if err != nil {
 		return err
 	}
+	if openPRs.CheckStatusErr != nil {
+		logWarning(checkStatusWarning(openPRs.CheckStatusErr))
+	}
 	loadedState, loadStateErr := loadPreviousState(githubClient, cfg)
+	openPRs.PRs = withRememberedFailingChecks(openPRs.PRs, loadedState)
 	mergedPRsShownAnywhere := cfg.ContentInputs.ShowMergedPRsInMessage || cfg.CanvasEnabled()
 	var mergedPRs []githubclient.PR
 	var mergedPRsErr error
@@ -110,6 +116,7 @@ func Run(
 	})...)
 	if stateToSave != nil {
 		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
+		stateToSave.PRsWithFailingRequiredChecks = state.RefsOfPRsWithFailingRequiredChecks(openPRs.PRs)
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
 	}
 	return errors.Join(messageErr, canvasErr, stateErr)
@@ -257,6 +264,28 @@ func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*st
 		cfg.StateArtifactName,
 		cfg.StateFilePath,
 	)
+}
+
+func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR {
+	seenFailingRefs := state.RefsOfPRsWithFailingRequiredChecks(prs)
+	prsWithRememberedFailingChecks := state.PRsWithRememberedFailingChecks(prs, loadedState)
+	for _, ref := range state.RefsOfPRsWithFailingRequiredChecks(prsWithRememberedFailingChecks) {
+		if !slices.Contains(seenFailingRefs, ref) {
+			log.Printf("PR %s/%d is failing a required check, as the previous run saw it", ref.Repository.GetPath(), ref.Number)
+		}
+	}
+	return prsWithRememberedFailingChecks
+}
+
+const missingCheckStatusPermissionsHint = ". In a private repository, the token needs checks: read, " +
+	"and statuses: read if commits there carry commit statuses"
+
+func checkStatusWarning(checkStatusErr error) string {
+	warning := fmt.Sprintf("Failed to fetch required check status: %v", checkStatusErr)
+	if errors.Is(checkStatusErr, githubclient.ErrForbidden) {
+		return warning + missingCheckStatusPermissionsHint
+	}
+	return warning
 }
 
 func mergedPRCacheToReuse(runMode config.RunMode, loadedState *state.State) []githubclient.PR {

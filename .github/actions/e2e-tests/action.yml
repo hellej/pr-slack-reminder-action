@@ -109,6 +109,7 @@ runs:
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
           hellej/pr-slack-reminder-test-repo-2
+          hellej/pr-slack-reminder-test-repo-3
         old-pr-threshold-hours: 48
         group-by-repository: true
         filters: |
@@ -140,6 +141,7 @@ runs:
           hellej/pr-slack-reminder-action
           hellej/pr-slack-reminder-test-repo-1
           hellej/pr-slack-reminder-test-repo-2
+          hellej/pr-slack-reminder-test-repo-3
         old-pr-threshold-hours: 48
         group-by-repository: true
         filters: |

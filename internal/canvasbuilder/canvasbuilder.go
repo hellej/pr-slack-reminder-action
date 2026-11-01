@@ -147,13 +147,14 @@ func renderOpenPRRow(pr prview.PR) string {
 	if pr.IsOldPR {
 		ageText = "🚨 `" + pr.GetPRAgeDisplayText() + "`"
 	}
-	return renderTitleLink(pr) + " " + ageText + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.Commenters)
+	return renderTitleLink(pr) + " " + ageText + renderAuthor(pr) +
+		renderReviewers(pr.Approvers, pr.Commenters, pr.MergeBlockers())
 }
 
 // A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
 // marker. The activity segment is a code span if the PR is active, italics if it's inactive.
 func renderWIPPRRow(pr prview.PR) string {
-	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters)
+	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters, nil)
 
 	activityText := pr.GetActivityText()
 	if activityText == "" {
@@ -180,7 +181,7 @@ func renderMergedPRRow(pr prview.PR) string {
 	if mergedText != "" {
 		row += " _" + mergedText + "_"
 	}
-	return row + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.Commenters)
+	return row + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.Commenters, nil)
 }
 
 func renderTitleLink(pr prview.PR) string {
@@ -191,9 +192,11 @@ func renderAuthor(pr prview.PR) string {
 	return " by " + escapeMarkdown(pr.Author.GetGitHubName())
 }
 
-func renderReviewers(approvers, commenters []prview.Collaborator) string {
+func renderReviewers(
+	approvers, commenters []prview.Collaborator, mergeBlockers []prview.MergeBlocker,
+) string {
 	return strings.Join(
-		utilities.Map(prview.GetReviewersTextSegments(approvers, commenters), escapeMarkdown),
+		utilities.Map(prview.GetReviewersTextSegments(approvers, commenters, mergeBlockers), escapeMarkdown),
 		"",
 	)
 }

@@ -133,9 +133,13 @@ type OpenPRsResult struct {
 	// tell, since snooze exclusion and content-level pruning shrink the lists further.
 	OpenPRsCapped  bool
 	DraftPRsCapped bool
+	// Set when the required check status fetch failed in whole or in part. The PRs it failed for
+	// are RequiredChecksUnknown
+	CheckStatusErr error
 }
 
-// Returns an error if listing the PRs of any repository fails.
+// Returns an error if listing the PRs of any repository fails. A failed required check status
+// fetch never fails it: see OpenPRsResult.CheckStatusErr.
 func (c *client) FindOpenPRs(
 	ctx context.Context,
 	repositories []models.Repository,
@@ -162,10 +166,12 @@ func (c *client) FindOpenPRs(
 	if err != nil {
 		return OpenPRsResult{}, err
 	}
+	prs, checkStatusErr := c.fetchRequiredCheckStatus(ctx, excludeSnoozedPRs(prs))
 	return OpenPRsResult{
-		PRs:            excludeSnoozedPRs(prs),
+		PRs:            prs,
 		OpenPRsCapped:  openPRsCapped,
 		DraftPRsCapped: draftPRsCapped,
+		CheckStatusErr: checkStatusErr,
 	}, nil
 }
 

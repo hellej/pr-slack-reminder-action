@@ -16,6 +16,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func LoadFromFile(filePath string) (*State, error) {
@@ -581,5 +582,50 @@ func TestRecentMergeStatsLastComputedAt(t *testing.T) {
 				t.Errorf("got %v, want %v", lastComputedAt, tt.expected)
 			}
 		})
+	}
+}
+
+func prWithRequiredChecks(number int, status githubclient.RequiredChecksStatus) githubclient.PR {
+	return githubclient.PR{
+		PullRequest:          &githubclient.PullRequest{Number: number},
+		Repository:           models.Repository{Owner: "owner", Name: "repo"},
+		RequiredChecksStatus: status,
+	}
+}
+
+// Only an unknown PR the state lists turns failing, in a copy. requiredchecks_test.go covers the
+// rest through Run, which cannot see whether the given PRs changed.
+func TestPRsWithRememberedFailingChecks(t *testing.T) {
+	prs := []githubclient.PR{
+		prWithRequiredChecks(1, githubclient.RequiredChecksUnknown),
+		prWithRequiredChecks(2, githubclient.RequiredChecksUnknown),
+	}
+	listingOne := &State{PRsWithFailingRequiredChecks: []models.PullRequestRef{prs[0].GetPullRequestRef()}}
+
+	result := PRsWithRememberedFailingChecks(prs, listingOne)
+
+	statuses := utilities.Map(result, func(pr githubclient.PR) githubclient.RequiredChecksStatus { return pr.RequiredChecksStatus })
+	expected := []githubclient.RequiredChecksStatus{githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown}
+	if !slices.Equal(statuses, expected) {
+		t.Errorf("RequiredChecksStatus = %q, expected %q", statuses, expected)
+	}
+	if prs[0].RequiredChecksStatus != githubclient.RequiredChecksUnknown {
+		t.Error("the given PRs were changed, expected copies")
+	}
+}
+
+func TestRefsOfPRsWithFailingRequiredChecksKeepsThePRsOrder(t *testing.T) {
+	prs := []githubclient.PR{
+		prWithRequiredChecks(3, githubclient.RequiredChecksFailing),
+		prWithRequiredChecks(1, githubclient.RequiredChecksPassing),
+		prWithRequiredChecks(2, githubclient.RequiredChecksFailing),
+		prWithRequiredChecks(4, githubclient.RequiredChecksUnknown),
+	}
+
+	refs := RefsOfPRsWithFailingRequiredChecks(prs)
+
+	expected := []models.PullRequestRef{prs[0].GetPullRequestRef(), prs[2].GetPullRequestRef()}
+	if !slices.Equal(refs, expected) {
+		t.Errorf("RefsOfPRsWithFailingRequiredChecks() = %v, expected %v", refs, expected)
 	}
 }

@@ -12,6 +12,7 @@
 - **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/31)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
 - **[Split the config package](https://github.com/test-org/repo-two/pull/32)** _3 days ago_ by Carol Clark (💬 Alice Anderson, Erin Evans)
 - **[Handle the 404 on missing repositories](https://github.com/test-org/repo-three/pull/33)** _5 hours ago_ by Dana Davis (✅ Alice Anderson / 💬 Bob Brown)
+- **[Retry the flaky upload](https://github.com/test-org/repo-two/pull/35)** _5 hours ago_ by Frank Foster (✅ Dana Davis / 💬 Erin Evans / CI failing)
 - **[Escape the canvas titles](https://github.com/test-org/test-repo/pull/34)** _30 minutes ago_ by Erin Evans (💬 Frank Foster)
 
 ## 🚀 Merged

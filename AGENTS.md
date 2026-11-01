@@ -15,6 +15,8 @@ Improve a software team's development velocity and flow.
 
 One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
 
+Most users run the action on private repositories. Docs and examples assume a private repository: a significant public-only difference is an optional side note.
+
 - One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
 - A monorepo the team owns, plus PRs the team has open in repos owned by others
 - The repositories are mostly private. A change that reads a new GitHub field is checked against a private repository, never only a public one
@@ -28,7 +30,7 @@ One known setup as an example. It's not the only supported one. Use it to weigh 
 ## GitHub API Budget
 
 - Target: a run over 20 open PRs costs at most 80 GraphQL points, so 60 runs an hour fit in a token's 5,000-point hourly limit
-  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
+  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`. The required check status fetch is not in that figure: it adds one request per 25 approved PRs. A Build E2E log showed a request of one PR costing 1 point. The cost at 25 PRs is not read yet
 - The limit is shared: `GITHUB_TOKEN`'s with the whole repository, a personal token's with everything its owner runs
 - A change to a GraphQL query compares `rateLimit.cost` in the Build E2E job log against the last run on `main`, and states the difference in its plan or PR
 
@@ -209,6 +211,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - The Build workflow's "Smoke/E2E test" step (`.github/actions/e2e-tests/`): runs each PR's own build against the real GitHub API and the dev Slack channels, in post and update mode. Its job log shows a query or Slack call working live
   - It uses a GitHub App token, not `GITHUB_TOKEN`. Fork PRs skip it
   - It lists PRs from `hellej/pr-slack-reminder-test-repo-1` and `-2`, both private, so its log checks a new GitHub field against a private repository (§ Reference Deployment)
+  - Its grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) also list the public `hellej/pr-slack-reminder-test-repo-3`. Its standing PR 14 is approved and fails a check that a ruleset makes required
 - `make check-fmt`: fail if any file needs `gofmt`
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
@@ -243,7 +246,7 @@ Then two tracks; channel message & canvas, the message first. A failure in one d
 
 Around the run:
 
-- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used to look up the merge stats of 7 days before and to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash, the merge stats, and the merge stats of every post that computed them in the 7 days before the run
+- **State** (`internal/state/`): loaded from a GitHub Actions artifact where a mode needs it (update: before building content; post: before the merge stats fetch, also used to look up the merge stats of 7 days before and to mark the previous message stale). Saved last when the mode produced one, holding PR refs, the Slack message ref, the last written message, the canvas markdown hash, the merge stats, the merge stats of every post that computed them in the 7 days before the run, and the PRs last seen failing a required check. Both modes apply that set to the open PRs right after the load, before either track
 - **Merge Stats** (`internal/mergestats/`): on a post computing them (Monday by default, per `show-merge-stats-in-message`), the count and median time to first review and to merge of the PRs merged since the previous stats, at most 7 days back, for the message's merge stats line, and each median's change against the stats from 7 days before
 - **Annotations** (`cmd/pr-slack-reminder/annotations.go`): reports warnings as they happen and the run's errors at exit, as annotations on the run page
 

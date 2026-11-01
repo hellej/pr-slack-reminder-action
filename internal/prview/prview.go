@@ -49,8 +49,9 @@ const (
 
 // Returns the next action of the first check that matches, so an earlier check wins every
 // overlap: a reviewer who requested changes and then approved leaves the PR ready to merge. A
-// conflict keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while
-// an unreviewed one stays in the review queue (conflicts should not block review).
+// conflict or a failing required check keeps an approved PR in NextActionWaitingForAuthor (vs
+// NextActionReadyToMerge), while an unreviewed one stays in the review queue (neither should
+// block review).
 func (pr PR) GetNextAction() PRNextAction {
 	// defensive nil check, should not happen
 	if pr.PR == nil {
@@ -58,13 +59,30 @@ func (pr PR) GetNextAction() PRNextAction {
 	}
 
 	isApproved := len(pr.Approvers) > 0
-	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
+	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
 		return NextActionReadyToMerge
 	}
 	if isApproved || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
 		return NextActionWaitingForAuthor
 	}
 	return NextActionWaitingForReview
+}
+
+// One thing blocking a PR's merge. The value is the text its row shows.
+type MergeBlocker string
+
+const MergeBlockerFailingChecks MergeBlocker = "CI failing"
+
+// None on an unapproved PR. See prview.spec.md § Oddities
+func (pr PR) MergeBlockers() []MergeBlocker {
+	if pr.PR == nil || len(pr.Approvers) == 0 || !pr.isFailingRequiredChecks() {
+		return nil
+	}
+	return []MergeBlocker{MergeBlockerFailingChecks}
+}
+
+func (pr PR) isFailingRequiredChecks() bool {
+	return pr.RequiredChecksStatus == githubclient.RequiredChecksFailing
 }
 
 func (pr PR) GetPRAgeText() string {
