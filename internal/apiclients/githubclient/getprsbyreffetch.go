@@ -51,7 +51,7 @@ func (c *client) getPRsByRef(ctx context.Context, references []models.PullReques
 func (c *client) getPRBatchByRef(
 	ctx context.Context, references []models.PullRequestRef,
 ) ([]PR, error) {
-	query := buildPullRequestsQuery(references, fullPullRequestFragment)
+	query := buildPullRequestsQuery(references, fullPullRequestFragment.selection())
 
 	var data aliasedData[pullRequestWrapperNode]
 	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)

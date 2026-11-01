@@ -21,7 +21,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		{Repository: testRepositories[1], Number: 222},
 	}
 
-	query := buildPullRequestsQuery(references, fullPullRequestFragment)
+	query := buildPullRequestsQuery(references, fullPullRequestFragment.selection())
 
 	requiredFragments := []string{
 		"query($owner0:String!,$name0:String!,$num0:Int!,$owner1:String!,$name1:String!,$num1:Int!)",

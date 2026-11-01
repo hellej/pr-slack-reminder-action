@@ -160,7 +160,7 @@ func (c *client) enrichPRsWithReviewInfo(ctx context.Context, prResults []PRResu
 
 func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, error) {
 	query := buildPullRequestsQuery(
-		utilities.Map(batch, PRResult.getPullRequestRef), enrichedPullRequestFragment,
+		utilities.Map(batch, PRResult.getPullRequestRef), enrichedPullRequestFragment.selection(),
 	)
 
 	var data aliasedData[pullRequestWrapperNode]
