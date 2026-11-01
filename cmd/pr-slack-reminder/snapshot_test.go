@@ -141,6 +141,7 @@ type snapshotScenario struct {
 	reviewsByPRNumber                  map[int][]*github.PullRequestReview
 	timelineCommentsByPRNumber         map[int][]*github.IssueComment
 	prNumbersWithFailingRequiredChecks []int
+	conflictingPRNumbers               []int
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
@@ -545,6 +546,7 @@ func snapshotScenarios() []snapshotScenario {
 				}),
 			},
 			prNumbersWithFailingRequiredChecks: []int{77},
+			conflictingPRNumbers:               []int{74, 75, 77},
 			// Four merges reach the cap of three, newest first.
 			mergedPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
@@ -697,6 +699,7 @@ func runSnapshotScenario(
 		MockPreviousState:          previousState,
 
 		FailingRequiredCheckPRNumbers: scenario.prNumbersWithFailingRequiredChecks,
+		ConflictingPRNumbers:          scenario.conflictingPRNumbers,
 
 		FirstReadyForReviewEventAtByPRNumber: scenario.firstReadyForReviewEventAtByPRNumber,
 	})
@@ -829,6 +832,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		reviewsByPRNumber                  map[int][]*github.PullRequestReview
 		requestedReviewerLoginsByPRNumber  map[int][]string
 		prNumbersWithFailingRequiredChecks []int
+		conflictingPRNumbers               []int
 		mergeStatsOfState                  func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
 		deletesTheMessage                  bool
 	}{
@@ -899,6 +903,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				}),
 			},
 			prNumbersWithFailingRequiredChecks: []int{59},
+			conflictingPRNumbers:               []int{59},
 			mergedPRsFromSearch: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
 					Number: 70, Title: "Merged without ever being listed", AuthorLogin: "heidi",
@@ -1047,6 +1052,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				ReviewsByPRNumber:                 tc.reviewsByPRNumber,
 				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
 				FailingRequiredCheckPRNumbers:     tc.prNumbersWithFailingRequiredChecks,
+				ConflictingPRNumbers:              tc.conflictingPRNumbers,
 				MockPreviousState:                 &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})

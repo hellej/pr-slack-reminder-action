@@ -19,7 +19,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `SortPRsOldestToNewest(prs)` orders PRs by ready-for-review time, oldest first, a tie going to the earlier `UpdatedAt`. It sorts the given slice in place and returns it
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
-  - Merge blockers add a last glue segment, ` / ` and the blockers joined by `, `, such as ` / CI failing`. Without reviewers they render alone, as ` (CI failing)`
+  - Merge blockers add a last glue segment, ` / ` and the blockers joined by `, `, such as ` / CI failing`. Without reviewers, the blockers render alone, as ` (conflicts)`
   - No reviewers and no merge blockers yield no segments
 - `IsMerged` reports whether a PR was merged
 - `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
@@ -29,8 +29,11 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - The checks being ordered is what settles the overlaps: a reviewer who requested changes and then approved leaves the PR ready to merge, since the approval is read before the changes request
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
 - A failing required check (`RequiredChecksStatus` is `RequiredChecksFailing`) also only demotes: it keeps an approved PR out of `NextActionReadyToMerge` and moves an unapproved one nowhere
-- A `MergeBlocker` names one thing blocking a PR's merge, its value the text the row shows. The one value is `MergeBlockerFailingChecks` (`"CI failing"`)
-- `MergeBlockers()` returns `MergeBlockerFailingChecks` for a PR that has an approver and is `RequiredChecksFailing`, also when a waiting thread or a conflict keeps it in `NextActionWaitingForAuthor`. Nil for an unapproved PR, and for a PR without its fetched half
+- A `MergeBlocker` names one thing blocking a PR's merge, its value the text the row shows. The values are `MergeBlockerFailingChecks` (`"CI failing"`) and `MergeBlockerConflicts` (`"conflicts"`)
+- `MergeBlockers()` returns, in this order:
+  - `MergeBlockerFailingChecks` for a PR that has an approver and is `RequiredChecksFailing`, also when a waiting thread or a conflict keeps it in `NextActionWaitingForAuthor`
+  - `MergeBlockerConflicts` for a `Conflicting` PR, whatever its review state
+  - Nil when neither applies, and for a PR without its fetched half
 - `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor`, `HasOutstandingChangesRequest` and `RequiredChecksStatus` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
 - `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
 - `PRSection` is one section's rows: the flat `Rows`, or `Groups` of `RepositoryRows` (a `models.Repository` and its `Rows`). `HasRows` reports whether either holds anything

@@ -3,7 +3,7 @@
 ### [test-repo](https://github.com/test-org/test-repo/pulls)
 
 - **[Trim the trailing newline](https://github.com/test-org/test-repo/pull/44)** 🚨 `10 days old` by Dana Davis
-- **[Add the dry-run flag](https://github.com/test-org/test-repo/pull/41)** _5 hours ago_ by Alice Anderson
+- **[Add the dry-run flag](https://github.com/test-org/test-repo/pull/41)** _5 hours ago_ by Alice Anderson (conflicts)
 
 ### [repo-three](https://github.com/test-org/repo-three/pulls)
 
@@ -25,7 +25,7 @@
 ### [repo-two](https://github.com/test-org/repo-two/pulls)
 
 - **[Split the config package](https://github.com/test-org/repo-two/pull/32)** _3 days ago_ by Carol Clark (💬 Alice Anderson, Erin Evans)
-- **[Retry the flaky upload](https://github.com/test-org/repo-two/pull/35)** _5 hours ago_ by Frank Foster (✅ Dana Davis / 💬 Erin Evans / CI failing)
+- **[Retry the flaky upload](https://github.com/test-org/repo-two/pull/35)** _5 hours ago_ by Frank Foster (✅ Dana Davis / 💬 Erin Evans / CI failing, conflicts)
 
 ### [repo-three](https://github.com/test-org/repo-three/pulls)
 

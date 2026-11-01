@@ -92,6 +92,11 @@
               },
               {
                 "type": "text",
+                "text": " / conflicts",
+                "style": {}
+              },
+              {
+                "type": "text",
                 "text": ")",
                 "style": {}
               }
@@ -123,6 +128,11 @@
               {
                 "type": "text",
                 "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (conflicts)",
                 "style": {}
               }
             ]
@@ -247,7 +257,7 @@
               },
               {
                 "type": "text",
-                "text": " / CI failing",
+                "text": " / CI failing, conflicts",
                 "style": {}
               },
               {

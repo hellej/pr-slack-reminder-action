@@ -46,12 +46,15 @@ type MockGitHubClientOptions struct {
 	// Each answers a FORBIDDEN field error on its PR's statusCheckRollup, as a token lacking
 	// checks: read gets in a private repository
 	CheckStatusForbiddenPRNumbers []int
-	PRServiceError                error
-	IssueServiceError             error
-	MockPreviousState             *state.State
-	ListArtifactsError            error
-	DownloadArtifactError         error
-	Recording                     *FetchRecording
+	// Each answers its PR's mergeable as CONFLICTING. Any other PR's node leaves mergeable out,
+	// which githubclient reads as not conflicting
+	ConflictingPRNumbers  []int
+	PRServiceError        error
+	IssueServiceError     error
+	MockPreviousState     *state.State
+	ListArtifactsError    error
+	DownloadArtifactError error
+	Recording             *FetchRecording
 }
 
 // Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
@@ -423,6 +426,9 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 		utilities.Map(t.opts.RequestedReviewerLoginsByPRNumber[number], reviewRequestNodeJSON),
 	)
 	node["timelineItems"] = t.readyForReviewEventsJSON(number)
+	if slices.Contains(t.opts.ConflictingPRNumbers, number) {
+		node["mergeable"] = "CONFLICTING"
+	}
 	return node
 }
 
