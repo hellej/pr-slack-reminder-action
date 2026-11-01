@@ -24,7 +24,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
 
 ### Non-goals
 
-- No `❌ CI` entry on an unapproved PR: its check status is not fetched
+- No `❌ CI` entry on an unapproved PR: its check status is not fetched, only remembered from the state
 - No new workflow trigger in this repository's own workflows. The README gains an optional one
 - No change to "waiting for review": a PR nobody approved stays there, whatever its checks say
 - No change to merged, draft or collapsed rows
@@ -64,9 +64,9 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
 - `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
-- `prview.PR.MergeBlockers() []MergeBlocker` holds `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecks` is `RequiredChecksFailing`, also when a thread or a conflict keeps it in "waiting for author". It is what the `❌ CI` entry reads
+- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecks` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `❌ CI` entry reads
   - An unapproved PR gets no `CI`: on it, a failing status can only be one the state remembers
-  - Nil on a PR without its fetched half, a nil embedded `githubclient.PR`
+  - `MergeBlockers()` returns nil on a PR whose embedded `githubclient.PR` is nil
 - `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
   - `prview.GetReviewersTextSegments` gains a `mergeBlockers []MergeBlocker` parameter and renders ` / ❌ ` and the blockers joined by `, ` before the closing parenthesis, so both builders share it
   - With no approvers or commenters it renders ` (❌ CI)`. A PR with `CI` is approved, so no row reaches that case before plan 020
@@ -155,13 +155,13 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
   - `make test`, and the new phase's request carries exactly the approved non-draft refs
-  - The owner's GitHub plan cannot require checks in a private repository (the owner's own account settings). So the fixture lives in this public repository, `hellej/pr-slack-reminder-action`. The repository owner sets it up as a standing fixture, kept after this plan for [plan 020](020_show-merge-blockers-on-PR-rows.md):
+  - The owner's free GitHub plan cannot require checks through a ruleset in a private repository. See docs/third-party-facts.md § Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one. So the fixture lives in this public repository, `hellej/pr-slack-reminder-action`. The repository owner sets it up as a standing fixture, kept after this plan for [plan 020](020_show-merge-blockers-on-PR-rows.md):
     - A base branch `fixture/required-check-base`, cut from `main`, and a ruleset targeting only that branch that requires a status check named `fixture-check`. That is the ruleset case docs/third-party-facts.md does not cover yet
     - A PR into that base branch, approved by a human other than its author, carrying no `ignore-reminder` label
     - A failing `fixture-check` status on the PR's head commit, posted by hand: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=failure -f context=fixture-check`. No workflow file is added
   - The owner also keeps an approved, non-draft open PR in `hellej/pr-slack-reminder-test-repo-1`, a Dependabot one, so the Build E2E runs read `statusCheckRollup` in a private repository, per AGENTS.md § Reference Deployment. Dependabot closes a PR a newer version supersedes, so the owner replaces it when that happens
   - After pushing the implementation branch, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. Its job log, under `GITHUB_TOKEN`, shows the fixture PR's status line reading `failing` and no check status error line
-  - The Build job log, under the E2E App token, shows the Dependabot PR's status line reading `unknown` or `passing`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line. The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
+  - The Build job log, under the E2E App token, shows the Dependabot PR's status line reading `unknown`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line. The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
   - If an error line shows in either log, stop and raise it with the user: a permission is needed and the plan has to say which
   - Add what this confirms to docs/third-party-facts.md, and amend the "not shown" list of docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
 
@@ -259,7 +259,7 @@ Touches `README.md`.
 ### Caveats
 
 - Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
-- The fixture PR stays open in this repository, so it shows in the dev `github` channel's daily reminder and its canvas. Its base is not `main`, so `build.yml` never runs on it
+- The fixture PR stays open in this repository, so it shows in the dev `github` channel's daily reminder and on that channel's canvas. The PR's base is not `main`, so `build.yml` never runs on it
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - A context carries `isRequired` only once it has reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers

@@ -1022,4 +1022,10 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - "Workflows will not run on `pull_request` activity if the pull request has a merge conflict. The merge conflict must be resolved first"
 - `pull_request_target` runs even with a conflict
 - The page says nothing about `pull_request_review` or `issue_comment` on a conflicting PR
-- So a push to a conflicting PR's branch gets no check run from a `pull_request` workflow, and that head commit's checks stay pending or missing
+- Inferred, not checked live: a push to a conflicting PR's branch gets no check run from a `pull_request` workflow, so that head commit's checks stay missing
+
+## Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one [2026-11-01]
+
+- Source: [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets), the availability callout, read with `curl`: WebFetch's markdown conversion drops it
+- "Rulesets are available in public repositories with GitHub Free and GitHub Free for organizations, and in public and private repositories with GitHub Pro, GitHub Team, and GitHub Enterprise Cloud"
+- So on a free plan, a check required through a ruleset can only be set up in a public repository
