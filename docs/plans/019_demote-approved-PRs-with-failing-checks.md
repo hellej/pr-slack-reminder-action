@@ -55,12 +55,12 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Otherwise `RequiredChecksPassing` when there is at least one required context, every required context is passing, and `hasNextPage` is false
   - Otherwise `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
 - `OpenPRsResult` gains `CheckStatusErr error`: set when the phase failed in whole or in part. The PRs of the failed batches stay `RequiredChecksUnknown`
-- `state.State` gains `FailingRequiredCheckPRs []models.PullRequestRef` (JSON key `failingRequiredCheckPRs`, omitted when empty): the open PRs the run last saw as failing
+- `state.State` gains `PRsWithFailingRequiredChecks []models.PullRequestRef` (JSON key `prsWithFailingRequiredChecks`, omitted when empty): the open PRs the run last saw as failing
 - `state.PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR` returns copies in which every `RequiredChecksUnknown` PR whose ref the loaded state lists is `RequiredChecksFailing`. A nil state changes nothing
-- `state.FailingRequiredCheckPRRefs(prs []githubclient.PR) []models.PullRequestRef` returns the refs of the `RequiredChecksFailing` PRs, in the PRs' order
+- `state.RefsOfPRsWithFailingRequiredChecks(prs []githubclient.PR) []models.PullRequestRef` returns the refs of the `RequiredChecksFailing` PRs, in the PRs' order
 - `Run` in `run.go`:
   - Right after `loadPreviousState`, applies `PRsWithRememberedFailingChecks` to the open PRs, passing the loaded state, nil when it did not load. Both tracks and both modes then read the same PRs
-  - Where it sets the canvas hash on the state to save, sets `FailingRequiredCheckPRs` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
+  - Where it sets the canvas hash on the state to save, sets `PRsWithFailingRequiredChecks` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
 - `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
@@ -104,7 +104,7 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 
 - A private repository needs `checks: read` for the check status fetch. A workflow without it still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and a PR the state does not remember as failing files as it does today. Nothing that worked stops working, so it stays minor. The README names the permission
 
-- State gains `failingRequiredCheckPRs`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
+- State gains `prsWithFailingRequiredChecks`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
 - `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
 - The first run after upgrading re-buckets every PR, and the canvas rewrites once wherever a PR moves
 - A downgrade ignores both keys
@@ -199,11 +199,11 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 
 Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`), `AGENTS.md`.
 
-- `State.FailingRequiredCheckPRs`, `PRsWithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
+- `State.PRsWithFailingRequiredChecks`, `PRsWithRememberedFailingChecks` and `RefsOfPRsWithFailingRequiredChecks` as in § Target shape. Size: one field, two pure functions
 - `Run` applies and saves them as in § Target shape. It logs one line per PR made failing from the state, naming it
 - `cmd/pr-slack-reminder/requiredchecks_test.go`, beside `main_test.go`, covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode, and a PR the loaded state lists as failing that this run did not fetch for check status (no longer approved, or a draft). It also covers update mode's deleted and kept message paths saving this run's set. `getTestState` gains an option for the failing refs
 - `run.go`'s `withRememberedFailingChecks` calls `state.PRsWithRememberedFailingChecks` and logs each PR it made failing
-- The state snapshots built from the step 3 fixture carry the failing PR in `failingRequiredCheckPRs`
+- The state snapshots built from the step 3 fixture carry the failing PR in `prsWithFailingRequiredChecks`
 - Update `state.spec.md`:
   - The opening sentence and § Behaviour: the field and both functions
   - § Oddities: the field was added without a schema bump, and the "An update run rewrites only ..." line gains the set
@@ -227,7 +227,7 @@ Touches no files. The step 1 fixture PR is the setup.
 - After step 5, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. It shows the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the dev channel's message and on its canvas
 - Then the owner posts a pending status on the fixture's head commit: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=pending -f context=fixture-check`
 - Right after, dispatch the same with `-f run-mode=update`. The edited message still shows `❌ CI`, and the job log has the line naming the fixture PR as made failing from the state
-  - Run the two dispatches back to back: an event-driven `pr-reminder.yml` run in between uses the released binary, and saves a state without `failingRequiredCheckPRs`
+  - Run the two dispatches back to back: an event-driven `pr-reminder.yml` run in between uses the released binary, and saves a state without `prsWithFailingRequiredChecks`
 - Last, the owner posts `-f state=failure` again, so the fixture stays red for plan 020
 - Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
 

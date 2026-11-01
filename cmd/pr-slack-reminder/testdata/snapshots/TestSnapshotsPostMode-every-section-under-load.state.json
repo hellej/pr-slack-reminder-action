@@ -730,7 +730,7 @@
       "HasCompleteReviewerInfo": true
     }
   ],
-  "failingRequiredCheckPRs": [
+  "prsWithFailingRequiredChecks": [
     {
       "repository": {
         "Owner": "test-org",

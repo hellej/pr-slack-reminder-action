@@ -600,7 +600,7 @@ func TestPRsWithRememberedFailingChecks(t *testing.T) {
 		prWithRequiredChecks(1, githubclient.RequiredChecksUnknown),
 		prWithRequiredChecks(2, githubclient.RequiredChecksUnknown),
 	}
-	listingOne := &State{FailingRequiredCheckPRs: []models.PullRequestRef{prs[0].GetPullRequestRef()}}
+	listingOne := &State{PRsWithFailingRequiredChecks: []models.PullRequestRef{prs[0].GetPullRequestRef()}}
 
 	result := PRsWithRememberedFailingChecks(prs, listingOne)
 
@@ -614,7 +614,7 @@ func TestPRsWithRememberedFailingChecks(t *testing.T) {
 	}
 }
 
-func TestFailingRequiredCheckPRRefsKeepsThePRsOrder(t *testing.T) {
+func TestRefsOfPRsWithFailingRequiredChecksKeepsThePRsOrder(t *testing.T) {
 	prs := []githubclient.PR{
 		prWithRequiredChecks(3, githubclient.RequiredChecksFailing),
 		prWithRequiredChecks(1, githubclient.RequiredChecksPassing),
@@ -622,10 +622,10 @@ func TestFailingRequiredCheckPRRefsKeepsThePRsOrder(t *testing.T) {
 		prWithRequiredChecks(4, githubclient.RequiredChecksUnknown),
 	}
 
-	refs := FailingRequiredCheckPRRefs(prs)
+	refs := RefsOfPRsWithFailingRequiredChecks(prs)
 
 	expected := []models.PullRequestRef{prs[0].GetPullRequestRef(), prs[2].GetPullRequestRef()}
 	if !slices.Equal(refs, expected) {
-		t.Errorf("FailingRequiredCheckPRRefs() = %v, expected %v", refs, expected)
+		t.Errorf("RefsOfPRsWithFailingRequiredChecks() = %v, expected %v", refs, expected)
 	}
 }

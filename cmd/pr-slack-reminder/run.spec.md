@@ -56,12 +56,12 @@ run modes and the pipeline order are in
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
-- State is saved carrying whichever canvas content hash is now current, and `FailingRequiredCheckPRs` set to the open PRs failing a required check after the loaded state was applied:
+- State is saved carrying whichever canvas content hash is now current, and `PRsWithFailingRequiredChecks` set to the open PRs failing a required check after the loaded state was applied:
   - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `RecentMergeStats.WithAdded`
   - Update mode saves it whenever the previous state loaded
     - After a successful edit: it records the edited message, adds the PRs the edit listed to the tracked PRs, and replaces the merged PR cache with the merged and tracked PRs this run used. See [internal/state](../../internal/state/state.spec.md) for which of them are kept
       - Also when saving the sent blocks then fails
-    - A deleted or kept message, or a failed edit: it saves the loaded state back unchanged, except for the canvas hash and `FailingRequiredCheckPRs`
+    - A deleted or kept message, or a failed edit: it saves the loaded state back unchanged, except for the canvas hash and `PRsWithFailingRequiredChecks`
 
 ## Doesn't Do
 

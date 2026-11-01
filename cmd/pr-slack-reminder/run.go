@@ -116,7 +116,7 @@ func Run(
 	})...)
 	if stateToSave != nil {
 		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
-		stateToSave.FailingRequiredCheckPRs = state.FailingRequiredCheckPRRefs(openPRs.PRs)
+		stateToSave.PRsWithFailingRequiredChecks = state.RefsOfPRsWithFailingRequiredChecks(openPRs.PRs)
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
 	}
 	return errors.Join(messageErr, canvasErr, stateErr)
@@ -267,9 +267,9 @@ func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*st
 }
 
 func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR {
-	seenFailingRefs := state.FailingRequiredCheckPRRefs(prs)
+	seenFailingRefs := state.RefsOfPRsWithFailingRequiredChecks(prs)
 	prsWithRememberedFailingChecks := state.PRsWithRememberedFailingChecks(prs, loadedState)
-	for _, ref := range state.FailingRequiredCheckPRRefs(prsWithRememberedFailingChecks) {
+	for _, ref := range state.RefsOfPRsWithFailingRequiredChecks(prsWithRememberedFailingChecks) {
 		if !slices.Contains(seenFailingRefs, ref) {
 			log.Printf("PR %s/%d is failing a required check, as the previous run saw it", ref.Repository.GetPath(), ref.Number)
 		}
