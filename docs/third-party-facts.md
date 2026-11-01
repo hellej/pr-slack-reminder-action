@@ -969,3 +969,49 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - 3 more replaces 90 seconds apart, each rewriting the same mention, notified the user each time
 - So a canvas that mentions people re-notifies them on every refresh. `canvasbuilder` names people instead
 - Not tested: an edit that leaves an existing mention untouched, since every write replaced the whole content
+
+## `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository [2026-10-31]
+
+- Source: PR Reminder run 41196901365 (workflow dispatch on the plan branch, since reverted). Two probe jobs ran the same queries against closed PR 99 of this repository, one with `pull-requests: read` alone (log: `Metadata: read`, `PullRequests: read`), one with `checks: read` and `statuses: read` added
+- Both jobs returned identical data, so `checks: read` and `statuses: read` made no difference here
+- `pullRequest { statusCheckRollup { state contexts(first: 100) { totalCount pageInfo { hasNextPage } nodes { __typename ... on CheckRun { name status conclusion isRequired(pullRequestNumber: $n) } ... on StatusContext { context state isRequired(pullRequestNumber: $n) } } } } }` worked directly on `PullRequest`
+  - The `commits(last: 1) { nodes { commit { statusCheckRollup ... } } }` path returned the same contexts
+- PR 99 read `state: SUCCESS` with 5 contexts, all `CheckRun`:
+  - `build` (twice) and `lint & unit tests`: `isRequired: true`
+  - `reminder`: `isRequired: false`
+  - `publish coverage`: `conclusion: SKIPPED`, `isRequired: false`
+  - So `isRequired` marks required checks per context, and the rollup `state` was not enough to tell which
+- Each probe query cost 1 point (`rateLimit.cost`), single PR
+- `mergeStateStatus` and `mergeable` both read `UNKNOWN` on that closed PR, and `reviewDecision` still read `REVIEW_REQUIRED`: none of the three is worth reading off a merged PR
+- Open PR 3, which has no checks, read `statusCheckRollup: null` (probe run by the repository owner with their own `gh` login, same day, `mergeStateStatus: DIRTY`)
+  - So a PR with no checks reads a null rollup, not an empty `contexts`
+- `build` appears twice in PR 99's contexts, as two distinct check runs, so a consumer keyed by check name would merge them
+- Not shown by this run:
+  - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer
+  - Where this repository's required checks come from, branch protection or a ruleset
+  - A failing or pending required check, or a branch with no protection
+
+## GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree [2026-10-31]
+
+- Source: research over [GraphQL commits reference](https://docs.github.com/en/graphql/reference/commits), [REST check runs](https://docs.github.com/en/rest/checks/runs), [REST check suites](https://docs.github.com/en/rest/checks/suites), [re-running workflows and jobs](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs). No live check
+- `contexts` is described only as "A list of status contexts and check runs for this commit", and the rollup `state` as "The combined status for the commit"
+- No page says whether a re-run replaces the failed attempt or lists beside it, nor whether the rollup `state` ignores a superseded attempt
+- REST's list endpoints take `filter=latest|all`, and GitHub limits same-name check runs to 1000 per suite. Neither says what "latest" means for a re-run
+- Third-party reports contradict each other: one says only the latest attempt is listed, another says the rollup `state` stays `FAILURE` after a successful re-run
+- Unverified: settling it needs a live PR whose required check failed and then passed on a re-run
+
+## The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link [2026-10-31]
+
+- Source: plan 019's draft PR, description read back after writing it
+- A 145 character URL stayed intact, a 152 character one came back wrapped in backticks
+- Unverified: where between 146 and 151 characters the wrapping starts. `checkprdescription` fails a URL over 150
+
+## `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created [2026-11-01]
+
+- Source: [events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows). No live check
+- "This event will only trigger a workflow run if the workflow file exists on the default branch." `GITHUB_SHA` and `GITHUB_REF` are the default branch's
+- "A workflow run is triggered regardless of the conclusion of the previous workflow." Filter in a job or step `if:` on `github.event.workflow_run.conclusion`
+- At most three levels of workflows chain through `workflow_run`
+- `check_suite` and `check_run` do "not trigger workflows if the check suite was created by GitHub Actions", so neither reacts to an Actions CI run
+- Inferred, not documented: `workflow_run` doesn't react to an external CI app's checks
+- Not documented: whether `completed` fires again for a re-run, and whether it fires for a fork PR's run. The [secure use page](https://docs.github.com/en/actions/reference/security/secure-use) only implies the second, by warning against `workflow_run` with untrusted PRs

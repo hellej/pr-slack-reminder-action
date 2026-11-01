@@ -200,7 +200,9 @@ Report to the user:
 - The reviewer's Outside this change items, for the user to fold into this change or queue
   as a separate task
 
-Leave the changes uncommitted, unless the user asked for commits.
+Leave the changes uncommitted, unless the user asked for commits. Once the changes are pushed
+to a branch with an open PR, update the PR description with the [pr skill](../pr/SKILL.md), if
+the change affects it.
 
 ## What the Run Taught
 

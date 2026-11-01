@@ -39,6 +39,14 @@ check-vulnerabilities:
 check-style:
 	./.github/scripts/check-style.sh
 
+# FILE is a PR description, such as .local/pr/<branch>.md. MCP=1 also checks link URL lengths. See the pr skill
+check-pr-description:
+	@failed=0; \
+	go run ./.github/scripts/checkprdescription $(if $(filter 1,$(MCP)),-mcp) $(FILE) || failed=1; \
+	broken_references=$$(go run ./.github/scripts/checkreferences -pr-description $(FILE)) || failed=1; \
+	if [ -n "$$broken_references" ]; then echo "$$broken_references"; failed=1; fi; \
+	exit $$failed
+
 lint: check-fmt check-vet check-dead-code check-vulnerabilities check-style
 
 install-hooks:

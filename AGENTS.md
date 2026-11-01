@@ -17,6 +17,7 @@ One known setup as an example. It's not the only supported one. Use it to weigh 
 
 - One team, one Slack channel, no one outside the team in it. Every member both authors and reviews PRs
 - A monorepo the team owns, plus PRs the team has open in repos owned by others
+- The repositories are mostly private. A change that reads a new GitHub field is checked against a private repository, never only a public one
 - 0 to 8 open PRs at a time. A weekly Dependabot batch adds ~5 at once
 - A draft PR with recent activity is a real WIP signal. A quiet one is just left open
 - Human approval gates merges: every PR needs an approving review from a human other than its author, bot-authored PRs included
@@ -121,7 +122,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source, plus any related package's spec needed to understand how a change fits
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
-- So does `.github/scripts/checkreferences/`: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
+- `.github/scripts/checkreferences/` and `.github/scripts/checkprdescription/` have one too: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md), [checkprdescription.spec.md](.github/scripts/checkprdescription/checkprdescription.spec.md)
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
   - A rough edge you knowingly leave, because the fix would need significant complexity for a rare case, goes in the spec's **Oddities** section
@@ -149,6 +150,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - Never amend commits or force push
 - Work on `main` by default. Branch only if the user asks for a branch or mentions a PR
 - Merge the latest `main` into a feature branch before each push and before its PR merges. Resolve conflicts, never rebase
+- Open a PR with [.agents/skills/pr/SKILL.md](.agents/skills/pr/SKILL.md)
 - Stage only the files for the task you were given. Another agent may have unrelated work
   in the same working tree, so never use `git add -A` or `git commit -a`
 - Commit with an explicit pathspec: `git commit -m "..." -- <paths>`. The index is shared too, so a bare `git commit` takes what another agent staged
@@ -206,11 +208,13 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
 - The Build workflow's "Smoke/E2E test" step (`.github/actions/e2e-tests/`): runs each PR's own build against the real GitHub API and the dev Slack channels, in post and update mode. Its job log shows a query or Slack call working live
   - It uses a GitHub App token, not `GITHUB_TOKEN`. Fork PRs skip it
+  - It lists PRs from `hellej/pr-slack-reminder-test-repo-1` and `-2`, both private, so its log checks a new GitHub field against a private repository (§ Reference Deployment)
 - `make check-fmt`: fail if any file needs `gofmt`
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
 - `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
+- `make check-pr-description FILE=<path>`: fail on a PR description over the [pr skill](.agents/skills/pr/SKILL.md)'s limits, or with a link into this repo that doesn't resolve
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
 - `go run .github/scripts/check_inputs.go`: validate action.yml, config.go constants and the README inputs table are in sync

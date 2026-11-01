@@ -1,6 +1,6 @@
 ---
 name: prose-clarity-checker
-description: Reads the added/edited prose without reading the code, and flags every sentence with more than one reading, every undefined term and every Output Style breach. Use beside the reviewer in the implement loop, and on an implementer's first report.
+description: Reads the added/edited prose without reading the code, and flags every sentence with more than one reading, every undefined term and every Output Style breach. Use beside the reviewer in the implement loop, on an implementer's first report, and on a plan `plan-critic` passed.
 model: sonnet
 effort: medium
 disallowedTools: [Edit, Write, NotebookEdit]
@@ -26,6 +26,8 @@ Read AGENTS.md § Output Style in full first. The read is mandatory.
 Every added or edited sentence in Markdown and YAML files: `git diff <base> -- '*.md' '*.yml'`
 with the base the brief gives, untracked files too. Read each sentence with the ones before
 it, to check its pronouns.
+
+On a re-check, read every added or changed line in full in its file, never only from grep output.
 
 ## Flag
 

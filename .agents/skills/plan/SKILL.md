@@ -13,7 +13,14 @@ Before drafting an implementation plan, read the following. Each read is mandato
 - **Code**: only the parts still unclear after reading the specs
 - **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page, or cite the facts entry or its source, at the point in the plan that depends on it. Never assume or guess
 - **Other runs of the action**: when a change makes a run mode read or write something new (state, artifacts, messages), list every workflow and composite action that runs it (`.github/workflows/`, `.github/actions/`) and what each reads and writes
+- **What starts a run**: when a change makes a run's output depend on time or on earlier runs, list the events that start a run (the README's trigger examples, `.github/workflows/`) and what the message and canvas show between two consecutive runs
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
+
+## Past Plans Are Not Examples
+
+- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. This skill and AGENTS.md § Output Style are the only reference for how a plan looks
+- Read a past plan only for its content: when the new plan builds on it, depends on it, or the user points to it. Even then, copy nothing of its shape
+- Listing a plans directory for the next sequence number is fine
 
 ## Mandatory Plan Steps
 
@@ -44,7 +51,6 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 - Don't enumerate call sites, test cases, or the edits inside a function
 - State the size instead: "rename across ~8 call sites", "new field, no behaviour change"
 - Counts convey size, so keep them approximate (use "~N" format). An exact one invites a correction round
-- Plans already in `docs/plans/` were written under older rules. Don't copy their shape
 
 ## Structure
 

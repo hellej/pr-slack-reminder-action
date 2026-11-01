@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 type linkTarget struct {
@@ -16,6 +18,8 @@ type linkTarget struct {
 	// Empty for a link to a heading of the file holding it.
 	path     string
 	fragment string
+	// A blob URL into this repository, such as one in a PR description, names its path from the repository root.
+	isPathFromRepoRoot bool
 }
 
 var (
@@ -23,17 +27,24 @@ var (
 	markdownLink    = regexp.MustCompile(`!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)`)
 	urlWithScheme   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 	markdownHeading = regexp.MustCompile(`^\s{0,3}#{1,6}\s+(.+?)\s*$`)
+	// Release tags here start with `v`, such as v3.9.0. See checkreferences.spec.md § Oddities
+	commitOrTagRef = regexp.MustCompile(`^(?:[0-9a-f]{7,40}|v\d[^/]*)/`)
 )
 
-func brokenLinks(paths []string) ([]string, error) {
+type writtenLink struct {
+	line   int
+	target string
+}
+
+func brokenLinks(paths []string, r repo) ([]string, error) {
 	var broken []string
 	for _, markdownPath := range pathsWithStyle(paths, markdownProse) {
 		content, err := os.ReadFile(markdownPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
 		}
-		for _, link := range relativeLinkTargets(string(content)) {
-			finding, err := checkLink(markdownPath, link)
+		for _, link := range linkTargetsInRepo(string(content), r.knownBranchBlobURLPrefixes) {
+			finding, err := checkLink(markdownPath, link, r.root)
 			if err != nil {
 				return nil, err
 			}
@@ -45,14 +56,43 @@ func brokenLinks(paths []string) ([]string, error) {
 	return broken, nil
 }
 
-func checkLink(holdingPath string, link linkTarget) (string, error) {
+// A PR description links its own branch or main, so any other branch is likely a typo, which brokenLinks would skip as external.
+func blobURLsOnOtherBranches(paths []string, r repo) ([]string, error) {
+	if r.blobURLRoot == "" {
+		return nil, nil
+	}
+	var found []string
+	for _, markdownPath := range pathsWithStyle(paths, markdownProse) {
+		content, err := os.ReadFile(markdownPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
+		}
+		for _, link := range writtenLinks(string(content)) {
+			if isBlobURLOnOtherBranch(link.target, r) {
+				found = append(found, fmt.Sprintf("%s:%d: %s: not on main or the current branch", markdownPath, link.line, link.target))
+			}
+		}
+	}
+	return found, nil
+}
+
+func isBlobURLOnOtherBranch(link string, r repo) bool {
+	refAndPath, isIntoRepo := strings.CutPrefix(link, r.blobURLRoot)
+	_, isOnKnownBranch := matchingPrefix(link, r.knownBranchBlobURLPrefixes)
+	return isIntoRepo && !isOnKnownBranch && !commitOrTagRef.MatchString(refAndPath)
+}
+
+func checkLink(holdingPath string, link linkTarget, repoRoot string) (string, error) {
 	written := link.path
 	if link.fragment != "" {
 		written += "#" + link.fragment
 	}
 	location := fmt.Sprintf("%s:%d: %s", holdingPath, link.line, written)
 	targetPath := holdingPath
-	if link.path != "" {
+	switch {
+	case link.isPathFromRepoRoot:
+		targetPath = filepath.Join(repoRoot, link.path)
+	case link.path != "":
 		targetPath = filepath.Join(filepath.Dir(holdingPath), link.path)
 	}
 	if _, err := os.Stat(targetPath); err != nil {
@@ -71,16 +111,40 @@ func checkLink(holdingPath string, link linkTarget) (string, error) {
 	return "", nil
 }
 
-func relativeLinkTargets(markdown string) []linkTarget {
-	var targets []linkTarget
+func writtenLinks(markdown string) []writtenLink {
+	var links []writtenLink
 	for i, line := range linesOutsideCodeBlocks(markdown) {
 		for _, match := range markdownLink.FindAllStringSubmatch(withoutCodeSpans(line), -1) {
-			if path, fragment, isRelative := splitRelativeLink(match[1]); isRelative {
-				targets = append(targets, linkTarget{line: i + 1, path: path, fragment: fragment})
-			}
+			links = append(links, writtenLink{line: i + 1, target: match[1]})
+		}
+	}
+	return links
+}
+
+// Relative links, and blob URLs starting with one of knownBranchBlobURLPrefixes.
+func linkTargetsInRepo(markdown string, knownBranchBlobURLPrefixes []string) []linkTarget {
+	var targets []linkTarget
+	for _, link := range writtenLinks(markdown) {
+		if target, isInRepo := linkTargetInRepo(link.target, knownBranchBlobURLPrefixes); isInRepo {
+			target.line = link.line
+			targets = append(targets, target)
 		}
 	}
 	return targets
+}
+
+func linkTargetInRepo(link string, knownBranchBlobURLPrefixes []string) (linkTarget, bool) {
+	prefix, isBlobURL := matchingPrefix(link, knownBranchBlobURLPrefixes)
+	if isBlobURL {
+		path, fragment, _ := splitRelativeLink(strings.TrimPrefix(link, prefix))
+		return linkTarget{path: path, fragment: fragment, isPathFromRepoRoot: true}, true
+	}
+	path, fragment, isRelative := splitRelativeLink(link)
+	return linkTarget{path: path, fragment: fragment}, isRelative
+}
+
+func matchingPrefix(link string, prefixes []string) (string, bool) {
+	return utilities.Find(prefixes, func(prefix string) bool { return strings.HasPrefix(link, prefix) })
 }
 
 func splitRelativeLink(target string) (path, fragment string, isRelative bool) {

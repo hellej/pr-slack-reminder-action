@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRelativeLinkTargets(t *testing.T) {
+func TestLinkTargetsInRepo(t *testing.T) {
 	tests := []struct {
 		name     string
 		markdown string
@@ -59,6 +59,19 @@ func TestRelativeLinkTargets(t *testing.T) {
 			want:     []linkTarget{{line: 1, path: "b.md"}},
 		},
 		{
+			name:     "a blob URL into this repository links from the repository root",
+			markdown: "[a](https://github.com/o/r/blob/claude/x/docs/facts.md#heading) [b](https://github.com/o/r/blob/main/README.md)",
+			want: []linkTarget{
+				{line: 1, path: "docs/facts.md", fragment: "heading", isPathFromRepoRoot: true},
+				{line: 1, path: "README.md", isPathFromRepoRoot: true},
+			},
+		},
+		{
+			name:     "a blob URL into another repository or branch is skipped",
+			markdown: "[a](https://github.com/o/other/blob/main/README.md) [b](https://github.com/o/r/blob/old/README.md)",
+			want:     nil,
+		},
+		{
 			name:     "a link inside a fenced code block is skipped",
 			markdown: "```md\n[a](inside.md)\n```\n~~~\n[b](tilde.md)\n~~~\n[c](after.md)",
 			want:     []linkTarget{{line: 7, path: "after.md"}},
@@ -66,7 +79,7 @@ func TestRelativeLinkTargets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := relativeLinkTargets(tt.markdown)
+			got := linkTargetsInRepo(tt.markdown, []string{"https://github.com/o/r/blob/main/", "https://github.com/o/r/blob/claude/x/"})
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -98,9 +111,14 @@ func TestBrokenLinks(t *testing.T) {
 		"[bad anchor](../../docs/exists.md#fake)\n"+
 		"## Own\n"+
 		"[own](#own)\n"+
-		"[own bad](#nope)")
+		"[own bad](#nope)\n"+
+		"[blob](https://github.com/o/r/blob/main/docs/exists.md#real-heading)\n"+
+		"[blob bad anchor](https://github.com/o/r/blob/main/docs/exists.md#fake)\n"+
+		"[blob missing](https://github.com/o/r/blob/main/docs/gone.md)")
+	r := newRepo(root, nil)
+	r.knownBranchBlobURLPrefixes = []string{"https://github.com/o/r/blob/main/"}
 
-	got, err := brokenLinks([]string{skill})
+	got, err := brokenLinks([]string{skill}, r)
 
 	if err != nil {
 		t.Fatal(err)
@@ -109,6 +127,8 @@ func TestBrokenLinks(t *testing.T) {
 		skill + ":2: ../docs/exists.md: no such file",
 		skill + ":5: ../../docs/exists.md#fake: no heading with this anchor in " + target,
 		skill + ":8: #nope: no heading with this anchor in " + skill,
+		skill + ":10: docs/exists.md#fake: no heading with this anchor in " + target,
+		skill + ":11: docs/gone.md: no such file",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -116,9 +136,58 @@ func TestBrokenLinks(t *testing.T) {
 }
 
 func TestBrokenLinksFailsOnUnreadableFile(t *testing.T) {
-	_, err := brokenLinks([]string{filepath.Join(t.TempDir(), "missing.md")})
+	_, err := brokenLinks([]string{filepath.Join(t.TempDir(), "missing.md")}, newRepo("", nil))
 
 	if err == nil {
 		t.Error("want an error for a file that can't be read")
+	}
+}
+
+func TestBlobURLsOnOtherBranches(t *testing.T) {
+	description := filepath.Join(t.TempDir(), "pr.md")
+	writeFile(t, description, "[ok](https://github.com/o/r/blob/main/README.md)\n"+
+		"[ok](https://github.com/o/r/blob/claude/x/README.md)\n"+
+		"[typo](https://github.com/o/r/blob/claude/y/README.md)\n"+
+		"[other repo](https://github.com/o/other/blob/claude/y/README.md)\n"+
+		"[short SHA](https://github.com/o/r/blob/8370f2b/README.md)\n"+
+		"[full SHA](https://github.com/o/r/blob/8370f2b0c4e1d2a3b4c5d6e7f8091a2b3c4d5e6f/README.md)\n"+
+		"[tag](https://github.com/o/r/blob/v1.0.0/README.md)\n"+
+		"[6 hex characters, a branch](https://github.com/o/r/blob/cafe12/README.md)\n"+
+		"[41 hex characters, a branch](https://github.com/o/r/blob/8370f2b0c4e1d2a3b4c5d6e7f8091a2b3c4d5e6f0/README.md)")
+	tests := []struct {
+		name        string
+		blobURLRoot string
+		want        []string
+	}{
+		{
+			name:        "a branch other than main and the current one",
+			blobURLRoot: "https://github.com/o/r/blob/",
+			want: []string{
+				description + ":3: https://github.com/o/r/blob/claude/y/README.md: not on main or the current branch",
+				description + ":8: https://github.com/o/r/blob/cafe12/README.md: not on main or the current branch",
+				description + ":9: https://github.com/o/r/blob/8370f2b0c4e1d2a3b4c5d6e7f8091a2b3c4d5e6f0/README.md: not on main or the current branch",
+			},
+		},
+		{
+			name:        "origin not on GitHub",
+			blobURLRoot: "",
+			want:        nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRepo("", nil)
+			r.blobURLRoot = tt.blobURLRoot
+			r.knownBranchBlobURLPrefixes = []string{"https://github.com/o/r/blob/main/", "https://github.com/o/r/blob/claude/x/"}
+
+			got, err := blobURLsOnOtherBranches([]string{description}, r)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(tt.want, "\n"))
+			}
+		})
 	}
 }
