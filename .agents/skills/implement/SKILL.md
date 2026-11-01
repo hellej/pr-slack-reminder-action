@@ -201,7 +201,7 @@ Report to the user:
   as a separate task
 
 Leave the changes uncommitted, unless the user asked for commits. Once they are pushed to a
-branch with an open PR, update its description with the [pr skill](../pr/SKILL.md).
+branch with an open PR, update its description (if needed) with the [pr skill](../pr/SKILL.md).
 
 ## What the Run Taught
 
