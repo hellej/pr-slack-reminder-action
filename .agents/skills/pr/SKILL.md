@@ -14,3 +14,4 @@ argument-hint: "Optional: draft, or what the PR is for"
 - Keep each link under 150 characters. See docs/third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link
 - Read the stored description back after writing it
 - A linked file renamed or moved later means editing its link
+- A plan's draft PR usually gets the implementation pushed onto it later. Then rewrite the description to cover the whole PR: the Summary, every `.md` file such as the specs, and what is still open
