@@ -79,7 +79,7 @@ Posted at 09:00, required check failed
 *💬 Waiting for author*
   • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
 
-Edited by `update` on the fix's push, checks still running: no change
+Edited by an `update` after the fix's push, checks still running: no change
 *💬 Waiting for author*
   • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
 
@@ -222,7 +222,16 @@ Touches `README.md`.
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
 - `README.md` § Required Permissions: one line saying check status needs nothing beyond `pull-requests: read`, once step 1 has shown it
-- The README's `update` trigger example gains an optional `workflow_run` trigger on the CI workflows' completion, with one line on why: without it, a fixed PR stays red until the next PR, review or comment event or post. TODO: wording and limits from the `workflow_run` research
+- `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, commented as optional, listing the workflows that run the required checks:
+  ```yaml
+    workflow_run:
+      workflows: ["CI"] # the workflows running your required checks
+      types: [completed]
+  ```
+  - One line on why: without it, a fixed PR stays red until the next PR, review or comment event or post
+  - One line on its limits: it reacts to GitHub Actions workflows only, not to an external CI app's checks, and the reminder workflow file must be on the default branch. See docs/third-party-facts.md § `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created
+  - One line on cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR. See AGENTS.md § GitHub API Budget
+  - The example's `run-mode` expression and concurrency group already send a `workflow_run` event to `update` and to the non-scheduled group, so neither changes
 
 ## Consequences
 
@@ -235,7 +244,7 @@ Touches `README.md`.
 
 ### Negative
 
-- Without the optional `workflow_run` trigger, a fixed PR stays red until the next PR, review or comment event or the next post. Before this plan's sticky status, the fix's own push showed it as ready
+- Without the optional `workflow_run` trigger, a fixed PR stays red until the first PR, review or comment event or post after its checks pass. An `update` that runs while they are pending keeps it red, where a status read without the state would have shown it as ready
 
 ### Caveats
 
