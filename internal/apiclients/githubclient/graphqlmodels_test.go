@@ -676,3 +676,62 @@ func TestPRWithReviewersTakesTheEarliestHumanReviewAsTheFirstReview(t *testing.T
 		})
 	}
 }
+
+// Decoded from JSON, so a mistagged field shows up. Each user is set up so that one wrong rule
+// moves them into or out of StaleApprovedByUsers.
+func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
+	nodeJSON := `{
+		"author":{"login":"alice","__typename":"User","name":"Alice"},
+		"reviews":{"nodes":[
+			{"state":"DISMISSED","submittedAt":"2026-10-06T09:00:00Z","createdAt":"2026-10-06T09:00:00Z",
+				"author":{"login":"carol","__typename":"User","name":"Carol"}},
+			{"state":"DISMISSED","submittedAt":"2026-10-07T09:00:00Z","createdAt":"2026-10-07T09:00:00Z",
+				"author":{"login":"dave","__typename":"User","name":"Dave"}},
+			{"state":"DISMISSED","submittedAt":"2026-10-07T10:00:00Z","createdAt":"2026-10-07T10:00:00Z",
+				"author":{"login":"erin","__typename":"User","name":"Erin"}},
+			{"state":"APPROVED","submittedAt":"2026-10-08T09:00:00Z","createdAt":"2026-10-08T09:00:00Z",
+				"author":{"login":"erin","__typename":"User","name":"Erin"}}
+		]},
+		"reviewDismissals":{"nodes":[
+			{"previousReviewState":"APPROVED","dismissalMessage":null,
+				"review":{"author":{"login":"carol","__typename":"User","name":"Carol"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,
+				"review":{"author":{"login":"carol","__typename":"User","name":"Carol"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":"Outdated after the rework",
+				"review":{"author":{"login":"dave","__typename":"User","name":"Dave"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,
+				"review":{"author":{"login":"erin","__typename":"User","name":"Erin"}}},
+			{"previousReviewState":"CHANGES_REQUESTED","dismissalMessage":null,
+				"review":{"author":{"login":"frank","__typename":"User","name":"Frank"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,
+				"review":{"author":{"login":"reviewer-app","__typename":"Bot"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,
+				"review":{"author":{"login":"alice","__typename":"User","name":"Alice"}}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,"review":{"author":null}},
+			{"previousReviewState":"APPROVED","dismissalMessage":null,"review":null}
+		]}
+	}`
+	var node pullRequestNode
+	if err := json.Unmarshal([]byte(nodeJSON), &node); err != nil {
+		t.Fatalf("unable to decode pull request node: %v", err)
+	}
+
+	pr := prWithReviewers(pullRequestFromNode(node), models.Repository{}, node)
+
+	expectedStaleApprovedBy := []Collaborator{{Login: "carol", Name: "Carol"}}
+	if !reflect.DeepEqual(pr.StaleApprovedByUsers, expectedStaleApprovedBy) {
+		t.Errorf("StaleApprovedByUsers = %+v, expected %+v", pr.StaleApprovedByUsers, expectedStaleApprovedBy)
+	}
+	expectedApprovedBy := []Collaborator{{Login: "erin", Name: "Erin"}}
+	if !reflect.DeepEqual(pr.ApprovedByUsers, expectedApprovedBy) {
+		t.Errorf("ApprovedByUsers = %+v, expected %+v", pr.ApprovedByUsers, expectedApprovedBy)
+	}
+	expectedCommentedBy := []Collaborator{{Login: "dave", Name: "Dave"}}
+	if !reflect.DeepEqual(pr.CommentedByUsers, expectedCommentedBy) {
+		t.Errorf("CommentedByUsers = %+v, expected %+v", pr.CommentedByUsers, expectedCommentedBy)
+	}
+	expectedFirstReviewAt := timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC))
+	if !reflect.DeepEqual(pr.FirstReviewAt, expectedFirstReviewAt) {
+		t.Errorf("FirstReviewAt = %v, expected %v", pr.FirstReviewAt, expectedFirstReviewAt)
+	}
+}

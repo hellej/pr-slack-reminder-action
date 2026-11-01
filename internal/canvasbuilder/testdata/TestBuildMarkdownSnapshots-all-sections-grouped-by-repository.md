@@ -7,7 +7,7 @@
 
 ### [repo-three](https://github.com/test-org/repo-three/pulls)
 
-- **[Log the rate limit cost](https://github.com/test-org/repo-three/pull/43)** _3 days ago_ by Carol Clark
+- **[Log the rate limit cost](https://github.com/test-org/repo-three/pull/43)** _3 days ago_ by Carol Clark (🔁 Frank Foster / 💬 Erin Evans)
 - **[Collapse the duplicate filters](https://github.com/test-org/repo-three/pull/46)** _30 minutes ago_ by Frank Foster
 
 ### [repo-two](https://github.com/test-org/repo-two/pulls)
@@ -20,7 +20,7 @@
 ### [test-repo](https://github.com/test-org/test-repo/pulls)
 
 - **[Rework the snooze parser](https://github.com/test-org/test-repo/pull/31)** 🚨 `10 days old` by Bob Brown (💬 Dana Davis)
-- **[Escape the canvas titles](https://github.com/test-org/test-repo/pull/34)** _30 minutes ago_ by Erin Evans (💬 Frank Foster)
+- **[Escape the canvas titles](https://github.com/test-org/test-repo/pull/34)** _30 minutes ago_ by Erin Evans (💬 Frank Foster, Bob Brown)
 
 ### [repo-two](https://github.com/test-org/repo-two/pulls)
 
@@ -54,7 +54,7 @@
 
 ### [test-repo](https://github.com/test-org/test-repo/pulls)
 
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 🔁 Grace Green / 💬 Erin Evans)
 
 ## 🔧 WIP
 

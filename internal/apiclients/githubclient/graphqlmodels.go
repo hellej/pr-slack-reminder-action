@@ -74,6 +74,17 @@ type reviewRequestNode struct {
 	RequestedReviewer *authorNode `json:"requestedReviewer"`
 }
 
+// A dismissal by a push carries a null dismissalMessage. See docs/third-party-facts.md § A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage`
+type reviewDismissedEventNode struct {
+	PreviousReviewState string               `json:"previousReviewState"`
+	DismissalMessage    *string              `json:"dismissalMessage"`
+	Review              *dismissedReviewNode `json:"review"`
+}
+
+type dismissedReviewNode struct {
+	Author *authorNode `json:"author"`
+}
+
 type readyForReviewEventNode struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -103,7 +114,8 @@ type pullRequestNode struct {
 
 	// Holds the earliest event only, read with first: 1.
 	// See docs/third-party-facts.md § `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only
-	ReadyForReviewEvents connection[readyForReviewEventNode] `json:"timelineItems"`
+	ReadyForReviewEvents connection[readyForReviewEventNode]  `json:"timelineItems"`
+	ReviewDismissals     connection[reviewDismissedEventNode] `json:"reviewDismissals"`
 }
 
 func collaboratorFromAuthorNode(author *authorNode) Collaborator {
@@ -174,22 +186,25 @@ func prWithReviewers(
 ) PR {
 	submittedReviews := utilities.Filter(node.Reviews.Nodes, isSubmittedUserReview)
 	approvingReviews := utilities.Filter(submittedReviews, isApprovingReviewNode)
+	pushDismissedApprovals := utilities.Filter(node.ReviewDismissals.Nodes, isPushDismissedUserApproval)
 	commentsFromUsers := utilities.Filter(node.Comments.Nodes, hasValidCommentAuthor)
 	timelineComments := utilities.Map(node.Comments.Nodes, timelineCommentFromNode)
 
-	approvedByUsers, commentedByUsers := deriveReviewers(
+	approvedByUsers, staleApprovedByUsers, commentedByUsers := deriveReviewers(
 		pullRequest.Author.Login,
 		utilities.Map(approvingReviews, reviewAuthor),
+		utilities.Map(pushDismissedApprovals, dismissedReviewAuthor),
 		utilities.Map(submittedReviews, reviewAuthor),
 		utilities.Map(commentsFromUsers, commentAuthor),
 	)
 
 	return PR{
-		PullRequest:      pullRequest,
-		Repository:       repository,
-		ApprovedByUsers:  approvedByUsers,
-		CommentedByUsers: commentedByUsers,
-		SnoozedUntil:     findActiveSnooze(timelineComments),
+		PullRequest:          pullRequest,
+		Repository:           repository,
+		ApprovedByUsers:      approvedByUsers,
+		CommentedByUsers:     commentedByUsers,
+		StaleApprovedByUsers: staleApprovedByUsers,
+		SnoozedUntil:         findActiveSnooze(timelineComments),
 		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
 			node.ReviewThreads.Nodes, pullRequest.Author,
 		),
@@ -266,6 +281,19 @@ func isSubmittedUserReview(review reviewNode) bool {
 
 func isApprovingReviewNode(review reviewNode) bool {
 	return review.State == approvedReviewState
+}
+
+// The schema makes the review nullable, and a deleted account leaves its author null.
+// See docs/third-party-facts.md § `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not
+func isPushDismissedUserApproval(dismissal reviewDismissedEventNode) bool {
+	return dismissal.PreviousReviewState == approvedReviewState &&
+		dismissal.DismissalMessage == nil &&
+		dismissal.Review != nil &&
+		hasKnownNonBotAuthorNode(dismissal.Review.Author)
+}
+
+func dismissedReviewAuthor(dismissal reviewDismissedEventNode) Collaborator {
+	return collaboratorFromAuthorNode(dismissal.Review.Author)
 }
 
 func reviewAuthor(review reviewNode) Collaborator {

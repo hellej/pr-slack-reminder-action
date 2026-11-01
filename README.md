@@ -17,6 +17,8 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot: #101 #102 #103`. The label links to a GitHub search for that author's PRs.
 
+On a PR waiting for review, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again: `(🔁 Dana Davis / 💬 Erin Evans)`. A merged PR keeps it under `🔁`.
+
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.

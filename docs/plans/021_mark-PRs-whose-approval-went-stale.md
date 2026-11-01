@@ -93,9 +93,10 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`.
 - The connection populates on a private repository under `pull-requests: read` alone. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
   - Its fixture stays: PR 7 of private `hellej/pr-slack-reminder-test-repo-1` carries a manually dismissed approval by `hellej`, so every E2E run listing that repository reads a private-repo `ReviewDismissedEvent`
 - `pullRequestNode` gains `ReviewDismissals`. The existing `timelineItems` field keeps its name
-- `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
-- Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
-- `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR
+- `deriveReviewers` derives `StaleApprovedByUsers` too, and leaves those users out of `CommentedByUsers`. `prWithReviewers` passes it the push-dismissed approvals' authors, skipping a null `review` or `author`. See docs/third-party-facts.md § `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not
+- `StaleApprovedByUsers` is tagged `json:",omitempty"`, so no state snapshot changes in this step: an empty list is left out of the saved merged PR cache, and decodes the same as before
+- Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, a null `review` or `author`, a later `APPROVED` review cancelling the stale entry, and a stale approver left out of `CommentedByUsers`. A test pins the query text of both selections, and another runs the mock through `FindOpenPRs` and `GetPRs`
+- `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR, as `[]ReviewDismissal`. `NewPushDismissedApproval` builds one with a null message
 - The grouped canvas E2E runs already list public `hellej/pr-slack-reminder-test-repo-3`, added by plan 019. A ruleset on its `main` dismisses approvals on push. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) set up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
   - PR 10, **push-dismissed**: approved, then a push
   - PR 11, **manually dismissed**: approved, then dismissed with a message
@@ -115,12 +116,17 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 
 - `prview.PR.StaleApprovers` and `GetReviewersTextSegments` as in § Target shape
 - `ReviewerGroupsForOpenRow` as in § Target shape
-- Call sites: the message's `getReviewersElements`, shared by open and merged rows, takes the stale approvers and commenters from its callers, as it takes `mergeBlockers`. Never call `ReviewerGroupsForOpenRow` inside it: a merged PR with an approver reads `NextActionReadyToMerge`, so its merged row would lose `🔁`
+- Call sites: the message's `getReviewersElements`, shared by open and merged rows, takes every reviewer group from its callers, as it takes `mergeBlockers`, the same signature as the canvas's `renderReviewers`. Never call `ReviewerGroupsForOpenRow` inside it: a merged PR with an approver reads `NextActionReadyToMerge`, so its merged row would lose `🔁`
 - The canvas's `renderReviewers` already takes its groups from its callers: open, merged and draft rows
 - Open rows read `ReviewerGroupsForOpenRow`, merged rows `StaleApprovers` and `Commenters`, draft rows no stale approvers
 - Update `prview.spec.md`: the `GetReviewersTextSegments` line, and a § Behaviour line for `ReviewerGroupsForOpenRow` and its rule. Update `messagebuilder.spec.md` and `canvasbuilder.spec.md`
-- In the post, update-mode and canvas snapshot fixtures, give one PR that has a commenter a push-dismissed approver. In the post and canvas fixtures, also give one merged PR a push-dismissed approver, and one PR in "waiting for author" a push-dismissed approver and a thread waiting for its author. Then `make update-test-snapshots`. Read each diff before re-recording: only those PRs' rows change
-- Expect every state snapshot with a cached merged PR to gain the `StaleApprovedByUsers` key
+- In the post, update-mode and canvas snapshot fixtures, give one PR in "waiting for review" that has a commenter a push-dismissed approver: post #74, update-mode #65, canvas #43 (which also gains a commenter, since no canvas PR in that section had one). In the post and canvas fixtures, also give one merged PR that has a current approver a push-dismissed approver (post #83, canvas #9), so a merged row split by next action would move that push-dismissed approver under `💬`. And give one PR in "waiting for author" a push-dismissed approver whose name sorts before its commenter's, so the `💬` order shows:
+  - Canvas #34, with a thread waiting for its author
+  - Post #73, through its changes request: the mock GitHub client renders no review threads
+- The canvas WIP PR #3 gets a push-dismissed approver too, and its row stays unchanged
+- Then `make update-test-snapshots`. Read each diff before re-recording: only those PRs' rows change
+- `prview` unit tests cover the `GetReviewersTextSegments` group order, `ReviewerGroupsForOpenRow` in each next action, and the stale approvers' Slack IDs, which no row text shows
+- Expect only the state snapshots whose cached merged PR has a push-dismissed approver to gain the `StaleApprovedByUsers` key: step 1 tags it `omitempty`
 
 ### 3. Check the rows live
 

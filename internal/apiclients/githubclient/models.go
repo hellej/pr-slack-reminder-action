@@ -91,8 +91,10 @@ type PR struct {
 	*PullRequest
 	Repository       models.Repository
 	ApprovedByUsers  []Collaborator
-	CommentedByUsers []Collaborator // reviewers who commented the PR but did not approve it
-	SnoozedUntil     *time.Time
+	CommentedByUsers []Collaborator // reviewers who commented the PR, neither approving it nor holding an approval a push dismissed
+	// Users whose approval a push dismissed. See githubclient.spec.md § Oddities
+	StaleApprovedByUsers []Collaborator `json:",omitempty"`
+	SnoozedUntil         *time.Time
 	// An unresolved review thread whose last comment is neither the author's nor a bot's. A
 	// thread with no comments, or one whose last commenter GitHub no longer reports, counts too.
 	HasThreadWaitingForAuthor    bool
@@ -164,27 +166,32 @@ func (c Collaborator) GetGitHubName() string {
 
 func deriveReviewers(
 	authorLogin string,
-	approvers, reviewAuthors, timelineCommenters []Collaborator,
-) (approvedBy, commentedBy []Collaborator) {
+	approvers, pushDismissedApprovers, reviewAuthors, timelineCommenters []Collaborator,
+) (approvedBy, staleApprovedBy, commentedBy []Collaborator) {
 	approvedBy = utilities.UniqueFunc(approvers, isUniqueCollaborator)
+
+	staleApprovedBy = utilities.Filter(
+		utilities.UniqueFunc(pushDismissedApprovers, isUniqueCollaborator),
+		isNotAuthorOrListedReviewer(authorLogin, approvedBy),
+	)
 
 	allCommenters := slices.Concat(reviewAuthors, timelineCommenters)
 	commentedBy = utilities.Filter(
 		utilities.UniqueFunc(allCommenters, isUniqueCollaborator),
-		getFilterForCommenters(authorLogin, approvedBy),
+		isNotAuthorOrListedReviewer(authorLogin, slices.Concat(approvedBy, staleApprovedBy)),
 	)
-	return approvedBy, commentedBy
+	return approvedBy, staleApprovedBy, commentedBy
 }
 
 func isUniqueCollaborator(a, b Collaborator) bool {
 	return a.Login == b.Login
 }
 
-func getFilterForCommenters(authorLogin string, approvedByUsers []Collaborator) func(c Collaborator) bool {
+func isNotAuthorOrListedReviewer(authorLogin string, listedReviewers []Collaborator) func(c Collaborator) bool {
 	return func(c Collaborator) bool {
 		return c.Login != authorLogin &&
-			!slices.ContainsFunc(approvedByUsers, func(approver Collaborator) bool {
-				return c.Login == approver.Login
+			!slices.ContainsFunc(listedReviewers, func(listed Collaborator) bool {
+				return c.Login == listed.Login
 			})
 	}
 }

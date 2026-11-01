@@ -5,7 +5,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 ## Behaviour
 
 - `BuildPRViews(prs, contentInputs)` returns PRs enriched for display, in the given order
-- Each collaborator (author, approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
+- Each collaborator (author, approvers, stale approvers, commenters) gets a Slack user ID attached when one is mapped for their GitHub login; unmapped users get an empty Slack ID
 - A PR's age counts from its ready-for-review time, `githubclient.PR.ReadyForReviewAt()`: its first switch from draft to ready, else its creation
 - A PR is flagged `IsOldPR` when an old-PR age threshold is configured and the PR's weekday age is past it. Weekday age leaves out Saturdays and Sundays, whole UTC days, so a PR that turned ready on a weekend starts counting Monday 00:00 UTC
 - `WeekdayTimeBetween(from, to)` is that weekday time, also read by [internal/mergestats](../mergestats/mergestats.spec.md). Zero when `from` is not before `to`. It walks one day at a time, so on a zero `from` it walks from year 1: callers guard it
@@ -18,9 +18,11 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsOldestToNewest(prs)` orders PRs by ready-for-review time, oldest first, a tie going to the earlier `UpdatedAt`. It sorts the given slice in place and returns it
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
-- `GetReviewersTextSegments(approvers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
+- `GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 🔁 c / 💬 d)`, returning one text run per segment so a renderer can style or escape names separately from the glue. The groups keep that order, and a group without names is left out. Every group is a parameter, so the caller decides who goes where
   - Merge blockers add a last glue segment, ` / ` and the blockers joined by `, `, such as ` / CI failing`. Without reviewers, the blockers render alone, as ` (conflicts)`
   - No reviewers and no merge blockers yield no segments
+- `StaleApprovers` are the users whose approval a push dismissed, from `githubclient.PR.StaleApprovedByUsers`
+- `ReviewerGroupsForOpenRow()` returns the stale approvers and commenters an open row shows. On a `NextActionWaitingForReview` PR: `StaleApprovers` and `Commenters` as they are, since a stale approver approving again can move the PR on. On any other PR: no stale approvers, and `Commenters` followed by `StaleApprovers`, all under `💬`
 - `IsMerged` reports whether a PR was merged
 - `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`

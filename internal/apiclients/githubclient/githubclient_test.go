@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -898,23 +899,18 @@ func TestFindOpenPRsCarriesTheUpdateTimeThroughEnrichment(t *testing.T) {
 	}
 }
 
-func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
-	createdAt := time.Now().Add(-240 * time.Hour).UTC().Truncate(time.Second)
-	firstReadyForReviewEventAt := time.Now().Add(-48 * time.Hour).UTC().Truncate(time.Second)
-	repository := models.Repository{Owner: "o", Name: "repo"}
+type namedPRFetch struct {
+	name  string
+	fetch func() ([]githubclient.PR, error)
+}
 
-	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
-		PRs: []*github.PullRequest{
-			makePRFixture(7, false, createdAt, createdAt),
-			makePRFixture(8, false, createdAt, createdAt),
-		},
-		FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{7: firstReadyForReviewEventAt},
+func openAndReferencedPRFetches(
+	client githubclient.Client, repository models.Repository, numbers ...int,
+) []namedPRFetch {
+	references := utilities.Map(numbers, func(number int) models.PullRequestRef {
+		return models.PullRequestRef{Repository: repository, Number: number}
 	})
-
-	fetches := []struct {
-		name  string
-		fetch func() ([]githubclient.PR, error)
-	}{
+	return []namedPRFetch{
 		{
 			name: "FindOpenPRs",
 			fetch: func() ([]githubclient.PR, error) {
@@ -928,18 +924,26 @@ func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
 		{
 			name: "GetPRs",
 			fetch: func() ([]githubclient.PR, error) {
-				return client.GetPRs(
-					context.Background(),
-					[]models.PullRequestRef{
-						{Repository: repository, Number: 7}, {Repository: repository, Number: 8},
-					},
-					noFilters,
-				)
+				return client.GetPRs(context.Background(), references, noFilters)
 			},
 		},
 	}
+}
 
-	for _, tt := range fetches {
+func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
+	createdAt := time.Now().Add(-240 * time.Hour).UTC().Truncate(time.Second)
+	firstReadyForReviewEventAt := time.Now().Add(-48 * time.Hour).UTC().Truncate(time.Second)
+	repository := models.Repository{Owner: "o", Name: "repo"}
+
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{
+			makePRFixture(7, false, createdAt, createdAt),
+			makePRFixture(8, false, createdAt, createdAt),
+		},
+		FirstReadyForReviewEventAtByPRNumber: map[int]time.Time{7: firstReadyForReviewEventAt},
+	})
+
+	for _, tt := range openAndReferencedPRFetches(client, repository, 7, 8) {
 		t.Run(tt.name, func(t *testing.T) {
 			prs, err := tt.fetch()
 			if err != nil {
@@ -959,6 +963,44 @@ func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
 			}
 			if neverMarkedReady := prByNumber[8].FirstReadyForReviewEventAt; neverMarkedReady != nil {
 				t.Errorf("PR 8 FirstReadyForReviewEventAt = %v, expected nil", *neverMarkedReady)
+			}
+		})
+	}
+}
+
+func TestFetchedPRsCarryStaleApprovers(t *testing.T) {
+	now := time.Now()
+	repository := models.Repository{Owner: "o", Name: "repo"}
+
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{makePRFixture(7, false, now, now)},
+		ReviewsByPRNumber: map[int][]*github.PullRequestReview{
+			7: {mockgithubclient.NewReview("carol", "Carol", "DISMISSED")},
+		},
+		ReviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
+			7: {mockgithubclient.NewPushDismissedApproval("carol", "Carol")},
+		},
+	})
+
+	for _, tt := range openAndReferencedPRFetches(client, repository, 7) {
+		t.Run(tt.name, func(t *testing.T) {
+			prs, err := tt.fetch()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(prs) != 1 {
+				t.Fatalf("expected 1 PR, got %d", len(prs))
+			}
+
+			expectedStaleApprovedBy := []githubclient.Collaborator{{Login: "carol", Name: "Carol"}}
+			if !reflect.DeepEqual(prs[0].StaleApprovedByUsers, expectedStaleApprovedBy) {
+				t.Errorf(
+					"StaleApprovedByUsers = %+v, expected %+v",
+					prs[0].StaleApprovedByUsers, expectedStaleApprovedBy,
+				)
+			}
+			if len(prs[0].CommentedByUsers) != 0 {
+				t.Errorf("CommentedByUsers = %+v, expected none", prs[0].CommentedByUsers)
 			}
 		})
 	}

@@ -1090,6 +1090,14 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
 
+## `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not [2026-11-01]
+
+- Source: [schema](https://raw.githubusercontent.com/github/docs/main/src/graphql/data/fpt/schema.docs.graphql), read 2026-11-01
+- `review: PullRequestReview`, "Identifies the review associated with the 'review_dismissed' event"
+- `dismissalMessage: String`, "Identifies the optional message associated with the 'review_dismissed' event"
+- `previousReviewState: PullRequestReviewState!`
+- No page says when `review` is null
+
 ## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
 
 - Source: Build workflow E2E job logs, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token
