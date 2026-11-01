@@ -66,8 +66,8 @@ func TestProblems(t *testing.T) {
 			description: "### The problem: <a few words summarizing it>\n\n- one\n- two\n<!-- a comment -->\n\n### The solution\n\n- one\n- two\n-\n",
 			wantProblems: []string{
 				"### The problem: template placeholder left in: <a few words summarizing it>",
-				"### The problem: not a bullet: <!-- a comment -->",
 				"### The solution: empty bullet",
+				"### The problem: not a bullet: <!-- a comment -->",
 			},
 		},
 		{
@@ -111,6 +111,27 @@ func TestProblems(t *testing.T) {
 				"## Related: start with Open, Closed or Merged: Issue #3: flaky E2E",
 				"## Related: start with Open, Closed or Merged: See https://github.com/o/r/pull/6",
 				"## Related: start with Open, Closed or Merged: Opened PR #7",
+			},
+		},
+		{
+			name: "open items numbered, with sub bullets",
+			description: validDescription + "\n## Open\n\n" +
+				"1. Whether pending checks demote\n" +
+				"   - Needs a live PR\n" +
+				"2. The E2E cost\n",
+			wantProblems: nil,
+		},
+		{
+			name:         "open items as bullets",
+			description:  validDescription + "\n## Open\n\n- Whether pending checks demote\n",
+			wantProblems: []string{"## Open: not a numbered item: - Whether pending checks demote"},
+		},
+		{
+			name:        "prose outside the summary",
+			description: "Some intro.\n" + validDescription + "\n## Related\n\nSee issue 3.\n",
+			wantProblems: []string{
+				"before the first heading: not a Closes or Fixes line: Some intro.",
+				"## Related: not a bullet: See issue 3.",
 			},
 		},
 		{

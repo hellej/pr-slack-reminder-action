@@ -24,6 +24,6 @@
 
 ## Open
 
-<!-- What is still undecided or unverified. Delete if none -->
+<!-- What is still undecided or unverified, as a numbered list. Delete if none -->
 
--
+1.

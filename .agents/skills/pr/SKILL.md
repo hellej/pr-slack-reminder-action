@@ -16,6 +16,7 @@ argument-hint: "Optional: draft, or what the PR is for"
 ## The Description
 
 - Bullets only, no prose. Don't copy a plan or spec into it
+  - `## Open` is a numbered list instead, so a reviewer can answer by number
 - `### The problem: <a few words>`, then 2 to 3 short bullets
 - `### The solution: <a few words>`, then 2 to 5 short bullets, with a few short sub bullets where needed. When a few words can't sum it up, the heading is just `### The solution`
 - When the PR resolves an issue, start with `Closes #<issue>`. Use `Fixes #<issue>` for a bug

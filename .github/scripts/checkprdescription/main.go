@@ -30,11 +30,16 @@ var summarySections = []summarySection{
 
 var markdownLinkURL = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
-const relatedHeading = "## Related"
+const (
+	relatedHeading = "## Related"
+	openHeading    = "## Open"
+)
 
 var (
 	issueOrPRReference = regexp.MustCompile(`#\d+|/(issues|pull)/\d+`)
 	issueOrPRState     = regexp.MustCompile(`^- (Open|Closed|Merged) `)
+	closesIssue        = regexp.MustCompile(`^(Closes|Fixes) #\d+`)
+	numberedItem       = regexp.MustCompile(`^\d+\. `)
 )
 
 func main() {
@@ -68,8 +73,45 @@ func problems(description string) []string {
 	if summaryWords > maxSummaryWords {
 		found = append(found, fmt.Sprintf("summary is %d words, want at most %d", summaryWords, maxSummaryWords))
 	}
+	found = append(found, proseLines(lines)...)
 	found = append(found, relatedWithoutState(lines)...)
 	return append(found, longLinks(description)...)
+}
+
+// The description is lists only: bullets, and a numbered list under "## Open".
+func proseLines(lines []string) []string {
+	var found []string
+	heading := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		isSubItem := strings.HasPrefix(line, " ")
+		switch {
+		case trimmed == "":
+		case strings.HasPrefix(line, "#"):
+			heading = line
+		case heading == "":
+			if !closesIssue.MatchString(trimmed) {
+				found = append(found, "before the first heading: not a Closes or Fixes line: "+trimmed)
+			}
+		case heading == openHeading && !isSubItem:
+			if !numberedItem.MatchString(trimmed) {
+				found = append(found, openHeading+": not a numbered item: "+trimmed)
+			}
+		case !isBullet(trimmed) && !(isSubItem && numberedItem.MatchString(trimmed)):
+			found = append(found, sectionName(heading)+": not a bullet: "+trimmed)
+		}
+	}
+	return found
+}
+
+func isBullet(trimmedLine string) bool {
+	return trimmedLine == "-" || strings.HasPrefix(trimmedLine, "- ")
+}
+
+// "### The problem: reviews stall" reports as "### The problem", the way its summary section does.
+func sectionName(heading string) string {
+	name, _, _ := strings.Cut(heading, ":")
+	return name
 }
 
 // A reader can't tell an open issue or PR from a closed one by its number alone.
@@ -107,8 +149,7 @@ func (s summarySection) problems(lines []string) ([]string, int) {
 		if trimmed == "" {
 			continue
 		}
-		if trimmed != "-" && !strings.HasPrefix(trimmed, "- ") {
-			report("not a bullet: " + trimmed)
+		if !isBullet(trimmed) {
 			continue
 		}
 		if strings.HasPrefix(line, "-") {
