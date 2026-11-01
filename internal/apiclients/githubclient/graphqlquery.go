@@ -88,8 +88,22 @@ func newPullRequestFragment(name, selection string) pullRequestFragment {
 	}
 }
 
+func (f pullRequestFragment) selection() pullRequestSelection {
+	return pullRequestSelection{
+		definitions: f.text,
+		body:        func(string) string { return "..." + f.name },
+	}
+}
+
+// What each aliased pullRequest selects. The body gets the alias's own number variable, such as
+// "$num0", for a field taking the PR number as an argument. A fragment cannot carry it.
+type pullRequestSelection struct {
+	definitions string // fragment definitions appended after the operation, empty when none
+	body        func(numberVariable string) string
+}
+
 func buildPullRequestsQuery(
-	references []models.PullRequestRef, fragment pullRequestFragment,
+	references []models.PullRequestRef, selection pullRequestSelection,
 ) graphqlQuery {
 	query := graphqlQuery{
 		variables:         map[string]any{},
@@ -117,12 +131,12 @@ func buildPullRequestsQuery(
 			"$"+ownerVariable+":String!", "$"+nameVariable+":String!", "$"+numberVariable+":Int!",
 		)
 		pullRequestSelections[index] = fmt.Sprintf(
-			"  %s: repository(owner:$%s,name:$%s){ pullRequest(number:$%s){ ...%s } }",
-			alias, ownerVariable, nameVariable, numberVariable, fragment.name,
+			"  %s: repository(owner:$%s,name:$%s){ pullRequest(number:$%s){ %s } }",
+			alias, ownerVariable, nameVariable, numberVariable, selection.body("$"+numberVariable),
 		)
 	}
 
-	query.text = assembleQuery(variableDeclarations, pullRequestSelections, fragment.text)
+	query.text = assembleQuery(variableDeclarations, pullRequestSelections, selection.definitions)
 	return query
 }
 

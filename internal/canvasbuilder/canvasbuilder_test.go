@@ -41,16 +41,17 @@ const (
 )
 
 type prOptions struct {
-	number      int
-	title       string
-	repository  string
-	authorName  string
-	approvers   []string
-	commenters  []string
-	isOldPR     bool
-	age         time.Duration
-	activityAge *time.Duration
-	mergeAge    *time.Duration
+	number                int
+	title                 string
+	repository            string
+	authorName            string
+	approvers             []string
+	commenters            []string
+	isOldPR               bool
+	age                   time.Duration
+	activityAge           *time.Duration
+	mergeAge              *time.Duration
+	failingRequiredChecks bool
 }
 
 func testRepository(name string) models.Repository {
@@ -68,6 +69,10 @@ func testPR(options prOptions) prview.PR {
 		timestamp := time.Now().Add(-*options.mergeAge)
 		mergedAt = &timestamp
 	}
+	requiredChecks := githubclient.RequiredChecksUnknown
+	if options.failingRequiredChecks {
+		requiredChecks = githubclient.RequiredChecksFailing
+	}
 	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
@@ -79,7 +84,8 @@ func testPR(options prOptions) prview.PR {
 				MergedAt:  mergedAt,
 				Merged:    mergedAt != nil,
 			},
-			Repository: repository,
+			Repository:           repository,
+			RequiredChecksStatus: requiredChecks,
 		},
 		Author:     testCollaborator(options.authorName),
 		Approvers:  utilities.Map(options.approvers, testCollaborator),
@@ -124,14 +130,18 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		number: 2, title: "Bump the Slack SDK", repository: "repo-two", authorName: "Bob Brown",
 		age: minutesAge,
 	})
+	// The WIP and merged PRs are approved and failing, so a row naming the failing checks
+	// anywhere but in an open section shows up in the snapshots.
 	wipPR := testPR(prOptions{
 		number: 3, title: "Spike: replace mux with chi", authorName: "Carol Clark",
 		age: hoursAge, activityAge: durationPointer(hoursAge),
+		approvers: []string{"Frank Foster"}, failingRequiredChecks: true,
 	})
 	mergedPR := testPR(prOptions{
 		number: 9, title: "Drop the REST fallback", authorName: "Alice Anderson",
 		age: oldAge, mergeAge: durationPointer(idleAge),
 		approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
+		failingRequiredChecks: true,
 	})
 	otherWIPPR := testPR(prOptions{
 		number: 11, title: "Draft the migration guide", repository: "repo-two",
@@ -178,6 +188,12 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			number: 33, title: "Handle the 404 on missing repositories", repository: "repo-three",
 			authorName: "Dana Davis", age: hoursAge,
 			approvers: []string{"Alice Anderson"}, commenters: []string{"Bob Brown"},
+		}),
+		testPR(prOptions{
+			number: 35, title: "Retry the flaky upload", repository: "repo-two",
+			authorName: "Frank Foster", age: hoursAge,
+			approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
+			failingRequiredChecks: true,
 		}),
 		testPR(prOptions{
 			number: 34, title: "Escape the canvas titles", authorName: "Erin Evans",

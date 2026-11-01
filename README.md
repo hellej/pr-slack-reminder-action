@@ -140,6 +140,9 @@ on:
     types: [submitted, dismissed]
   issue_comment:
     types: [created, deleted]
+  workflow_run:
+    workflows: ["CI"] # the workflows running your required checks
+    types: [completed]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
@@ -150,6 +153,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      checks: read
       issues: read
       actions: read
     steps:
@@ -208,7 +212,9 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 <img src="docs/examples/example_canvas.png" alt="Example PR tracker canvas" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
-Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts; ready to merge (3) is an approved PR with nothing outstanding.
+Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts or fails a required check; ready to merge (3) is an approved PR with nothing outstanding and no failing required check.
+
+A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes. The message lists such a PR under the same heading, with the same `CI failing`.
 
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
@@ -268,9 +274,12 @@ If you're using the default `GITHUB_TOKEN`, grant these via the job's `permissio
 ```yaml
 permissions:
   pull-requests: read # listing/fetching PRs and reviews
+  checks: read # reading required check status (not needed in a public repository)
   issues: read # reading PR comments (incl. /snooze comments)
   actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale and compare the merge stats week over week
 ```
+
+> If your commits carry commit statuses, e.g. from an external CI, also grant `statuses: read`. A missing permission shows as a warning on the run page.
 
 ### Option 1: Default Token (Single Repository)
 
@@ -285,7 +294,7 @@ github-token: ${{ secrets.GITHUB_TOKEN }}
 For better security and granular permissions, especially when monitoring multiple repositories, using a GitHub App is the recommended approach.
 
 1.  **Create a GitHub App** in your organization or personal account settings.
-2.  **Give it necessary permissions** (e.g., "read" access to PRs).
+2.  **Give it necessary permissions** (e.g., "read" access to PRs and Checks, plus Commit statuses if your commits carry them).
 3.  **Install the app** on the repositories you want to monitor. During installation, you can choose to grant access to **all repositories** (of your organization) or only to **specific ones**. For better security, it's recommended to select only the repositories you intend to monitor.
 4.  **Add the App ID and Private Key** as secrets in the repository where your workflow runs.
 5.  **Use a token generation action** (like `actions/create-github-app-token`) in your workflow to generate a temporary token.

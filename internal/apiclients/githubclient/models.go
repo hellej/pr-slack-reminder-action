@@ -104,6 +104,8 @@ type PR struct {
 	FirstReviewAt *time.Time
 	// False after a failed enrichment. See githubclient.spec.md § Behaviour
 	HasCompleteReviewerInfo bool
+	// Never saved in a merged PR cache. See githubclient.spec.md § Oddities
+	RequiredChecksStatus RequiredChecksStatus `json:",omitempty"`
 }
 
 func (p PR) GetPullRequestRef() models.PullRequestRef {

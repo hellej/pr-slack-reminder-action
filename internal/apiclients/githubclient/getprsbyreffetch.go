@@ -51,7 +51,7 @@ func (c *client) getPRsByRef(ctx context.Context, references []models.PullReques
 func (c *client) getPRBatchByRef(
 	ctx context.Context, references []models.PullRequestRef,
 ) ([]PR, error) {
-	query := buildPullRequestsQuery(references, fullPullRequestFragment)
+	query := buildPullRequestsQuery(references, fullPullRequestFragment.selection())
 
 	var data aliasedData[pullRequestWrapperNode]
 	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
@@ -89,15 +89,9 @@ func getPRsError(err error, referenceByAlias map[string]models.PullRequestRef) e
 }
 
 func pullRequestNotFoundError(reference models.PullRequestRef) error {
-	return fmt.Errorf(
-		"PR %s/%s/%d not found - check the path and permissions",
-		reference.Repository.Owner, reference.Repository.Name, reference.Number,
-	)
+	return fmt.Errorf("PR %s not found - check the path and permissions", pullRequestPath(reference))
 }
 
 func pullRequestFetchError(reference models.PullRequestRef, err error) error {
-	return fmt.Errorf(
-		"error fetching pull request %s/%s/%d: %w",
-		reference.Repository.Owner, reference.Repository.Name, reference.Number, err,
-	)
+	return fmt.Errorf("error fetching pull request %s: %w", pullRequestPath(reference), err)
 }

@@ -50,6 +50,9 @@ the whole plan:
 - What the plan must **not** do: its non-goals
 - Test cases the plan lists are a minimum. A guard they don't cover needs one too
 
+The names the plan gives new types, fields and funcs are not criteria: AGENTS.md § Code
+Style's naming rules outrank them. Say so to the implementer and the reviewer.
+
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
 

@@ -271,6 +271,56 @@
                 "style": {}
               }
             ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/59",
+                "text": "Approved but a required check fails",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 8 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Heidi Hill",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / CI failing",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
           }
         ],
         "style": "bullet",

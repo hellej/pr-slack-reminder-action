@@ -31,6 +31,7 @@ Check it against:
   slightly more explicit, is a `nit` naming it
   - A name that reads clearly only next to its comment, or only to someone who has read
     the spec, is a `medium` Fix. A term coined in a spec doesn't make a name clear
+  - A name the plan specifies gets the same check. Matching the plan doesn't make it clear
 - Whether any prose is true is not yours to check: `prose-truth-checker` checks every
   spec, comment and doc claim against the code, references and stale claims included
 - How Markdown and YAML prose reads is not yours either: `prose-clarity-checker` checks it
