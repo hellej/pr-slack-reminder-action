@@ -4,10 +4,12 @@ description: "Open or update a GitHub pull request with a description that follo
 argument-hint: "Optional: draft, or what the PR is for"
 ---
 
-# Open a Pull Request
+# Open or Update a Pull Request
 
 1. Merge the latest `main` (AGENTS.md § Git)
-2. Write the description to `.local/pr/<branch>.md`, from [the PR template](../../../.github/pull_request_template.md), following the `writing` skill
+2. Write the description to `.local/pr/<branch>.md`, each `/` in the branch name as `-`, following the `writing` skill:
+   - New PR: start from [the PR template](../../../.github/pull_request_template.md)
+   - Open PR: start from its stored description, never an earlier local file, which misses edits made on GitHub: `gh pr view --json body -q .body > .local/pr/<branch>.md`, or the body a GitHub MCP tools read returns
 3. Run `make check-pr-description FILE=.local/pr/<branch>.md`. Fix and rerun until it prints nothing
    - It also checks each link into this repo, on `main` or this branch, resolves to a file and heading in the working tree
 4. Create or edit the PR from that file, either:
