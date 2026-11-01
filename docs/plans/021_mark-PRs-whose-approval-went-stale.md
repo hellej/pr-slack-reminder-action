@@ -141,9 +141,9 @@ Touches no files. Step 1's repo-3 PRs are the setup.
 
 ### 4. Docs
 
-Touches `README.md`.
+Touches no files.
 
-- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
+- No `README.md` change: a README cleanup on `main` dropped the row format prose from § Example Output, collapsed rows included, so `🔁` gets no line there either
 - Done means `make check-style` passes
 
 ## Consequences
