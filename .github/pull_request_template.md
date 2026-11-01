@@ -2,11 +2,11 @@
 
 ## Summary
 
-### Problem
+### The problem: <a few words summarizing it>
 
 -
 
-### Solution
+### The solution: <a few words summarizing it>
 
 -
 
