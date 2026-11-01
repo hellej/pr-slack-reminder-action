@@ -52,6 +52,7 @@ type prOptions struct {
 	activityAge           *time.Duration
 	mergeAge              *time.Duration
 	failingRequiredChecks bool
+	conflicting           bool
 }
 
 func testRepository(name string) models.Repository {
@@ -86,6 +87,7 @@ func testPR(options prOptions) prview.PR {
 			},
 			Repository:           repository,
 			RequiredChecksStatus: requiredChecks,
+			Conflicting:          options.conflicting,
 		},
 		Author:     testCollaborator(options.authorName),
 		Approvers:  utilities.Map(options.approvers, testCollaborator),
@@ -193,7 +195,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			number: 35, title: "Retry the flaky upload", repository: "repo-two",
 			authorName: "Frank Foster", age: hoursAge,
 			approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
-			failingRequiredChecks: true,
+			failingRequiredChecks: true, conflicting: true,
 		}),
 		testPR(prOptions{
 			number: 34, title: "Escape the canvas titles", authorName: "Erin Evans",
@@ -211,6 +213,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		}),
 		testPR(prOptions{
 			number: 41, title: "Add the dry-run flag", authorName: "Alice Anderson", age: hoursAge,
+			conflicting: true,
 		}),
 		testPR(prOptions{
 			number: 45, title: "Bump golangci-lint", repository: "repo-two",

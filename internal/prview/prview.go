@@ -58,11 +58,10 @@ func (pr PR) GetNextAction() PRNextAction {
 		return NextActionWaitingForReview
 	}
 
-	isApproved := len(pr.Approvers) > 0
-	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
+	if pr.isApproved() && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
 		return NextActionReadyToMerge
 	}
-	if isApproved || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
+	if pr.isApproved() || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
 		return NextActionWaitingForAuthor
 	}
 	return NextActionWaitingForReview
@@ -71,14 +70,28 @@ func (pr PR) GetNextAction() PRNextAction {
 // One thing blocking a PR's merge. The value is the text its row shows.
 type MergeBlocker string
 
-const MergeBlockerFailingChecks MergeBlocker = "CI failing"
+const (
+	MergeBlockerFailingChecks MergeBlocker = "CI failing"
+	MergeBlockerConflicts     MergeBlocker = "conflicts"
+)
 
-// None on an unapproved PR. See prview.spec.md § Oddities
 func (pr PR) MergeBlockers() []MergeBlocker {
-	if pr.PR == nil || len(pr.Approvers) == 0 || !pr.isFailingRequiredChecks() {
+	if pr.PR == nil {
 		return nil
 	}
-	return []MergeBlocker{MergeBlockerFailingChecks}
+	var mergeBlockers []MergeBlocker
+	// An unapproved PR's check status is never fetched. See prview.spec.md § Oddities
+	if pr.isApproved() && pr.isFailingRequiredChecks() {
+		mergeBlockers = append(mergeBlockers, MergeBlockerFailingChecks)
+	}
+	if pr.Conflicting {
+		mergeBlockers = append(mergeBlockers, MergeBlockerConflicts)
+	}
+	return mergeBlockers
+}
+
+func (pr PR) isApproved() bool {
+	return len(pr.Approvers) > 0
 }
 
 func (pr PR) isFailingRequiredChecks() bool {

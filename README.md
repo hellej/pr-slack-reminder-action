@@ -216,6 +216,8 @@ Open PRs are split by whose turn it is: waiting for review (1) is every open PR 
 
 A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes. The message lists such a PR under the same heading, with the same `CI failing`.
 
+A PR that conflicts with its base branch shows `conflicts` in its reviewer list, after `CI failing` when both apply. It does so in every open section of the canvas and the message, except in a collapsed row, which has no reviewer list.
+
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
 As in the message, 2 or more PRs by one author in `collapse-prs-from-authors` in a section collapse into one row of linked PR numbers.
