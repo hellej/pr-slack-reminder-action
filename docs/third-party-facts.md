@@ -999,3 +999,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - REST's list endpoints take `filter=latest|all`, and GitHub limits same-name check runs to 1000 per suite. Neither says what "latest" means for a re-run
 - Third-party reports contradict each other: one says only the latest attempt is listed, another says the rollup `state` stays `FAILURE` after a successful re-run
 - Unverified: settling it needs a live PR whose required check failed and then passed on a re-run
+
+## The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link [2026-10-31]
+
+- Source: plan 019's draft PR, description read back after writing it
+- A 145 character link stayed intact, a 152 character one came back wrapped in backticks
