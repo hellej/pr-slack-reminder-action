@@ -40,7 +40,7 @@ func testPR(options testPROptions) prview.PR {
 				MergedAt:  options.mergedAt,
 				Merged:    options.mergedAt != nil,
 			},
-			RequiredChecks: requiredChecks,
+			RequiredChecksStatus: requiredChecks,
 		},
 		Author: prview.Collaborator{
 			Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},

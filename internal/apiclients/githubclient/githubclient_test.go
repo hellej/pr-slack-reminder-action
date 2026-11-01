@@ -1018,7 +1018,7 @@ func TestFindOpenPRsFetchesTheRequiredCheckStatusOfApprovedPRsOnly(t *testing.T)
 
 	statusByNumber := map[int]githubclient.RequiredChecksStatus{}
 	for _, pr := range result.PRs {
-		statusByNumber[pr.GetNumber()] = pr.RequiredChecks
+		statusByNumber[pr.GetNumber()] = pr.RequiredChecksStatus
 	}
 	expectedStatusByNumber := map[int]githubclient.RequiredChecksStatus{
 		1: githubclient.RequiredChecksFailing,
@@ -1029,7 +1029,7 @@ func TestFindOpenPRsFetchesTheRequiredCheckStatusOfApprovedPRsOnly(t *testing.T)
 		7: githubclient.RequiredChecksUnknown,
 	}
 	if !maps.Equal(statusByNumber, expectedStatusByNumber) {
-		t.Errorf("RequiredChecks by PR number = %v, expected %v", statusByNumber, expectedStatusByNumber)
+		t.Errorf("RequiredChecksStatus by PR number = %v, expected %v", statusByNumber, expectedStatusByNumber)
 	}
 }
 
@@ -1052,8 +1052,8 @@ func TestFindOpenPRsReturnsThePRsWhenTheCheckStatusFetchFails(t *testing.T) {
 	if !strings.Contains(errorText(result.CheckStatusErr), "resource not accessible by integration") {
 		t.Errorf("CheckStatusErr = %v, expected the mock's check status error", result.CheckStatusErr)
 	}
-	if len(result.PRs) != 1 || result.PRs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
-		t.Errorf("PRs = %+v, expected PR 1 with unknown RequiredChecks", result.PRs)
+	if len(result.PRs) != 1 || result.PRs[0].RequiredChecksStatus != githubclient.RequiredChecksUnknown {
+		t.Errorf("PRs = %+v, expected PR 1 with unknown RequiredChecksStatus", result.PRs)
 	}
 }
 

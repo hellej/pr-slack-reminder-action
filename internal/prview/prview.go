@@ -82,7 +82,7 @@ func (pr PR) MergeBlockers() []MergeBlocker {
 }
 
 func (pr PR) isFailingRequiredChecks() bool {
-	return pr.RequiredChecks == githubclient.RequiredChecksFailing
+	return pr.RequiredChecksStatus == githubclient.RequiredChecksFailing
 }
 
 func (pr PR) GetPRAgeText() string {

@@ -163,8 +163,8 @@ func PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *State) [
 	}
 	return utilities.Map(prs, func(pr githubclient.PR) githubclient.PR {
 		isRemembered := slices.Contains(loadedState.PRsWithFailingRequiredChecks, pr.GetPullRequestRef())
-		if pr.RequiredChecks == githubclient.RequiredChecksUnknown && isRemembered {
-			pr.RequiredChecks = githubclient.RequiredChecksFailing
+		if pr.RequiredChecksStatus == githubclient.RequiredChecksUnknown && isRemembered {
+			pr.RequiredChecksStatus = githubclient.RequiredChecksFailing
 		}
 		return pr
 	})
@@ -172,7 +172,7 @@ func PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *State) [
 
 func RefsOfPRsWithFailingRequiredChecks(prs []githubclient.PR) []models.PullRequestRef {
 	failingPRs := utilities.Filter(prs, func(pr githubclient.PR) bool {
-		return pr.RequiredChecks == githubclient.RequiredChecksFailing
+		return pr.RequiredChecksStatus == githubclient.RequiredChecksFailing
 	})
 	return utilities.Map(failingPRs, githubclient.PR.GetPullRequestRef)
 }

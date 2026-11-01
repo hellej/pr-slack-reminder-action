@@ -587,9 +587,9 @@ func TestRecentMergeStatsLastComputedAt(t *testing.T) {
 
 func prWithRequiredChecks(number int, status githubclient.RequiredChecksStatus) githubclient.PR {
 	return githubclient.PR{
-		PullRequest:    &githubclient.PullRequest{Number: number},
-		Repository:     models.Repository{Owner: "owner", Name: "repo"},
-		RequiredChecks: status,
+		PullRequest:          &githubclient.PullRequest{Number: number},
+		Repository:           models.Repository{Owner: "owner", Name: "repo"},
+		RequiredChecksStatus: status,
 	}
 }
 
@@ -604,12 +604,12 @@ func TestPRsWithRememberedFailingChecks(t *testing.T) {
 
 	result := PRsWithRememberedFailingChecks(prs, listingOne)
 
-	statuses := utilities.Map(result, func(pr githubclient.PR) githubclient.RequiredChecksStatus { return pr.RequiredChecks })
+	statuses := utilities.Map(result, func(pr githubclient.PR) githubclient.RequiredChecksStatus { return pr.RequiredChecksStatus })
 	expected := []githubclient.RequiredChecksStatus{githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown}
 	if !slices.Equal(statuses, expected) {
-		t.Errorf("RequiredChecks = %q, expected %q", statuses, expected)
+		t.Errorf("RequiredChecksStatus = %q, expected %q", statuses, expected)
 	}
-	if prs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
+	if prs[0].RequiredChecksStatus != githubclient.RequiredChecksUnknown {
 		t.Error("the given PRs were changed, expected copies")
 	}
 }

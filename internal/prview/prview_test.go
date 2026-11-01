@@ -655,18 +655,18 @@ func TestGetNextAction(t *testing.T) {
 			// A failing required check cannot be merged either, so it demotes like a conflict.
 			name:           "approved but failing a required check",
 			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksFailing},
+			prFlags:        githubclient.PR{RequiredChecksStatus: githubclient.RequiredChecksFailing},
 			expected:       prview.NextActionWaitingForAuthor,
 		},
 		{
 			name:           "approved with every required check passing",
 			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksPassing},
+			prFlags:        githubclient.PR{RequiredChecksStatus: githubclient.RequiredChecksPassing},
 			expected:       prview.NextActionReadyToMerge,
 		},
 		{
 			name:     "failing a required check and nothing else",
-			prFlags:  githubclient.PR{RequiredChecks: githubclient.RequiredChecksFailing},
+			prFlags:  githubclient.PR{RequiredChecksStatus: githubclient.RequiredChecksFailing},
 			expected: prview.NextActionWaitingForReview,
 		},
 		{
@@ -709,19 +709,19 @@ func TestMergeBlockers(t *testing.T) {
 		{
 			// A failing status on an unapproved PR can only be one the state remembers.
 			name:     "unapproved with a remembered failing status",
-			prFlags:  githubclient.PR{RequiredChecks: failing},
+			prFlags:  githubclient.PR{RequiredChecksStatus: failing},
 			expected: nil,
 		},
 		{
 			name:           "approved, failing and a thread waiting for the author",
 			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: failing, HasThreadWaitingForAuthor: true},
+			prFlags:        githubclient.PR{RequiredChecksStatus: failing, HasThreadWaitingForAuthor: true},
 			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 		},
 		{
 			name:           "approved, failing and conflicting",
 			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: failing, Conflicting: true},
+			prFlags:        githubclient.PR{RequiredChecksStatus: failing, Conflicting: true},
 			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 		},
 	}

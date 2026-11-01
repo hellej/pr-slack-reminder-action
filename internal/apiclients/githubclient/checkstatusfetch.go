@@ -118,7 +118,7 @@ func needsRequiredCheckStatus(pr PR) bool {
 	return !pr.GetDraft() && pr.HasCompleteReviewerInfo && len(pr.ApprovedByUsers) > 0
 }
 
-// Returns the PRs, in input order, with RequiredChecks set on those needing it. A failed batch
+// Returns the PRs, in input order, with RequiredChecksStatus set on those needing it. A failed batch
 // leaves its PRs unknown and fails no other batch. The returned error joins every failure.
 func (c *client) fetchRequiredCheckStatus(ctx context.Context, prs []PR) ([]PR, error) {
 	requestedRefs := utilities.Map(utilities.Filter(prs, needsRequiredCheckStatus), PR.GetPullRequestRef)
@@ -146,7 +146,7 @@ func (c *client) fetchRequiredCheckStatus(ctx context.Context, prs []PR) ([]PR, 
 		maps.Copy(statusByRef, batchStatusByRef)
 	}
 	return utilities.Map(prs, func(pr PR) PR {
-		pr.RequiredChecks = statusByRef[pr.GetPullRequestRef()]
+		pr.RequiredChecksStatus = statusByRef[pr.GetPullRequestRef()]
 		return pr
 	}), errors.Join(batchErrors...)
 }

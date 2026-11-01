@@ -31,7 +31,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
 
 ## Target shape
 
-- `githubclient.PR` gains `RequiredChecks RequiredChecksStatus`, a string type:
+- `githubclient.PR` gains `RequiredChecksStatus RequiredChecksStatus`, a string type:
   - `RequiredChecksUnknown` (`""`, the zero value): not fetched, fetch failed, or no evidence either way
   - `RequiredChecksPassing` (`"passing"`)
   - `RequiredChecksFailing` (`"failing"`)
@@ -64,7 +64,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
 - `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
-- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecks` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `❌ CI` entry reads
+- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecksStatus` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `❌ CI` entry reads
   - An unapproved PR gets no `CI`: on it, a failing status can only be one the state remembers
   - `MergeBlockers()` returns nil on a PR whose embedded `githubclient.PR` is nil
 - `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
@@ -105,7 +105,7 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 - A private repository needs `checks: read` for the check status fetch. A workflow without it still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and a PR the state does not remember as failing files as it does today. Nothing that worked stops working, so it stays minor. The README names the permission
 
 - State gains `prsWithFailingRequiredChecks`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
-- `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
+- `PR.RequiredChecksStatus` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
 - The first run after upgrading re-buckets every PR, and the canvas rewrites once wherever a PR moves
 - A downgrade ignores both keys
 
@@ -136,11 +136,11 @@ Touches `internal/apiclients/githubclient` (`graphqlquery.go`, `openprsfetch.go`
 
 Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd/pr-slack-reminder` (`run.go`).
 
-- `PR.RequiredChecks` is set by `client.fetchRequiredCheckStatus`, which `FindOpenPRs` calls at its end, after `excludeSnoozedPRs`. See [§ Why check status is its own request for approved PRs](#why-check-status-is-its-own-request-for-approved-prs)
+- `PR.RequiredChecksStatus` is set by `client.fetchRequiredCheckStatus`, which `FindOpenPRs` calls at its end, after `excludeSnoozedPRs`. See [§ Why check status is its own request for approved PRs](#why-check-status-is-its-own-request-for-approved-prs)
 - Requested PRs: not draft, `HasCompleteReviewerInfo`, and at least one approver. A PR outside that set stays `RequiredChecksUnknown`
 - The phase batches 25 PRs per request, runs at most `defaultGitHubAPIConcurrencyLimit` requests at a time and goes through `retry.DefaultPolicy` like every GraphQL request
 - `classifyRequiredChecks` classifies the decoded contexts, as listed in § Target shape. A table test covers each row of that list, including `hasNextPage` true with every context passing
-- `PR.RequiredChecks` carries `omitempty`, so no existing state snapshot gains the key. The merged PR cache never holds a known status
+- `PR.RequiredChecksStatus` carries `omitempty`, so no existing state snapshot gains the key. The merged PR cache never holds a known status
 - A failure never fails `FindOpenPRs`:
   - A query, repository or transport error leaves every PR of that batch unknown
   - A per-PR error leaves only that PR unknown: a `pullRequestError`, as `failsOnlyOnePullRequest` reads it, a field error below the PR, or a PR missing from the answer. A token lacking the permission could get a field error on `statusCheckRollup`, so that error goes into `CheckStatusErr` and the warning like any other
@@ -194,7 +194,7 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
   - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`, for the canvas row
   - Both cmd fixture sets pass the failing PR through a `prNumbersWithFailingRequiredChecks` field to `FailingRequiredCheckPRNumbers`
 - The canvas WIP and merged fixtures, and the message's merged row test, are approved and failing too, with their expected output unchanged, so a row naming the failing check outside an open section fails a test
-- Expect the snapshots holding those fixtures to change. No state snapshot gains a `RequiredChecks` key: it is `omitempty`, and a cached merged PR is always unknown
+- Expect the snapshots holding those fixtures to change. No state snapshot gains a `RequiredChecksStatus` key: it is `omitempty`, and a cached merged PR is always unknown
 
 ### 4. Keep a failing status until the required checks pass, through the state
 

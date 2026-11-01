@@ -27,7 +27,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - `PR.HasReadyForReviewTime()` is false when `ReadyForReviewAt()` is zero: no ready-for-review event and a zero creation time
 - Each returned PR carries `FirstReviewAt`, the earliest time among the submitted reviews `ApprovedByUsers` and `CommentedByUsers` read, not pending and not a bot's, minus the PR author's own. A review's time is `submittedAt`, else `createdAt`. Nil without such a review. A timeline comment is not a review
   - The minimum over the reviews, never the first node: `reviews(last: 100)` comes in an order GitHub doesn't document
-- `FindOpenPRs` sets `RequiredChecks` on each approved PR: not draft, `HasCompleteReviewerInfo`, at least one approver. The check status fetch is a third phase of `FindOpenPRs`, after snooze exclusion. It reads `statusCheckRollup.contexts(first: 100)` and each context's `isRequired(pullRequestNumber:)`. Any other PR, and every PR from `GetPRs` or the merged paths, stays `RequiredChecksUnknown`
+- `FindOpenPRs` sets `RequiredChecksStatus` on each approved PR: not draft, `HasCompleteReviewerInfo`, at least one approver. The check status fetch is a third phase of `FindOpenPRs`, after snooze exclusion. It reads `statusCheckRollup.contexts(first: 100)` and each context's `isRequired(pullRequestNumber:)`. Any other PR, and every PR from `GetPRs` or the merged paths, stays `RequiredChecksUnknown`
   - A required context is failing when it is a completed `CheckRun` whose conclusion is not `SUCCESS`, `NEUTRAL` or `SKIPPED`, or a `StatusContext` in `FAILURE` or `ERROR`. Passing is a completed `CheckRun` with one of those three, or a `StatusContext` in `SUCCESS`
   - `RequiredChecksFailing` when any required context is failing
   - Else `RequiredChecksPassing` when there is at least one required context, every one is passing, and `hasNextPage` is false
@@ -107,5 +107,5 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - A commit with over 100 check contexts never gets `RequiredChecksPassing`: a failing required context among the first 100 still reads failing, but a passing set reads unknown
 - A context carries `isRequired` only once it has reported, so a required check that never started is not seen: a PR reads passing once the required checks that reported have passed
 - A failed check re-run on the same commit is unverified. If the rollup shows only the re-run's attempt, the PR reads unknown while it runs. If it keeps the failed attempt beside a passing re-run, the PR reads failing until a new commit. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree
-- `RequiredChecks` is left out of a saved merged PR cache when unknown, which every merged PR is, so a cache carries no such key
+- `RequiredChecksStatus` is left out of a saved merged PR cache when unknown, which every merged PR is, so a cache carries no such key
 - The JSON file inside the artifact zip is matched by base name, so the directory part of the given path is ignored

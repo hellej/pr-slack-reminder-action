@@ -273,7 +273,7 @@ func approvedPRs(firstNumber, count int) []PR {
 }
 
 func requiredChecksOf(prs []PR) []RequiredChecksStatus {
-	return utilities.Map(prs, func(pr PR) RequiredChecksStatus { return pr.RequiredChecks })
+	return utilities.Map(prs, func(pr PR) RequiredChecksStatus { return pr.RequiredChecksStatus })
 }
 
 func newCheckStatusTestClient(transport graphqlTransport) *client {
@@ -309,7 +309,7 @@ func TestFetchRequiredCheckStatusRequestsOnlyApprovedNonDraftPRsWithCompleteRevi
 		RequiredChecksFailing,
 	}
 	if got := requiredChecksOf(result); !reflect.DeepEqual(got, expected) {
-		t.Errorf("RequiredChecks = %q, expected %q", got, expected)
+		t.Errorf("RequiredChecksStatus = %q, expected %q", got, expected)
 	}
 }
 
@@ -352,7 +352,7 @@ func TestFetchRequiredCheckStatusBatches25PRsPerRequest(t *testing.T) {
 	statuses := requiredChecksOf(result)
 	if statuses[0] != RequiredChecksFailing || statuses[24] != RequiredChecksPassing ||
 		statuses[25] != RequiredChecksFailing || statuses[1] != RequiredChecksUnknown {
-		t.Errorf("RequiredChecks = %q, expected 1 and 26 failing, 25 passing, 2 unknown", statuses)
+		t.Errorf("RequiredChecksStatus = %q, expected 1 and 26 failing, 25 passing, 2 unknown", statuses)
 	}
 }
 
@@ -377,10 +377,10 @@ func TestFetchRequiredCheckStatusBatchesFailIndependently(t *testing.T) {
 	}
 	statuses := requiredChecksOf(result)
 	if !slices.Equal(statuses[:25], slices.Repeat([]RequiredChecksStatus{RequiredChecksUnknown}, 25)) {
-		t.Errorf("first batch RequiredChecks = %q, expected every one unknown", statuses[:25])
+		t.Errorf("first batch RequiredChecksStatus = %q, expected every one unknown", statuses[:25])
 	}
 	if statuses[25] != RequiredChecksFailing {
-		t.Errorf("PR 26 RequiredChecks = %q, expected failing from the second batch", statuses[25])
+		t.Errorf("PR 26 RequiredChecksStatus = %q, expected failing from the second batch", statuses[25])
 	}
 }
 
@@ -412,7 +412,7 @@ func TestFetchRequiredCheckStatusPerPRErrorLeavesOnlyThatPRUnknown(t *testing.T)
 			}
 			expected := []RequiredChecksStatus{RequiredChecksFailing, RequiredChecksUnknown, RequiredChecksPassing}
 			if got := requiredChecksOf(result); !reflect.DeepEqual(got, expected) {
-				t.Errorf("RequiredChecks = %q, expected %q", got, expected)
+				t.Errorf("RequiredChecksStatus = %q, expected %q", got, expected)
 			}
 		})
 	}
@@ -448,7 +448,7 @@ func TestFetchRequiredCheckStatusFailedBatchLeavesEveryPRUnknown(t *testing.T) {
 			}
 			expected := []RequiredChecksStatus{RequiredChecksUnknown, RequiredChecksUnknown}
 			if got := requiredChecksOf(result); !reflect.DeepEqual(got, expected) {
-				t.Errorf("RequiredChecks = %q, expected %q", got, expected)
+				t.Errorf("RequiredChecksStatus = %q, expected %q", got, expected)
 			}
 		})
 	}
