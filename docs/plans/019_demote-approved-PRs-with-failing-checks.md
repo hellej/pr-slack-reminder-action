@@ -8,7 +8,7 @@ Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-
 ## Requirements
 
 - An approved PR with a failing required check leaves "ready to merge" for "waiting for author", in the message and on the canvas
-- Its row says why: a `❌ checks failing` marker
+- Its row says why: a last `❌ CI` entry in the reviewer list, as in `(✅ Dana Davis / 💬 Erin Evans / ❌ CI)`
 - Pending required checks do not demote. Only a failing one does
 - Required means required by branch protection or a ruleset, so a failing optional check never demotes
 - A PR with no checks or no required checks keeps today's bucket
@@ -19,7 +19,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
 
 ### Non-goals
 
-- No marker on unreviewed PRs, or on approved PRs already in "waiting for author" for another reason
+- No `❌ CI` entry on unreviewed PRs, or on approved PRs already in "waiting for author" for another reason
 - No demotion for pending checks
 - No new workflow trigger for check completion. The README's `update` triggers stay as they are
 - No change to "waiting for review": a PR nobody approved stays there, whatever its checks say
@@ -46,8 +46,11 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - A null rollup, no required context and only pending required contexts read false
 - `OpenPRsResult` gains `CheckStatusErr error`: set when the phase failed in whole or in part. The PRs it covers keep `HasFailingRequiredCheck` false, so a failed phase leaves today's bucketing
 - `prview.PR.GetNextAction` reads the flag in its first check: a failing required check keeps an approved PR out of `NextActionReadyToMerge`, so it is `NextActionWaitingForAuthor`, as for a conflict
-- `prview.PR.IsHeldBackByFailingChecks()` is true when the failing check alone keeps an approved PR out of "ready to merge": approved, no waiting thread, no conflict, flag set. It is what the marker reads
-- Marker text: `❌ checks failing`, appended after the reviewer segment on an open row, in the message and on the canvas
+- `prview.PR.IsHeldBackByFailingChecks()` is true when the failing check alone keeps an approved PR out of "ready to merge": approved, no waiting thread, no conflict, flag set. It is what the `❌ CI` entry reads
+- `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
+  - `prview.GetReviewersTextSegments` gains a `hasFailingChecks bool` parameter and renders ` / ❌ CI` before the closing parenthesis, so both builders share it
+  - With no approvers or commenters it renders ` (❌ CI)`. A held-back PR is approved, so no held-back row reaches that case
+  - Only open rows pass `IsHeldBackByFailingChecks()`. Draft and merged rows pass false
 - Action inputs: none new. Permissions: none new
   - `statusCheckRollup` and `isRequired` populated under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
   - Step 1's checkpoint covers a private repository under the E2E App token
@@ -57,19 +60,19 @@ Message and canvas states for an approved PR whose required check fails:
 ```
 Posted at 09:00
 *💬 Waiting for author*
-  • Fix retry loop   2 days ago   by alice (✅ bob)   ❌ checks failing
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
 
 Edited by `update` after the check is fixed and a PR event fires
 *✅ Ready to merge*
-  • Fix retry loop   2 days ago   by alice (✅ bob)
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol)
 
 Marked stale by the next post
 ⚠️ Stale, updated Oct 31 at 09:00
 *💬 Waiting for author*
-  • Fix retry loop   2 days ago   by alice (✅ bob)   ❌ checks failing
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
 ```
 
-The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob) ❌ checks failing` under `## 💬 Waiting for author`.
+The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob / 💬 carol / ❌ CI)` under `## 💬 Waiting for author`.
 
 ## Breaking or non-breaking
 
@@ -84,7 +87,7 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 - **R1** Let `buildPullRequestsQuery` take a selection per PR
 - **1** Fetch required check status for approved PRs (checkpoint)
 - **2** Keep failing PRs out of "ready to merge" in `prview`
-- **3** Render the `❌ checks failing` marker in the message and on the canvas
+- **3** Render `❌ CI` in the reviewer list, in the message and on the canvas
 - **4** Warn when the check status fetch fails
 - **5** Check the message and canvas live
 - **6** Docs
@@ -138,14 +141,15 @@ Touches `internal/prview`.
 - `GetNextAction` and `IsHeldBackByFailingChecks()` as in § Target shape. Size: one condition, one method
 - Update `prview.spec.md`: the check list, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
 
-### 3. Render the `❌ checks failing` marker
+### 3. Render `❌ CI` in the reviewer list
 
-Touches `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
+Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
-- `messagebuilder.buildOpenPRBulletPoint` appends a plain text element ` ❌ checks failing` after the reviewer elements when `IsHeldBackByFailingChecks()`
-- `canvasbuilder.renderOpenPRRow` appends the same text after `renderReviewers`
-- Collapsed rows carry no marker, as they carry no reviewers
-- Update `messagebuilder.spec.md` and `canvasbuilder.spec.md`
+- `prview.GetReviewersTextSegments` takes `hasFailingChecks`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers` and its WIP and merged rows
+- `messagebuilder.buildOpenPRBulletPoint` and `canvasbuilder.renderOpenPRRow` pass `IsHeldBackByFailingChecks()`. The other callers pass false
+- `❌ CI` is part of the glue segments, so neither builder escapes or styles it as a name
+- Collapsed rows carry no reviewer list, so no `❌ CI`
+- Update `prview.spec.md`'s `GetReviewersTextSegments` line, `messagebuilder.spec.md` and `canvasbuilder.spec.md`
 - Add a failing-check PR to three fixture sets, then `make update-test-snapshots`:
   - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, which serves the post and marked-stale snapshots
   - The update-mode table of `TestSnapshotsUpdateMode`, for the edited message
@@ -165,14 +169,14 @@ Touches `cmd/pr-slack-reminder` (`run.go`), `run.spec.md`.
 Touches no files. The step 1 fixture PR is the setup.
 
 - `pr-reminder.yml` lists this repository only, so it cannot show the fixture PR. Read the branch's Build E2E runs instead:
-  - The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the fixture PR under "Waiting for author" with the marker, in the message and on the canvas
-- Done means both surfaces show the marker and neither shows the PR under "Ready to merge"
+  - The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the message and on the canvas
+- Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
 
 ### 6. Docs
 
 Touches `README.md`.
 
-- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check, and a failing required check puts an approved PR under waiting for the author, with a `❌ checks failing` marker
+- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check, and a failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
 - `README.md` § Required Permissions: one line saying check status needs nothing beyond `pull-requests: read`, once step 1 has shown it
@@ -191,8 +195,8 @@ Touches `README.md`.
 
 ### Caveats
 
-- Check completion fires none of the README's `update` triggers, so a PR whose check fails after the 09:00 post, or recovers later, shows the old bucket and marker until the next PR, review or comment event or the next post
-- Collapsed rows have no marker: a bot PR demoted by a failing check sits in "waiting for author" without saying why
+- Check completion fires none of the README's `update` triggers, so a PR whose check fails after the 09:00 post, or recovers later, shows the old bucket and reviewer list until the next PR, review or comment event or the next post
+- Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Pending required checks do not demote, so a PR can read as ready for the minutes its checks run
 - `isRequired` reads only contexts that have reported. A required check that never started is not seen, so such a PR stays ready
 - More than 100 contexts on a commit: only the first 100 are read
