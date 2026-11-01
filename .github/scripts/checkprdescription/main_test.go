@@ -10,16 +10,16 @@ const validDescription = `Closes #12
 
 ## Summary
 
-### The problem: reviews stall on failing checks
+### The problem: "ready to merge" lists unmergeable PRs
 
-- Approved PRs with failing checks sit in "waiting for review"
-- Reviewers open them for nothing
+- An approved PR with a failing required check shows as ready to merge
+- Its merge button is red, so the team stops trusting the section
 
-### The solution: demote them
+### The solution: demote them to "waiting for author"
 
-- Move approved PRs with a failing required check to their own section
-  - Sorted oldest first
-- Fetch check status in batches
+- Fetch required check status for approved, non-draft PRs
+- A failing required check moves the PR to "waiting for author"
+  - Its row gets a "❌ checks failing" marker
 
 ## Docs
 
@@ -72,7 +72,7 @@ func TestProblems(t *testing.T) {
 		},
 		{
 			name:         "heading summary of 7 words",
-			description:  strings.Replace(validDescription, "demote them", "one two three four five six seven", 1),
+			description:  strings.Replace(validDescription, `demote them to "waiting for author"`, "one two three four five six seven", 1),
 			wantProblems: []string{"### The solution: heading summary over 6 words"},
 		},
 		{
