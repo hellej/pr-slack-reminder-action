@@ -246,11 +246,11 @@ func TestGetReviewersTextSegments(t *testing.T) {
 	carol := testCollaborator("Carol")
 
 	tests := []struct {
-		name             string
-		approvers        []prview.Collaborator
-		commenters       []prview.Collaborator
-		hasFailingChecks bool
-		expected         []string
+		name          string
+		approvers     []prview.Collaborator
+		commenters    []prview.Collaborator
+		mergeBlockers []prview.MergeBlocker
+		expected      []string
 	}{
 		{
 			name:     "no reviewers",
@@ -273,28 +273,29 @@ func TestGetReviewersTextSegments(t *testing.T) {
 			expected:   []string{" (✅ ", "Alice", " / 💬 ", "Bob", ", ", "Carol", ")"},
 		},
 		{
-			name:             "approvers and commenters, failing checks",
-			approvers:        []prview.Collaborator{alice},
-			commenters:       []prview.Collaborator{bob},
-			hasFailingChecks: true,
-			expected:         []string{" (✅ ", "Alice", " / 💬 ", "Bob", " / ❌ CI", ")"},
+			name:          "approvers, commenters and a merge blocker",
+			approvers:     []prview.Collaborator{alice},
+			commenters:    []prview.Collaborator{bob},
+			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
+			expected:      []string{" (✅ ", "Alice", " / 💬 ", "Bob", " / ❌ CI", ")"},
 		},
 		{
-			name:             "approvers only, failing checks",
-			approvers:        []prview.Collaborator{alice, bob},
-			hasFailingChecks: true,
-			expected:         []string{" (✅ ", "Alice", ", ", "Bob", " / ❌ CI", ")"},
+			name:      "approvers and two merge blockers",
+			approvers: []prview.Collaborator{alice, bob},
+			// A second blocker, which only plan 020 adds, shows the join.
+			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks, prview.MergeBlocker("conflicts")},
+			expected:      []string{" (✅ ", "Alice", ", ", "Bob", " / ❌ CI, conflicts", ")"},
 		},
 		{
-			name:             "no reviewers, failing checks",
-			hasFailingChecks: true,
-			expected:         []string{" (❌ CI)"},
+			name:          "no reviewers, a merge blocker",
+			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
+			expected:      []string{" (❌ CI)"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters, tt.hasFailingChecks)
+			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters, tt.mergeBlockers)
 			if !slices.Equal(segments, tt.expected) {
 				t.Errorf("expected segments %q, got %q", tt.expected, segments)
 			}
@@ -695,67 +696,47 @@ func TestGetNextActionOfPRWithoutFetchedData(t *testing.T) {
 	}
 }
 
-func TestIsHeldBackByFailingChecks(t *testing.T) {
+// Approved and failing alone reaches the snapshots. A waiting thread or a conflict does not, and
+// neither drops CI: the row says every blocker, whatever else keeps the PR with its author.
+func TestMergeBlockers(t *testing.T) {
 	failing := githubclient.RequiredChecksFailing
 	tests := []struct {
 		name           string
 		approverLogins []string
 		prFlags        githubclient.PR
-		expected       bool
+		expected       []prview.MergeBlocker
 	}{
 		{
-			name:           "approved, failing and nothing else outstanding",
-			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: failing},
-			expected:       true,
-		},
-		{
-			name:           "approved by the reviewer who requested changes, failing",
-			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: failing, HasOutstandingChangesRequest: true},
-			expected:       true,
-		},
-		{
-			name:           "approved, failing and conflicting",
-			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: failing, Conflicting: true},
-			expected:       false,
+			// A failing status on an unapproved PR can only be one the state remembers.
+			name:     "unapproved with a remembered failing status",
+			prFlags:  githubclient.PR{RequiredChecks: failing},
+			expected: nil,
 		},
 		{
 			name:           "approved, failing and a thread waiting for the author",
 			approverLogins: []string{"bob"},
 			prFlags:        githubclient.PR{RequiredChecks: failing, HasThreadWaitingForAuthor: true},
-			expected:       false,
+			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 		},
 		{
-			name:     "failing but not approved",
-			prFlags:  githubclient.PR{RequiredChecks: failing},
-			expected: false,
-		},
-		{
-			name:           "approved and passing",
+			name:           "approved, failing and conflicting",
 			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksPassing},
-			expected:       false,
-		},
-		{
-			name:           "approved with unknown checks",
-			approverLogins: []string{"bob"},
-			expected:       false,
+			prFlags:        githubclient.PR{RequiredChecks: failing, Conflicting: true},
+			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := nextActionPR(tt.approverLogins, tt.prFlags).IsHeldBackByFailingChecks(); got != tt.expected {
-				t.Errorf("IsHeldBackByFailingChecks() = %v, expected %v", got, tt.expected)
+			if got := nextActionPR(tt.approverLogins, tt.prFlags).MergeBlockers(); !slices.Equal(got, tt.expected) {
+				t.Errorf("MergeBlockers() = %q, expected %q", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestIsHeldBackByFailingChecksOfPRWithoutFetchedData(t *testing.T) {
-	if (prview.PR{}).IsHeldBackByFailingChecks() {
-		t.Error("IsHeldBackByFailingChecks() = true, expected false")
+func TestMergeBlockersOfPRWithoutFetchedData(t *testing.T) {
+	if blockers := (prview.PR{}).MergeBlockers(); blockers != nil {
+		t.Errorf("MergeBlockers() = %q, expected nil", blockers)
 	}
 }

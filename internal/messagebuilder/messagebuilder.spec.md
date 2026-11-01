@@ -13,7 +13,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
   - A sub-heading: a `context` block of one mrkdwn element `*<url|name>*`, the repository name without its owner, linked to `models.Repository.GetPullsURL()`
   - A `rich_text` block holding only that repository's bullet list
 - Nothing sits between rendered sections: a `header` block carries its own vertical padding
-- An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist), then `❌ CI` when `IsHeldBackByFailingChecks()` is true
+- An open PR row shows: title (linked), age (warning marker when [internal/prview](../prview/prview.spec.md) flagged the PR old, otherwise a plain "N ago"), author, approvers/commenters (marked distinctly, both shown together if both exist), then a `❌` group naming the PR's `MergeBlockers()`, such as `❌ CI`
 - A merged PR row shows: title (linked), when it merged in italics, author, approvers/commenters. No age, no old-PR marker: the section heading says it landed. Never `❌ CI`
 - A collapsed row (`prview.CollapsedRow`), in any section, is one more bullet in the section's list: a bold link `🤖 <label>:`, the label from `GetAuthorLabel()`, linking to `GetSearchURL()`; then each PR number as a bold `#<n>` link to its PR. A plain `" "` run separates each element. No age, author, reviewers, old-PR marker or merge time
 - Every section renders its rows in the given order: sorting, grouping and collapsing are [internal/messagecontent](../messagecontent/messagecontent.spec.md)'s

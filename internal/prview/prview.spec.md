@@ -18,9 +18,9 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsOldestToNewest(prs)` orders PRs by ready-for-review time, oldest first, a tie going to the earlier `UpdatedAt`. It sorts the given slice in place and returns it
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
-- `GetReviewersTextSegments(approvers, commenters, hasFailingChecks)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
-  - `hasFailingChecks` adds a last ` / ❌ CI` glue segment, or renders ` (❌ CI)` alone without reviewers
-  - No reviewers and no failing checks yield no segments
+- `GetReviewersTextSegments(approvers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 💬 c)`, returning one text run per segment so a renderer can style or escape names separately from the glue. Both groups are parameters, so a caller passing no approvers gets the commenters-only rendering
+  - Merge blockers add a last glue segment, ` / ❌ ` and the blockers joined by `, `, such as ` / ❌ CI`. Without reviewers they render alone, as ` (❌ CI)`
+  - No reviewers and no merge blockers yield no segments
 - `IsMerged` reports whether a PR was merged
 - `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`
@@ -29,7 +29,8 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - The checks being ordered is what settles the overlaps: a reviewer who requested changes and then approved leaves the PR ready to merge, since the approval is read before the changes request
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
 - A failing required check (`RequiredChecks` is `RequiredChecksFailing`) only demotes too, the same way
-- `IsHeldBackByFailingChecks()` is true when the failing required check alone keeps a PR out of `NextActionReadyToMerge`: approved, no waiting thread, no conflict, failing. A conflict or a waiting thread already explains the demotion, so either makes it false
+- A `MergeBlocker` names one thing blocking a PR's merge, its value the text the row shows. The one value is `MergeBlockerFailingChecks` (`"CI"`)
+- `MergeBlockers()` returns `MergeBlockerFailingChecks` for a PR with an approver and `RequiredChecksFailing`, also when a waiting thread or a conflict keeps it in `NextActionWaitingForAuthor`. Nil for an unapproved PR, and for a PR without its fetched half
 - `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor`, `HasOutstandingChangesRequest` and `RequiredChecks` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
 - `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
 - `PRSection` is one section's rows: the flat `Rows`, or `Groups` of `RepositoryRows` (a `models.Repository` and its `Rows`). `HasRows` reports whether either holds anything
@@ -58,7 +59,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 
 - `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
 - Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
-- A failing required check on an unapproved PR moves nothing: it stays in `NextActionWaitingForReview` with no `❌ CI`, since nobody has signed off on it yet
+- A failing required check on an unapproved PR moves nothing: it stays in `NextActionWaitingForReview` with no `❌ CI`. Its check status is never fetched, so a failing one there is only what the state remembers
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value

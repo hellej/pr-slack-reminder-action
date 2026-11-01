@@ -58,26 +58,28 @@ func (pr PR) GetNextAction() PRNextAction {
 		return NextActionWaitingForReview
 	}
 
-	if pr.isApprovedWithoutConflictOrWaitingThread() && !pr.isFailingRequiredChecks() {
+	isApproved := len(pr.Approvers) > 0
+	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
 		return NextActionReadyToMerge
 	}
-	if len(pr.Approvers) > 0 || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
+	if isApproved || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
 		return NextActionWaitingForAuthor
 	}
 	return NextActionWaitingForReview
 }
 
-// True when the failing required check alone keeps an approved PR out of "ready to merge", the
-// one case a row names the check as the reason.
-func (pr PR) IsHeldBackByFailingChecks() bool {
-	if pr.PR == nil {
-		return false
-	}
-	return pr.isApprovedWithoutConflictOrWaitingThread() && pr.isFailingRequiredChecks()
-}
+// One thing blocking a PR's merge. The value is the text its row shows.
+type MergeBlocker string
 
-func (pr PR) isApprovedWithoutConflictOrWaitingThread() bool {
-	return len(pr.Approvers) > 0 && !pr.HasThreadWaitingForAuthor && !pr.Conflicting
+const MergeBlockerFailingChecks MergeBlocker = "CI"
+
+// An unapproved PR's check status is never fetched, so a failing one there is only remembered
+// and names no blocker.
+func (pr PR) MergeBlockers() []MergeBlocker {
+	if pr.PR == nil || len(pr.Approvers) == 0 || !pr.isFailingRequiredChecks() {
+		return nil
+	}
+	return []MergeBlocker{MergeBlockerFailingChecks}
 }
 
 func (pr PR) isFailingRequiredChecks() bool {

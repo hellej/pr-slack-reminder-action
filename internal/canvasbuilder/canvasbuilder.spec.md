@@ -10,7 +10,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - `## Open` is the one heading without an emoji: it stands for all three open buckets, so no single emoji fits it
 - Any section can render grouped: its rows then get one `###` sub-heading per repository, the repository name without its owner, linking to `models.Repository.GetPullsURL()`. The section heading above them already scopes the rows, so it is not repeated. Each section reads its own grouped slice, so all of them group together, off the one `Content.GroupedByRepository` flag. Nothing dedupes a repository across sections, so one repository can carry a `###` heading under each
 - The three open sections share one PR row renderer, one empty-state line and one heading level: only the heading text and the rows differ. A PR's bucket is `canvascontent`'s to decide
-- Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers, then `❌ CI` in the reviewer list when `IsHeldBackByFailingChecks()` is true
+- Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers, then a `❌` group in the reviewer list naming the PR's `MergeBlockers()`, such as `❌ CI`
 - WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prview.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
 - Merged PR row: linked title, the merge text in italics, the author, then the reviewers, named as an open row names them but never with `❌ CI`. An unknown merge time drops that segment only
 - Collapsed row (`prview.CollapsedRow`), in any section: `**[🤖 <label>:](<search URL>)** **[#101](url)** **[#102](url)**`, the label from `GetAuthorLabel()`, escaped, the URL from `GetSearchURL()`. No age, activity, author, reviewers, old-PR marker or merge time. One renderer serves every section
@@ -19,6 +19,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Footer: a blank line, a line holding a lone non-breaking space, another blank line, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC
 - No cap note for the merged section, though open and WIP get one: it is always the newest 6 by design. A capped open or WIP fetch adds an italic line above the `Updated` line naming the fetch limit, with the counts read from `githubclient.MaxPRsToFetch` and `MaxDraftPRsToFetch`. Both caps are named in one line. It never claims how many rows the canvas shows: `canvascontent` prunes inactive drafts after the fetch
 - Everything coming from GitHub (PR titles, author and reviewer names, collapsed row labels, repository names) is backslash-escaped for `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `>` and `&`, the backslash first so later replacements aren't double-escaped
+  - The reviewer list's glue segments, the `❌` group included, go through the same escaping. None of them holds one of those characters, so it leaves them unchanged
 - The rendered markdown is covered by golden files in `testdata/`, re-recorded with `make update-test-snapshots`
 
 ## Doesn't Do

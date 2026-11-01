@@ -257,7 +257,7 @@ func buildOpenPRBulletPoint(pr prview.PR) slack.RichTextElement {
 		getUserNameElement(pr),
 	)
 	return slack.NewRichTextSection(
-		append(elements, getReviewersElements(pr, pr.IsHeldBackByFailingChecks())...)...,
+		append(elements, getReviewersElements(pr, pr.MergeBlockers())...)...,
 	)
 }
 
@@ -278,7 +278,7 @@ func buildMergedPRBulletPoint(pr prview.PR) slack.RichTextElement {
 		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
 	)
-	return slack.NewRichTextSection(append(elements, getReviewersElements(pr, false)...)...)
+	return slack.NewRichTextSection(append(elements, getReviewersElements(pr, nil)...)...)
 }
 
 func buildAgeElements(pr prview.PR) []slack.RichTextSectionElement {
@@ -308,9 +308,9 @@ func getUserNameElement(pr prview.PR) slack.RichTextSectionElement {
 	)
 }
 
-func getReviewersElements(pr prview.PR, hasFailingChecks bool) []slack.RichTextSectionElement {
+func getReviewersElements(pr prview.PR, mergeBlockers []prview.MergeBlocker) []slack.RichTextSectionElement {
 	return utilities.Map(
-		prview.GetReviewersTextSegments(pr.Approvers, pr.Commenters, hasFailingChecks),
+		prview.GetReviewersTextSegments(pr.Approvers, pr.Commenters, mergeBlockers),
 		func(segment string) slack.RichTextSectionElement {
 			return slack.NewRichTextSectionTextElement(segment, &slack.RichTextSectionTextStyle{})
 		},

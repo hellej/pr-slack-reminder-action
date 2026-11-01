@@ -3,6 +3,7 @@ package prview
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -67,13 +68,13 @@ func (pr PR) GetPRAgeDisplayText() string {
 
 // GetReviewersTextSegments renders approvers and commenters as "(✅ a, b / 💬 c)", split into one
 // text run per segment so a renderer can style or escape the names separately from the glue.
-// Failing checks add a last " / ❌ CI" glue segment. No reviewers and no failing checks yield no
+// Merge blockers add a last " / ❌ CI" glue segment. No reviewers and no blockers yield no
 // segments. Approvers and commenters are given explicitly, so a caller wanting the
 // commenters-only rendering passes no approvers.
-func GetReviewersTextSegments(approvers, commenters []Collaborator, hasFailingChecks bool) []string {
+func GetReviewersTextSegments(approvers, commenters []Collaborator, mergeBlockers []MergeBlocker) []string {
 	if len(approvers) == 0 && len(commenters) == 0 {
-		if hasFailingChecks {
-			return []string{" (❌ CI)"}
+		if len(mergeBlockers) > 0 {
+			return []string{" (❌ " + mergeBlockersText(mergeBlockers) + ")"}
 		}
 		return nil
 	}
@@ -87,10 +88,14 @@ func GetReviewersTextSegments(approvers, commenters []Collaborator, hasFailingCh
 		}
 	}
 	segments = append(segments, nameSegments(commenters)...)
-	if hasFailingChecks {
-		segments = append(segments, " / ❌ CI")
+	if len(mergeBlockers) > 0 {
+		segments = append(segments, " / ❌ "+mergeBlockersText(mergeBlockers))
 	}
 	return append(segments, ")")
+}
+
+func mergeBlockersText(mergeBlockers []MergeBlocker) string {
+	return strings.Join(utilities.Map(mergeBlockers, func(blocker MergeBlocker) string { return string(blocker) }), ", ")
 }
 
 func nameSegments(collaborators []Collaborator) []string {
