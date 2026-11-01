@@ -150,11 +150,11 @@ func TestClassifyRequiredChecks(t *testing.T) {
 }
 
 type checkStatusFixture struct {
-	rollup        any // rendered as the PR's statusCheckRollup; nil renders null
-	errorType     string
-	errorPath     []any // path suffix after the alias
-	requestStatus int   // non-zero: the whole request carrying this PR fails with this status
-	rawAlias      string
+	rollup                any // rendered as the PR's statusCheckRollup; nil renders null
+	errorType             string
+	errorPathAfterAlias   []any
+	failRequestWithStatus int
+	rawAlias              string
 }
 
 // Answers check status requests from fixtures by PR number. A request carrying a number in
@@ -202,14 +202,14 @@ func (t *fakeCheckStatusTransport) Post(ctx context.Context, body []byte) (int, 
 	responseErrors := []map[string]any{}
 	for index, number := range numbers {
 		fixture := t.fixtureByNumber[number]
-		if fixture.requestStatus != 0 {
-			return fixture.requestStatus, json.RawMessage(`{"message":"forbidden"}`), nil
+		if fixture.failRequestWithStatus != 0 {
+			return fixture.failRequestWithStatus, json.RawMessage(`{"message":"forbidden"}`), nil
 		}
 		alias := fmt.Sprintf("p%d", index)
 		aliasTexts = append(aliasTexts, fmt.Sprintf("%q:%s", alias, fixture.aliasJSON(number)))
 		if fixture.errorType != "" {
 			responseErrors = append(responseErrors, map[string]any{
-				"type": fixture.errorType, "path": append([]any{alias}, fixture.errorPath...), "message": "failed",
+				"type": fixture.errorType, "path": append([]any{alias}, fixture.errorPathAfterAlias...), "message": "failed",
 			})
 		}
 	}
@@ -226,7 +226,7 @@ func (f checkStatusFixture) aliasJSON(number int) string {
 	if f.rawAlias != "" {
 		return f.rawAlias
 	}
-	if len(f.errorPath) == 1 {
+	if len(f.errorPathAfterAlias) == 1 {
 		return `{"pullRequest":null}`
 	}
 	rollupJSON, _ := json.Marshal(f.rollup)
@@ -362,7 +362,7 @@ func TestFetchRequiredCheckStatusBatchesFailIndependently(t *testing.T) {
 	prs := approvedPRs(1, 26)
 	transport := &fakeCheckStatusTransport{
 		fixtureByNumber: map[int]checkStatusFixture{
-			1:  {requestStatus: 403},
+			1:  {failRequestWithStatus: 403},
 			26: {rollup: failingRollup},
 		},
 		waitForCancelNumbers: []int{26},
@@ -389,10 +389,10 @@ func TestFetchRequiredCheckStatusPerPRErrorLeavesOnlyThatPRUnknown(t *testing.T)
 		name    string
 		fixture checkStatusFixture
 	}{
-		{"pull request error", checkStatusFixture{errorType: "NOT_FOUND", errorPath: []any{"pullRequest"}}},
+		{"pull request error", checkStatusFixture{errorType: "NOT_FOUND", errorPathAfterAlias: []any{"pullRequest"}}},
 		{
 			"field error under the pull request",
-			checkStatusFixture{errorType: "FORBIDDEN", errorPath: []any{"pullRequest", "statusCheckRollup"}},
+			checkStatusFixture{errorType: "FORBIDDEN", errorPathAfterAlias: []any{"pullRequest", "statusCheckRollup"}},
 		},
 		{"pull request missing without an error", checkStatusFixture{rawAlias: `{"pullRequest":null}`}},
 	}
@@ -426,7 +426,7 @@ func TestFetchRequiredCheckStatusFailedBatchLeavesEveryPRUnknown(t *testing.T) {
 		ctx     context.Context
 		fixture checkStatusFixture
 	}{
-		{"repository error", context.Background(), checkStatusFixture{errorType: "FORBIDDEN", errorPath: []any{}}},
+		{"repository error", context.Background(), checkStatusFixture{errorType: "FORBIDDEN", errorPathAfterAlias: []any{}}},
 		{
 			"decode error",
 			context.Background(),
@@ -462,7 +462,7 @@ func TestFetchRequiredCheckStatusLogs(t *testing.T) {
 		1:  {rollup: failingRollup},
 		2:  {rollup: truncatedRollup},
 		3:  {rollup: passingRollup},
-		26: {requestStatus: 403},
+		26: {failRequestWithStatus: 403},
 	}}
 
 	_, _ = newCheckStatusTestClient(transport).fetchRequiredCheckStatus(context.Background(), approvedPRs(1, 26))

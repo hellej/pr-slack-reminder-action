@@ -18,12 +18,11 @@ import (
 var generatedAt = time.Date(2026, 9, 19, 12, 12, 0, 0, time.UTC)
 
 type testPROptions struct {
-	title       string
-	slackUserID string
-	mergedAt    *time.Time
-	isOldPR     bool
-	approvers   []string
-	// Sets RequiredChecks failing
+	title                 string
+	slackUserID           string
+	mergedAt              *time.Time
+	isOldPR               bool
+	approvers             []string
 	failingRequiredChecks bool
 }
 

@@ -73,8 +73,7 @@ type MergeBlocker string
 
 const MergeBlockerFailingChecks MergeBlocker = "CI"
 
-// An unapproved PR's check status is never fetched, so a failing one there is only remembered
-// and names no blocker.
+// None on an unapproved PR. See prview.spec.md § Oddities
 func (pr PR) MergeBlockers() []MergeBlocker {
 	if pr.PR == nil || len(pr.Approvers) == 0 || !pr.isFailingRequiredChecks() {
 		return nil

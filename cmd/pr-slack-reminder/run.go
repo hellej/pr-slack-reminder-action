@@ -265,7 +265,6 @@ func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*st
 	)
 }
 
-// A nil loadedState, one that did not load, remembers nothing.
 func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR {
 	seenFailingRefs := state.FailingRequiredCheckPRRefs(prs)
 	prsWithRememberedFailingChecks := state.PRsWithRememberedFailingChecks(prs, loadedState)

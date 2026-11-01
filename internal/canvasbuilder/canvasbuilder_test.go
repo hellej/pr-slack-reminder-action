@@ -41,17 +41,16 @@ const (
 )
 
 type prOptions struct {
-	number      int
-	title       string
-	repository  string
-	authorName  string
-	approvers   []string
-	commenters  []string
-	isOldPR     bool
-	age         time.Duration
-	activityAge *time.Duration
-	mergeAge    *time.Duration
-	// Sets RequiredChecks failing
+	number                int
+	title                 string
+	repository            string
+	authorName            string
+	approvers             []string
+	commenters            []string
+	isOldPR               bool
+	age                   time.Duration
+	activityAge           *time.Duration
+	mergeAge              *time.Duration
 	failingRequiredChecks bool
 }
 

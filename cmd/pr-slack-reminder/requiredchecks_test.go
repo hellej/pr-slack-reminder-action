@@ -85,8 +85,8 @@ func runWithRequiredChecks(t *testing.T, options requiredChecksRunOptions) requi
 	var loadedState *state.State
 	if !options.noLoadedState {
 		testState := getTestState(GetTestStateOptions{
-			PRNumbers:                     []int{1},
-			FailingRequiredCheckPRNumbers: options.rememberedFailingPRNumbers,
+			PRNumbers:                               []int{1},
+			RememberedFailingRequiredCheckPRNumbers: options.rememberedFailingPRNumbers,
 		})
 		loadedState = &testState
 	}
@@ -363,7 +363,7 @@ func TestUpdateModeSavesThisRunsFailingSetWhenItSavesTheLoadedStateBack(t *testi
 				config.EnvStateFilePath: stateFilePath,
 			})
 			loadedState := getTestState(GetTestStateOptions{
-				PRNumbers: []int{9}, FailingRequiredCheckPRNumbers: []int{9},
+				PRNumbers: []int{9}, RememberedFailingRequiredCheckPRNumbers: []int{9},
 			})
 			loadedState.LastWrittenMessage = seededLastWrittenMessage
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})

@@ -212,9 +212,8 @@ func filterPRsByNumbers(
 type GetTestStateOptions struct {
 	PRNumbers []int
 	// Defaults to an hour ago.
-	PostedHoursAgo float32
-	// The PRs the run before saw failing a required check
-	FailingRequiredCheckPRNumbers []int
+	PostedHoursAgo                          float32
+	RememberedFailingRequiredCheckPRNumbers []int
 }
 
 func getTestState(options GetTestStateOptions) state.State {
@@ -232,7 +231,7 @@ func getTestState(options GetTestStateOptions) state.State {
 			MessageTS: "1623850245.000200",
 		},
 		TrackedPRs:              prRefs,
-		FailingRequiredCheckPRs: utilities.Map(options.FailingRequiredCheckPRNumbers, stateRef),
+		FailingRequiredCheckPRs: utilities.Map(options.RememberedFailingRequiredCheckPRNumbers, stateRef),
 	}
 }
 
