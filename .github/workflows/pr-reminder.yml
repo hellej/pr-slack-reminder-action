@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   reminder:
-    if: false # TEMPORARY PROBE
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -62,32 +62,3 @@ jobs:
           name: pr-slack-reminder-state
           path: pr-slack-reminder-state.json
           retention-days: 4
-
-  probe-pull-requests-read-only:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    steps:
-      - name: Probe stale approval fields
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-          gh api graphql -f owner=hellej -f name=pr-slack-reminder-action -F number=52 -f query='
-          query($owner: String!, $name: String!, $number: Int!) {
-            rateLimit { cost remaining }
-            repository(owner: $owner, name: $name) {
-              pullRequest(number: $number) {
-                headRefOid
-                reviewDecision
-                reviews(last: 100) { nodes { state commit { oid } author { login __typename } } }
-                reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100) {
-                  nodes { ... on ReviewDismissedEvent {
-                    previousReviewState
-                    pullRequestCommit { id }
-                    review { author { login __typename ... on User { name } } }
-                  } }
-                }
-              }
-            }
-          }'
