@@ -8,7 +8,7 @@ Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-
 ## Requirements
 
 - An approved PR with a failing required check leaves "ready to merge" for "waiting for author", in the message and on the canvas
-- Its row says why: a last `❌ CI` entry in the reviewer list, as in `(✅ Dana Davis / 💬 Erin Evans / ❌ CI)`
+- Its row says why: a last `CI failing` entry in the reviewer list, as in `(✅ Dana Davis / 💬 Erin Evans / CI failing)`
 - The CI status changes only on evidence:
   - Red to green only when every required check has completed and passed
   - Green to red only when a required check has failed
@@ -24,7 +24,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
 
 ### Non-goals
 
-- No `❌ CI` entry on an unapproved PR: its check status is not fetched, only remembered from the state
+- No `CI failing` entry on an unapproved PR: its check status is not fetched, only remembered from the state
 - No new workflow trigger in this repository's own workflows. The README gains an optional one
 - No change to "waiting for review": a PR nobody approved stays there, whatever its checks say
 - No change to merged, draft or collapsed rows
@@ -63,13 +63,13 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Where it sets the canvas hash on the state to save, sets `PRsWithFailingRequiredChecks` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
-- `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
-- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecksStatus` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `❌ CI` entry reads
-  - An unapproved PR gets no `CI`: on it, a failing status can only be one the state remembers
+- `prview.MergeBlocker`, a string type naming one thing that blocks a PR's merge. Its value is the text the row shows. This plan adds one, `MergeBlockerFailingChecks` (`"CI failing"`). [Plan 020](020_show-merge-blockers-on-PR-rows.md) adds conflicts
+- `prview.PR.MergeBlockers() []MergeBlocker` returns `MergeBlockerFailingChecks` when the PR has an approver and `RequiredChecksStatus` is `RequiredChecksFailing`, also when a thread or a conflict keeps that PR in "waiting for author". It is what the `CI failing` entry reads
+  - An unapproved PR gets no `CI failing`: on it, a failing status can only be one the state remembers
   - `MergeBlockers()` returns nil on a PR whose embedded `githubclient.PR` is nil
-- `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
-  - `prview.GetReviewersTextSegments` gains a `mergeBlockers []MergeBlocker` parameter and renders ` / ❌ ` and the blockers joined by `, ` before the closing parenthesis, so both builders share it
-  - With no approvers or commenters it renders ` (❌ CI)`. A PR with `CI` is approved, so no row reaches that case before plan 020
+- `CI failing` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
+  - `prview.GetReviewersTextSegments` gains a `mergeBlockers []MergeBlocker` parameter and renders ` / ` and the blockers joined by `, ` before the closing parenthesis, so both builders share it
+  - With no approvers or commenters it renders ` (CI failing)`. A PR with `CI failing` is approved, so no row reaches that case before plan 020
   - Only open rows pass `MergeBlockers()`. Draft and merged rows pass nil
 - Action inputs: none new. Permissions: `checks: read` in a private repository, none new in a public one. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field
   - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
@@ -80,11 +80,11 @@ Message states for an approved PR whose required check fails, then gets a fix:
 ```
 Posted at 09:00, required check failed
 *💬 Waiting for author*
-  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / CI failing)
 
 Edited by an `update` after the fix's push, checks still running: no change
 *💬 Waiting for author*
-  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / CI failing)
 
 Edited by `update` once every required check passed
 *✅ Ready to merge*
@@ -93,10 +93,10 @@ Edited by `update` once every required check passed
 Marked stale by the next post, after the message was posted while the PR was red
 ⚠️ Stale, updated Oct 31 at 09:00
 *💬 Waiting for author*
-  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
+  • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / CI failing)
 ```
 
-The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob / 💬 carol / ❌ CI)` under `## 💬 Waiting for author`, and follows the same states.
+The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob / 💬 carol / CI failing)` under `## 💬 Waiting for author`, and follows the same states.
 
 ## Breaking or non-breaking
 
@@ -114,7 +114,7 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 - **R1** Let `buildPullRequestsQuery` take a selection per PR
 - **1** Fetch required check status for approved PRs (checkpoint)
 - **2** Keep failing PRs out of "ready to merge" in `prview`
-- **3** Render `❌ CI` in the reviewer list, in the message and on the canvas
+- **3** Render `CI failing` in the reviewer list, in the message and on the canvas
 - **4** Keep a failing status until the required checks pass, through the state
 - **5** Warn when the check status fetch fails
 - **6** Check the message and canvas live
@@ -176,17 +176,17 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 Touches `internal/prview`.
 
 - `GetNextAction`, `MergeBlocker` and `MergeBlockers()` as in § Target shape. Size: one condition, one type, one method
-- A package test on `MergeBlockers()` for what the snapshots do not reach: an unapproved PR with a remembered failing status, and a nil embedded PR. Also an approved failing PR with a waiting thread, and an approved failing PR with a conflict. The mock has no waiting thread or conflict row, so no snapshot shows `❌ CI` on either
+- A package test on `MergeBlockers()` for what the snapshots do not reach: an unapproved PR with a remembered failing status, and a nil embedded PR. Also an approved failing PR with a waiting thread, and an approved failing PR with a conflict. The mock has no waiting thread or conflict row, so no snapshot shows `CI failing` on either
 - Update `prview.spec.md`: a `MergeBlocker` and `MergeBlockers()` line, the list of conditions, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
 
-### 3. Render `❌ CI` in the reviewer list
+### 3. Render `CI failing` in the reviewer list
 
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
 - `prview.GetReviewersTextSegments` takes `mergeBlockers`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers`, the canvas's WIP row and the canvas's merged row
 - `messagebuilder.buildOpenPRBulletPoint` and `canvasbuilder.renderOpenPRRow` pass `MergeBlockers()`. The other callers pass nil
-- `❌ CI` is part of the glue segments, so neither builder styles it as a name
-- Collapsed rows carry no reviewer list, so no `❌ CI`
+- `CI failing` is part of the glue segments, so neither builder styles it as a name
+- Collapsed rows carry no reviewer list, so no `CI failing`
 - Update `prview.spec.md`'s `GetReviewersTextSegments` line, `messagebuilder.spec.md` and `canvasbuilder.spec.md`
 - Add a failing-check PR to three fixture sets, then `make update-test-snapshots`:
   - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, which serves the post and marked-stale snapshots
@@ -225,17 +225,17 @@ Touches `cmd/pr-slack-reminder` (`run.go`), `run.spec.md`.
 
 Touches no files. The step 1 fixture PR is the setup.
 
-- After step 5, the branch's Build E2E grouped canvas runs show PR 14 under "Waiting for author" with `❌ CI` in its reviewer list, in the dev channel's message and on its canvas
+- After step 5, the branch's Build E2E grouped canvas runs show PR 14 under "Waiting for author" with `CI failing` in its reviewer list, in the dev channel's message and on its canvas
 - Then the owner posts a pending status on PR 14's head commit: `gh api repos/hellej/pr-slack-reminder-test-repo-3/statuses/<head sha> -f state=pending -f context=fixture-check`
-- The next Build E2E post and update pair, within the state artifact's 1-day retention, still shows `❌ CI`, and its job log has the line naming PR 14 as made failing from the state
+- The next Build E2E post and update pair, within the state artifact's 1-day retention, still shows `CI failing`, and its job log has the line naming PR 14 as made failing from the state
 - Last, the owner posts `-f state=failure` again, so the fixture stays red for plan 020
-- Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
+- Done means both surfaces show `CI failing` and neither shows the PR under "Ready to merge"
 
 ### 7. Docs
 
 Touches `README.md`.
 
-- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check. A failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list, until every required check passes
+- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check. A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
 - `README.md` § Required Permissions: `checks: read` in the permissions block, and a line no wider than step 1 and the facts entries show: an App token in a private repository needs `checks: read`, `GITHUB_TOKEN` there is untested, and `GITHUB_TOKEN` in a public repository needs only `pull-requests: read`. The update-mode example's `permissions:` block gains `checks: read` too
@@ -265,7 +265,7 @@ Touches `README.md`.
 
 - Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
 - The fixture PR stays open in `hellej/pr-slack-reminder-test-repo-3`, so it shows in every Build E2E grouped canvas run's message and canvas
-- Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
+- Collapsed rows have no reviewer list, so no `CI failing`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - A context carries `isRequired` only once it has reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
 - More than 100 contexts on a commit: a failure among the first 100 still reads failing, but the PR never reads passing, so a red PR stays red

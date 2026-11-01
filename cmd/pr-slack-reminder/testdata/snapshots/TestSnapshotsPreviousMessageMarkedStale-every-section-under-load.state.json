@@ -307,7 +307,7 @@
                   },
                   {
                     "type": "text",
-                    "text": " / ❌ CI",
+                    "text": " / CI failing",
                     "style": {}
                   },
                   {

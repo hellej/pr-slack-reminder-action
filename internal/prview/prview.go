@@ -71,7 +71,7 @@ func (pr PR) GetNextAction() PRNextAction {
 // One thing blocking a PR's merge. The value is the text its row shows.
 type MergeBlocker string
 
-const MergeBlockerFailingChecks MergeBlocker = "CI"
+const MergeBlockerFailingChecks MergeBlocker = "CI failing"
 
 // None on an unapproved PR. See prview.spec.md § Oddities
 func (pr PR) MergeBlockers() []MergeBlocker {

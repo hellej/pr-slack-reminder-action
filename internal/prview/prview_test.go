@@ -277,19 +277,19 @@ func TestGetReviewersTextSegments(t *testing.T) {
 			approvers:     []prview.Collaborator{alice},
 			commenters:    []prview.Collaborator{bob},
 			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
-			expected:      []string{" (✅ ", "Alice", " / 💬 ", "Bob", " / ❌ CI", ")"},
+			expected:      []string{" (✅ ", "Alice", " / 💬 ", "Bob", " / CI failing", ")"},
 		},
 		{
 			name:      "approvers and two merge blockers",
 			approvers: []prview.Collaborator{alice, bob},
 			// A second blocker, which only plan 020 adds, shows the join.
 			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks, prview.MergeBlocker("conflicts")},
-			expected:      []string{" (✅ ", "Alice", ", ", "Bob", " / ❌ CI, conflicts", ")"},
+			expected:      []string{" (✅ ", "Alice", ", ", "Bob", " / CI failing, conflicts", ")"},
 		},
 		{
 			name:          "no reviewers, a merge blocker",
 			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
-			expected:      []string{" (❌ CI)"},
+			expected:      []string{" (CI failing)"},
 		},
 	}
 

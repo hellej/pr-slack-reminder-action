@@ -24,7 +24,7 @@ const (
 	readyToMergeHeading     = "✅ Ready to merge"
 	waitingForAuthorHeading = "💬 Waiting for author"
 	waitingForReviewHeading = "👀 Waiting for review"
-	failingChecksEntry      = "❌ CI"
+	failingChecksEntry      = "CI failing"
 )
 
 type requiredChecksRunOptions struct {
@@ -251,7 +251,7 @@ func TestBothTracksReadTheRememberedFailingStatus(t *testing.T) {
 			assertFixRetryLoopRow(t, run, waitingForAuthorHeading, true)
 			canvasMarkdown := run.mockSlackAPI.ReplacedCanvas.Markdown
 			if !strings.Contains(canvasMarkdown, "## 💬 Waiting for author") ||
-				!strings.Contains(canvasMarkdown, "(✅ Bob Brown / ❌ CI)") {
+				!strings.Contains(canvasMarkdown, "(✅ Bob Brown / CI failing)") {
 				t.Errorf("Expected the canvas row under waiting for author with %q, got:\n%s", failingChecksEntry, canvasMarkdown)
 			}
 			if !strings.Contains(run.logOutput.String(), "test-org/test-repo/1") ||
