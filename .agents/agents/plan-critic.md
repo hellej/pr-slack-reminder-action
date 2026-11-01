@@ -75,6 +75,10 @@ Not a checklist, and not all of it applies to any one plan.
   An external API the repo has never called, planned after the code built on it
 - **A step nobody can verify.** Tooling, CI, docs and live-API steps must say inline what
   done means
+- **An unclear new name.** A type, field, func or test field the plan adds that breaks
+  AGENTS.md § Code Style's naming rules, such as `RequiredChecks` for a status
+  (`RequiredChecksStatus`) or `failingRequiredCheckNumbers` for PR numbers
+  (`prNumbersWithFailingRequiredChecks`). A **nit** naming the clearer one
 - **A missing structural call.** Breaking vs non-breaking, `action.yml` input changes, new
   token permissions or Slack scopes
 - **The plan doesn't read in order.** Top to bottom is the implementation order, and the
