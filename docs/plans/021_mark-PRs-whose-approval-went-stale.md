@@ -36,7 +36,7 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
     previousReviewState dismissalMessage review { author { login __typename ... on User { name } } } } } }
   ```
   - Cost: 27 points instead of 26 over 25 PRs. See docs/third-party-facts.md § Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query
-  - Populates under `pull-requests: read` on `GITHUB_TOKEN` in a public repository. Step 1 checks a private one first
+  - Populates under `pull-requests: read` on `GITHUB_TOKEN`, in a public and a private repository
 - `prview.PR` gains `StaleApprovers []Collaborator`, with Slack IDs attached as for `Approvers`
 - `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters)` renders the groups `✅`, `♻️`, `💬`, in that order, separated by ` / `
   - Open and merged rows pass `StaleApprovers`. Draft rows pass none, as they pass no approvers
@@ -88,20 +88,17 @@ Non-breaking, **minor**. Row text changes, with no input or permission change.
 
 Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.github/actions/e2e-tests/action.yml`, `docs/third-party-facts.md`.
 
-- First, before any code, check the event on a private repository. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) sets it up:
-  - `hellej` approves an open Dependabot PR in private `hellej/pr-slack-reminder-test-repo-1`, then dismisses that approval with a message. The dismissal stays, so every E2E run reads a private-repo `ReviewDismissedEvent`
-  - A temporary workflow on a throwaway branch of that repository, with `permissions: pull-requests: read` only, runs `gh api graphql` with the § Target shape connection on that PR
-  - Record the result in docs/third-party-facts.md
-  - If the node comes back `FORBIDDEN` or null, stop and raise it with the user: a field error under `timelineItems` costs that PR all its reviewer info
+- The connection populates on a private repository under `pull-requests: read` alone. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
+  - Its fixture stays: PR 7 of private `hellej/pr-slack-reminder-test-repo-1` carries a manually dismissed approval by `hellej`, so every E2E run reads a private-repo `ReviewDismissedEvent`
 - `pullRequestNode` gains `ReviewDismissals`. The existing `timelineItems` field keeps its name
 - `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
 - Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
 - `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR
-- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. Issue #7 there sets up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
-  - **push-dismissed**: approved, then a push
-  - **manually dismissed**: approved, then dismissed with a message
-  - **current approval**: approved
-  - **re-approved**: approved, a push, then approved again
+- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) set up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
+  - PR 10, **push-dismissed**: approved, then a push
+  - PR 11, **manually dismissed**: approved, then dismissed with a message
+  - PR 12, **current approval**: approved
+  - PR 13, **re-approved**: approved, a push, then approved again
   - Not Dependabot: 2 or more Dependabot PRs in a section collapse into one row without a reviewer list
   - The repository owner installs the E2E GitHub App on it
 - Update `githubclient.spec.md`: `StaleApprovedByUsers`, the new connection, the `CommentedByUsers` line, the `FirstReviewAt` line, which still counts a dismissed review, and the PR-scoped field lists of the `FindOpenPRs` and `GetPRs` lines under § Doesn't Do, which gain `reviewDismissals`

@@ -1076,7 +1076,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - `pullRequest.baseRef`, so `Ref.rules` is out of reach too
   - `timelineItems(itemTypes: [PULL_REQUEST_COMMIT])`'s node itself, even selecting only `url`
 - Populated in the same query, no error: `headRefOid`, `reviewDecision` (null, no rules on a free private repository), the review's `state` and `author`, and an empty `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])`
-- Untested: a `ReviewDismissedEvent` node on a private repository. Neither test repository has one
+- A `ReviewDismissedEvent` node populates on a private repository under `pull-requests: read` alone: PR 7 of `hellej/pr-slack-reminder-test-repo-1`, with a manual dismissal, returned `previousReviewState`, `dismissalMessage` and `review { author { login __typename ... on User { name } } }`, no error. Source: the probe reported in [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7), branch `probe-review-dismissed-event` (since deleted), job log `Metadata: read`, `PullRequests: read`
 - REST under the same token: `GET /repos/{o}/{r}/pulls/2/reviews` returns each review's `commit_id`, and `GET /repos/{o}/{r}/pulls/2` returns `head.sha`
 - So a public repository is no test of a GraphQL field's permission: § A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository does not carry over
 - `Ref.rules` read from another repository's workflow token on public `hellej/pr-slack-reminder-action` returned its ruleset, `requireLastPushApproval: true` and `dismissStaleReviewsOnPush: true`
