@@ -1,0 +1,113 @@
+package main
+
+import (
+	"slices"
+	"strings"
+	"testing"
+)
+
+const validDescription = `Closes #12
+
+## Summary
+
+### The problem: reviews stall on failing checks
+
+- Approved PRs with failing checks sit in "waiting for review"
+- Reviewers open them for nothing
+
+### The solution: demote them
+
+- Move approved PRs with a failing required check to their own section
+  - Sorted oldest first
+- Fetch check status in batches
+
+## Docs
+
+- [019_x.md](https://github.com/o/r/blob/b/docs/plans/019_x.md)
+`
+
+func TestProblems(t *testing.T) {
+	tests := []struct {
+		name         string
+		description  string
+		wantProblems []string
+	}{
+		{
+			name:         "valid description",
+			description:  validDescription,
+			wantProblems: nil,
+		},
+		{
+			name:        "solution heading without a summary",
+			description: strings.Replace(validDescription, "### The solution: demote them", "### The solution", 1),
+		},
+		{
+			name:         "missing problem section",
+			description:  "### The solution\n\n- one\n- two\n",
+			wantProblems: []string{"missing heading: ### The problem"},
+		},
+		{
+			name:         "too few problem bullets",
+			description:  "### The problem\n\n- one\n\n### The solution\n\n- one\n- two\n",
+			wantProblems: []string{"### The problem: 1 bullets, want 2 to 3"},
+		},
+		{
+			name:         "too many solution bullets, sub bullets not counted",
+			description:  "### The problem\n\n- one\n- two\n\n### The solution\n\n- 1\n  - 1a\n- 2\n- 3\n- 4\n- 5\n- 6\n",
+			wantProblems: []string{"### The solution: 6 bullets, want 2 to 5"},
+		},
+		{
+			name:         "prose line",
+			description:  "### The problem\n\nThis PR does things.\n\n- one\n- two\n\n### The solution\n\n- one\n- two\n",
+			wantProblems: []string{"### The problem: not a bullet: This PR does things."},
+		},
+		{
+			name:        "template placeholders left in",
+			description: "### The problem: <a few words summarizing it>\n\n- one\n- two\n<!-- a comment -->\n\n### The solution\n\n- one\n- two\n-\n",
+			wantProblems: []string{
+				"### The problem: template placeholder left in: <a few words summarizing it>",
+				"### The problem: not a bullet: <!-- a comment -->",
+				"### The solution: empty bullet",
+			},
+		},
+		{
+			name:         "heading summary of 7 words",
+			description:  strings.Replace(validDescription, "demote them", "one two three four five six seven", 1),
+			wantProblems: []string{"### The solution: heading summary over 6 words"},
+		},
+		{
+			name:         "long bullet, 16 words",
+			description:  "### The problem\n\n- " + strings.Repeat("word ", 16) + "\n- two\n\n### The solution\n\n- one\n- two\n",
+			wantProblems: []string{"### The problem: bullet over 15 words: " + strings.TrimSpace(strings.Repeat("word ", 16))},
+		},
+		{
+			name:         "bullet of exactly 15 words",
+			description:  "### The problem\n\n- " + strings.Repeat("word ", 15) + "\n- two\n\n### The solution\n\n- one\n- two\n",
+			wantProblems: nil,
+		},
+		{
+			name: "summary of 81 words",
+			description: "### The problem\n\n" + strings.Repeat("- "+strings.Repeat("w ", 15)+"\n", 3) +
+				"\n### The solution\n\n" + strings.Repeat("- "+strings.Repeat("w ", 15)+"\n", 2) + "- w w w w w w\n",
+			wantProblems: []string{"summary is 81 words, want at most 80"},
+		},
+		{
+			name:         "link over 150 characters",
+			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 132) + ")\n",
+			wantProblems: []string{"link over 150 characters: https://github.com/" + strings.Repeat("a", 132)},
+		},
+		{
+			name:         "link of exactly 150 characters",
+			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 131) + ")\n",
+			wantProblems: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := problems(tt.description)
+			if !slices.Equal(got, tt.wantProblems) {
+				t.Errorf("problems() =\n%q\nwant\n%q", got, tt.wantProblems)
+			}
+		})
+	}
+}
