@@ -116,6 +116,12 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - Docs read on GitHub, such as `README.md`: `[tips](#-tips)`
 - `make check-style` checks these. What it skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
 
+## README
+
+- Keep it short. Let the example screenshots show the behaviour
+- Explain only what a user can't see in them or guess: setup, inputs, and "hidden features" such as `/snooze`
+- Edge cases and section rules go in the package specs, not the README
+
 ## Releasing
 
 - Release procedure: [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)
