@@ -24,6 +24,10 @@ const testReviewsSelection = "reviews(last: 100){ nodes { state submittedAt crea
 const testReadyForReviewEventSelection = "timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1)" +
 	"{ nodes { ... on ReadyForReviewEvent { createdAt } } }"
 
+const testReviewDismissalsSelection = "reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100)" +
+	"{ nodes { ... on ReviewDismissedEvent { previousReviewState dismissalMessage " +
+	"review { author { login __typename ... on User { name } } } } } }"
+
 type enrichFixture struct {
 	reviews         []map[string]any
 	comments        []map[string]any

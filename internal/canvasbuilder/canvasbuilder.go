@@ -147,14 +147,15 @@ func renderOpenPRRow(pr prview.PR) string {
 	if pr.IsOldPR {
 		ageText = "🚨 `" + pr.GetPRAgeDisplayText() + "`"
 	}
+	staleApprovers, commenters := pr.ReviewerGroupsForOpenRow()
 	return renderTitleLink(pr) + " " + ageText + renderAuthor(pr) +
-		renderReviewers(pr.Approvers, pr.Commenters, pr.MergeBlockers())
+		renderReviewers(pr.Approvers, staleApprovers, commenters, pr.MergeBlockers())
 }
 
-// A WIP PR shows its last activity instead of its age, and never its approvers or the old-PR
-// marker. The activity segment is a code span if the PR is active, italics if it's inactive.
+// A WIP PR shows its last activity instead of its age, and never its approvers, stale approvers
+// or the old-PR marker. The activity segment is a code span if the PR is active, italics if it's inactive.
 func renderWIPPRRow(pr prview.PR) string {
-	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, pr.Commenters, nil)
+	row := renderTitleLink(pr) + renderAuthor(pr) + renderReviewers(nil, nil, pr.Commenters, nil)
 
 	activityText := pr.GetActivityText()
 	if activityText == "" {
@@ -181,7 +182,7 @@ func renderMergedPRRow(pr prview.PR) string {
 	if mergedText != "" {
 		row += " _" + mergedText + "_"
 	}
-	return row + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.Commenters, nil)
+	return row + renderAuthor(pr) + renderReviewers(pr.Approvers, pr.StaleApprovers, pr.Commenters, nil)
 }
 
 func renderTitleLink(pr prview.PR) string {
@@ -193,10 +194,13 @@ func renderAuthor(pr prview.PR) string {
 }
 
 func renderReviewers(
-	approvers, commenters []prview.Collaborator, mergeBlockers []prview.MergeBlocker,
+	approvers, staleApprovers, commenters []prview.Collaborator, mergeBlockers []prview.MergeBlocker,
 ) string {
 	return strings.Join(
-		utilities.Map(prview.GetReviewersTextSegments(approvers, commenters, mergeBlockers), escapeMarkdown),
+		utilities.Map(
+			prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers),
+			escapeMarkdown,
+		),
 		"",
 	)
 }

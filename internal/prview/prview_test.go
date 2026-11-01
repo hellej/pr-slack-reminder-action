@@ -52,6 +52,22 @@ func TestBuildPRViewsReturnsGivenOrder(t *testing.T) {
 	}
 }
 
+func TestBuildPRViewsAttachesSlackUserIDsToStaleApprovers(t *testing.T) {
+	pr := testPR(1, time.Now(), time.Now())
+	pr.StaleApprovedByUsers = []githubclient.Collaborator{{Login: "mapped"}, {Login: "unmapped"}}
+
+	prViews := prview.BuildPRViews([]githubclient.PR{pr}, config.ContentInputs{
+		SlackUserIdByGitHubUsername: map[string]string{"mapped": "U2234567890"},
+	})
+
+	slackUserIDs := utilities.Map(prViews[0].StaleApprovers, func(c prview.Collaborator) string {
+		return c.SlackUserID
+	})
+	if expected := []string{"U2234567890", ""}; !slices.Equal(slackUserIDs, expected) {
+		t.Errorf("stale approvers' Slack user IDs = %q, expected %q", slackUserIDs, expected)
+	}
+}
+
 func TestBuildPRViewsIsOldPRFlagSetCorrectly(t *testing.T) {
 	now := time.Now()
 	pr1 := testPR(1, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
@@ -245,12 +261,15 @@ func TestGetReviewersTextSegments(t *testing.T) {
 	bob := testCollaborator("Bob")
 	carol := testCollaborator("Carol")
 
+	dana := testCollaborator("Dana")
+
 	tests := []struct {
-		name          string
-		approvers     []prview.Collaborator
-		commenters    []prview.Collaborator
-		mergeBlockers []prview.MergeBlocker
-		expected      []string
+		name           string
+		approvers      []prview.Collaborator
+		staleApprovers []prview.Collaborator
+		commenters     []prview.Collaborator
+		mergeBlockers  []prview.MergeBlocker
+		expected       []string
 	}{
 		{
 			name:     "no reviewers",
@@ -287,6 +306,33 @@ func TestGetReviewersTextSegments(t *testing.T) {
 			expected:      []string{" (✅ ", "Alice", ", ", "Bob", " / CI failing, conflicts", ")"},
 		},
 		{
+			name:           "stale approvers only",
+			staleApprovers: []prview.Collaborator{alice, bob},
+			expected:       []string{" (🔁 ", "Alice", ", ", "Bob", ")"},
+		},
+		{
+			name:           "every group and a merge blocker, in order",
+			approvers:      []prview.Collaborator{dana},
+			staleApprovers: []prview.Collaborator{carol},
+			commenters:     []prview.Collaborator{alice, bob},
+			mergeBlockers:  []prview.MergeBlocker{prview.MergeBlockerConflicts},
+			expected: []string{
+				" (✅ ", "Dana", " / 🔁 ", "Carol", " / 💬 ", "Alice", ", ", "Bob", " / conflicts", ")",
+			},
+		},
+		{
+			name:           "stale approvers and commenters",
+			staleApprovers: []prview.Collaborator{carol},
+			commenters:     []prview.Collaborator{alice},
+			expected:       []string{" (🔁 ", "Carol", " / 💬 ", "Alice", ")"},
+		},
+		{
+			name:           "approvers and stale approvers",
+			approvers:      []prview.Collaborator{alice},
+			staleApprovers: []prview.Collaborator{bob},
+			expected:       []string{" (✅ ", "Alice", " / 🔁 ", "Bob", ")"},
+		},
+		{
 			name:          "no reviewers, a merge blocker",
 			mergeBlockers: []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 			expected:      []string{" (CI failing)"},
@@ -295,7 +341,9 @@ func TestGetReviewersTextSegments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters, tt.mergeBlockers)
+			segments := prview.GetReviewersTextSegments(
+				tt.approvers, tt.staleApprovers, tt.commenters, tt.mergeBlockers,
+			)
 			if !slices.Equal(segments, tt.expected) {
 				t.Errorf("expected segments %q, got %q", tt.expected, segments)
 			}
@@ -587,6 +635,62 @@ func nextActionPR(approverLogins []string, prFlags githubclient.PR) prview.PR {
 		Approvers: utilities.Map(approverLogins, func(login string) prview.Collaborator {
 			return prview.NewCollaborator(githubclient.Collaborator{Login: login}, "")
 		}),
+	}
+}
+
+func collaboratorNames(collaborators []prview.Collaborator) []string {
+	return utilities.Map(collaborators, prview.Collaborator.GetGitHubName)
+}
+
+func TestReviewerGroupsForOpenRow(t *testing.T) {
+	commenter := testCollaborator("Zoe")
+	staleApprover := testCollaborator("Adam")
+
+	tests := []struct {
+		name                   string
+		approverLogins         []string
+		prFlags                githubclient.PR
+		expectedStaleApprovers []prview.Collaborator
+		expectedCommenters     []prview.Collaborator
+	}{
+		{
+			name:                   "waiting for review keeps the stale approvers in their own group",
+			expectedStaleApprovers: []prview.Collaborator{staleApprover},
+			expectedCommenters:     []prview.Collaborator{commenter},
+		},
+		{
+			name:               "waiting for author lists the stale approvers after the commenters",
+			prFlags:            githubclient.PR{HasThreadWaitingForAuthor: true},
+			expectedCommenters: []prview.Collaborator{commenter, staleApprover},
+		},
+		{
+			name:               "ready to merge lists the stale approvers after the commenters",
+			approverLogins:     []string{"bob"},
+			expectedCommenters: []prview.Collaborator{commenter, staleApprover},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := nextActionPR(tt.approverLogins, tt.prFlags)
+			pr.StaleApprovers = []prview.Collaborator{staleApprover}
+			pr.Commenters = []prview.Collaborator{commenter}
+
+			staleApprovers, commenters := pr.ReviewerGroupsForOpenRow()
+
+			if !slices.Equal(staleApprovers, tt.expectedStaleApprovers) {
+				t.Errorf(
+					"stale approvers = %v, expected %v",
+					collaboratorNames(staleApprovers), collaboratorNames(tt.expectedStaleApprovers),
+				)
+			}
+			if !slices.Equal(commenters, tt.expectedCommenters) {
+				t.Errorf(
+					"commenters = %v, expected %v",
+					collaboratorNames(commenters), collaboratorNames(tt.expectedCommenters),
+				)
+			}
+		})
 	}
 }
 

@@ -66,32 +66,51 @@ func (pr PR) GetPRAgeDisplayText() string {
 	return pr.GetPRAgeText() + " ago"
 }
 
-// GetReviewersTextSegments renders approvers and commenters as "(✅ a, b / 💬 c)", split into one
-// text run per segment so a renderer can style or escape the names separately from the glue.
-// Merge blockers add a last glue segment, " / " and the blockers joined by ", ". No reviewers
-// and no blockers yield no segments. Approvers and commenters are given explicitly, so a caller
-// wanting the commenters-only rendering passes no approvers.
-func GetReviewersTextSegments(approvers, commenters []Collaborator, mergeBlockers []MergeBlocker) []string {
-	if len(approvers) == 0 && len(commenters) == 0 {
+// GetReviewersTextSegments renders the reviewer groups as "(✅ a, b / 🔁 c / 💬 d)", split into
+// one text run per segment so a renderer can style or escape the names separately from the glue.
+// A group without reviewers is left out. Merge blockers add a last glue segment, " / " and the
+// blockers joined by ", ". No reviewers and no blockers yield no segments.
+func GetReviewersTextSegments(
+	approvers, staleApprovers, commenters []Collaborator, mergeBlockers []MergeBlocker,
+) []string {
+	groups := utilities.Filter([]reviewerGroup{
+		{marker: "✅", reviewers: approvers},
+		{marker: "🔁", reviewers: staleApprovers},
+		{marker: "💬", reviewers: commenters},
+	}, reviewerGroup.hasReviewers)
+
+	if len(groups) == 0 {
 		if len(mergeBlockers) > 0 {
 			return []string{" (" + mergeBlockersText(mergeBlockers) + ")"}
 		}
 		return nil
 	}
 
-	segments := []string{" (💬 "}
-	if len(approvers) > 0 {
-		segments = []string{" (✅ "}
-		segments = append(segments, nameSegments(approvers)...)
-		if len(commenters) > 0 {
-			segments = append(segments, " / 💬 ")
-		}
+	var segments []string
+	for index, group := range groups {
+		segments = append(segments, textBeforeGroup(index)+group.marker+" ")
+		segments = append(segments, nameSegments(group.reviewers)...)
 	}
-	segments = append(segments, nameSegments(commenters)...)
 	if len(mergeBlockers) > 0 {
 		segments = append(segments, " / "+mergeBlockersText(mergeBlockers))
 	}
 	return append(segments, ")")
+}
+
+type reviewerGroup struct {
+	marker    string
+	reviewers []Collaborator
+}
+
+func (group reviewerGroup) hasReviewers() bool {
+	return len(group.reviewers) > 0
+}
+
+func textBeforeGroup(groupIndex int) string {
+	if groupIndex == 0 {
+		return " ("
+	}
+	return " / "
 }
 
 func mergeBlockersText(mergeBlockers []MergeBlocker) string {

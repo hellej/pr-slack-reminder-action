@@ -250,6 +250,7 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }",
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 		testReadyForReviewEventSelection,
+		testReviewDismissalsSelection,
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {

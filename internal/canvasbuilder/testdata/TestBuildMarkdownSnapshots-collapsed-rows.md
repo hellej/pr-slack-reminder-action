@@ -10,7 +10,7 @@
 
 ## 🚀 Merged
 
-- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 💬 Erin Evans)
+- **[Drop the REST fallback](https://github.com/test-org/test-repo/pull/9)** _merged 3 days ago_ by Alice Anderson (✅ Dana Davis / 🔁 Grace Green / 💬 Erin Evans)
 - **[🤖 dependabot:](https://github.com/test-org/test-repo/pulls?q=is%3Apr+is%3Amerged+author%3Aapp%2Fdependabot)** **[#98](https://github.com/test-org/test-repo/pull/98)** **[#97](https://github.com/test-org/test-repo/pull/97)**
 
 ## 🔧 WIP

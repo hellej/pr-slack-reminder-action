@@ -215,7 +215,17 @@
                   },
                   {
                     "type": "text",
-                    "text": " (💬 ",
+                    "text": " (🔁 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Grace Green",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " / 💬 ",
                     "style": {}
                   },
                   {

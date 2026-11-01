@@ -41,18 +41,20 @@ const (
 )
 
 type prOptions struct {
-	number                int
-	title                 string
-	repository            string
-	authorName            string
-	approvers             []string
-	commenters            []string
-	isOldPR               bool
-	age                   time.Duration
-	activityAge           *time.Duration
-	mergeAge              *time.Duration
-	failingRequiredChecks bool
-	conflicting           bool
+	number                 int
+	title                  string
+	repository             string
+	authorName             string
+	approvers              []string
+	staleApprovers         []string
+	commenters             []string
+	isOldPR                bool
+	age                    time.Duration
+	activityAge            *time.Duration
+	mergeAge               *time.Duration
+	failingRequiredChecks  bool
+	conflicting            bool
+	threadWaitingForAuthor bool
 }
 
 func testRepository(name string) models.Repository {
@@ -85,14 +87,16 @@ func testPR(options prOptions) prview.PR {
 				MergedAt:  mergedAt,
 				Merged:    mergedAt != nil,
 			},
-			Repository:           repository,
-			RequiredChecksStatus: requiredChecks,
-			Conflicting:          options.conflicting,
+			Repository:                repository,
+			RequiredChecksStatus:      requiredChecks,
+			Conflicting:               options.conflicting,
+			HasThreadWaitingForAuthor: options.threadWaitingForAuthor,
 		},
-		Author:     testCollaborator(options.authorName),
-		Approvers:  utilities.Map(options.approvers, testCollaborator),
-		Commenters: utilities.Map(options.commenters, testCollaborator),
-		IsOldPR:    options.isOldPR,
+		Author:         testCollaborator(options.authorName),
+		Approvers:      utilities.Map(options.approvers, testCollaborator),
+		Commenters:     utilities.Map(options.commenters, testCollaborator),
+		StaleApprovers: utilities.Map(options.staleApprovers, testCollaborator),
+		IsOldPR:        options.isOldPR,
 	}
 }
 
@@ -133,17 +137,19 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		age: minutesAge,
 	})
 	// The WIP and merged PRs are approved and failing, so a row naming the failing checks
-	// anywhere but in an open section shows up in the snapshots.
+	// anywhere but in an open section shows up in the snapshots. Both have a stale approver too:
+	// a WIP row naming them, or a merged row splitting its groups as an open row does, shows up.
 	wipPR := testPR(prOptions{
 		number: 3, title: "Spike: replace mux with chi", authorName: "Carol Clark",
 		age: hoursAge, activityAge: durationPointer(hoursAge),
-		approvers: []string{"Frank Foster"}, failingRequiredChecks: true,
+		approvers: []string{"Frank Foster"}, staleApprovers: []string{"Grace Green"},
+		failingRequiredChecks: true,
 	})
 	mergedPR := testPR(prOptions{
 		number: 9, title: "Drop the REST fallback", authorName: "Alice Anderson",
 		age: oldAge, mergeAge: durationPointer(idleAge),
-		approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
-		failingRequiredChecks: true,
+		approvers: []string{"Dana Davis"}, staleApprovers: []string{"Grace Green"},
+		commenters: []string{"Erin Evans"}, failingRequiredChecks: true,
 	})
 	otherWIPPR := testPR(prOptions{
 		number: 11, title: "Draft the migration guide", repository: "repo-two",
@@ -197,9 +203,11 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
 			failingRequiredChecks: true, conflicting: true,
 		}),
+		// Its stale approver sorts before its commenter, so the order they join 💬 in shows.
 		testPR(prOptions{
 			number: 34, title: "Escape the canvas titles", authorName: "Erin Evans",
 			age: minutesAge, commenters: []string{"Frank Foster"},
+			staleApprovers: []string{"Bob Brown"}, threadWaitingForAuthor: true,
 		}),
 	}
 	waitingForReviewPRs := []prview.PR{
@@ -210,6 +218,7 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		testPR(prOptions{
 			number: 43, title: "Log the rate limit cost", repository: "repo-three",
 			authorName: "Carol Clark", age: idleAge,
+			staleApprovers: []string{"Frank Foster"}, commenters: []string{"Erin Evans"},
 		}),
 		testPR(prOptions{
 			number: 41, title: "Add the dry-run flag", authorName: "Alice Anderson", age: hoursAge,

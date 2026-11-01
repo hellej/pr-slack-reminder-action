@@ -22,7 +22,8 @@ const fullPullRequestSelection = `  number title url isDraft createdAt updatedAt
   comments(last: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
   reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }
   reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }
-  timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1){ nodes { ... on ReadyForReviewEvent { createdAt } } }`
+  timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1){ nodes { ... on ReadyForReviewEvent { createdAt } } }
+  reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100){ nodes { ... on ReviewDismissedEvent { previousReviewState dismissalMessage review { author { login __typename ... on User { name } } } } } }`
 
 var fullPullRequestFragment = newPullRequestFragment("fullPr", fullPullRequestSelection)
 

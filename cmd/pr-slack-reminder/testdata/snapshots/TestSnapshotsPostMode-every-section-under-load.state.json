@@ -142,7 +142,17 @@
                   },
                   {
                     "type": "text",
-                    "text": " (💬 ",
+                    "text": " (🔁 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Frank Foster",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " / 💬 ",
                     "style": {}
                   },
                   {
@@ -258,6 +268,16 @@
                   {
                     "type": "text",
                     "text": "Dana Davis",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ", ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Bob Brown",
                     "style": {}
                   },
                   {
@@ -517,6 +537,16 @@
                   },
                   {
                     "type": "text",
+                    "text": " / 🔁 ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Grace Green",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
                     "text": " / 💬 ",
                     "style": {}
                   },
@@ -636,6 +666,12 @@
         {
           "Login": "erin",
           "Name": "Erin Evans"
+        }
+      ],
+      "StaleApprovedByUsers": [
+        {
+          "Login": "grace",
+          "Name": "Grace Green"
         }
       ],
       "SnoozedUntil": null,

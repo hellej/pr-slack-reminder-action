@@ -20,10 +20,11 @@ const RecentActivityThreshold = 24 * time.Hour
 
 type PR struct {
 	*githubclient.PR
-	Author     Collaborator
-	Approvers  []Collaborator
-	Commenters []Collaborator // Users who have commented on the PR but did not approve it
-	IsOldPR    bool           // Weekday age past the old-PR threshold
+	Author         Collaborator
+	Approvers      []Collaborator
+	Commenters     []Collaborator // Users who commented on the PR, neither approving it nor holding an approval a push dismissed
+	StaleApprovers []Collaborator // Users whose approval a push dismissed
+	IsOldPR        bool           // Weekday age past the old-PR threshold
 }
 
 type Collaborator struct {
@@ -90,6 +91,14 @@ func (pr PR) MergeBlockers() []MergeBlocker {
 	return mergeBlockers
 }
 
+// Asks stale approvers to approve again only on a PR waiting for review. See prview.spec.md § Behaviour
+func (pr PR) ReviewerGroupsForOpenRow() (staleApprovers, commenters []Collaborator) {
+	if pr.GetNextAction() == NextActionWaitingForReview {
+		return pr.StaleApprovers, pr.Commenters
+	}
+	return nil, slices.Concat(pr.Commenters, pr.StaleApprovers)
+}
+
 func (pr PR) isApproved() bool {
 	return len(pr.Approvers) > 0
 }
@@ -141,7 +150,10 @@ func buildPRView(pr githubclient.PR, config config.ContentInputs) PR {
 		Author:     NewCollaborator(pr.Author, config.SlackUserIdByGitHubUsername[pr.Author.Login]),
 		Approvers:  withSlackUserIds(pr.ApprovedByUsers, config.SlackUserIdByGitHubUsername),
 		Commenters: withSlackUserIds(pr.CommentedByUsers, config.SlackUserIdByGitHubUsername),
-		IsOldPR:    isWeekdayAgeOver(pr, config.OldPRThresholdHours),
+		StaleApprovers: withSlackUserIds(
+			pr.StaleApprovedByUsers, config.SlackUserIdByGitHubUsername,
+		),
+		IsOldPR: isWeekdayAgeOver(pr, config.OldPRThresholdHours),
 	}
 }
 

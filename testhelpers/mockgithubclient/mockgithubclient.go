@@ -37,6 +37,7 @@ type MockGitHubClientOptions struct {
 	TimelineCommentsByPRNumber           map[int][]*github.IssueComment
 	RequestedReviewerLoginsByPRNumber    map[int][]string
 	FirstReadyForReviewEventAtByPRNumber map[int]time.Time
+	ReviewDismissalsByPRNumber           map[int][]ReviewDismissal
 	// Each answers its PRs' check status with one required check run that failed, passed or is
 	// in progress. Any other PR gets a null rollup: unknown
 	FailingRequiredCheckPRNumbers []int
@@ -152,6 +153,18 @@ func NewTimelineComment(login, name, body string, createdAt time.Time, userType 
 		Body:      github.Ptr(body),
 		CreatedAt: &github.Timestamp{Time: createdAt},
 	}
+}
+
+// A ReviewDismissedEvent: go-github has no type for the GraphQL timeline node.
+type ReviewDismissal struct {
+	PreviousReviewState string
+	DismissalMessage    *string
+	Reviewer            *github.User
+}
+
+// GitHub leaves dismissalMessage null on a dismissal by a push.
+func NewPushDismissedApproval(login, name string, userType ...string) ReviewDismissal {
+	return ReviewDismissal{PreviousReviewState: "APPROVED", Reviewer: newUser(login, name, userType...)}
 }
 
 func newUser(login, name string, userType ...string) *github.User {
@@ -426,6 +439,9 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 		utilities.Map(t.opts.RequestedReviewerLoginsByPRNumber[number], reviewRequestNodeJSON),
 	)
 	node["timelineItems"] = t.readyForReviewEventsJSON(number)
+	node["reviewDismissals"] = connectionJSON(
+		utilities.Map(t.opts.ReviewDismissalsByPRNumber[number], reviewDismissedEventNodeJSON),
+	)
 	if slices.Contains(t.opts.ConflictingPRNumbers, number) {
 		node["mergeable"] = "CONFLICTING"
 	}
@@ -513,6 +529,14 @@ func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
 		"submittedAt": review.GetSubmittedAt().Time,
 		"createdAt":   review.GetSubmittedAt().Time,
 		"author":      authorNodeJSON(review.GetUser()),
+	}
+}
+
+func reviewDismissedEventNodeJSON(dismissal ReviewDismissal) map[string]any {
+	return map[string]any{
+		"previousReviewState": dismissal.PreviousReviewState,
+		"dismissalMessage":    dismissal.DismissalMessage,
+		"review":              map[string]any{"author": authorNodeJSON(dismissal.Reviewer)},
 	}
 }
 

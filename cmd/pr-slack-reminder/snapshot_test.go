@@ -140,6 +140,7 @@ type snapshotScenario struct {
 	mergedPRsByRepo                    map[string][]*github.PullRequest
 	reviewsByPRNumber                  map[int][]*github.PullRequestReview
 	timelineCommentsByPRNumber         map[int][]*github.IssueComment
+	reviewDismissalsByPRNumber         map[int][]mockgithubclient.ReviewDismissal
 	prNumbersWithFailingRequiredChecks []int
 	conflictingPRNumbers               []int
 
@@ -576,8 +577,14 @@ func snapshotScenarios() []snapshotScenario {
 					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
 					mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED"),
 				},
-				73: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
-				74: {mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED")},
+				73: {
+					mockgithubclient.NewReview("bob", "Bob Brown", "DISMISSED"),
+					mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED"),
+				},
+				74: {
+					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
+					mockgithubclient.NewReview("frank", "Frank Foster", "DISMISSED"),
+				},
 				77: {
 					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
 					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
@@ -587,7 +594,15 @@ func snapshotScenarios() []snapshotScenario {
 				83: {
 					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
 					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
+					mockgithubclient.NewReview("grace", "Grace Green", "DISMISSED"),
 				},
+			},
+			// A push dismissed an approval on a PR waiting for review (#74), on one waiting for
+			// its author (#73) and on a merged one that has a current approver too (#83).
+			reviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
+				73: {mockgithubclient.NewPushDismissedApproval("bob", "Bob Brown")},
+				74: {mockgithubclient.NewPushDismissedApproval("frank", "Frank Foster")},
+				83: {mockgithubclient.NewPushDismissedApproval("grace", "Grace Green")},
 			},
 		},
 		{
@@ -696,6 +711,7 @@ func runSnapshotScenario(
 		MergedPRsByRepo:            scenario.mergedPRsByRepo,
 		ReviewsByPRNumber:          scenario.reviewsByPRNumber,
 		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
+		ReviewDismissalsByPRNumber: scenario.reviewDismissalsByPRNumber,
 		MockPreviousState:          previousState,
 
 		FailingRequiredCheckPRNumbers: scenario.prNumbersWithFailingRequiredChecks,
@@ -830,6 +846,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		openPRsNotInState                  []*github.PullRequest
 		mergedPRsFromSearch                []*github.PullRequest
 		reviewsByPRNumber                  map[int][]*github.PullRequestReview
+		reviewDismissalsByPRNumber         map[int][]mockgithubclient.ReviewDismissal
 		requestedReviewerLoginsByPRNumber  map[int][]string
 		prNumbersWithFailingRequiredChecks []int
 		conflictingPRNumbers               []int
@@ -915,9 +932,15 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				61: {mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED")},
 				60: {mockgithubclient.NewReview("frank", "Frank Foster", "CHANGES_REQUESTED")},
 				62: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
-				65: {mockgithubclient.NewReview("frank", "Frank Foster", "COMMENTED")},
+				65: {
+					mockgithubclient.NewReview("frank", "Frank Foster", "COMMENTED"),
+					mockgithubclient.NewReview("grace", "Grace Green", "DISMISSED"),
+				},
 				66: {mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED")},
 				59: {mockgithubclient.NewReview("frank", "Frank Foster", "APPROVED")},
+			},
+			reviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
+				65: {mockgithubclient.NewPushDismissedApproval("grace", "Grace Green")},
 			},
 			requestedReviewerLoginsByPRNumber: map[int][]string{60: {"frank"}},
 		},
@@ -1050,6 +1073,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				PRs:                               openPRsOfFetch(tc.prByNumber, tc.openPRNumbers, tc.openPRsNotInState),
 				MergedPRs:                         tc.mergedPRsFromSearch,
 				ReviewsByPRNumber:                 tc.reviewsByPRNumber,
+				ReviewDismissalsByPRNumber:        tc.reviewDismissalsByPRNumber,
 				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
 				FailingRequiredCheckPRNumbers:     tc.prNumbersWithFailingRequiredChecks,
 				ConflictingPRNumbers:              tc.conflictingPRNumbers,
