@@ -122,9 +122,10 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 Touches no files. Step 1's repo-3 PRs are the setup.
 
 - The implementation PR's Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show, under repo-3:
-  - **push-dismissed** under "Waiting for review" with `hellej` under `♻️`
-  - **manually dismissed** under "Waiting for review" with `hellej` under `💬`
-  - **current approval** and **re-approved** under "Ready to merge" with `hellej` under `✅`
+  - **push-dismissed** under "Waiting for review" with `Joose` under `♻️`
+  - **manually dismissed** under "Waiting for review" with `Joose` under `💬`
+  - **current approval** and **re-approved** under "Ready to merge" with `Joose` under `✅`
+  - Rows name a reviewer by GitHub display name: `hellej` reads `Joose`
 - Done means the message and the canvas both show those rows
 
 ### 4. Docs
@@ -147,7 +148,7 @@ Touches `README.md`.
 
 ### Caveats
 
-- The README's update mode example triggers on no `synchronize`, so a push alone starts an `update` only if the dismissal fires `pull_request_review: dismissed`, and no GitHub docs page says whether it does. This repository's `pr-reminder.yml` also skips runs by `dependabot[bot]`, so a Dependabot rebase starts no `update` here. Without a run, the row changes at the next PR, review or comment event or post
+- The README's update mode example triggers on no `synchronize`. A push starts an `update` once the CI workflows its `workflow_run` trigger lists complete, or earlier if the dismissal fires `pull_request_review: dismissed`, and no GitHub docs page says whether it does. This repository's `pr-reminder.yml` has no `workflow_run` and skips runs by `dependabot[bot]`, so a Dependabot rebase starts no `update` here. Without a run, the row changes at the next PR, review or comment event, CI completion or post
 - Under "Require approval of the most recent reviewable push" without the dismissal rule, an approval made before the latest push keeps reading `✅` in "ready to merge"
 - Collapsed rows have no reviewer list, so a collapsed Dependabot PR shows no `♻️`
 - A draft row drops a push-dismissed approver, who read under `💬` on that row before
