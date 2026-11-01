@@ -1052,8 +1052,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The owner posted a commit status `probe-status`, `success`, not required, on PR 49's head `0a7770a`, beside its one check run `build`
 - All five E2E scenarios logged `field error on [p0 pullRequest statusCheckRollup contexts nodes 1]: FORBIDDEN Resource not accessible by integration`
   - Node 1 is the `StatusContext`. GitHub returned node 0, the `CheckRun`, without an error
-  - So a status that is not required still triggers it
-  - The path names a node index, not its type: unlike the missing `checks` case, which fails the whole `statusCheckRollup` field
+  - So a status that is not required still gets `FORBIDDEN`
+  - The path names a node index, not the node's type. A missing `checks` permission fails the whole `statusCheckRollup` field instead
   - The action reads any error under a PR as that PR's check status unknown, so it warned `Failed to fetch required check status` and stayed green
 - Which contexts it covers, inferred, not from a GitHub page: `statuses` covers `StatusContext` contexts, the ones posted through the Statuses API by an app, a script or a person
 - Not shown:
