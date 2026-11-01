@@ -3,58 +3,47 @@
 date: 2026-11-01
 status: draft
 
-Lands on the feature branch `plan-020-stale-approvals`, through a PR.
+Lands on the feature branch `plan-020-stale-approvals`, through a PR. Independent of plans [019](019_demote-approved-PRs-with-failing-checks.md) and [020](020_show-merge-blockers-on-PR-rows.md): all three change the same reviewer list, so whichever of the three lands last merges `main` and resolves the conflict in `GetReviewersTextSegments`. Once all three land, the groups read `✅`, `♻️`, `💬`, then plan 019's `❌` last.
 
 ## Requirements
 
-- An open PR whose approval went stale after a push names that approver in a `♻️` group of its reviewer list, in the message and on the canvas: `(♻️ Dana Davis / 💬 Erin Evans)`
-- Both rules that make an approval stale are covered:
-  - **Dismissed by a push**: "Dismiss stale pull request approvals when new commits are pushed" in branch protection, or `dismiss_stale_reviews_on_push` in a ruleset. GitHub dismisses the approval
-  - **Approval before the last push**: "Require approval of the most recent reviewable push", without the dismissal rule. The approval stays `APPROVED`, but no longer allows the merge
-- A PR whose approvals are all stale is not "ready to merge". With nothing else outstanding it is "waiting for review"
+- An open or merged row names each approver whose approval a push dismissed in a `♻️` group of its reviewer list, in the message and on the canvas: `(♻️ Dana Davis / 💬 Erin Evans)`
+- A push dismisses an approval under the "Dismiss stale pull request approvals when new commits are pushed" rule: in branch protection, or `dismiss_stale_reviews_on_push` in a ruleset
 - An approver who approves again is a current approver: `✅`, not `♻️`
 - A manually dismissed approval is not stale: its reviewer stays under `💬`, as today
-- The notification text is unchanged: a PR with stale approvals counts under "to review"
-- No new action input, no new permission
+- No bucket change: with no other approval, such a PR is in "waiting for review" today and stays there
+- The notification text doesn't change
+- No new action input, permission or GitHub request
 
-Serves § **Purpose**: today a dismissed approval turns a PR into one that looks untouched (`💬` only), and under the last-push rule a PR sits in "ready to merge" with a blocked merge button. `♻️` says the PR needs a quick re-stamp and names who gave the last one. Sized for § **Reference Deployment**: human approval gates every merge, and a weekly Dependabot batch rebases ~5 approved PRs at once.
+Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouched today, and `♻️` turns it into a quick re-stamp from a named reviewer. Fits AGENTS.md § Reference Deployment, where a weekly Dependabot batch rebases ~5 approved PRs at once.
 
 ### Non-goals
 
-- No new section, no change to the sort order
-- No Slack mention of a stale approver
-- No `♻️` on merged, draft or collapsed rows
-- No flag on an approval older than the latest commit when no rule asks for re-approval: the merge is still allowed
-- No fix for a PR short of a required approval count: with one current approval of two required, it stays "ready to merge"
+- The "Require approval of the most recent reviewable push" rule. Its approvals stay `APPROVED`, and telling which ones went stale needs the review's commit, which GraphQL forbids on a private repository under `pull-requests: read`. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
+- No bucket change for a PR with a merge conflict (`mergeable` is `CONFLICTING`) whose only approvals were push-dismissed: it stays in "waiting for review"
+- No `♻️` on draft or collapsed rows
+- No new section, sort order or Slack mention
 
 ## Target shape
 
-- `githubclient.PR` gains `StaleApprovedByUsers []Collaborator`: the users whose approval went stale and who have no current approval
+- `githubclient.PR` gains `StaleApprovedByUsers []Collaborator`: the users with a push-dismissed approval and no `APPROVED` review
   - Deduped by login, no bots, never the PR author
-  - Disjoint from `ApprovedByUsers`. `CommentedByUsers` leaves them out
-- A user's approval went stale when either holds:
-  - A `ReviewDismissedEvent` has `previousReviewState` `APPROVED`, a non-null `pullRequestCommit`, and names the user as its `review`'s author. See docs/third-party-facts.md § A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set
-  - `reviewDecision` is `REVIEW_REQUIRED` and the user has an `APPROVED` review whose `commit.oid` is not `headRefOid`. A review with a null `commit` counts as not on `headRefOid`
-- A current approval is an `APPROVED` review, except under `REVIEW_REQUIRED`, where it must be on `headRefOid`. `ApprovedByUsers` holds current approvals only
-- Both selections, `enrichedPullRequestSelection` and `fullPullRequestSelection`, gain:
+  - `CommentedByUsers` leaves them out. `ApprovedByUsers` is unchanged
+- A push-dismissed approval is a `ReviewDismissedEvent` with `previousReviewState` `APPROVED` and a null `dismissalMessage`. Its `review`'s author is the stale approver. A manual dismissal carries a message, since the API requires one. See docs/third-party-facts.md § A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage`
+- Both selections, `enrichedPullRequestSelection` and `fullPullRequestSelection`, gain one aliased connection beside the existing `timelineItems`:
   ```
-  headRefOid reviewDecision
-  reviews(last: 100){ nodes { ... commit { oid } } }
   reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100){ nodes { ... on ReviewDismissedEvent {
-    previousReviewState pullRequestCommit { id } review { author { login __typename ... on User { name } } } } } }
+    previousReviewState dismissalMessage review { author { login __typename ... on User { name } } } } } }
   ```
-  - All populate under `pull-requests: read` on `GITHUB_TOKEN`. See docs/third-party-facts.md § A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
-  - Cost: no change measured over 18 PRs. See docs/third-party-facts.md § Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` kept the enrichment query's cost
+  - Cost: 27 points instead of 26 over 25 PRs. See docs/third-party-facts.md § Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query
+  - Populates under `pull-requests: read` on `GITHUB_TOKEN` in a public repository. Step 1 checks a private one first
 - `prview.PR` gains `StaleApprovers []Collaborator`, with Slack IDs attached as for `Approvers`
-- `prview.PR.GetNextAction` doesn't change. It reads `Approvers`, which now holds current approvals only
 - `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters)` renders the groups `✅`, `♻️`, `💬`, in that order, separated by ` / `
-  - Open rows pass `StaleApprovers`
-  - Merged and draft rows pass no stale approvers, and name them among the commenters, after them, as a dismissed approver reads today
-  - Plan 019 adds a `hasFailingChecks` parameter to the same function. Whichever plan lands second keeps `❌ CI` as the last group
-- `FindOpenPRs` logs one line per PR with stale approvers, naming them
+  - Open and merged rows pass `StaleApprovers`. Draft rows pass none, as they pass no approvers
+- `GetNextAction` doesn't change
 - Action inputs: none new. Permissions: none new
 
-Message states for a Dependabot PR that Dana approved, under the dismissal rule:
+Message states for a Dependabot PR that Dana approved:
 
 ```
 Posted at 09:00, approved
@@ -69,97 +58,91 @@ Edited by an `update` after Dana approved again
 *✅ Ready to merge*
   • Bump zod   3 days ago   by dependabot (✅ Dana Davis / 💬 Erin Evans)
 
-Marked stale by the next post, after the message was posted while the approval was stale
+Marked stale by the next post, after the message was posted while the approval was dismissed
 ⚠️ Stale, updated Nov 2 at 09:00
 *👀 Waiting for review*
   • Bump zod   3 days ago   by dependabot (♻️ Dana Davis / 💬 Erin Evans)
 ```
 
-Under the last-push rule the states are the same.
-
-The canvas row reads `**[Bump zod](url)** _3 days ago_ by dependabot (♻️ Dana Davis / 💬 Erin Evans)` under `## 👀 Waiting for review`, and follows the same states.
+- Today the "after a rebase" and "marked stale by the next post" states read `(💬 Dana Davis, Erin Evans)`
+- The canvas row reads `**[Bump zod](url)** _3 days ago_ by dependabot (♻️ Dana Davis / 💬 Erin Evans)` under `## 👀 Waiting for review`, and follows the same states
+- A merged row shows the reviewer list in the same format, after its merge time
 
 ## Breaking or non-breaking
 
-Non-breaking, **minor**. Row text changes, and under the last-push rule a PR changes bucket, with no input or permission change.
+Non-breaking, **minor**. Row text changes, with no input or permission change.
 
-- The merged PR cache saves `StaleApprovedByUsers` beside `ApprovedByUsers`. A cache saved before it decodes none, so a cached merged row names its dismissed approvers among the commenters, as today
-- The first run after upgrading re-renders every PR with a stale approval, and the canvas rewrites once where one exists
+- The merged PR cache saves `StaleApprovedByUsers`. A cache saved before this change decodes it empty, so a cached merged row lists its push-dismissed approvers under `💬`, as today
+- The first run after upgrading re-renders every row with a push-dismissed approval. The canvas is rewritten in that run only if it has such a row
 
 ## Summary
 
-- **1** Fetch stale approvals in `githubclient` (checkpoint)
+- **1** Fetch push-dismissed approvals in `githubclient` (checkpoint)
 - **2** Render `♻️` in the reviewer list, in the message and on the canvas
-- **3** Check the message and canvas live
+- **3** Check the rows live
 - **4** Docs
 
 ## Steps
 
-### 1. Fetch stale approvals in `githubclient` (checkpoint)
+### 1. Fetch push-dismissed approvals in `githubclient` (checkpoint)
 
-Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.github/actions/e2e-tests/action.yml`.
+Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.github/actions/e2e-tests/action.yml`, `docs/third-party-facts.md`.
 
-- The selections and `StaleApprovedByUsers` as in § Target shape. `prWithReviewers` derives it beside `deriveReviewers`, whose approvers become the current ones
-- `pullRequestNode` gains `HeadRefOid`, `ReviewDecision` and `ReviewDismissals`, and `reviewNode` gains `Commit`. The existing `timelineItems` field keeps its name
-- Unit tests in `githubclient` cover each rule of § Target shape, including:
-  - A push-dismissed approval followed by a fresh approval from the same user: current, not stale. PR 52 of this repository has this shape
-  - A manual dismissal, a null `pullRequestCommit`: not stale
-  - `REVIEW_REQUIRED` with one approval on `headRefOid` and another user's on an older commit: one current, one stale
-  - `APPROVED` or null `reviewDecision` with an approval on an older commit: current
-- `mockgithubclient`:
-  - `reviewNodeJSON` writes `commit.oid` from `github.PullRequestReview.CommitID`, and a PR's `headRefOid` from `Head.SHA`
-  - `MockGitHubClientOptions` gains `ReviewDecisionByPRNumber map[int]string` and `ReviewDismissalsByPRNumber`, the dismissal events per PR
-- Add `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories. It is public, so it can carry the rules. The owner set it up:
-  - `main` under a ruleset dismissing stale approvals, `last-push-base` under one requiring last-push approval
-  - Fixture PRs, all by `hellej` and approved by a second account: A, push-dismissed on `main`; B, approved before the last push on `last-push-base`; C and D, current approvals on each base; E, manually dismissed on `main`; F, changes requested then a push, on `main`
+- First, before any code, check the event on a private repository:
+  - The repository owner approves an open Dependabot PR in private `hellej/pr-slack-reminder-test-repo-1`, then dismisses that approval with a message. The dismissal stays, so every E2E run reads a private-repo `ReviewDismissedEvent`
+  - A temporary workflow on a throwaway branch of that repository, with `permissions: pull-requests: read` only, runs `gh api graphql` with the § Target shape connection on that PR, as runs 41299479257 and 41299564373 did. Delete the branch afterwards
+  - Record the result in docs/third-party-facts.md
+  - If the node comes back `FORBIDDEN` or null, stop and raise it with the user: a field error under `timelineItems` costs that PR all its reviewer info
+- `pullRequestNode` gains `ReviewDismissals`. The existing `timelineItems` field keeps its name
+- `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
+- Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
+- `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR
+- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. The repository owner sets it up:
+  - PR 1, approved by a human other than its author, then a push: push-dismissed
+  - PR 5, approved the same way, then dismissed with a message: manual
+  - PR 3, approved the same way: current
+  - Today these approvals come from `github-actions`, a bot, which the action ignores. A human approver replaces the bot on PRs 1, 3 and 5
+  - PRs 2, 4 and 6 stay as they are
   - The E2E GitHub App is installed on it
-- Update `githubclient.spec.md`: `StaleApprovedByUsers`, the current approval rule, the new fields, and the "Doesn't read `reviewDecision`" line, which now reads it for the last-push rule only
+- Update `githubclient.spec.md`: `StaleApprovedByUsers`, the new connection, the `CommentedByUsers` line, the `FirstReviewAt` line, which still counts a dismissed review, and the PR-scoped field lists of the `FindOpenPRs` and `GetPRs` lines under § Doesn't Do, which gain `reviewDismissals`
 - Verifying it done:
   - `make test`
-  - The repo-3 probe results are in docs/third-party-facts.md, amending § With "Require approval of the most recent reviewable push", older approvals stay `APPROVED`, and what `reviewDecision` reports is undocumented
-  - If B's `reviewDecision` is not `REVIEW_REQUIRED`, or E's dismissal event has a non-null `pullRequestCommit`, stop and raise it with the user: the stale rule needs another signal
-  - After pushing the branch, the Build job log shows stale approver lines for A and B only, no enrichment error line, and the enrichment `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget)
+  - The implementation PR's Build run: the E2E job log shows no enrichment error line
+  - Put the enrichment `rateLimit.cost` per enriched PR in the implementation PR's description, next to the same figure from the last `main` Build run, per AGENTS.md § GitHub API Budget. Compare per enriched PR, since repo-3 adds PRs to every listing
 
 ### 2. Render `♻️` in the reviewer list
 
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
-- `prview.PR.StaleApprovers` and `GetReviewersTextSegments` as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers` for open, WIP and merged rows
-- `♻️` is part of the glue segments, so neither builder escapes or styles it as a name
-- Update `prview.spec.md` (the new field, `GetReviewersTextSegments`, and the Oddities line on "a user with any `APPROVED` review counts as an approver", which now holds outside the last-push rule only), `messagebuilder.spec.md` and `canvasbuilder.spec.md`
-- Add a PR with a stale approver and a commenter to three fixture sets, then `make update-test-snapshots`:
-  - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, which serves the post and marked-stale snapshots
-  - The update-mode table of `TestSnapshotsUpdateMode`, for the edited message
-  - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`, for the canvas row
+- `prview.PR.StaleApprovers` and `GetReviewersTextSegments` as in § Target shape
+- Call sites: the message's `getReviewersElements`, which serves open and merged rows, and the canvas's `renderReviewers`, whose open and merged rows pass `StaleApprovers` and whose draft row passes none
+- Update `prview.spec.md`'s `GetReviewersTextSegments` line, `messagebuilder.spec.md` and `canvasbuilder.spec.md`
+- In the post, update-mode and canvas snapshot fixtures, give one PR that has a commenter a push-dismissed approver. In the canvas fixtures, also give one merged PR a push-dismissed approver. Then `make update-test-snapshots`. Read each diff before re-recording: only those PRs' rows change
 - Expect every state snapshot with a cached merged PR to gain the `StaleApprovedByUsers` key
-- `main_test.go`: a last-push PR with only a stale approval lands in "waiting for review", in post and in update mode
 
-### 3. Check the message and canvas live
+### 3. Check the rows live
 
-Touches no files. The repo-3 fixtures are the setup.
+Touches no files. Step 1's repo-3 PRs are the setup.
 
-- Read the branch's Build E2E runs. The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show, under repo-3:
-  - A and B under "Waiting for review" with `♻️` and the second account's name
-  - C and D under "Ready to merge" with `✅`
-  - E under "Waiting for review" with the second account under `💬`
-  - F under "Waiting for author"
-- Done means both the message and the canvas show those rows
+- The implementation PR's Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show, under repo-3:
+  - PR 1 under "Waiting for review" with the approver under `♻️`
+  - PR 5 under "Waiting for review" with the approver under `💬`
+  - PR 3 under "Ready to merge" with the approver under `✅`
+- Done means the message and the canvas both show those rows
 
 ### 4. Docs
 
 Touches `README.md`.
 
-- The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" needs a current approval. An approval dismissed by a push, or made before the last push under the last-push rule, is listed under `♻️` instead of `✅` until the reviewer approves again
-- The screenshots in `docs/examples/` stay: no sample shows a stale approval
+- `README.md` § Example Output, beside the paragraph on collapsed rows: an approval a push dismissed is listed under `♻️` instead of `💬`, in the message and on the canvas, until the reviewer approves again
 - Done means `make check-style` passes
 
 ## Consequences
 
 ### Positive
 
-- A PR whose approval went stale reads as a quick re-stamp, not as untouched
-- Under the last-push rule, "ready to merge" stops listing PRs with a blocked merge button
-- No extra request and no measured cost
+- A PR whose approval a push dismissed reads as a quick re-stamp, with the reviewer named
+- One point more per 25 enriched PRs, and no extra request
 
 ### Negative
 
@@ -167,13 +150,14 @@ Touches `README.md`.
 
 ### Caveats
 
-- No run reacts to the push itself: the example triggers carry no `synchronize`. Whether an automatic dismissal fires `pull_request_review: dismissed` is undocumented. Until the next PR, review or comment event or post, the message shows the PR as before the push
-- Collapsed rows have no reviewer list, so a collapsed Dependabot PR with a stale approval says nothing about it
-- Under the last-push rule, a push by the approver themselves needs another person's approval, but the row still names them under `♻️`
-- Under the last-push rule with more than one required approval, `REVIEW_REQUIRED` also reads while the count is short. An approval on an older commit then reads stale even if GitHub still counts it
-- A user whose approval was dismissed and who then requested changes reads under `♻️`, while the PR sits in "waiting for author"
-- A PR with over 100 dismissals or reviews is judged on the newest 100, as for reviews today
+- The README's update mode example triggers on no `synchronize`, so a push alone starts an `update` only if the dismissal fires `pull_request_review: dismissed`, and no GitHub docs page says whether it does. This repository's `pr-reminder.yml` also skips runs by `dependabot[bot]`, so a Dependabot rebase starts no `update` here. Without a run, the row changes at the next PR, review or comment event or post
+- Under "Require approval of the most recent reviewable push" without the dismissal rule, an approval made before the latest push keeps reading `✅` in "ready to merge"
+- Collapsed rows have no reviewer list, so a collapsed Dependabot PR shows no `♻️`
+- A draft row drops a push-dismissed approver, who read under `💬` on that row before
+- A manual dismissal sent with an empty message may read as push-dismissed
+- A push-dismissed approver who then requested changes reads under `♻️` only, while the PR sits in "waiting for author"
+- A PR with over 100 dismissals is judged on the newest 100
 
 ### Neutral
 
-- The notification text counts these PRs under "to review"
+- None

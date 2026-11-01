@@ -1037,7 +1037,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The dismissed review's `state` reads `DISMISSED`. Its `commit` is the older commit the approval was made on
 - `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])` returns one event per dismissal, with `previousReviewState: APPROVED`, a non-null `pullRequestCommit` (the pushed commit), `dismissalMessage: null`, and the pusher as `actor` (`dependabot` on all four, without a `[bot]` suffix)
 - The schema describes `pullRequestCommit` as "the commit which caused the review to become stale". No page says it is null on a manual dismissal. Unverified
-- Every official wording of the rule names approvals only ([about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches): "the approving review is dismissed as stale"). No page says a `CHANGES_REQUESTED` review survives the push
+- Every official wording of the rule names approvals only ([about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches): "the approving review is dismissed as stale")
+- A `CHANGES_REQUESTED` review survives the push: PR 6 of `hellej/pr-slack-reminder-test-repo-3`, under ruleset 26307879 (`dismiss_stale_reviews_on_push: true`), kept its review `CHANGES_REQUESTED` after a later push, with no `ReviewDismissedEvent` (`gh api graphql`, 2026-11-01). The reviewer was the `github-actions` bot. Its approval on PR 1 of the same repository was dismissed by a push under the same ruleset
 - The rule also fires on **Update branch** and when the merge base gains changes, per the same page
 
 ## With "Require approval of the most recent reviewable push", older approvals stay `APPROVED`, and what `reviewDecision` reports is undocumented [2026-11-01]
@@ -1048,11 +1049,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Undocumented: whether `reviewDecision` reads `REVIEW_REQUIRED` while the latest push is unapproved, and whether it also does so for a required approval count not yet met
 - No `PullRequest` field says whether the latest push is approved. `Ref.rules` exposes `PullRequestParameters.requireLastPushApproval`, with an undocumented token permission
 
-## Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` kept the enrichment query's cost [2026-11-01]
+## Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query [2026-11-01]
 
 - Source: the enrichment query as `buildPullRequestsQuery` builds it, over the 18 open PRs of `hellej/pr-slack-reminder-test-repo-1` and `-2`, under the owner's `gh` token, `rateLimit { cost }` and `rateLimit(dryRun: true) { cost }`
 - 19 points as-is and 19 with the additions, `errors: null`
 - The added connection was `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 20)`, under its own alias beside the existing unaliased one
+- At `last: 100`, selecting `previousReviewState dismissalMessage review { author { login __typename ... on User { name } } }`, over 25 PRs of `pr-slack-reminder-test-repo-1`, `-2`, `-3` and this repository, under the owner's `gh` token: 26 points without the connection, 27 with it, `errors: null` (2026-11-01)
 - Says nothing about `GITHUB_TOKEN` or an App token: see § Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented
 
 ## A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository [2026-11-01]
@@ -1081,5 +1083,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 
 - Source: [dismiss a review for a pull request](https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request): `message` is required, "The message for the pull request review dismissal"
 - The four push dismissals in § A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set all read `dismissalMessage: null`
+- Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
