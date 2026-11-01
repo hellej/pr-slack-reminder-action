@@ -100,7 +100,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.gi
   - PR 12, **current approval**: approved
   - PR 13, **re-approved**: approved, a push, then approved again
   - Not Dependabot: 2 or more Dependabot PRs in a section collapse into one row without a reviewer list
-  - The repository owner installs the E2E GitHub App on it
+  - The E2E GitHub App is installed on it
 - Update `githubclient.spec.md`: `StaleApprovedByUsers`, the new connection, the `CommentedByUsers` line, the `FirstReviewAt` line, which still counts a dismissed review, and the PR-scoped field lists of the `FindOpenPRs` and `GetPRs` lines under § Doesn't Do, which gain `reviewDismissals`
 - Verifying it done:
   - `make test`
