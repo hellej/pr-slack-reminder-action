@@ -83,20 +83,27 @@ Before spawning the critic, re-read the draft against the `plan` skill § Struct
    - **Fix**: you revise the plan, once the answers are in
 3. Revise, then re-review. That is one more round. Revise so the plan reads as if the finding
    never happened, and cut what the round grew
-4. Three rounds maximum. At the cap, hand back with the open findings named and the plan
+4. On the critic's first `PASS`, spawn `prose-clarity-checker`, with
+   `run_in_background: false`. It reads the plan as the implementer will: without the
+   research or the code. Brief it with the plan file path, to read in full, since the
+   whole file is new prose. Tell it you revise the plan, not an implementer
+   - Its medium findings are `Fix`es. Revise, then continue both agents with `SendMessage`
+     for a re-review, since a rewrite can change what a step means. That is one more round
+   - Its nits go to § Nits On a Pass
+5. Three rounds maximum. At the cap, hand back with the open findings named and the plan
    as it stands
 
 Ask before you edit. An answer can redirect a step, and a `Fix` you already applied to it
 is then work done twice. A `Verify` that comes back against the plan does the same, so a
 claim stays marked until its answer lands and no step builds on it in the meantime.
 
-Done is a `PASS` with no `Verify` outstanding and no `Ask` unanswered. Open nits do not
-hold the plan.
+Done is a `PASS` from `plan-critic` and no medium finding from `prose-clarity-checker`,
+with no `Verify` outstanding and no `Ask` unanswered. Open nits do not hold the plan.
 
-Agent definitions load at session start. If `plan-critic` is not registered yet, spawn
-`general-purpose`, paste the agent file's body into the prompt, and tell it to invoke the
-`plan` and `writing` skills first. `general-purpose` gets neither the body nor the
-`skills:` preload.
+Agent definitions load at session start. If an agent this section names is not registered
+yet, spawn `general-purpose`, paste the agent file's body into the prompt, and tell it to
+invoke each skill its `skills:` line lists first. `general-purpose` gets neither the body
+nor the `skills:` preload.
 
 ### Nits On a Pass
 
@@ -128,7 +135,8 @@ take more than one batch. Rounds are what the user has to sit through, so spend 
 
 ## Continue Agents, Never Respawn
 
-- After round 1, continue the existing `plan-critic` with `SendMessage`
+- After round 1, continue the existing `plan-critic` with `SendMessage`. Same for
+  `prose-clarity-checker` once spawned
 - A fresh critic re-checks claims it already confirmed and re-raises findings you resolved
   two rounds ago
 - Researchers are one question each and normally finish for good. Continue one only to
