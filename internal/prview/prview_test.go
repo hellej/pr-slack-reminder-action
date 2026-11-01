@@ -696,8 +696,8 @@ func TestGetNextActionOfPRWithoutFetchedData(t *testing.T) {
 	}
 }
 
-// Approved and failing alone reaches the snapshots. A waiting thread or a conflict does not, and
-// neither drops CI: the row says every blocker, whatever else keeps the PR with its author.
+// The snapshots reach approved, failing and conflicting, and a conflict on its own. These also pin
+// that CI failing needs an approval, and that a waiting thread never drops it.
 func TestMergeBlockers(t *testing.T) {
 	failing := githubclient.RequiredChecksFailing
 	tests := []struct {
@@ -713,15 +713,14 @@ func TestMergeBlockers(t *testing.T) {
 			expected: nil,
 		},
 		{
+			name:     "unapproved, conflicting and with a remembered failing status",
+			prFlags:  githubclient.PR{RequiredChecksStatus: failing, Conflicting: true},
+			expected: []prview.MergeBlocker{prview.MergeBlockerConflicts},
+		},
+		{
 			name:           "approved, failing and a thread waiting for the author",
 			approverLogins: []string{"bob"},
 			prFlags:        githubclient.PR{RequiredChecksStatus: failing, HasThreadWaitingForAuthor: true},
-			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
-		},
-		{
-			name:           "approved, failing and conflicting",
-			approverLogins: []string{"bob"},
-			prFlags:        githubclient.PR{RequiredChecksStatus: failing, Conflicting: true},
 			expected:       []prview.MergeBlocker{prview.MergeBlockerFailingChecks},
 		},
 	}

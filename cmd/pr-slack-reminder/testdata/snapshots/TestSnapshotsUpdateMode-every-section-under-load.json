@@ -312,7 +312,7 @@
               },
               {
                 "type": "text",
-                "text": " / CI failing",
+                "text": " / CI failing, conflicts",
                 "style": {}
               },
               {

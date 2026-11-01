@@ -3,7 +3,7 @@
 date: 2026-11-01
 status: draft
 
-Builds on [plan 019](019_demote-approved-PRs-with-failing-checks.md), which must be implemented first. Plan 019 adds `prview.MergeBlocker`, `MergeBlockers()` and the merge blocker group, `CI failing`. This plan adds conflicts to them.
+Builds on [plan 019](019_demote-approved-PRs-with-failing-checks.md), which has landed. Plan 019 added `prview.MergeBlocker`, `MergeBlockers()` and the merge blocker group, `CI failing`. This plan adds conflicts to them.
 
 ## Requirements
 
@@ -26,6 +26,7 @@ Serves § **Purpose**: the row says what the author has to fix, and a reviewer s
 
 - `prview.MergeBlockerConflicts` (`"conflicts"`), a second `MergeBlocker`
 - `prview.PR.MergeBlockers()` adds `MergeBlockerConflicts` when the PR's `Conflicting` field is true (`mergeable` is `CONFLICTING`), after `MergeBlockerFailingChecks`
+  - Plan 019's `MergeBlockers()` returned nil for every unapproved PR, so the approval check moves from that early return to `MergeBlockerFailingChecks` alone. `CI failing` still needs an approval: an unapproved PR's check status is never fetched (`prview.spec.md` § Oddities). So an unapproved PR that conflicts shows only `conflicts`, even if the state remembers it as failing
 - `GetReviewersTextSegments` needs no change. With no approvers or commenters it renders ` (conflicts)`, a case an unreviewed conflicting PR now reaches
 - `mergeable` is already fetched for every open PR, so the GraphQL cost does not change. A PR GitHub reports `UNKNOWN` reads as not conflicting. See docs/third-party-facts.md § `PullRequest.mergeable` returns `UNKNOWN` while GitHub computes it, and only REST documents the retry
 - Action inputs: none new. Permissions: none new
@@ -64,14 +65,15 @@ Non-breaking, **minor**. Row text changes, with no input or permission change, a
 
 Touches `internal/prview`, `testhelpers/mockgithubclient`, `cmd/pr-slack-reminder` and `internal/canvasbuilder` snapshot tests.
 
-- `MergeBlockerConflicts` and the `MergeBlockers()` change as in § Target shape. Size: one constant, one condition
+- `MergeBlockerConflicts` and the `MergeBlockers()` change as in § Target shape. Size: one constant, and `MergeBlockers()` rebuilt as an early return of nil for a PR without its fetched half, plus one condition per blocker
+- The `MergeBlockers` table test in `internal/prview/prview_test.go` pins what the snapshots miss: `CI failing` needs an approval, even on a conflicting PR
 - `mockgithubclient`: `MockGitHubClientOptions.ConflictingPRNumbers []int` answers those PRs' enrichment with `mergeable: CONFLICTING`. Other PRs keep today's answer
 - Fixtures, then `make update-test-snapshots`. Mark existing PRs, so only their rows change:
-  - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`: mark plan 019's failing-check PR and one existing unreviewed PR conflicting. That serves the post and marked-stale snapshots
-  - The update-mode table of `TestSnapshotsUpdateMode`: mark plan 019's failing-check PR conflicting, for the edited message
-  - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`: plan 019's failing-check PR and an unreviewed PR, both marked conflicting, for the canvas rows
+  - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, "every section under load": plan 019's failing-check PR #77 (`CI failing, conflicts`), the commented-only #74 (`💬 Erin Evans / conflicts`) and the unreviewed #75 (`(conflicts)`). That serves the post and marked-stale snapshots
+  - The update-mode table of `TestSnapshotsUpdateMode`, "every section under load": plan 019's failing-check PR #59, for the edited message
+  - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`, through a new `conflicting` option beside `failingRequiredChecks`: plan 019's failing-check PR #35 and the unreviewed #41, for the canvas rows
   - Read each snapshot diff before re-recording: only those PRs' rows change
-- Update `prview.spec.md`'s `MergeBlockers` line
+- Update `prview.spec.md`'s `MergeBlocker` and `MergeBlockers` lines, the merged row line of `messagebuilder.spec.md`, and the merged and WIP row lines of `canvasbuilder.spec.md`. They said `CI failing` where they mean any merge blocker
 
 ### 2. Check the rows live
 
@@ -88,7 +90,7 @@ Touches no files.
 
 Touches `README.md`.
 
-- The bucket paragraph under `README.md` § PR Tracker Canvas: an open row's merge blocker group also says `conflicts` when the PR conflicts with its base branch, in any open section
+- A new paragraph under `README.md` § PR Tracker Canvas, after the `CI failing` one: an open row also says `conflicts` when the PR conflicts with its base branch, in any open section, after `CI failing` when both apply
 - Done means `make check-style` passes
 
 ## Consequences
