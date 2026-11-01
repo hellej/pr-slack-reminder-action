@@ -89,7 +89,7 @@ Non-breaking, **minor**. Row text changes, with no input or permission change.
 Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`.
 
 - The connection populates on a private repository under `pull-requests: read` alone. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
-  - Its fixture stays: PR 7 of private `hellej/pr-slack-reminder-test-repo-1` carries a manually dismissed approval by `hellej`, so every E2E run reads a private-repo `ReviewDismissedEvent`
+  - Its fixture stays: PR 7 of private `hellej/pr-slack-reminder-test-repo-1` carries a manually dismissed approval by `hellej`, so every E2E run listing that repository reads a private-repo `ReviewDismissedEvent`
 - `pullRequestNode` gains `ReviewDismissals`. The existing `timelineItems` field keeps its name
 - `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
 - Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
