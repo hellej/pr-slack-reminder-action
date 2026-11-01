@@ -1012,5 +1012,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - "This event will only trigger a workflow run if the workflow file exists on the default branch." `GITHUB_SHA` and `GITHUB_REF` are the default branch's
 - "A workflow run is triggered regardless of the conclusion of the previous workflow." Filter in a job or step `if:` on `github.event.workflow_run.conclusion`
 - At most three levels of workflows chain through `workflow_run`
-- `check_suite` and `check_run` do "not trigger workflows if the check suite was created by GitHub Actions", so neither reacts to an Actions CI run. `workflow_run` doesn't react to an external CI app's checks
-- Not documented: whether `completed` fires again for a re-run, and whether it fires for a fork PR's run, which the [secure use page](https://docs.github.com/en/actions/reference/security/secure-use) only implies by warning against `workflow_run` with untrusted PRs
+- `check_suite` and `check_run` do "not trigger workflows if the check suite was created by GitHub Actions", so neither reacts to an Actions CI run
+- Inferred, not documented: `workflow_run` doesn't react to an external CI app's checks
+- Not documented: whether `completed` fires again for a re-run, and whether it fires for a fork PR's run. The [secure use page](https://docs.github.com/en/actions/reference/security/secure-use) only implies the second, by warning against `workflow_run` with untrusted PRs

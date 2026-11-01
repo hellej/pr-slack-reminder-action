@@ -20,7 +20,7 @@ Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-
 - Check status is fetched for approved, non-draft open PRs only
 - The README suggests an optional `update` trigger on CI completion, so a fixed PR turns green without waiting for the next PR event
 
-Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is red, which is the trust the section exists to earn. A push no longer flips a red PR to ready while its fix is still unproven. Sized for § **Reference Deployment**: 0 to 8 open PRs, so the extra request is at most one.
+Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is red, which is the trust the "ready to merge" section exists to earn. A push no longer flips a red PR to ready while its fix is still unproven. Sized for § **Reference Deployment**: 0 to 8 open PRs, so the extra request is at most one.
 
 ### Non-goals
 
@@ -54,7 +54,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - The PR is `RequiredChecksFailing` when any required context is failing
   - Otherwise `RequiredChecksPassing` when there is at least one required context, every required context is passing, and `hasNextPage` is false
   - Otherwise `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
-- `OpenPRsResult` gains `CheckStatusErr error`: set when the phase failed in whole or in part. The PRs it covers stay `RequiredChecksUnknown`
+- `OpenPRsResult` gains `CheckStatusErr error`: set when the phase failed in whole or in part. The PRs of the failed batches stay `RequiredChecksUnknown`
 - `state.State` gains `FailingRequiredCheckPRs []models.PullRequestRef` (JSON key `failingRequiredCheckPRs`, omitted when empty): the open PRs the run last saw as failing
 - `state.PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR` returns copies in which every `RequiredChecksUnknown` PR whose ref the loaded state lists is `RequiredChecksFailing`. A nil state changes nothing
 - `state.FailingRequiredCheckPRRefs(prs []githubclient.PR) []models.PullRequestRef` returns the refs of the `RequiredChecksFailing` PRs, in the PRs' order
@@ -62,14 +62,14 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Right after `loadPreviousState`, applies `PRsWithRememberedFailingChecks` to the open PRs, passing the loaded state, nil when it did not load. Both tracks and both modes then read the same PRs
   - Where it sets the canvas hash on the state to save, sets `FailingRequiredCheckPRs` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
   - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
-- `prview.PR.GetNextAction` reads `RequiredChecksFailing` in its first check: it keeps an approved PR out of `NextActionReadyToMerge`, so it is `NextActionWaitingForAuthor`, as for a conflict
+- `prview.PR.GetNextAction` reads `RequiredChecksFailing` in the first of its three ordered conditions. A failing status keeps an approved PR out of `NextActionReadyToMerge`: the PR gets `NextActionWaitingForAuthor`, as for a conflict
 - `prview.PR.IsHeldBackByFailingChecks()` is true when the failing check alone keeps an approved PR out of "ready to merge": approved, no waiting thread, no conflict, `RequiredChecksFailing`. It is what the `❌ CI` entry reads
 - `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
   - `prview.GetReviewersTextSegments` gains a `hasFailingChecks bool` parameter and renders ` / ❌ CI` before the closing parenthesis, so both builders share it
   - With no approvers or commenters it renders ` (❌ CI)`. A held-back PR is approved, so no held-back row reaches that case
   - Only open rows pass `IsHeldBackByFailingChecks()`. Draft and merged rows pass false
 - Action inputs: none new. Permissions: none new
-  - `statusCheckRollup` and `isRequired` populated under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
+  - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
   - Step 1's checkpoint covers a private repository under the E2E App token
 
 Message states for an approved PR whose required check fails, then gets a fix:
@@ -87,7 +87,7 @@ Edited by `update` once every required check passed
 *✅ Ready to merge*
   • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol)
 
-Marked stale by the next post, when it was posted while red
+Marked stale by the next post, after the message was posted while the PR was red
 ⚠️ Stale, updated Oct 31 at 09:00
 *💬 Waiting for author*
   • Fix retry loop   2 days ago   by alice (✅ bob / 💬 carol / ❌ CI)
@@ -121,8 +121,9 @@ Non-breaking, **minor**. Bucketing and row text change for users with a failing 
 
 Touches `internal/apiclients/githubclient` (`graphqlquery.go`, `openprsfetch.go`, `getprsbyreffetch.go`). Refactor, no behaviour change, ~2 call sites.
 
-- `buildPullRequestsQuery` takes a `pullRequestSelection` instead of a `pullRequestFragment`. It is a small struct holding the fragment definitions text, empty when there is none, and a `body` func from the number variable to the alias body
-- `pullRequestFragment` gains a method returning the `pullRequestSelection` that carries its definition and spreads it, so both existing callers keep their query text byte for byte
+- `buildPullRequestsQuery` takes a `pullRequestSelection` instead of a `pullRequestFragment`
+- `pullRequestSelection` is a small struct holding the fragment definitions text (empty when there is none) and a `body` func from the number variable to the alias body
+- `pullRequestFragment` gains a method that returns a `pullRequestSelection` holding the fragment's own definition, with a body that spreads the fragment. Both existing callers keep their query text byte for byte
 - The check status selection has no definitions and an inline body
 - The existing query tests and the snapshots are the regression net
 
@@ -130,19 +131,19 @@ Touches `internal/apiclients/githubclient` (`graphqlquery.go`, `openprsfetch.go`
 
 Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd/pr-slack-reminder` (`run.go`).
 
-- `PR.RequiredChecks`, set by `client.fetchRequiredCheckStatus`, called at the end of `FindOpenPRs` after `excludeSnoozedPRs`. See [§ Why check status is its own request for approved PRs](#why-check-status-is-its-own-request-for-approved-prs)
+- `PR.RequiredChecks` is set by `client.fetchRequiredCheckStatus`, which `FindOpenPRs` calls at its end, after `excludeSnoozedPRs`. See [§ Why check status is its own request for approved PRs](#why-check-status-is-its-own-request-for-approved-prs)
 - Requested PRs: not draft, `HasCompleteReviewerInfo`, and at least one approver. A PR outside that set stays `RequiredChecksUnknown`
 - The phase batches 25 PRs per request, runs at most `defaultGitHubAPIConcurrencyLimit` requests at a time and goes through `retry.DefaultPolicy` like every GraphQL request
-- `requiredChecksStatus` classifies the decoded contexts, as listed in § Target shape. A table test covers each row of that list, `hasNextPage` with all passing included
+- `requiredChecksStatus` classifies the decoded contexts, as listed in § Target shape. A table test covers each row of that list, including `hasNextPage` true with every context passing
 - A failure never fails `FindOpenPRs`:
   - A query, repository or transport error leaves every PR of that batch unknown
   - A per-PR error (`pullRequestError`, as `failsOnlyOnePullRequest` reads it) leaves only that PR unknown
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
   - Batches fail independently: unlike `enrichPRsWithReviewInfo`'s `errgroup.WithContext`, one failed batch does not cancel the others
-  - A decode error and an expired context count as a failed batch too. Nothing in the phase returns an error from `FindOpenPRs`
+  - A decode error and an expired context count as a failed batch too
 - A rollup with `hasNextPage` true is logged
 - Log the phase's `rateLimit.cost` through `logRateLimit`, and one line per requested PR with its status. A failed batch logs its error there too
-- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged list, merge stats and by-ref fetches share the constant and get the longer limit too, which the comment says in one line
+- `prFetchTimeout` in `run.go` grows from 2 to 3 minutes, and its comment names the third phase: a listing, a wave of enrichment batches and a wave of check status batches, each call retried for up to 52s. The merged list, merge stats and by-ref fetches share the constant and get the longer limit too. The comment says so in one line
 - `mockgithubclient`:
   - The transport routes a query containing `statusCheckRollup` before its `pullRequest(number:` branch. The default answer is a null rollup, unknown, so existing fixtures with an approved PR keep their buckets
   - `MockGitHubClientOptions.FailingRequiredCheckPRNumbers []int`, `PassingRequiredCheckPRNumbers []int` and `PendingRequiredCheckPRNumbers []int` answer those PRs with one required check run that failed, passed or is in progress
@@ -151,24 +152,25 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
   - `make test`, and the new phase's request carries exactly the approved non-draft refs
-  - The repository owner sets up, in a private test repository the E2E runs list, a PR approved by a human other than its author, whose required check fails. The check is required through a ruleset, the case docs/third-party-facts.md does not cover yet. The PR is not authored by `alice` in `pr-slack-reminder-test-repo-1` and carries no `ignore-reminder` label, or the grouped runs drop it
+  - The repository owner sets up a PR in one of the private test repositories that the E2E runs list: approved by a human other than its author, with a failing required check. The check is required through a ruleset, the case docs/third-party-facts.md does not cover yet
+  - Its author is not `alice` if it is in `pr-slack-reminder-test-repo-1`, where the grouped runs filter out PRs by `alice`. It carries no `ignore-reminder` label
   - The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
   - After pushing the branch, the Build job log shows, for the fixture PR: its status line reading `failing`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line
   - If an error line shows, stop and raise it with the user: a permission is needed and the plan has to say which
-  - Add what this confirms to docs/third-party-facts.md, and amend the probe entry's "not shown" list
+  - Add what this confirms to docs/third-party-facts.md, and amend the "not shown" list of docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
 
 ### 2. Keep failing PRs out of "ready to merge" in `prview`
 
 Touches `internal/prview`.
 
 - `GetNextAction` and `IsHeldBackByFailingChecks()` as in § Target shape. Size: one condition, one method
-- Update `prview.spec.md`: the check list, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
+- Update `prview.spec.md`: the list of conditions, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
 
 ### 3. Render `❌ CI` in the reviewer list
 
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
-- `prview.GetReviewersTextSegments` takes `hasFailingChecks`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers` and its WIP and merged rows
+- `prview.GetReviewersTextSegments` takes `hasFailingChecks`, as in § Target shape. ~4 call sites: the message's `getReviewersElements`, the canvas's `renderReviewers`, the canvas's WIP row and the canvas's merged row
 - `messagebuilder.buildOpenPRBulletPoint` and `canvasbuilder.renderOpenPRRow` pass `IsHeldBackByFailingChecks()`. The other callers pass false
 - `❌ CI` is part of the glue segments, so neither builder escapes or styles it as a name
 - Collapsed rows carry no reviewer list, so no `❌ CI`
@@ -185,8 +187,8 @@ Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`), `AGENTS.md`.
 
 - `State.FailingRequiredCheckPRs`, `PRsWithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
 - `Run` applies and saves them as in § Target shape. It logs one line per PR made failing from the state, naming it
-- `main_test.go` covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode, and a listed PR this run did not fetch for check status (no longer approved, or a draft). `getTestState` gains an option for the failing refs
-- The state snapshots holding the step 3 fixture list the failing PR
+- `main_test.go` covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode, and a PR the loaded state lists as failing that this run did not fetch for check status (no longer approved, or a draft). `getTestState` gains an option for the failing refs
+- The state snapshots built from the step 3 fixture carry the failing PR in `failingRequiredCheckPRs`
 - Update `state.spec.md`:
   - The opening sentence and § Behaviour: the field and both functions
   - § Oddities: the field was added without a schema bump, and the "An update run rewrites only ..." line gains the set
@@ -210,7 +212,7 @@ Touches no files. The step 1 fixture PR is the setup.
 - `pr-reminder.yml` lists this repository only, so it cannot show the fixture PR. Read the branch's Build E2E runs instead:
   - The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the message and on the canvas
 - Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
-- The sticky status is not checked live: the fixture's check would have to run during the E2E job. `main_test.go` covers it
+- The remembered failing status is not checked live: the fixture's check would have to run during the E2E job. `main_test.go` covers it
 
 ### 7. Docs
 
@@ -250,12 +252,12 @@ Touches `README.md`.
 - Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
-- `isRequired` reads only contexts that have reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
+- A context carries `isRequired` only once it has reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
 - More than 100 contexts on a commit: a failure among the first 100 still reads failing, but the PR never reads passing, so a red PR stays red
-- A snoozed or filtered-out PR leaves the set, and so does one turned draft while the canvas is off. When it comes back with pending checks, it reads green
+- A snoozed or filtered-out PR leaves the set, and so does one turned draft while the canvas is off. When such a PR comes back with pending checks, it reads green
 - A PR whose required checks are all removed stays red until it leaves the open fetch: no required context reads unknown
-- In update mode, a state that fails to load fails the run, but the canvas refresh still runs, without the set
-- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree. If the rollup shows only the re-run's pending attempt, the state keeps the PR red until it passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree
+- In update mode, a state that fails to load fails the run. The canvas refresh still runs, but with no remembered failing PRs applied
+- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree. If the rollup shows only the re-run's pending attempt, the state keeps the PR red until the re-run passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree
 - Unverified for a fine-grained PAT and a classic PAT. A token lacking the permission either fails the request, which degrades to the warning, or gets a null rollup without an error, which leaves every PR unknown with no warning. See docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
 
 ### Neutral
@@ -270,4 +272,4 @@ The enrichment query runs for every open PR and a failure scoped to a repository
 
 ### Why the last status lives in the state
 
-The run already loads and saves the state, so remembering a set of refs costs no request. Reading the status from GitHub's history instead means fetching earlier commits' rollups for every pending PR, which costs points each run. It also misses a re-run on the same commit, if the rollup shows only the pending attempt, which no GitHub page settles. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree.
+The run already loads and saves the state, so remembering a set of refs costs no request. Reading the status from GitHub's history instead means fetching earlier commits' rollups for every pending PR, which costs points each run. That approach also misses a re-run on the same commit, if the rollup shows only the pending attempt, which no GitHub page settles. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree.
