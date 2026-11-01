@@ -87,8 +87,9 @@ Before spawning the critic, re-read the draft against the `plan` skill § Struct
    `run_in_background: false`. It reads the plan as the implementer will: without the
    research or the code. Brief it with the plan file path, to read in full, since the
    whole file is new prose. Tell it you revise the plan, not an implementer
-   - Its medium findings are `Fix`es. Revise, then continue both agents with `SendMessage`
-     for a re-review, since a rewrite can change what a step means. That is one more round
+   - Apply its medium findings yourself, then continue it with `SendMessage` to re-check the
+     rewritten sentences. No `plan-critic` re-review and no round spent, unless a rewrite
+     changes a step's scope, size or order. Then it is a `Fix`: re-review, one more round
    - Its nits go to § Nits On a Pass
 5. Three rounds maximum. At the cap, hand back with the open findings named and the plan
    as it stands
