@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestBlobURLPrefixes(t *testing.T) {
+func TestKnownBranchBlobURLPrefixes(t *testing.T) {
 	tests := []struct {
 		name          string
 		remoteURL     string
@@ -31,6 +31,18 @@ func TestBlobURLPrefixes(t *testing.T) {
 			want:          []string{"https://github.com/o/r/blob/main/"},
 		},
 		{
+			name:          "SSH URL remote",
+			remoteURL:     "ssh://git@github.com/o/r.git",
+			currentBranch: "main",
+			want:          []string{"https://github.com/o/r/blob/main/"},
+		},
+		{
+			name:          "HTTPS remote with credentials",
+			remoteURL:     "https://x-access-token:abc123@github.com/o/r.git",
+			currentBranch: "main",
+			want:          []string{"https://github.com/o/r/blob/main/"},
+		},
+		{
 			name:          "remote not on GitHub",
 			remoteURL:     "https://gitlab.com/o/r.git",
 			currentBranch: "main",
@@ -39,7 +51,7 @@ func TestBlobURLPrefixes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := blobURLPrefixes(tt.remoteURL, tt.currentBranch)
+			got := knownBranchBlobURLPrefixes(blobURLRoot(tt.remoteURL), tt.currentBranch)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}

@@ -19,13 +19,14 @@ const (
 )
 
 type summarySection struct {
-	heading    string
-	minBullets int
-	maxBullets int
+	heading         string
+	requiresSummary bool
+	minBullets      int
+	maxBullets      int
 }
 
 var summarySections = []summarySection{
-	{heading: "### The problem", minBullets: 2, maxBullets: 3},
+	{heading: "### The problem", requiresSummary: true, minBullets: 2, maxBullets: 3},
 	{heading: "### The solution", minBullets: 2, maxBullets: 5},
 }
 
@@ -37,10 +38,10 @@ const (
 )
 
 var (
-	issueOrPRReference = regexp.MustCompile(`#\d+|/(issues|pull)/\d+`)
-	issueOrPRState     = regexp.MustCompile(`^- (Open|Closed|Merged) `)
-	closesIssue        = regexp.MustCompile(`^(Closes|Fixes) #\d+`)
-	numberedItem       = regexp.MustCompile(`^\d+\. `)
+	issueOrPRReference       = regexp.MustCompile(`#\d+|/(issues|pull)/\d+`)
+	startsWithIssueOrPRState = regexp.MustCompile(`^- (Open|Closed|Merged) `)
+	closesOrFixesIssue       = regexp.MustCompile(`^(Closes|Fixes) #\d+`)
+	numberedItem             = regexp.MustCompile(`^\d+\. `)
 )
 
 func main() {
@@ -65,6 +66,7 @@ func main() {
 }
 
 func problems(description string, forMCPTools bool) []string {
+	description = strings.ReplaceAll(description, "\r\n", "\n")
 	lines := strings.Split(description, "\n")
 	var found []string
 	summaryWords := 0
@@ -76,7 +78,7 @@ func problems(description string, forMCPTools bool) []string {
 	if summaryWords > maxSummaryWords {
 		found = append(found, fmt.Sprintf("summary is %d words, want at most %d", summaryWords, maxSummaryWords))
 	}
-	found = append(found, proseLines(lines)...)
+	found = append(found, linesNotListItems(lines)...)
 	found = append(found, relatedWithoutState(lines)...)
 	if forMCPTools {
 		found = append(found, longLinks(description)...)
@@ -84,40 +86,44 @@ func problems(description string, forMCPTools bool) []string {
 	return found
 }
 
-// The description is lists only: bullets, and a numbered list under "## Open".
-func proseLines(lines []string) []string {
+func linesNotListItems(lines []string) []string {
 	var found []string
-	heading := ""
+	currentHeading := ""
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		isSubItem := strings.HasPrefix(line, " ")
+		isListItem := isBullet(trimmed) || isSubItem(line) && numberedItem.MatchString(trimmed)
 		switch {
 		case trimmed == "":
 		case strings.HasPrefix(line, "#"):
-			heading = line
-		case heading == "":
-			if !closesIssue.MatchString(trimmed) {
+			currentHeading = line
+		case currentHeading == "":
+			if !closesOrFixesIssue.MatchString(trimmed) {
 				found = append(found, "before the first heading: not a Closes or Fixes line: "+trimmed)
 			}
-		case heading == openHeading && !isSubItem:
+		case currentHeading == openHeading && !isSubItem(line):
 			if !numberedItem.MatchString(trimmed) {
 				found = append(found, openHeading+": not a numbered item: "+trimmed)
 			}
-		case !isBullet(trimmed) && !(isSubItem && numberedItem.MatchString(trimmed)):
-			found = append(found, sectionName(heading)+": not a bullet: "+trimmed)
+		case !isListItem:
+			found = append(found, headingWithoutSummary(currentHeading)+": not a bullet: "+trimmed)
+		case trimmed == "-":
+			found = append(found, headingWithoutSummary(currentHeading)+": empty bullet")
 		}
 	}
 	return found
+}
+
+func isSubItem(line string) bool {
+	return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
 }
 
 func isBullet(trimmedLine string) bool {
 	return trimmedLine == "-" || strings.HasPrefix(trimmedLine, "- ")
 }
 
-// "### The problem: reviews stall" reports as "### The problem", the way its summary section does.
-func sectionName(heading string) string {
-	name, _, _ := strings.Cut(heading, ":")
-	return name
+func headingWithoutSummary(heading string) string {
+	withoutSummary, _, _ := strings.Cut(heading, ":")
+	return withoutSummary
 }
 
 // A reader can't tell an open issue or PR from a closed one by its number alone.
@@ -129,45 +135,37 @@ func relatedWithoutState(lines []string) []string {
 	var found []string
 	for _, line := range linesUntilNextHeading(lines[headingIndex+1:]) {
 		trimmed := strings.TrimSpace(line)
-		if issueOrPRReference.MatchString(trimmed) && !issueOrPRState.MatchString(trimmed) {
+		if issueOrPRReference.MatchString(trimmed) && !startsWithIssueOrPRState.MatchString(trimmed) {
 			found = append(found, relatedHeading+": start with Open, Closed or Merged: "+strings.TrimPrefix(trimmed, "- "))
 		}
 	}
 	return found
 }
 
-// Returns the section's problems and the word count of its bullets.
-func (s summarySection) problems(lines []string) ([]string, int) {
+func (s summarySection) problems(lines []string) (found []string, bulletWords int) {
 	headingIndex := slices.IndexFunc(lines, func(line string) bool { return strings.HasPrefix(line, s.heading) })
 	if headingIndex == -1 {
 		return []string{"missing heading: " + s.heading}, 0
 	}
-	var found []string
 	report := func(problem string) { found = append(found, s.heading+": "+problem) }
 
-	if problem := headingSummaryProblem(strings.TrimPrefix(lines[headingIndex], s.heading)); problem != "" {
+	if problem := s.headingSummaryProblem(lines[headingIndex]); problem != "" {
 		report(problem)
 	}
 
-	topLevelBullets, words := 0, 0
+	topLevelBullets := 0
 	for _, line := range linesUntilNextHeading(lines[headingIndex+1:]) {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
 		if !isBullet(trimmed) {
 			continue
 		}
-		if strings.HasPrefix(line, "-") {
+		if !isSubItem(line) {
 			topLevelBullets++
 		}
 		bulletText := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
-		bulletWords := len(strings.Fields(bulletText))
-		words += bulletWords
-		switch {
-		case bulletWords == 0:
-			report("empty bullet")
-		case bulletWords > maxBulletWords:
+		wordsInBullet := len(strings.Fields(bulletText))
+		bulletWords += wordsInBullet
+		if wordsInBullet > maxBulletWords {
 			report(fmt.Sprintf("bullet over %d words: %s", maxBulletWords, bulletText))
 		}
 	}
@@ -175,12 +173,19 @@ func (s summarySection) problems(lines []string) ([]string, int) {
 	if topLevelBullets < s.minBullets || topLevelBullets > s.maxBullets {
 		report(fmt.Sprintf("%d bullets, want %d to %d", topLevelBullets, s.minBullets, s.maxBullets))
 	}
-	return found, words
+	return found, bulletWords
 }
 
-// headingRest is what follows "### The problem", such as ": reviews stall".
-func headingSummaryProblem(headingRest string) string {
-	summary := strings.TrimSpace(strings.TrimPrefix(headingRest, ":"))
+func (s summarySection) headingSummaryProblem(headingLine string) string {
+	afterHeading := strings.TrimSpace(strings.TrimPrefix(headingLine, s.heading))
+	summary, hasColon := strings.CutPrefix(afterHeading, ":")
+	if afterHeading != "" && !hasColon {
+		return "summary not after a colon"
+	}
+	summary = strings.TrimSpace(summary)
+	if s.requiresSummary && summary == "" {
+		return "heading without a summary"
+	}
 	if strings.HasPrefix(summary, "<a few words") {
 		return "template placeholder left in: " + summary
 	}
@@ -202,7 +207,7 @@ func longLinks(description string) []string {
 	var found []string
 	for _, match := range markdownLinkURL.FindAllStringSubmatch(description, -1) {
 		if url := match[1]; len(url) > maxLinkLength {
-			found = append(found, fmt.Sprintf("link over %d characters: %s", maxLinkLength, url))
+			found = append(found, fmt.Sprintf("link URL over %d characters: %s", maxLinkLength, url))
 		}
 	}
 	return found

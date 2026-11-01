@@ -170,8 +170,9 @@ separate run of the [implement skill](../implement/SKILL.md).
 
 ### The Plan's PR
 
-When the plan lands on a feature branch (round 0), push the final plan and open a draft PR
-with the [pr skill](../pr/SKILL.md). Its `## Open` lists what is still open before implementing.
+When round 0 decided on a feature branch and a PR, push the final plan and open a draft PR
+with the [pr skill](../pr/SKILL.md). In the PR description, `## Open` lists what is still open
+before implementing.
 
 ## What the Run Taught
 

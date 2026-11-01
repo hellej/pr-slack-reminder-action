@@ -1003,4 +1003,5 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 ## The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link [2026-10-31]
 
 - Source: plan 019's draft PR, description read back after writing it
-- A 145 character link stayed intact, a 152 character one came back wrapped in backticks
+- A 145 character URL stayed intact, a 152 character one came back wrapped in backticks
+- Unverified: where between 146 and 151 characters the wrapping starts. `checkprdescription` fails a URL over 150

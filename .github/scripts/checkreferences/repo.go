@@ -15,9 +15,8 @@ type repo struct {
 	// Every file git lists, tracked or untracked but not ignored, plus every directory holding one.
 	isListedByPath map[string]bool
 	// Blob URLs into this repository start with blobURLRoot, such as "https://github.com/o/r/blob/"
-	blobURLRoot string
-	// Blob URL prefixes into this repository on `main` and the current branch, as a PR description links them
-	blobURLPrefixes []string
+	blobURLRoot                string
+	knownBranchBlobURLPrefixes []string
 }
 
 // Claude Code's own agent types, which live outside .agents/.
@@ -31,9 +30,8 @@ func loadRepo(root string) (repo, error) {
 		return repo{}, fmt.Errorf("listing repository files: %w", err)
 	}
 	r := newRepo(root, strings.Split(strings.TrimSpace(string(output)), "\n"))
-	remoteURL := gitOutput(root, "remote", "get-url", "origin")
-	r.blobURLRoot = blobURLRoot(remoteURL)
-	r.blobURLPrefixes = blobURLPrefixes(remoteURL, gitOutput(root, "branch", "--show-current"))
+	r.blobURLRoot = blobURLRoot(gitOutput(root, "remote", "get-url", "origin"))
+	r.knownBranchBlobURLPrefixes = knownBranchBlobURLPrefixes(r.blobURLRoot, gitOutput(root, "branch", "--show-current"))
 	return r, nil
 }
 
@@ -45,7 +43,7 @@ func gitOutput(root string, args ...string) string {
 	return strings.TrimSpace(string(output))
 }
 
-var githubRemote = regexp.MustCompile(`^(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?$`)
+var githubRemote = regexp.MustCompile(`^(?:git@github\.com:|ssh://git@github\.com/|https://(?:[^@/]+@)?github\.com/)([^/]+/[^/]+?)(?:\.git)?$`)
 
 // Empty for a remote not on GitHub.
 func blobURLRoot(remoteURL string) string {
@@ -57,8 +55,7 @@ func blobURLRoot(remoteURL string) string {
 }
 
 // A branch name may hold slashes, so a blob URL's path is found by its known branch, not by position.
-func blobURLPrefixes(remoteURL, currentBranch string) []string {
-	root := blobURLRoot(remoteURL)
+func knownBranchBlobURLPrefixes(root, currentBranch string) []string {
 	if root == "" {
 		return nil
 	}
