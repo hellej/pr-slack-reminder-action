@@ -191,7 +191,7 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
   - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, which serves the post and marked-stale snapshots
   - The update-mode table of `TestSnapshotsUpdateMode`, for the edited message
   - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`, for the canvas row
-  - Both cmd fixture sets pass the failing PR through a `failingRequiredCheckNumbers` field to `FailingRequiredCheckPRNumbers`
+  - Both cmd fixture sets pass the failing PR through a `prNumbersWithFailingRequiredChecks` field to `FailingRequiredCheckPRNumbers`
 - The canvas WIP and merged fixtures, and the message's merged row test, are approved and failing too, with their expected output unchanged, so a row naming the failing check outside an open section fails a test
 - Expect the snapshots holding those fixtures to change. No state snapshot gains a `RequiredChecks` key: it is `omitempty`, and a cached merged PR is always unknown
 

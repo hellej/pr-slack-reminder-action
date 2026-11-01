@@ -132,15 +132,15 @@ func assertMatchesSnapshot(t *testing.T, actual []byte, snapshotFilePath string)
 }
 
 type snapshotScenario struct {
-	name                        string
-	configOverrides             map[string]any
-	prs                         []*github.PullRequest
-	prsByRepo                   map[string][]*github.PullRequest
-	mergedPRs                   []*github.PullRequest
-	mergedPRsByRepo             map[string][]*github.PullRequest
-	reviewsByPRNumber           map[int][]*github.PullRequestReview
-	timelineCommentsByPRNumber  map[int][]*github.IssueComment
-	failingRequiredCheckNumbers []int
+	name                               string
+	configOverrides                    map[string]any
+	prs                                []*github.PullRequest
+	prsByRepo                          map[string][]*github.PullRequest
+	mergedPRs                          []*github.PullRequest
+	mergedPRsByRepo                    map[string][]*github.PullRequest
+	reviewsByPRNumber                  map[int][]*github.PullRequestReview
+	timelineCommentsByPRNumber         map[int][]*github.IssueComment
+	prNumbersWithFailingRequiredChecks []int
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
@@ -544,7 +544,7 @@ func snapshotScenarios() []snapshotScenario {
 					AgeHours: 7,
 				}),
 			},
-			failingRequiredCheckNumbers: []int{77},
+			prNumbersWithFailingRequiredChecks: []int{77},
 			// Four merges reach the cap of three, newest first.
 			mergedPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
@@ -696,7 +696,7 @@ func runSnapshotScenario(
 		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
 		MockPreviousState:          previousState,
 
-		FailingRequiredCheckPRNumbers: scenario.failingRequiredCheckNumbers,
+		FailingRequiredCheckPRNumbers: scenario.prNumbersWithFailingRequiredChecks,
 
 		FirstReadyForReviewEventAtByPRNumber: scenario.firstReadyForReviewEventAtByPRNumber,
 	})
@@ -823,14 +823,14 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		prByNumber      map[int]*github.PullRequest
 		// The open-PR fetch is live, so it returns the state PRs that are still open, by number,
 		// and any PR opened since the message was posted.
-		openPRNumbers                     []int
-		openPRsNotInState                 []*github.PullRequest
-		mergedPRsFromSearch               []*github.PullRequest
-		reviewsByPRNumber                 map[int][]*github.PullRequestReview
-		requestedReviewerLoginsByPRNumber map[int][]string
-		failingRequiredCheckNumbers       []int
-		mergeStatsOfState                 func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
-		deletesTheMessage                 bool
+		openPRNumbers                      []int
+		openPRsNotInState                  []*github.PullRequest
+		mergedPRsFromSearch                []*github.PullRequest
+		reviewsByPRNumber                  map[int][]*github.PullRequestReview
+		requestedReviewerLoginsByPRNumber  map[int][]string
+		prNumbersWithFailingRequiredChecks []int
+		mergeStatsOfState                  func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
+		deletesTheMessage                  bool
 	}{
 		{
 			name: "every section under load",
@@ -898,7 +898,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					AgeHours: 8, State: "open",
 				}),
 			},
-			failingRequiredCheckNumbers: []int{59},
+			prNumbersWithFailingRequiredChecks: []int{59},
 			mergedPRsFromSearch: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
 					Number: 70, Title: "Merged without ever being listed", AuthorLogin: "heidi",
@@ -1046,7 +1046,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				MergedPRs:                         tc.mergedPRsFromSearch,
 				ReviewsByPRNumber:                 tc.reviewsByPRNumber,
 				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
-				FailingRequiredCheckPRNumbers:     tc.failingRequiredCheckNumbers,
+				FailingRequiredCheckPRNumbers:     tc.prNumbersWithFailingRequiredChecks,
 				MockPreviousState:                 &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})
