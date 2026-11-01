@@ -166,7 +166,7 @@ func (c *client) enrichPRBatch(ctx context.Context, batch []PRResult) ([]PR, err
 	var data aliasedData[pullRequestWrapperNode]
 	fieldErrors, err := c.graphql.Do(ctx, query.text, query.variables, query.aliases, &data)
 	if err != nil && !failsOnlyOnePullRequest(err) {
-		return nil, enrichPRsWithReviewInfoError(err, query.repositoryByAlias)
+		return nil, pullRequestBatchError("reviews and comments", err, query.repositoryByAlias)
 	}
 	logRateLimit(data.RateLimit)
 
@@ -185,17 +185,19 @@ func failsOnlyOnePullRequest(err error) bool {
 	return errors.As(err, &prError)
 }
 
-func enrichPRsWithReviewInfoError(err error, repositoryByAlias map[string]models.Repository) error {
+// Names the repository when the error is scoped to one.
+func pullRequestBatchError(
+	fetched string, err error, repositoryByAlias map[string]models.Repository,
+) error {
 	var repoError repositoryError
 	if errors.As(err, &repoError) {
 		if repository, isKnownAlias := repositoryByAlias[repoError.alias]; isKnownAlias {
 			return fmt.Errorf(
-				"error fetching reviews and comments from %s/%s: %w",
-				repository.Owner, repository.Name, err,
+				"error fetching %s from %s/%s: %w", fetched, repository.Owner, repository.Name, err,
 			)
 		}
 	}
-	return fmt.Errorf("error fetching reviews and comments: %w", err)
+	return fmt.Errorf("error fetching %s: %w", fetched, err)
 }
 
 func enrichedPR(result PRResult, aliasNode *pullRequestWrapperNode, aliasError error) PR {

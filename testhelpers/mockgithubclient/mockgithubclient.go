@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -36,24 +37,31 @@ type MockGitHubClientOptions struct {
 	TimelineCommentsByPRNumber           map[int][]*github.IssueComment
 	RequestedReviewerLoginsByPRNumber    map[int][]string
 	FirstReadyForReviewEventAtByPRNumber map[int]time.Time
-	PRServiceError                       error
-	IssueServiceError                    error
-	MockPreviousState                    *state.State
-	ListArtifactsError                   error
-	DownloadArtifactError                error
-	Recording                            *FetchRecording
+	// Each answers its PRs' check status with one required check run that failed, passed or is
+	// in progress. Any other PR gets a null rollup: unknown
+	FailingRequiredCheckPRNumbers []int
+	PassingRequiredCheckPRNumbers []int
+	PendingRequiredCheckPRNumbers []int
+	CheckStatusError              error // fails the check status request only
+	PRServiceError                error
+	IssueServiceError             error
+	MockPreviousState             *state.State
+	ListArtifactsError            error
+	DownloadArtifactError         error
+	Recording                     *FetchRecording
 }
 
 // Counts the open and merged PR fetches a run made, so a test can pin that each one goes out
-// once whatever the run renders from it. GetPRsRequests and EnrichmentRequests get one entry per
-// request, so a skipped call shows up as no entry at all. Both fetch in batches of 25 refs over
-// their own goroutines, so every write takes the lock.
+// once whatever the run renders from it. GetPRsRequests, EnrichmentRequests and
+// CheckStatusRequests get one entry per request, so a skipped call shows up as no entry at all.
+// Each fetches in batches of 25 refs over its own goroutines, so every write takes the lock.
 type FetchRecording struct {
-	mutex              sync.Mutex
-	OpenPRFetches      int
-	MergedPRFetches    int
-	GetPRsRequests     [][]models.PullRequestRef
-	EnrichmentRequests [][]models.PullRequestRef
+	mutex               sync.Mutex
+	OpenPRFetches       int
+	MergedPRFetches     int
+	GetPRsRequests      [][]models.PullRequestRef
+	EnrichmentRequests  [][]models.PullRequestRef
+	CheckStatusRequests [][]models.PullRequestRef
 	// One entry per merged search request: its qN search query strings, in alias order
 	MergedPRSearchQueries  [][]string
 	StateArtifactDownloads int
@@ -69,6 +77,12 @@ func (r *FetchRecording) recordEnrichmentRequest(references []models.PullRequest
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.EnrichmentRequests = append(r.EnrichmentRequests, references)
+}
+
+func (r *FetchRecording) recordCheckStatusRequest(references []models.PullRequestRef) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.CheckStatusRequests = append(r.CheckStatusRequests, references)
 }
 
 func (r *FetchRecording) recordOpenPRFetch() {
@@ -167,6 +181,10 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 	}
 	if strings.Contains(request.Query, "pullRequests(") {
 		return t.openPRsResponse(request.Variables)
+	}
+	// The check status query selects a PR by number too, so it is told apart first.
+	if strings.Contains(request.Query, "statusCheckRollup") {
+		return t.checkStatusResponse(request.Variables)
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
 		t.recordPullRequestsRequest(request.Query, request.Variables)
@@ -294,6 +312,48 @@ func (t GraphQLTransport) mergedPRsResponse(variables map[string]any) (int, json
 		}
 	}
 	return marshalResponse(response)
+}
+
+// Fails with a 403, as the merged search does, since githubclient waits seconds before retrying a
+// 5xx.
+func (t GraphQLTransport) checkStatusResponse(variables map[string]any) (int, json.RawMessage, error) {
+	if t.opts.Recording != nil {
+		t.opts.Recording.recordCheckStatusRequest(pullRequestReferences(variables))
+	}
+	if t.opts.CheckStatusError != nil {
+		body, err := json.Marshal(map[string]string{"message": t.opts.CheckStatusError.Error()})
+		return http.StatusForbidden, body, err
+	}
+
+	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
+	for index, ref := range postedPullRequestRefs(variables) {
+		response.Data[fmt.Sprintf("p%d", index)] = map[string]any{"pullRequest": map[string]any{
+			"number":            ref.number,
+			"statusCheckRollup": t.statusCheckRollupJSON(ref.number),
+		}}
+	}
+	return marshalResponse(response)
+}
+
+func (t GraphQLTransport) statusCheckRollupJSON(number int) any {
+	switch {
+	case slices.Contains(t.opts.FailingRequiredCheckPRNumbers, number):
+		return requiredCheckRunRollupJSON("COMPLETED", "FAILURE")
+	case slices.Contains(t.opts.PassingRequiredCheckPRNumbers, number):
+		return requiredCheckRunRollupJSON("COMPLETED", "SUCCESS")
+	case slices.Contains(t.opts.PendingRequiredCheckPRNumbers, number):
+		return requiredCheckRunRollupJSON("IN_PROGRESS", nil)
+	}
+	return nil
+}
+
+func requiredCheckRunRollupJSON(status string, conclusion any) map[string]any {
+	return map[string]any{"contexts": map[string]any{
+		"pageInfo": map[string]any{"hasNextPage": false},
+		"nodes": []map[string]any{{
+			"__typename": "CheckRun", "status": status, "conclusion": conclusion, "isRequired": true,
+		}},
+	}}
 }
 
 func (t GraphQLTransport) mergedPRs(repoName string) []*github.PullRequest {

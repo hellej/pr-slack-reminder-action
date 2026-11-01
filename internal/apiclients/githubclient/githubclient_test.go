@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -961,4 +962,104 @@ func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
 			}
 		})
 	}
+}
+
+func approvalOf(numbers ...int) map[int][]*github.PullRequestReview {
+	reviewsByPRNumber := map[int][]*github.PullRequestReview{}
+	for _, number := range numbers {
+		reviewsByPRNumber[number] = []*github.PullRequestReview{
+			mockgithubclient.NewReview("approver", "Approver", "APPROVED"),
+		}
+	}
+	return reviewsByPRNumber
+}
+
+func TestFindOpenPRsFetchesTheRequiredCheckStatusOfApprovedPRsOnly(t *testing.T) {
+	now := time.Now()
+	recording := &mockgithubclient.FetchRecording{}
+	openPRs := makeOpenPRFixtures(6, 0) // 1 to 6
+	draft := makePRFixture(7, true, now, now)
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs:               append(openPRs, draft),
+		ReviewsByPRNumber: approvalOf(1, 2, 3, 4, 6, 7),
+		TimelineCommentsByPRNumber: map[int][]*github.IssueComment{
+			6: {mockgithubclient.NewTimelineComment("snoozer", "Snoozer", "/snooze for 3 days", now)},
+		},
+		FailingRequiredCheckPRNumbers: []int{1, 5, 6, 7},
+		PassingRequiredCheckPRNumbers: []int{2},
+		PendingRequiredCheckPRNumbers: []int{3},
+		Recording:                     recording,
+	})
+	repository := models.Repository{Owner: "o", Name: "repo"}
+
+	result, err := client.FindOpenPRs(
+		context.Background(), []models.Repository{repository}, noFilters,
+		githubclient.PRFetchOptions{IncludeDrafts: true},
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CheckStatusErr != nil {
+		t.Errorf("CheckStatusErr = %v, expected nil", result.CheckStatusErr)
+	}
+	refsOf := func(numbers ...int) []models.PullRequestRef {
+		return utilities.Map(numbers, func(number int) models.PullRequestRef {
+			return models.PullRequestRef{Repository: repository, Number: number}
+		})
+	}
+	expectedRequests := [][]models.PullRequestRef{refsOf(1, 2, 3, 4)}
+	if !slices.EqualFunc(recording.CheckStatusRequests, expectedRequests, slices.Equal) {
+		t.Errorf("CheckStatusRequests = %v, expected %v", recording.CheckStatusRequests, expectedRequests)
+	}
+	if len(recording.EnrichmentRequests) != 1 || len(recording.EnrichmentRequests[0]) != 7 {
+		t.Errorf("EnrichmentRequests = %v, expected one request for all 7 PRs", recording.EnrichmentRequests)
+	}
+
+	statusByNumber := map[int]githubclient.RequiredChecksStatus{}
+	for _, pr := range result.PRs {
+		statusByNumber[pr.GetNumber()] = pr.RequiredChecks
+	}
+	expectedStatusByNumber := map[int]githubclient.RequiredChecksStatus{
+		1: githubclient.RequiredChecksFailing,
+		2: githubclient.RequiredChecksPassing,
+		3: githubclient.RequiredChecksUnknown,
+		4: githubclient.RequiredChecksUnknown,
+		5: githubclient.RequiredChecksUnknown,
+		7: githubclient.RequiredChecksUnknown,
+	}
+	if !maps.Equal(statusByNumber, expectedStatusByNumber) {
+		t.Errorf("RequiredChecks by PR number = %v, expected %v", statusByNumber, expectedStatusByNumber)
+	}
+}
+
+func TestFindOpenPRsReturnsThePRsWhenTheCheckStatusFetchFails(t *testing.T) {
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs:                           makeOpenPRFixtures(1, 0),
+		ReviewsByPRNumber:             approvalOf(1),
+		FailingRequiredCheckPRNumbers: []int{1},
+		CheckStatusError:              errors.New("resource not accessible by integration"),
+	})
+
+	result, err := client.FindOpenPRs(
+		context.Background(), []models.Repository{{Owner: "o", Name: "repo"}}, noFilters,
+		githubclient.PRFetchOptions{},
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(errorString(result.CheckStatusErr), "resource not accessible by integration") {
+		t.Errorf("CheckStatusErr = %v, expected the mock's check status error", result.CheckStatusErr)
+	}
+	if len(result.PRs) != 1 || result.PRs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
+		t.Errorf("PRs = %+v, expected PR 1 with unknown RequiredChecks", result.PRs)
+	}
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

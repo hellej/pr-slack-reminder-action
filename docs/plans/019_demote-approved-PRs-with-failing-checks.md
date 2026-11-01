@@ -70,7 +70,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Only open rows pass `IsHeldBackByFailingChecks()`. Draft and merged rows pass false
 - Action inputs: none new. Permissions: none new
   - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
-  - Step 1's checkpoint covers a private repository under the E2E App token
+  - Step 1's checkpoint confirms it for this repository's own PRs. No private repository is checked: the owner has no paid GitHub plan
 
 Message states for an approved PR whose required check fails, then gets a fix:
 
@@ -100,7 +100,7 @@ The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob /
 Non-breaking, **minor**. Bucketing and row text change for users with a failing required check, with no input or permission change, as plans 012 and 014 did.
 
 - State gains `failingRequiredCheckPRs`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
-- The merged PR cache saves `RequiredChecks` beside `Conflicting`. A cache saved before it decodes `""`, unknown. Merged PRs are not fetched for check status, so it stays unknown
+- `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before it decodes `""`, unknown
 - The first run after upgrading re-buckets every PR, and the canvas rewrites once wherever a PR moves
 - A downgrade ignores both keys
 
@@ -135,10 +135,12 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - Requested PRs: not draft, `HasCompleteReviewerInfo`, and at least one approver. A PR outside that set stays `RequiredChecksUnknown`
 - The phase batches 25 PRs per request, runs at most `defaultGitHubAPIConcurrencyLimit` requests at a time and goes through `retry.DefaultPolicy` like every GraphQL request
 - `requiredChecksStatus` classifies the decoded contexts, as listed in § Target shape. A table test covers each row of that list, including `hasNextPage` true with every context passing
+- `PR.RequiredChecks` carries `omitempty`, so no existing state snapshot gains the key. The merged PR cache never holds a known status
 - A failure never fails `FindOpenPRs`:
   - A query, repository or transport error leaves every PR of that batch unknown
-  - A per-PR error (`pullRequestError`, as `failsOnlyOnePullRequest` reads it) leaves only that PR unknown
+  - A per-PR error leaves only that PR unknown: a `pullRequestError`, as `failsOnlyOnePullRequest` reads it, a field error below the PR, or a PR missing from the answer. A field error on `statusCheckRollup` is what a token lacking the permission could get, so it must reach the warning too
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
+  - A batch error names the repository when it is scoped to one, through `pullRequestBatchError`, which `enrichPRsWithReviewInfoError` becomes with its message text unchanged
   - Batches fail independently: unlike `enrichPRsWithReviewInfo`'s `errgroup.WithContext`, one failed batch does not cancel the others
   - A decode error and an expired context count as a failed batch too
 - A rollup with `hasNextPage` true is logged
@@ -147,17 +149,17 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - `mockgithubclient`:
   - The transport routes a query containing `statusCheckRollup` before its `pullRequest(number:` branch. The default answer is a null rollup, unknown, so existing fixtures with an approved PR keep their buckets
   - `MockGitHubClientOptions.FailingRequiredCheckPRNumbers []int`, `PassingRequiredCheckPRNumbers []int` and `PendingRequiredCheckPRNumbers []int` answer those PRs with one required check run that failed, passed or is in progress
-  - `MockGitHubClientOptions.CheckStatusError error` fails this request only, as `MergedPRsSearchError` does for the merged search
+  - `MockGitHubClientOptions.CheckStatusError error` fails this request only with a 403, as `MergedPRsSearchError` does for the merged search
   - `FetchRecording.CheckStatusRequests` records the refs of each request, so a test can assert which PRs were asked for. These requests never enter `EnrichmentRequests`
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
   - `make test`, and the new phase's request carries exactly the approved non-draft refs
-  - The repository owner sets up a PR in one of the private test repositories that the E2E runs list: approved by a human other than its author, with a failing required check. The check is required through a ruleset, the case docs/third-party-facts.md does not cover yet
-  - Its author is not `alice` if it is in `pr-slack-reminder-test-repo-1`, where the grouped runs filter out PRs by `alice`. It carries no `ignore-reminder` label
-  - The E2E App token keeps its current permissions, which the owner confirmed hold neither `checks` nor `statuses`
-  - After pushing the branch, the Build job log shows, for the fixture PR: its status line reading `failing`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line
+  - No fixture PR is set up and no private repository is checked: the owner has no paid GitHub plan
+  - Live, the only check is that `statusCheckRollup` and `isRequired` come back without an error for this repository's PRs: the owner runs `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, and its job log shows a status line per requested PR, the phase's `rateLimit.cost`, and no check status error line
+  - The phase sends a request only when this repository has an open, approved, non-draft PR. Without one the job log shows no phase at all, which confirms nothing
+  - The branch's Build E2E log still gives the phase's `rateLimit.cost`, compared against the last `main` Build run. State the difference in the PR, per AGENTS.md § GitHub API Budget
   - If an error line shows, stop and raise it with the user: a permission is needed and the plan has to say which
-  - Add what this confirms to docs/third-party-facts.md, and amend the "not shown" list of docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
+  - Amend docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository with what the probe shows: a public repository, `GITHUB_TOKEN`, this repository's required checks, and whether they are required through a ruleset or branch protection
 
 ### 2. Keep failing PRs out of "ready to merge" in `prview`
 
@@ -179,7 +181,7 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
   - `snapshotScenarios()` in `cmd/pr-slack-reminder/snapshot_test.go`, which serves the post and marked-stale snapshots
   - The update-mode table of `TestSnapshotsUpdateMode`, for the edited message
   - The fixtures of `TestBuildMarkdownSnapshots` in `internal/canvasbuilder/canvasbuilder_test.go`, for the canvas row
-- Expect the snapshots holding those fixtures to change, and every state snapshot with a cached merged PR to gain the `RequiredChecks` key
+- Expect the snapshots holding those fixtures to change. No state snapshot gains a `RequiredChecks` key: it is `omitempty`, and a cached merged PR is always unknown
 
 ### 4. Keep a failing status until the required checks pass, through the state
 
@@ -207,12 +209,12 @@ Touches `cmd/pr-slack-reminder` (`run.go`), `run.spec.md`.
 
 ### 6. Check the message and canvas live
 
-Touches no files. The step 1 fixture PR is the setup.
+Touches no files. No fixture PR exists, so no live run shows a failing required check: the `❌ CI` row and the demotion are covered by step 3's snapshots and step 4's `main_test.go` only.
 
-- `pr-reminder.yml` lists this repository only, so it cannot show the fixture PR. Read the branch's Build E2E runs instead:
-  - The grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the message and on the canvas
-- Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
-- The remembered failing status is not checked live: the fixture's check would have to run during the E2E job. `main_test.go` covers it
+- The owner runs `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true` against this repository
+- Done means the job log shows the check status phase without an error line, and the message and canvas render as before for this repository's PRs
+- If an open PR here has a failing required check while approved, it shows under "Waiting for author" with `❌ CI`. That is a bonus, not a requirement
+- The remembered failing status is not checked live. `main_test.go` covers it
 
 ### 7. Docs
 
