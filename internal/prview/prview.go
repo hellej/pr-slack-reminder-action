@@ -49,22 +49,39 @@ const (
 
 // Returns the next action of the first check that matches, so an earlier check wins every
 // overlap: a reviewer who requested changes and then approved leaves the PR ready to merge. A
-// conflict keeps an approved PR in NextActionWaitingForAuthor (vs NextActionReadyToMerge), while
-// an unreviewed one stays in the review queue (conflicts should not block review).
+// conflict or a failing required check keeps an approved PR in NextActionWaitingForAuthor (vs
+// NextActionReadyToMerge), while an unreviewed one stays in the review queue (neither should
+// block review).
 func (pr PR) GetNextAction() PRNextAction {
 	// defensive nil check, should not happen
 	if pr.PR == nil {
 		return NextActionWaitingForReview
 	}
 
-	isApproved := len(pr.Approvers) > 0
-	if isApproved && !pr.HasThreadWaitingForAuthor && !pr.Conflicting {
+	if pr.isApprovedWithoutConflictOrWaitingThread() && !pr.isFailingRequiredChecks() {
 		return NextActionReadyToMerge
 	}
-	if isApproved || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
+	if len(pr.Approvers) > 0 || pr.HasOutstandingChangesRequest || pr.HasThreadWaitingForAuthor {
 		return NextActionWaitingForAuthor
 	}
 	return NextActionWaitingForReview
+}
+
+// True when the failing required check alone keeps an approved PR out of "ready to merge", the
+// one case a row names the check as the reason.
+func (pr PR) IsHeldBackByFailingChecks() bool {
+	if pr.PR == nil {
+		return false
+	}
+	return pr.isApprovedWithoutConflictOrWaitingThread() && pr.isFailingRequiredChecks()
+}
+
+func (pr PR) isApprovedWithoutConflictOrWaitingThread() bool {
+	return len(pr.Approvers) > 0 && !pr.HasThreadWaitingForAuthor && !pr.Conflicting
+}
+
+func (pr PR) isFailingRequiredChecks() bool {
+	return pr.RequiredChecks == githubclient.RequiredChecksFailing
 }
 
 func (pr PR) GetPRAgeText() string {

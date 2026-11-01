@@ -583,3 +583,79 @@ func TestRecentMergeStatsLastComputedAt(t *testing.T) {
 		})
 	}
 }
+
+func prWithRequiredChecks(number int, status githubclient.RequiredChecksStatus) githubclient.PR {
+	return githubclient.PR{
+		PullRequest:    &githubclient.PullRequest{Number: number},
+		Repository:     models.Repository{Owner: "owner", Name: "repo"},
+		RequiredChecks: status,
+	}
+}
+
+func TestPRsWithRememberedFailingChecks(t *testing.T) {
+	prs := []githubclient.PR{
+		prWithRequiredChecks(1, githubclient.RequiredChecksUnknown),
+		prWithRequiredChecks(2, githubclient.RequiredChecksPassing),
+		prWithRequiredChecks(3, githubclient.RequiredChecksFailing),
+		prWithRequiredChecks(4, githubclient.RequiredChecksUnknown),
+	}
+	listingAllButFour := &State{FailingRequiredCheckPRs: []models.PullRequestRef{
+		prs[2].GetPullRequestRef(), prs[1].GetPullRequestRef(), prs[0].GetPullRequestRef(),
+	}}
+
+	tests := []struct {
+		name        string
+		loadedState *State
+		expected    []githubclient.RequiredChecksStatus
+	}{
+		{
+			name:        "no loaded state",
+			loadedState: nil,
+			expected: []githubclient.RequiredChecksStatus{
+				githubclient.RequiredChecksUnknown, githubclient.RequiredChecksPassing,
+				githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown,
+			},
+		},
+		{
+			name:        "only an unknown PR the state lists turns failing",
+			loadedState: listingAllButFour,
+			expected: []githubclient.RequiredChecksStatus{
+				githubclient.RequiredChecksFailing, githubclient.RequiredChecksPassing,
+				githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := PRsWithRememberedFailingChecks(prs, tt.loadedState)
+
+			statuses := make([]githubclient.RequiredChecksStatus, len(result))
+			for index, pr := range result {
+				statuses[index] = pr.RequiredChecks
+			}
+			if !slices.Equal(statuses, tt.expected) {
+				t.Errorf("RequiredChecks = %q, expected %q", statuses, tt.expected)
+			}
+			if prs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
+				t.Error("the given PRs were changed, expected copies")
+			}
+		})
+	}
+}
+
+func TestFailingRequiredCheckPRRefsKeepsThePRsOrder(t *testing.T) {
+	prs := []githubclient.PR{
+		prWithRequiredChecks(3, githubclient.RequiredChecksFailing),
+		prWithRequiredChecks(1, githubclient.RequiredChecksPassing),
+		prWithRequiredChecks(2, githubclient.RequiredChecksFailing),
+		prWithRequiredChecks(4, githubclient.RequiredChecksUnknown),
+	}
+
+	refs := FailingRequiredCheckPRRefs(prs)
+
+	expected := []models.PullRequestRef{prs[0].GetPullRequestRef(), prs[2].GetPullRequestRef()}
+	if !slices.Equal(refs, expected) {
+		t.Errorf("FailingRequiredCheckPRRefs() = %v, expected %v", refs, expected)
+	}
+}

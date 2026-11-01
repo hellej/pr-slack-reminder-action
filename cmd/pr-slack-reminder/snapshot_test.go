@@ -132,14 +132,15 @@ func assertMatchesSnapshot(t *testing.T, actual []byte, snapshotFilePath string)
 }
 
 type snapshotScenario struct {
-	name                       string
-	configOverrides            map[string]any
-	prs                        []*github.PullRequest
-	prsByRepo                  map[string][]*github.PullRequest
-	mergedPRs                  []*github.PullRequest
-	mergedPRsByRepo            map[string][]*github.PullRequest
-	reviewsByPRNumber          map[int][]*github.PullRequestReview
-	timelineCommentsByPRNumber map[int][]*github.IssueComment
+	name                        string
+	configOverrides             map[string]any
+	prs                         []*github.PullRequest
+	prsByRepo                   map[string][]*github.PullRequest
+	mergedPRs                   []*github.PullRequest
+	mergedPRsByRepo             map[string][]*github.PullRequest
+	reviewsByPRNumber           map[int][]*github.PullRequestReview
+	timelineCommentsByPRNumber  map[int][]*github.IssueComment
+	failingRequiredCheckNumbers []int
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
@@ -537,7 +538,13 @@ func snapshotScenarios() []snapshotScenario {
 					AuthorName: "Frank Foster", HTMLURL: "https://github.com/test-org/test-repo/pull/76",
 					AgeHours: 170,
 				}),
+				getTestPR(GetTestPROptions{
+					Number: 77, Title: "Approved but a required check fails", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/77",
+					AgeHours: 7,
+				}),
 			},
+			failingRequiredCheckNumbers: []int{77},
 			// Four merges reach the cap of three, newest first.
 			mergedPRs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
@@ -569,6 +576,10 @@ func snapshotScenarios() []snapshotScenario {
 				},
 				73: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
 				74: {mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED")},
+				77: {
+					mockgithubclient.NewReview("dana", "Dana Davis", "APPROVED"),
+					mockgithubclient.NewReview("erin", "Erin Evans", "COMMENTED"),
+				},
 				// Only one of the merged PRs was reviewed, so the snapshot keeps a merged row
 				// with reviewers apart from one without.
 				83: {
@@ -684,6 +695,8 @@ func runSnapshotScenario(
 		ReviewsByPRNumber:          scenario.reviewsByPRNumber,
 		TimelineCommentsByPRNumber: scenario.timelineCommentsByPRNumber,
 		MockPreviousState:          previousState,
+
+		FailingRequiredCheckPRNumbers: scenario.failingRequiredCheckNumbers,
 
 		FirstReadyForReviewEventAtByPRNumber: scenario.firstReadyForReviewEventAtByPRNumber,
 	})
@@ -815,6 +828,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		mergedPRsFromSearch               []*github.PullRequest
 		reviewsByPRNumber                 map[int][]*github.PullRequestReview
 		requestedReviewerLoginsByPRNumber map[int][]string
+		failingRequiredCheckNumbers       []int
 		mergeStatsOfState                 func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
 		deletesTheMessage                 bool
 	}{
@@ -878,7 +892,13 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/69",
 					AgeHours: 3, State: "open",
 				}),
+				getTestPR(GetTestPROptions{
+					Number: 59, Title: "Approved but a required check fails", AuthorLogin: "heidi",
+					AuthorName: "Heidi Hill", HTMLURL: "https://github.com/test-org/test-repo/pull/59",
+					AgeHours: 8, State: "open",
+				}),
 			},
+			failingRequiredCheckNumbers: []int{59},
 			mergedPRsFromSearch: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
 					Number: 70, Title: "Merged without ever being listed", AuthorLogin: "heidi",
@@ -892,6 +912,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				62: {mockgithubclient.NewReview("dana", "Dana Davis", "CHANGES_REQUESTED")},
 				65: {mockgithubclient.NewReview("frank", "Frank Foster", "COMMENTED")},
 				66: {mockgithubclient.NewReview("erin", "Erin Evans", "APPROVED")},
+				59: {mockgithubclient.NewReview("frank", "Frank Foster", "APPROVED")},
 			},
 			requestedReviewerLoginsByPRNumber: map[int][]string{60: {"frank"}},
 		},
@@ -1025,6 +1046,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				MergedPRs:                         tc.mergedPRsFromSearch,
 				ReviewsByPRNumber:                 tc.reviewsByPRNumber,
 				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
+				FailingRequiredCheckPRNumbers:     tc.failingRequiredCheckNumbers,
 				MockPreviousState:                 &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})

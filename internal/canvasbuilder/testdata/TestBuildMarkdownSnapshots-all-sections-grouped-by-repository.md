@@ -25,6 +25,7 @@
 ### [repo-two](https://github.com/test-org/repo-two/pulls)
 
 - **[Split the config package](https://github.com/test-org/repo-two/pull/32)** _3 days ago_ by Carol Clark (💬 Alice Anderson, Erin Evans)
+- **[Retry the flaky upload](https://github.com/test-org/repo-two/pull/35)** _5 hours ago_ by Frank Foster (✅ Dana Davis / 💬 Erin Evans / ❌ CI)
 
 ### [repo-three](https://github.com/test-org/repo-three/pulls)
 

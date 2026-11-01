@@ -67,10 +67,14 @@ func (pr PR) GetPRAgeDisplayText() string {
 
 // GetReviewersTextSegments renders approvers and commenters as "(✅ a, b / 💬 c)", split into one
 // text run per segment so a renderer can style or escape the names separately from the glue.
-// No reviewers at all yields no segments. Approvers and commenters are given explicitly, so a
-// caller wanting the commenters-only rendering passes no approvers.
-func GetReviewersTextSegments(approvers, commenters []Collaborator) []string {
+// Failing checks add a last " / ❌ CI" glue segment. No reviewers and no failing checks yield no
+// segments. Approvers and commenters are given explicitly, so a caller wanting the
+// commenters-only rendering passes no approvers.
+func GetReviewersTextSegments(approvers, commenters []Collaborator, hasFailingChecks bool) []string {
 	if len(approvers) == 0 && len(commenters) == 0 {
+		if hasFailingChecks {
+			return []string{" (❌ CI)"}
+		}
 		return nil
 	}
 
@@ -83,7 +87,9 @@ func GetReviewersTextSegments(approvers, commenters []Collaborator) []string {
 		}
 	}
 	segments = append(segments, nameSegments(commenters)...)
-
+	if hasFailingChecks {
+		segments = append(segments, " / ❌ CI")
+	}
 	return append(segments, ")")
 }
 

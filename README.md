@@ -140,6 +140,9 @@ on:
     types: [submitted, dismissed]
   issue_comment:
     types: [created, deleted]
+  workflow_run: # optional, see below
+    workflows: ["CI"] # the workflows running your required checks
+    types: [completed]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
@@ -166,6 +169,12 @@ jobs:
           path: pr-slack-reminder-state.json
           retention-days: 4
 ```
+
+The optional `workflow_run` trigger:
+
+- Turns a fixed PR green as soon as its required checks pass. Without it, the PR stays red until the next PR, review or comment event or post
+- Reacts to GitHub Actions workflows only, not to an external CI app's checks. The reminder's workflow file must be on the default branch
+- Runs an `update` on each completion of a listed workflow, costing about 1 GraphQL point per open PR plus 1 per repository
 
 ## ➡️ Inputs
 
@@ -208,7 +217,9 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 <img src="docs/examples/example_canvas.png" alt="Example PR tracker canvas" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
-Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts; ready to merge (3) is an approved PR with nothing outstanding.
+Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts or fails a required check; ready to merge (3) is an approved PR with nothing outstanding and no failing required check.
+
+A failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list, until every required check passes. The message files it the same way.
 
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 
@@ -271,6 +282,8 @@ permissions:
   issues: read # reading PR comments (incl. /snooze comments)
   actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale and compare the merge stats week over week
 ```
+
+Reading required check status needs nothing beyond `pull-requests: read`, confirmed for `GITHUB_TOKEN` in a public repository.
 
 ### Option 1: Default Token (Single Repository)
 

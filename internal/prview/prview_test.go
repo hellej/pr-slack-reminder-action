@@ -246,10 +246,11 @@ func TestGetReviewersTextSegments(t *testing.T) {
 	carol := testCollaborator("Carol")
 
 	tests := []struct {
-		name       string
-		approvers  []prview.Collaborator
-		commenters []prview.Collaborator
-		expected   []string
+		name             string
+		approvers        []prview.Collaborator
+		commenters       []prview.Collaborator
+		hasFailingChecks bool
+		expected         []string
 	}{
 		{
 			name:     "no reviewers",
@@ -271,11 +272,29 @@ func TestGetReviewersTextSegments(t *testing.T) {
 			commenters: []prview.Collaborator{bob, carol},
 			expected:   []string{" (✅ ", "Alice", " / 💬 ", "Bob", ", ", "Carol", ")"},
 		},
+		{
+			name:             "approvers and commenters, failing checks",
+			approvers:        []prview.Collaborator{alice},
+			commenters:       []prview.Collaborator{bob},
+			hasFailingChecks: true,
+			expected:         []string{" (✅ ", "Alice", " / 💬 ", "Bob", " / ❌ CI", ")"},
+		},
+		{
+			name:             "approvers only, failing checks",
+			approvers:        []prview.Collaborator{alice, bob},
+			hasFailingChecks: true,
+			expected:         []string{" (✅ ", "Alice", ", ", "Bob", " / ❌ CI", ")"},
+		},
+		{
+			name:             "no reviewers, failing checks",
+			hasFailingChecks: true,
+			expected:         []string{" (❌ CI)"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters)
+			segments := prview.GetReviewersTextSegments(tt.approvers, tt.commenters, tt.hasFailingChecks)
 			if !slices.Equal(segments, tt.expected) {
 				t.Errorf("expected segments %q, got %q", tt.expected, segments)
 			}
@@ -632,6 +651,24 @@ func TestGetNextAction(t *testing.T) {
 			expected:       prview.NextActionReadyToMerge,
 		},
 		{
+			// A failing required check cannot be merged either, so it demotes like a conflict.
+			name:           "approved but failing a required check",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksFailing},
+			expected:       prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:           "approved with every required check passing",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksPassing},
+			expected:       prview.NextActionReadyToMerge,
+		},
+		{
+			name:     "failing a required check and nothing else",
+			prFlags:  githubclient.PR{RequiredChecks: githubclient.RequiredChecksFailing},
+			expected: prview.NextActionWaitingForReview,
+		},
+		{
 			name:           "approved, changes requested, and a thread left unanswered",
 			approverLogins: []string{"erin", "bob"},
 			prFlags: githubclient.PR{
@@ -655,5 +692,70 @@ func TestGetNextAction(t *testing.T) {
 func TestGetNextActionOfPRWithoutFetchedData(t *testing.T) {
 	if nextAction := (prview.PR{}).GetNextAction(); nextAction != prview.NextActionWaitingForReview {
 		t.Errorf("GetNextAction() = %q, expected %q", nextAction, prview.NextActionWaitingForReview)
+	}
+}
+
+func TestIsHeldBackByFailingChecks(t *testing.T) {
+	failing := githubclient.RequiredChecksFailing
+	tests := []struct {
+		name           string
+		approverLogins []string
+		prFlags        githubclient.PR
+		expected       bool
+	}{
+		{
+			name:           "approved, failing and nothing else outstanding",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: failing},
+			expected:       true,
+		},
+		{
+			name:           "approved by the reviewer who requested changes, failing",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: failing, HasOutstandingChangesRequest: true},
+			expected:       true,
+		},
+		{
+			name:           "approved, failing and conflicting",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: failing, Conflicting: true},
+			expected:       false,
+		},
+		{
+			name:           "approved, failing and a thread waiting for the author",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: failing, HasThreadWaitingForAuthor: true},
+			expected:       false,
+		},
+		{
+			name:     "failing but not approved",
+			prFlags:  githubclient.PR{RequiredChecks: failing},
+			expected: false,
+		},
+		{
+			name:           "approved and passing",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{RequiredChecks: githubclient.RequiredChecksPassing},
+			expected:       false,
+		},
+		{
+			name:           "approved with unknown checks",
+			approverLogins: []string{"bob"},
+			expected:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nextActionPR(tt.approverLogins, tt.prFlags).IsHeldBackByFailingChecks(); got != tt.expected {
+				t.Errorf("IsHeldBackByFailingChecks() = %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsHeldBackByFailingChecksOfPRWithoutFetchedData(t *testing.T) {
+	if (prview.PR{}).IsHeldBackByFailingChecks() {
+		t.Error("IsHeldBackByFailingChecks() = true, expected false")
 	}
 }

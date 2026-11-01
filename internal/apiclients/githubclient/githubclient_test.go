@@ -964,7 +964,7 @@ func TestFetchedPRsCarryTheFirstReadyForReviewEventTime(t *testing.T) {
 	}
 }
 
-func approvalOf(numbers ...int) map[int][]*github.PullRequestReview {
+func approvingReviewsByPRNumber(numbers ...int) map[int][]*github.PullRequestReview {
 	reviewsByPRNumber := map[int][]*github.PullRequestReview{}
 	for _, number := range numbers {
 		reviewsByPRNumber[number] = []*github.PullRequestReview{
@@ -981,7 +981,7 @@ func TestFindOpenPRsFetchesTheRequiredCheckStatusOfApprovedPRsOnly(t *testing.T)
 	draft := makePRFixture(7, true, now, now)
 	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
 		PRs:               append(openPRs, draft),
-		ReviewsByPRNumber: approvalOf(1, 2, 3, 4, 6, 7),
+		ReviewsByPRNumber: approvingReviewsByPRNumber(1, 2, 3, 4, 6, 7),
 		TimelineCommentsByPRNumber: map[int][]*github.IssueComment{
 			6: {mockgithubclient.NewTimelineComment("snoozer", "Snoozer", "/snooze for 3 days", now)},
 		},
@@ -1036,7 +1036,7 @@ func TestFindOpenPRsFetchesTheRequiredCheckStatusOfApprovedPRsOnly(t *testing.T)
 func TestFindOpenPRsReturnsThePRsWhenTheCheckStatusFetchFails(t *testing.T) {
 	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
 		PRs:                           makeOpenPRFixtures(1, 0),
-		ReviewsByPRNumber:             approvalOf(1),
+		ReviewsByPRNumber:             approvingReviewsByPRNumber(1),
 		FailingRequiredCheckPRNumbers: []int{1},
 		CheckStatusError:              errors.New("resource not accessible by integration"),
 	})
@@ -1049,7 +1049,7 @@ func TestFindOpenPRsReturnsThePRsWhenTheCheckStatusFetchFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(errorString(result.CheckStatusErr), "resource not accessible by integration") {
+	if !strings.Contains(errorText(result.CheckStatusErr), "resource not accessible by integration") {
 		t.Errorf("CheckStatusErr = %v, expected the mock's check status error", result.CheckStatusErr)
 	}
 	if len(result.PRs) != 1 || result.PRs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
@@ -1057,7 +1057,7 @@ func TestFindOpenPRsReturnsThePRsWhenTheCheckStatusFetchFails(t *testing.T) {
 	}
 }
 
-func errorString(err error) string {
+func errorText(err error) string {
 	if err == nil {
 		return ""
 	}

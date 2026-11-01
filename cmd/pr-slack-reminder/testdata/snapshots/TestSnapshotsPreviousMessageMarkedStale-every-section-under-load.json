@@ -205,6 +205,66 @@
                 "style": {}
               }
             ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/77",
+                "text": "Approved but a required check fails",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 7 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Grace Green",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (✅ ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Dana Davis",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / 💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / ❌ CI",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
           }
         ],
         "style": "bullet",

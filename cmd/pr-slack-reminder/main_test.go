@@ -213,6 +213,8 @@ type GetTestStateOptions struct {
 	PRNumbers []int
 	// Defaults to an hour ago.
 	PostedHoursAgo float32
+	// The PRs the run before saw failing a required check
+	FailingRequiredCheckPRNumbers []int
 }
 
 func getTestState(options GetTestStateOptions) state.State {
@@ -229,7 +231,8 @@ func getTestState(options GetTestStateOptions) state.State {
 			ChannelID: "C12345678",
 			MessageTS: "1623850245.000200",
 		},
-		TrackedPRs: prRefs,
+		TrackedPRs:              prRefs,
+		FailingRequiredCheckPRs: utilities.Map(options.FailingRequiredCheckPRNumbers, stateRef),
 	}
 }
 

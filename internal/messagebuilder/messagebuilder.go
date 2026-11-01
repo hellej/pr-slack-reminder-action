@@ -256,7 +256,9 @@ func buildOpenPRBulletPoint(pr prview.PR) slack.RichTextElement {
 		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
 	)
-	return slack.NewRichTextSection(append(elements, getReviewersElements(pr)...)...)
+	return slack.NewRichTextSection(
+		append(elements, getReviewersElements(pr, pr.IsHeldBackByFailingChecks())...)...,
+	)
 }
 
 // A merged row shows when it landed instead of its age, so it carries neither the old-PR marker
@@ -276,7 +278,7 @@ func buildMergedPRBulletPoint(pr prview.PR) slack.RichTextElement {
 		slack.NewRichTextSectionTextElement(" by ", &slack.RichTextSectionTextStyle{}),
 		getUserNameElement(pr),
 	)
-	return slack.NewRichTextSection(append(elements, getReviewersElements(pr)...)...)
+	return slack.NewRichTextSection(append(elements, getReviewersElements(pr, false)...)...)
 }
 
 func buildAgeElements(pr prview.PR) []slack.RichTextSectionElement {
@@ -306,9 +308,9 @@ func getUserNameElement(pr prview.PR) slack.RichTextSectionElement {
 	)
 }
 
-func getReviewersElements(pr prview.PR) []slack.RichTextSectionElement {
+func getReviewersElements(pr prview.PR, hasFailingChecks bool) []slack.RichTextSectionElement {
 	return utilities.Map(
-		prview.GetReviewersTextSegments(pr.Approvers, pr.Commenters),
+		prview.GetReviewersTextSegments(pr.Approvers, pr.Commenters, hasFailingChecks),
 		func(segment string) slack.RichTextSectionElement {
 			return slack.NewRichTextSectionTextElement(segment, &slack.RichTextSectionTextStyle{})
 		},

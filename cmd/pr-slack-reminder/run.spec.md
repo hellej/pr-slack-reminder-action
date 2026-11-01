@@ -18,9 +18,11 @@ run modes and the pipeline order are in
   - The tracked PR fetch failing in update mode
   - The delete failing in update mode
   - The merge stats left out: their merged PR fetch failing
+  - The required check status fetch failing in whole or in part, in either mode: `Failed to fetch required check status: <error>`. Each PR keeps the status the loaded state remembers
   - A merged PR in the merge stats fetch without complete reviewer info, one warning per PR naming it. It stays in the line's merged count
 - `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. In update mode, a load error fails the run, but only after the merged fetch and the canvas refresh have run
+- Right after the load, both modes apply `state.PRsWithRememberedFailingChecks` to the open PRs, with the loaded state, nil when it did not load. Both tracks then read those PRs. Each PR the loaded state makes failing gets a log line naming it
 - Post mode loads it whether or not it then sends. A missing artifact logs, and any other load error warns, before the send: post mode goes on without the previous state
 - Update mode passes the loaded merged PR cache to the merged fetch, which returns a cached PR instead of enriching it. Post mode passes none, so it enriches every merged PR
 - With `show-merged-prs-in-message` false, the run skips the work only the message's merged section needs:
@@ -54,12 +56,12 @@ run modes and the pipeline order are in
 - The message send and the canvas refresh are independent: one failing does not skip the other, and both errors are joined into the run's return value
 - Each part of the canvas refresh error, the write failure and the merged fetch failure, carries its own `PR tracker canvas refresh failed: ` prefix and stays a separate part of the join, so each is its own annotation
 - The canvas refresh hashes the markdown it would write, footer timestamp excluded, and skips the write when the hash matches the previous run's, since Slack's canvas API can mis-merge a replace that lands while someone has the canvas open. It still carries the merged-fetch error alongside a skipped or successful write
-- State is saved carrying whichever canvas content hash is now current:
+- State is saved carrying whichever canvas content hash is now current, and `FailingRequiredCheckPRs` set to the open PRs failing a required check after the loaded state was applied:
   - Post mode saves it only when the message was sent, recording the new message, caching its merged PRs, and saving the recent merge stats through `RecentMergeStats.WithAdded`
   - Update mode saves it whenever the previous state loaded
     - After a successful edit: it records the edited message, adds the PRs the edit listed to the tracked PRs, and replaces the merged PR cache with the merged and tracked PRs this run used. See [internal/state](../../internal/state/state.spec.md) for which of them are kept
       - Also when saving the sent blocks then fails
-    - A deleted or kept message, or a failed edit: it saves the loaded state back unchanged
+    - A deleted or kept message, or a failed edit: it saves the loaded state back unchanged, except for the canvas hash and `FailingRequiredCheckPRs`
 
 ## Doesn't Do
 
@@ -86,4 +88,6 @@ run modes and the pipeline order are in
 - When later posts send nothing, Monday's merge stats line stays on a message read days later
 - The week before's window can differ in length from the shown one, such as after `show-merge-stats-in-message` changes. The medians are still compared
 - A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post
+- In update mode, a state that fails to load fails the run. The canvas refresh still runs, with no remembered failing PRs applied
+- A PR filtered out, snoozed, or turned draft with the canvas off leaves the failing set. When it comes back with pending checks, it reads green
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied

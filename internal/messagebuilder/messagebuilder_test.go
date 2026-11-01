@@ -23,9 +23,15 @@ type testPROptions struct {
 	mergedAt    *time.Time
 	isOldPR     bool
 	approvers   []string
+	// Sets RequiredChecks failing
+	failingRequiredChecks bool
 }
 
 func testPR(options testPROptions) prview.PR {
+	requiredChecks := githubclient.RequiredChecksUnknown
+	if options.failingRequiredChecks {
+		requiredChecks = githubclient.RequiredChecksFailing
+	}
 	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
@@ -35,6 +41,7 @@ func testPR(options testPROptions) prview.PR {
 				MergedAt:  options.mergedAt,
 				Merged:    options.mergedAt != nil,
 			},
+			RequiredChecks: requiredChecks,
 		},
 		Author: prview.Collaborator{
 			Collaborator: &githubclient.Collaborator{Login: "testuser", Name: "Test User"},
@@ -338,12 +345,14 @@ func TestAuthorFallsBackToGitHubName(t *testing.T) {
 	}
 }
 
+// The failing checks are there to show that only an open row names them.
 func TestMergedPRRowShowsMergeTimeAndReviewers(t *testing.T) {
 	mergedAt := time.Now().Add(-2 * time.Hour)
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		Merged: prview.PRSection{
 			Rows: []prview.Row{testPR(testPROptions{
 				title: "Merged PR", mergedAt: &mergedAt, isOldPR: true, approvers: []string{"Dana Davis"},
+				failingRequiredChecks: true,
 			})},
 		},
 		GeneratedAt: generatedAt,

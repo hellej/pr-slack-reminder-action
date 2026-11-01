@@ -10,9 +10,9 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - `## Open` is the one heading without an emoji: it stands for all three open buckets, so no single emoji fits it
 - Any section can render grouped: its rows then get one `###` sub-heading per repository, the repository name without its owner, linking to `models.Repository.GetPullsURL()`. The section heading above them already scopes the rows, so it is not repeated. Each section reads its own grouped slice, so all of them group together, off the one `Content.GroupedByRepository` flag. Nothing dedupes a repository across sections, so one repository can carry a `###` heading under each
 - The three open sections share one PR row renderer, one empty-state line and one heading level: only the heading text and the rows differ. A PR's bucket is `canvascontent`'s to decide
-- Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers
+- Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, reviewers, then `❌ CI` in the reviewer list when `IsHeldBackByFailingChecks()` is true
 - WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prview.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
-- Merged PR row: linked title, the merge text in italics, the author, then the reviewers, named as an open row names them. An unknown merge time drops that segment only
+- Merged PR row: linked title, the merge text in italics, the author, then the reviewers, named as an open row names them but never with `❌ CI`. An unknown merge time drops that segment only
 - Collapsed row (`prview.CollapsedRow`), in any section: `**[🤖 <label>:](<search URL>)** **[#101](url)** **[#102](url)**`, the label from `GetAuthorLabel()`, escaped, the URL from `GetSearchURL()`. No age, activity, author, reviewers, old-PR marker or merge time. One renderer serves every section
 - Every section renders through one path, differing only in heading, rows, PR row renderer, empty text and whether it hides while empty, so a further section costs one call
 - An empty section that does not hide keeps its heading and shows one italic line: `_No work in progress_` or `_No merged PRs_`, and `_No open PRs_` in the all-empty open case. A merged section whose fetch failed shows `_Merged PRs could not be fetched_` instead, so a failure never reads as an empty week. Grouped mode with such a section shows that section's line and no sub-headings
@@ -25,7 +25,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 
 - No top-level heading: the canvas title is its own field, set by a `rename` change on `canvases.edit`, so it survives a full content replace. Slack renders it as an H1 at the top of the document and doesn't dedupe a matching one from the body, so a body H1 would show the title twice
 - No Slack mentions: authors and reviewers render through `GetGitHubName()`, never `SlackUserID`, so refreshing the canvas notifies nobody
-- Never approvers on a WIP row, and never the old-PR `🚨` marker there: nobody has been asked to review a draft yet
+- Never approvers on a WIP row, and never the old-PR `🚨` marker or `❌ CI` there: nobody has been asked to review a draft yet
 - No strike-through, and no `🚀` on a row: the `## 🚀 Merged` heading already says what its rows are, and an open or WIP row can never carry a closed or merged PR
 - Doesn't escape link targets: they come from GitHub and can't contain a space or a closing parenthesis
 - Doesn't decide a PR's bucket, nor derive a heading from `prview.PRNextAction`: the heading strings are this package's, and the bucketing is `canvascontent`'s

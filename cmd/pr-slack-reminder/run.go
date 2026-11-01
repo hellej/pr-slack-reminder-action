@@ -61,7 +61,11 @@ func Run(
 	if err != nil {
 		return err
 	}
+	if openPRs.CheckStatusErr != nil {
+		logWarning(fmt.Sprintf("Failed to fetch required check status: %v", openPRs.CheckStatusErr))
+	}
 	loadedState, loadStateErr := loadPreviousState(githubClient, cfg)
+	openPRs.PRs = withRememberedFailingChecks(openPRs.PRs, loadedState)
 	mergedPRsShownAnywhere := cfg.ContentInputs.ShowMergedPRsInMessage || cfg.CanvasEnabled()
 	var mergedPRs []githubclient.PR
 	var mergedPRsErr error
@@ -111,6 +115,7 @@ func Run(
 	})...)
 	if stateToSave != nil {
 		stateToSave.LastWrittenCanvasMarkdownHash = lastWrittenCanvasMarkdownHash
+		stateToSave.FailingRequiredCheckPRs = state.FailingRequiredCheckPRRefs(openPRs.PRs)
 		stateErr = state.Save(cfg.StateFilePath, *stateToSave)
 	}
 	return errors.Join(messageErr, canvasErr, stateErr)
@@ -258,6 +263,18 @@ func loadPreviousState(githubClient githubclient.Client, cfg config.Config) (*st
 		cfg.StateArtifactName,
 		cfg.StateFilePath,
 	)
+}
+
+// A nil loadedState, one that did not load, remembers nothing.
+func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR {
+	seenFailingRefs := state.FailingRequiredCheckPRRefs(prs)
+	prsWithRememberedFailingChecks := state.PRsWithRememberedFailingChecks(prs, loadedState)
+	for _, ref := range state.FailingRequiredCheckPRRefs(prsWithRememberedFailingChecks) {
+		if !slices.Contains(seenFailingRefs, ref) {
+			log.Printf("PR %s/%d is failing a required check, as the previous run saw it", ref.Repository.GetPath(), ref.Number)
+		}
+	}
+	return prsWithRememberedFailingChecks
 }
 
 func mergedPRCacheToReuse(runMode config.RunMode, loadedState *state.State) []githubclient.PR {

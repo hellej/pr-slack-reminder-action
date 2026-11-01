@@ -74,6 +74,13 @@
         "Owner": "test-org",
         "Name": "test-repo"
       },
+      "number": 59
+    },
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
       "number": 69
     }
   ],
@@ -352,6 +359,56 @@
                     "style": {}
                   }
                 ]
+              },
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/59",
+                    "text": "Approved but a required check fails",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 8 hours ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Heidi Hill",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " (✅ ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Frank Foster",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " / ❌ CI",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ")",
+                    "style": {}
+                  }
+                ]
               }
             ],
             "style": "bullet",
@@ -572,7 +629,7 @@
         ]
       }
     ],
-    "summaryText": "5 PRs to review, 1 waiting for author, 1 to merge 👀",
+    "summaryText": "5 PRs to review, 2 waiting for author, 1 to merge 👀",
     "generatedAt": "1970-01-01T00:00:00Z"
   },
   "mergedPRCache": [
@@ -673,6 +730,15 @@
       "FirstReadyForReviewEventAt": null,
       "FirstReviewAt": null,
       "HasCompleteReviewerInfo": true
+    }
+  ],
+  "failingRequiredCheckPRs": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 59
     }
   ]
 }

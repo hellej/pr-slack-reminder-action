@@ -75,12 +75,12 @@ var checkStatusSelection = pullRequestSelection{
 	},
 }
 
-func requiredChecksStatus(rollup *statusCheckRollupNode) RequiredChecksStatus {
+func classifyRequiredChecks(rollup *statusCheckRollupNode) RequiredChecksStatus {
 	if rollup == nil {
 		return RequiredChecksUnknown
 	}
 	requiredContexts := utilities.Filter(
-		rollup.Contexts.Nodes, func(context statusCheckContextNode) bool { return context.IsRequired },
+		rollup.Contexts.Nodes, func(node statusCheckContextNode) bool { return node.IsRequired },
 	)
 	if slices.ContainsFunc(requiredContexts, statusCheckContextNode.isFailing) {
 		return RequiredChecksFailing
@@ -173,13 +173,14 @@ func (c *client) fetchRequiredCheckStatusBatch(
 		alias := query.aliases[index]
 		pullRequest, aliasError := checkStatusPullRequest(data.ByAlias[alias], errorsForAlias(alias, err, fieldErrors))
 		if aliasError != nil {
-			log.Printf("Unable to fetch required check status of PR %s: %v", pullRequestPath(reference), aliasError)
-			pullRequestErrors = append(pullRequestErrors, fmt.Errorf(
+			pullRequestError := fmt.Errorf(
 				"error fetching required check status of PR %s: %w", pullRequestPath(reference), aliasError,
-			))
+			)
+			log.Print(pullRequestError)
+			pullRequestErrors = append(pullRequestErrors, pullRequestError)
 			continue
 		}
-		statusByRef[reference] = requiredChecksStatus(pullRequest.StatusCheckRollup)
+		statusByRef[reference] = classifyRequiredChecks(pullRequest.StatusCheckRollup)
 		logRequiredCheckStatus(reference, pullRequest.StatusCheckRollup, statusByRef[reference])
 	}
 	return statusByRef, errors.Join(pullRequestErrors...)

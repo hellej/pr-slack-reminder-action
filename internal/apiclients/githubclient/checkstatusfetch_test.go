@@ -3,6 +3,7 @@ package githubclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -57,9 +58,16 @@ func requiredStatusContext(state string) statusCheckContextNode {
 	return statusCheckContextNode{Typename: statusContextTypename, State: state, IsRequired: true}
 }
 
-func optional(context statusCheckContextNode) statusCheckContextNode {
-	context.IsRequired = false
-	return context
+func optionalCheckRun(status, conclusion string) statusCheckContextNode {
+	node := requiredCheckRun(status, conclusion)
+	node.IsRequired = false
+	return node
+}
+
+func optionalStatusContext(state string) statusCheckContextNode {
+	node := requiredStatusContext(state)
+	node.IsRequired = false
+	return node
 }
 
 func rollupOf(hasNextPage bool, contexts ...statusCheckContextNode) *statusCheckRollupNode {
@@ -69,7 +77,7 @@ func rollupOf(hasNextPage bool, contexts ...statusCheckContextNode) *statusCheck
 	return rollup
 }
 
-func TestRequiredChecksStatus(t *testing.T) {
+func TestClassifyRequiredChecks(t *testing.T) {
 	tests := []struct {
 		name     string
 		rollup   *statusCheckRollupNode
@@ -79,7 +87,7 @@ func TestRequiredChecksStatus(t *testing.T) {
 		{"no contexts", rollupOf(false), RequiredChecksUnknown},
 		{
 			"only optional contexts, one failing",
-			rollupOf(false, optional(requiredCheckRun("COMPLETED", "FAILURE")), optional(requiredStatusContext("SUCCESS"))),
+			rollupOf(false, optionalCheckRun("COMPLETED", "FAILURE"), optionalStatusContext("SUCCESS")),
 			RequiredChecksUnknown,
 		},
 		{"required check run failed", rollupOf(false, requiredCheckRun("COMPLETED", "FAILURE")), RequiredChecksFailing},
@@ -115,8 +123,8 @@ func TestRequiredChecksStatus(t *testing.T) {
 			rollupOf(false,
 				requiredCheckRun("COMPLETED", "SUCCESS"),
 				requiredStatusContext("SUCCESS"),
-				optional(requiredCheckRun("COMPLETED", "FAILURE")),
-				optional(requiredStatusContext("FAILURE")),
+				optionalCheckRun("COMPLETED", "FAILURE"),
+				optionalStatusContext("FAILURE"),
 			),
 			RequiredChecksPassing,
 		},
@@ -134,8 +142,8 @@ func TestRequiredChecksStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := requiredChecksStatus(tt.rollup); got != tt.expected {
-				t.Errorf("requiredChecksStatus() = %q, expected %q", got, tt.expected)
+			if got := classifyRequiredChecks(tt.rollup); got != tt.expected {
+				t.Errorf("classifyRequiredChecks() = %q, expected %q", got, tt.expected)
 			}
 		})
 	}
@@ -176,7 +184,11 @@ func (t *fakeCheckStatusTransport) Post(ctx context.Context, body []byte) (int, 
 	t.mutex.Unlock()
 
 	if slices.ContainsFunc(numbers, func(number int) bool { return slices.Contains(t.waitForCancelNumbers, number) }) {
-		<-t.answered
+		select {
+		case <-t.answered:
+		case <-time.After(time.Second):
+			return 0, nil, errors.New("no other check status request was answered within a second")
+		}
 		select {
 		case <-ctx.Done():
 			return 0, nil, ctx.Err()

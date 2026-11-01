@@ -31,6 +31,7 @@ type State struct {
 	MergedPRCache                 []githubclient.PR       `json:"mergedPRCache,omitempty"`
 	ShownMergeStats               *mergestats.MergeStats  `json:"shownMergeStats,omitempty"`
 	RecentMergeStats              RecentMergeStats        `json:"recentMergeStats,omitempty"`
+	FailingRequiredCheckPRs       []models.PullRequestRef `json:"failingRequiredCheckPRs,omitempty"`
 }
 
 // Falls back to the keys older releases wrote. See state.spec.md § Oddities.
@@ -153,6 +154,27 @@ func WithMergedPRCache(s State, prs []githubclient.PR) State {
 	})
 	s.MergedPRCache = utilities.UniqueFunc(cacheablePRs, isSamePullRequest)
 	return s
+}
+
+// Keeps a failing status through a run that saw no evidence either way.
+func PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *State) []githubclient.PR {
+	if loadedState == nil {
+		return prs
+	}
+	return utilities.Map(prs, func(pr githubclient.PR) githubclient.PR {
+		isRemembered := slices.Contains(loadedState.FailingRequiredCheckPRs, pr.GetPullRequestRef())
+		if pr.RequiredChecks == githubclient.RequiredChecksUnknown && isRemembered {
+			pr.RequiredChecks = githubclient.RequiredChecksFailing
+		}
+		return pr
+	})
+}
+
+func FailingRequiredCheckPRRefs(prs []githubclient.PR) []models.PullRequestRef {
+	failingPRs := utilities.Filter(prs, func(pr githubclient.PR) bool {
+		return pr.RequiredChecks == githubclient.RequiredChecksFailing
+	})
+	return utilities.Map(failingPRs, githubclient.PR.GetPullRequestRef)
 }
 
 const daysInAWeek = 7
