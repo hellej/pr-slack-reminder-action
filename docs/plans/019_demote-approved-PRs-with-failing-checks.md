@@ -185,7 +185,7 @@ Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`), `AGENTS.md`.
 
 - `State.FailingRequiredCheckPRs`, `PRsWithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
 - `Run` applies and saves them as in § Target shape. It logs one line per PR made failing from the state, naming it
-- `main_test.go` covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode. `getTestState` gains an option for the failing refs
+- `main_test.go` covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode, and a listed PR this run did not fetch for check status (no longer approved, or a draft). `getTestState` gains an option for the failing refs
 - The state snapshots holding the step 3 fixture list the failing PR
 - Update `state.spec.md`:
   - The opening sentence and § Behaviour: the field and both functions
@@ -247,8 +247,7 @@ Touches `README.md`.
 
 ### Caveats
 
-- Without the optional `workflow_run` trigger, a fixed PR stays red until the first PR, review or comment event or post after its checks pass
-- Check completion fires none of the README's default `update` triggers, so a PR whose check fails after the 09:00 post shows the old bucket until the next event or post
+- Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - `isRequired` reads only contexts that have reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
@@ -256,7 +255,7 @@ Touches `README.md`.
 - A snoozed or filtered-out PR leaves the set, and so does one turned draft while the canvas is off. When it comes back with pending checks, it reads green
 - A PR whose required checks are all removed stays red until it leaves the open fetch: no required context reads unknown
 - In update mode, a state that fails to load fails the run, but the canvas refresh still runs, without the set
-- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree (docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree). If the rollup shows only the re-run's pending attempt, the state keeps the PR red until it passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit
+- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree. If the rollup shows only the re-run's pending attempt, the state keeps the PR red until it passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree
 - Unverified for a fine-grained PAT and a classic PAT. A token lacking the permission either fails the request, which degrades to the warning, or gets a null rollup without an error, which leaves every PR unknown with no warning. See docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
 
 ### Neutral
