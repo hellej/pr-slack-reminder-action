@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"regexp"
@@ -13,7 +14,7 @@ const (
 	maxHeadingSummaryWords = 8
 	maxBulletWords         = 15
 	maxSummaryWords        = 80
-	// The GitHub MCP tools wrap a longer URL in backticks. See docs/third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link
+	// The GitHub MCP tools wrap a longer URL in backticks. `gh` has no such limit. See docs/third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link
 	maxLinkLength = 150
 )
 
@@ -43,16 +44,18 @@ var (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: checkprdescription <description file>")
+	forMCPTools := flag.Bool("mcp", false, "also check link lengths, for a description written with the GitHub MCP tools")
+	flag.Parse()
+	if flag.NArg() != 1 {
+		fmt.Fprintln(os.Stderr, "usage: checkprdescription [-mcp] <description file>")
 		os.Exit(2)
 	}
-	description, err := os.ReadFile(os.Args[1])
+	description, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	found := problems(string(description))
+	found := problems(string(description), *forMCPTools)
 	for _, problem := range found {
 		fmt.Println(problem)
 	}
@@ -61,7 +64,7 @@ func main() {
 	}
 }
 
-func problems(description string) []string {
+func problems(description string, forMCPTools bool) []string {
 	lines := strings.Split(description, "\n")
 	var found []string
 	summaryWords := 0
@@ -75,7 +78,10 @@ func problems(description string) []string {
 	}
 	found = append(found, proseLines(lines)...)
 	found = append(found, relatedWithoutState(lines)...)
-	return append(found, longLinks(description)...)
+	if forMCPTools {
+		found = append(found, longLinks(description)...)
+	}
+	return found
 }
 
 // The description is lists only: bullets, and a numbered list under "## Open".

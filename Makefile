@@ -39,9 +39,9 @@ check-vulnerabilities:
 check-style:
 	./.github/scripts/check-style.sh
 
-# FILE is a PR description, such as .local/pr/<branch>.md. See the pr skill
+# FILE is a PR description, such as .local/pr/<branch>.md. MCP=1 also checks link lengths. See the pr skill
 check-pr-description:
-	go run ./.github/scripts/checkprdescription $(FILE)
+	go run ./.github/scripts/checkprdescription $(if $(MCP),-mcp) $(FILE)
 
 lint: check-fmt check-vet check-dead-code check-vulnerabilities check-style
 

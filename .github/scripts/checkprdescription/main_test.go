@@ -30,6 +30,7 @@ func TestProblems(t *testing.T) {
 	tests := []struct {
 		name         string
 		description  string
+		forMCPTools  bool
 		wantProblems []string
 	}{
 		{
@@ -135,19 +136,26 @@ func TestProblems(t *testing.T) {
 			},
 		},
 		{
-			name:         "link over 150 characters",
+			name:         "link over 150 characters, for the GitHub MCP tools",
+			forMCPTools:  true,
 			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 132) + ")\n",
 			wantProblems: []string{"link over 150 characters: https://github.com/" + strings.Repeat("a", 132)},
 		},
 		{
-			name:         "link of exactly 150 characters",
+			name:         "link over 150 characters, for gh",
+			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 132) + ")\n",
+			wantProblems: nil,
+		},
+		{
+			name:         "link of exactly 150 characters, for the GitHub MCP tools",
+			forMCPTools:  true,
 			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 131) + ")\n",
 			wantProblems: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := problems(tt.description)
+			got := problems(tt.description, tt.forMCPTools)
 			if !slices.Equal(got, tt.wantProblems) {
 				t.Errorf("problems() =\n%q\nwant\n%q", got, tt.wantProblems)
 			}

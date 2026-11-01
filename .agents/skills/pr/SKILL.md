@@ -11,7 +11,8 @@ argument-hint: "Optional: draft, or what the PR is for"
 3. Run `make check-pr-description FILE=.local/pr/<branch>.md`. Fix and rerun until it prints nothing
 4. Create or edit the PR from that file, either:
    - With `gh`: `gh pr create --body-file <file>`, or `gh pr edit --body-file <file>`
-   - If `gh` is unavailable, with the GitHub MCP tools: pass the file's content, then read the stored description back
+   - If `gh` is unavailable, with the GitHub MCP tools: rerun step 3 with `MCP=1`, pass the file's content, then read the stored description back
+     - `MCP=1` fails a link over 150 characters. Drop an over-long link's anchor
 
 ## The Description
 
@@ -22,7 +23,9 @@ argument-hint: "Optional: draft, or what the PR is for"
 - When the PR resolves an issue, start with `Closes #<issue>`. Use `Fixes #<issue>` for a bug
 - Under `## Docs`, link every `.md` file the PR adds or changes, on the PR's branch:
   `[019_x.md](https://github.com/<owner>/<repo>/blob/<branch>/<path>)`
+  - For a file that already existed, link the first heading the PR adds or changes: `<path>#<anchor>`. GitHub's anchor is the heading lowercased, spaces as `-`, punctuation other than `-` and `_` dropped
 - Under `## Related`, link the issues, PRs and `.md` files the PR doesn't change but a reviewer needs, such as a docs/third-party-facts.md entry
+  - Link a section the same way, by its heading's anchor
   - Start each issue or PR with its state: `Open issue #12`, `Closed issue #7`, `Merged PR #95`, `Closed PR #90`
 - Drop a template section that would be empty
 - [checkprdescription.spec.md](../../../.github/scripts/checkprdescription/checkprdescription.spec.md) has the word and link limits

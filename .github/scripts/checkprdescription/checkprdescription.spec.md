@@ -14,13 +14,14 @@
   - Under `## Open`: a numbered item, `1. `, with bullet or numbered sub items
   - Elsewhere: a bullet, with bullet or numbered sub items
 - Under `## Related`, up to the next heading: a line naming an issue or PR, as `#12` or an `/issues/12` or `/pull/12` URL, starts with `- Open `, `- Closed ` or `- Merged `
-- Every Markdown link URL in the whole description: at most 150 characters
+- With `-mcp` (`MCP=1`), for a description written with the GitHub MCP tools: every Markdown link URL in the whole description is at most 150 characters
 
 ## Doesn't Do
 
 - Reads the stored PR description. The agent checks its local file before creating or editing the PR
 - Sections other than the summary's, such as `## Docs`
 - Whether a stated issue or PR state is true
+- Whether a `## Docs` link points to the first heading the PR adds or changes
 - Whether `## Docs` lists every `.md` file the PR changes
 
 ## Oddities
