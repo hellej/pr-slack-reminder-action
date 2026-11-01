@@ -7,22 +7,22 @@ Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on 
 
 ## Requirements
 
-- A row in "waiting for review", or a merged row, names each approver whose approval a push dismissed in a `♻️` group of its reviewer list, in the message and on the canvas: `(♻️ Dana Davis / 💬 Erin Evans)`
+- A row in "waiting for review", or a merged row, names each approver whose approval a push dismissed in a `🔁` group of its reviewer list, in the message and on the canvas: `(🔁 Dana Davis / 💬 Erin Evans)`
 - A row in "waiting for author" or "ready to merge" lists them under `💬` instead: the next move is not their re-stamp. Examples: a PR with a changes request, or with a thread waiting for its author
 - A push dismisses an approval under the "Dismiss stale pull request approvals when new commits are pushed" rule: in branch protection, or `dismiss_stale_reviews_on_push` in a ruleset
-- An approver who approves again is a current approver: `✅`, not `♻️`
+- An approver who approves again is a current approver: `✅`, not `🔁`
 - A manually dismissed approval is not stale: its reviewer stays under `💬`, as today
 - No bucket change: with no other approval, such a PR is in "waiting for review" today and stays there
 - The notification text doesn't change
 - No new action input, permission or GitHub request
 
-Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouched today, and `♻️` turns it into a quick re-stamp from a named reviewer. Fits AGENTS.md § Reference Deployment, where a weekly Dependabot batch rebases ~5 approved PRs at once.
+Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouched today, and `🔁` turns it into a quick re-stamp from a named reviewer. Fits AGENTS.md § Reference Deployment, where a weekly Dependabot batch rebases ~5 approved PRs at once.
 
 ### Non-goals
 
 - The "Require approval of the most recent reviewable push" rule. Its approvals stay `APPROVED`, and telling which ones went stale needs the review's commit, which GraphQL forbids on a private repository under `pull-requests: read`. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
 - No bucket change for a PR with a merge conflict (`mergeable` is `CONFLICTING`) whose only approvals were push-dismissed: it stays in "waiting for review"
-- No `♻️` on draft or collapsed rows
+- No `🔁` on draft or collapsed rows
 - No new section, sort order or Slack mention
 
 ## Target shape
@@ -39,7 +39,7 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
   - Cost: 27 points instead of 26 over 25 PRs. See docs/third-party-facts.md § Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query
   - Populates under `pull-requests: read` on `GITHUB_TOKEN`, in a public and a private repository
 - `prview.PR` gains `StaleApprovers []Collaborator`, with Slack IDs attached as for `Approvers`
-- `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders the groups `✅`, `♻️`, `💬`, then the merge blockers, in that order, separated by ` / `: `(✅ Dana Davis / ♻️ Erin Evans / 💬 Frank Fisher / CI failing)`
+- `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders the groups `✅`, `🔁`, `💬`, then the merge blockers, in that order, separated by ` / `: `(✅ Dana Davis / 🔁 Erin Evans / 💬 Frank Fisher / CI failing)`
   - `prview.PR.ReviewerGroupsForOpenRow() (staleApprovers, commenters []Collaborator)` splits them for an open row: `StaleApprovers` and `Commenters` when `GetNextAction()` is `NextActionWaitingForReview`, else no stale approvers and `Commenters` followed by `StaleApprovers`. Both builders' open rows call it
   - Merged rows pass `StaleApprovers` and `Commenters` as they are. Draft rows pass no stale approvers, as they pass no approvers
 - `GetNextAction` doesn't change
@@ -54,7 +54,7 @@ Posted at 09:00, approved
 
 Edited by an `update` after a rebase dismissed the approval
 *👀 Waiting for review*
-  • Bump zod   3 days ago   by dependabot (♻️ Dana Davis / 💬 Erin Evans)
+  • Bump zod   3 days ago   by dependabot (🔁 Dana Davis / 💬 Erin Evans)
 
 Edited by an `update` after Dana approved again
 *✅ Ready to merge*
@@ -63,11 +63,11 @@ Edited by an `update` after Dana approved again
 Marked stale by the next post, after the message was posted while the approval was dismissed
 ⚠️ Stale, updated Nov 2 at 09:00
 *👀 Waiting for review*
-  • Bump zod   3 days ago   by dependabot (♻️ Dana Davis / 💬 Erin Evans)
+  • Bump zod   3 days ago   by dependabot (🔁 Dana Davis / 💬 Erin Evans)
 ```
 
 - Today the "after a rebase" and "marked stale by the next post" states read `(💬 Dana Davis, Erin Evans)`
-- The canvas row reads `**[Bump zod](url)** _3 days ago_ by dependabot (♻️ Dana Davis / 💬 Erin Evans)` under `## 👀 Waiting for review`, and follows the same states
+- The canvas row reads `**[Bump zod](url)** _3 days ago_ by dependabot (🔁 Dana Davis / 💬 Erin Evans)` under `## 👀 Waiting for review`, and follows the same states
 - A merged row shows the reviewer list in the same format, after its merge time
 
 ## Breaking or non-breaking
@@ -80,7 +80,7 @@ Non-breaking, **minor**. Row text changes, with no input or permission change.
 ## Summary
 
 - **1** Fetch push-dismissed approvals in `githubclient` (checkpoint)
-- **2** Render `♻️` in the reviewer list, in the message and on the canvas
+- **2** Render `🔁` in the reviewer list, in the message and on the canvas
 - **3** Check the rows live
 - **4** Docs
 
@@ -109,13 +109,13 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`.
   - The implementation PR's Build run: the E2E job log shows no enrichment error line
   - Put the enrichment `rateLimit.cost` in the implementation PR's description, next to the same figure from the last `main` Build run, per AGENTS.md § GitHub API Budget
 
-### 2. Render `♻️` in the reviewer list
+### 2. Render `🔁` in the reviewer list
 
 Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, `cmd/pr-slack-reminder` snapshot tests.
 
 - `prview.PR.StaleApprovers` and `GetReviewersTextSegments` as in § Target shape
 - `ReviewerGroupsForOpenRow` as in § Target shape
-- Call sites: the message's `getReviewersElements`, shared by open and merged rows, takes the stale approvers and commenters from its callers, as it takes `mergeBlockers`. Never call `ReviewerGroupsForOpenRow` inside it: a merged PR with an approver reads `NextActionReadyToMerge`, so its merged row would lose `♻️`
+- Call sites: the message's `getReviewersElements`, shared by open and merged rows, takes the stale approvers and commenters from its callers, as it takes `mergeBlockers`. Never call `ReviewerGroupsForOpenRow` inside it: a merged PR with an approver reads `NextActionReadyToMerge`, so its merged row would lose `🔁`
 - The canvas's `renderReviewers` already takes its groups from its callers: open, merged and draft rows
 - Open rows read `ReviewerGroupsForOpenRow`, merged rows `StaleApprovers` and `Commenters`, draft rows no stale approvers
 - Update `prview.spec.md`: the `GetReviewersTextSegments` line, and a § Behaviour line for `ReviewerGroupsForOpenRow` and its rule. Update `messagebuilder.spec.md` and `canvasbuilder.spec.md`
@@ -127,7 +127,7 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 Touches no files. Step 1's repo-3 PRs are the setup.
 
 - The implementation PR's Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show, under repo-3:
-  - **push-dismissed** under "Waiting for review" with `Joose` under `♻️`
+  - **push-dismissed** under "Waiting for review" with `Joose` under `🔁`
   - **manually dismissed** under "Waiting for review" with `Joose` under `💬`
   - **current approval** and **re-approved** under "Ready to merge" with `Joose` under `✅`
   - Rows name a reviewer by GitHub display name: `hellej` reads `Joose`
@@ -137,7 +137,7 @@ Touches no files. Step 1's repo-3 PRs are the setup.
 
 Touches `README.md`.
 
-- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `♻️` instead of `💬`, in the message and on the canvas, until the reviewer approves again
+- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
 - Done means `make check-style` passes
 
 ## Consequences
@@ -155,7 +155,7 @@ Touches `README.md`.
 
 - The README's update mode example triggers on no `synchronize`. A push starts an `update` once the CI workflows its `workflow_run` trigger lists complete, or earlier if the dismissal fires `pull_request_review: dismissed`, and no GitHub docs page says whether it does. This repository's `pr-reminder.yml` has no `workflow_run` and skips runs by `dependabot[bot]`, so a Dependabot rebase starts no `update` here. Without a run, the row changes at the next PR, review or comment event, CI completion or post
 - Under "Require approval of the most recent reviewable push" without the dismissal rule, an approval made before the latest push keeps reading `✅` in "ready to merge"
-- Collapsed rows have no reviewer list, so a collapsed Dependabot PR shows no `♻️`
+- Collapsed rows have no reviewer list, so a collapsed Dependabot PR shows no `🔁`
 - A draft row drops a push-dismissed approver, who read under `💬` on that row before
 - A manual dismissal sent with an empty message may read as push-dismissed
 - In "waiting for author", every push-dismissed approver reads under `💬`, also one whose only open item is the re-stamp, while another reviewer's thread holds the PR
