@@ -10,7 +10,7 @@ const validDescription = `Closes #12
 
 ## Summary
 
-### The problem: "ready to merge" lists unmergeable PRs
+### The problem: "ready to merge" lists PRs failing CI
 
 - An approved PR with a failing required check shows as ready to merge
 - Its merge button is red, so the team stops trusting the section
@@ -71,9 +71,9 @@ func TestProblems(t *testing.T) {
 			},
 		},
 		{
-			name:         "heading summary of 7 words",
-			description:  strings.Replace(validDescription, `demote them to "waiting for author"`, "one two three four five six seven", 1),
-			wantProblems: []string{"### The solution: heading summary over 6 words"},
+			name:         "heading summary of 9 words",
+			description:  strings.Replace(validDescription, `demote them to "waiting for author"`, "one two three four five six seven eight nine", 1),
+			wantProblems: []string{"### The solution: heading summary over 8 words"},
 		},
 		{
 			name:         "long bullet, 16 words",
