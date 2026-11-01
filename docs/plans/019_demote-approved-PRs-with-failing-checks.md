@@ -1,6 +1,6 @@
 # Demote approved PRs with failing checks
 
-date: 2026-10-31
+date: 2026-11-01
 status: draft
 
 Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-reminder-action/issues/100). The work lands on the feature branch `claude/fervent-wozniak-lwnedy` and its PR, not on `main`.
@@ -56,12 +56,12 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Otherwise `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
 - `OpenPRsResult` gains `CheckStatusErr error`: set when the phase failed in whole or in part. The PRs it covers stay `RequiredChecksUnknown`
 - `state.State` gains `FailingRequiredCheckPRs []models.PullRequestRef` (JSON key `failingRequiredCheckPRs`, omitted when empty): the open PRs the run last saw as failing
-- `state.WithRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR` returns copies in which every `RequiredChecksUnknown` PR whose ref the loaded state lists is `RequiredChecksFailing`. A nil state changes nothing
+- `state.PRsWithRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State) []githubclient.PR` returns copies in which every `RequiredChecksUnknown` PR whose ref the loaded state lists is `RequiredChecksFailing`. A nil state changes nothing
 - `state.FailingRequiredCheckPRRefs(prs []githubclient.PR) []models.PullRequestRef` returns the refs of the `RequiredChecksFailing` PRs, in the PRs' order
 - `Run` in `run.go`:
-  - Right after `loadPreviousState`, applies `WithRememberedFailingChecks` to the open PRs, passing the loaded state, nil when it did not load. Both tracks and both modes then read the same PRs
+  - Right after `loadPreviousState`, applies `PRsWithRememberedFailingChecks` to the open PRs, passing the loaded state, nil when it did not load. Both tracks and both modes then read the same PRs
   - Where it sets the canvas hash on the state to save, sets `FailingRequiredCheckPRs` from those PRs too. So every state saved carries this run's set, in both modes and on every save path
-  - A PR that leaves the open fetch (merged, closed, snoozed, filtered out) leaves the set
+  - A PR that leaves the open fetch (merged, closed, snoozed, filtered out, or turned draft with the canvas off) leaves the set
 - `prview.PR.GetNextAction` reads `RequiredChecksFailing` in its first check: it keeps an approved PR out of `NextActionReadyToMerge`, so it is `NextActionWaitingForAuthor`, as for a conflict
 - `prview.PR.IsHeldBackByFailingChecks()` is true when the failing check alone keeps an approved PR out of "ready to merge": approved, no waiting thread, no conflict, `RequiredChecksFailing`. It is what the `❌ CI` entry reads
 - `❌ CI` is the last group of the reviewer list, after the approvers and commenters, on an open row in the message and on the canvas
@@ -181,21 +181,19 @@ Touches `internal/prview`, `internal/messagebuilder`, `internal/canvasbuilder`, 
 
 ### 4. Keep a failing status until the required checks pass, through the state
 
-Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`).
+Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`), `AGENTS.md`.
 
-- `State.FailingRequiredCheckPRs`, `WithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
+- `State.FailingRequiredCheckPRs`, `PRsWithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
 - `Run` applies and saves them as in § Target shape. It logs one line per PR made failing from the state, naming it
-- `main_test.go`, through the mock's status options and a loaded state listing the PR, each in post and in update mode unless noted:
-  - Listed and pending: under "waiting for author" with `❌ CI`, and the saved state still lists it
-  - Listed and passing: under "ready to merge", and the saved state drops it
-  - Listed, and the check status fetch fails: under "waiting for author" with `❌ CI`
-  - Not listed and pending: under "ready to merge"
-  - Listed, but not in this run's open fetch: the saved state drops it
-  - Listed and no longer approved: under "waiting for review" without `❌ CI`, and the saved state still lists it
-  - Post mode with a state that fails to load: a pending PR is under "ready to merge"
-  - Update mode keeping or deleting its message still saves this run's set
-- The state snapshot of the step 3 fixture lists the failing PR
-- Update `state.spec.md`: the field, both functions, and an Oddities line that it was added without a schema bump. Update `run.spec.md`: where the set is applied and saved
+- `main_test.go` covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode. `getTestState` gains an option for the failing refs
+- The state snapshots holding the step 3 fixture list the failing PR
+- Update `state.spec.md`:
+  - The opening sentence and § Behaviour: the field and both functions
+  - § Oddities: the field was added without a schema bump, and the "An update run rewrites only ..." line gains the set
+- Update `run.spec.md` § Behaviour:
+  - Where the set is applied and saved
+  - "A deleted or kept message, or a failed edit: it saves the loaded state back unchanged" now says: except for the canvas hash and the set
+- Update AGENTS.md § Architecture, the **State** bullet: it also holds the PRs last seen with a failing required check, and both modes apply them to the open PRs before either track
 
 ### 5. Warn when the check status fetch fails
 
@@ -230,8 +228,9 @@ Touches `README.md`.
   ```
   - One line on why: without it, a fixed PR stays red until the next PR, review or comment event or post
   - One line on its limits: it reacts to GitHub Actions workflows only, not to an external CI app's checks, and the reminder workflow file must be on the default branch. See docs/third-party-facts.md § `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created
-  - One line on cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR. See AGENTS.md § GitHub API Budget
+  - One line on cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR plus 1 per repository. See AGENTS.md § GitHub API Budget
   - The example's `run-mode` expression and concurrency group already send a `workflow_run` event to `update` and to the non-scheduled group, so neither changes
+- Done means `make check-style` passes and the trigger example stays one valid `on:` block
 
 ## Consequences
 
@@ -244,19 +243,20 @@ Touches `README.md`.
 
 ### Negative
 
-- Without the optional `workflow_run` trigger, a fixed PR stays red until the first PR, review or comment event or post after its checks pass. An `update` that runs while they are pending keeps it red, where a status read without the state would have shown it as ready
+- None
 
 ### Caveats
 
+- Without the optional `workflow_run` trigger, a fixed PR stays red until the first PR, review or comment event or post after its checks pass
 - Check completion fires none of the README's default `update` triggers, so a PR whose check fails after the 09:00 post shows the old bucket until the next event or post
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
-- Without a loaded state (first run, failed load, a PR new to the open fetch), pending checks read as green, so a PR can read as ready for the minutes its checks run
+- Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - `isRequired` reads only contexts that have reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
 - More than 100 contexts on a commit: a failure among the first 100 still reads failing, but the PR never reads passing, so a red PR stays red
-- A snoozed or filtered-out PR leaves the set. When it comes back with pending checks, it reads green
+- A snoozed or filtered-out PR leaves the set, and so does one turned draft while the canvas is off. When it comes back with pending checks, it reads green
 - A PR whose required checks are all removed stays red until it leaves the open fetch: no required context reads unknown
 - In update mode, a state that fails to load fails the run, but the canvas refresh still runs, without the set
-- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree. If the rollup shows only the re-run's pending attempt, the state keeps the PR red until it passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit
+- Not covered by a fixture: a failed check followed by a re-run. GitHub's docs say nothing about whether the rollup keeps the failed attempt, and third-party reports disagree (docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree). If the rollup shows only the re-run's pending attempt, the state keeps the PR red until it passes. If it keeps the failed attempt beside the passing re-run, the PR stays red until a new commit
 - Unverified for a fine-grained PAT and a classic PAT. A token lacking the permission either fails the request, which degrades to the warning, or gets a null rollup without an error, which leaves every PR unknown with no warning. See docs/third-party-facts.md § No GitHub page documents the token permission for any GraphQL field
 
 ### Neutral
@@ -271,4 +271,4 @@ The enrichment query runs for every open PR and a failure scoped to a repository
 
 ### Why the last status lives in the state
 
-The run already loads and saves the state, so remembering a set of refs costs no request. Reading the status from GitHub's history instead means fetching earlier commits' rollups for every pending PR, which costs points each run. It also misses a re-run on the same commit, if the rollup shows only the pending attempt.
+The run already loads and saves the state, so remembering a set of refs costs no request. Reading the status from GitHub's history instead means fetching earlier commits' rollups for every pending PR, which costs points each run. It also misses a re-run on the same commit, if the rollup shows only the pending attempt, which no GitHub page settles. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree.
