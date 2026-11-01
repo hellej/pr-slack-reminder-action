@@ -274,12 +274,12 @@ If you're using the default `GITHUB_TOKEN`, grant these via the job's `permissio
 ```yaml
 permissions:
   pull-requests: read # listing/fetching PRs and reviews
-  checks: read # reading required check status in a private repository
+  checks: read # reading required check status (not needed in a public repository)
   issues: read # reading PR comments (incl. /snooze comments)
   actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale and compare the merge stats week over week
 ```
 
-> In a private repository whose commits carry commit statuses, e.g. from an external CI, also grant `statuses: read`. A missing permission shows as a warning on the run page.
+> If your commits carry commit statuses, e.g. from an external CI, also grant `statuses: read`. A missing permission shows as a warning on the run page.
 
 ### Option 1: Default Token (Single Repository)
 
@@ -294,7 +294,7 @@ github-token: ${{ secrets.GITHUB_TOKEN }}
 For better security and granular permissions, especially when monitoring multiple repositories, using a GitHub App is the recommended approach.
 
 1.  **Create a GitHub App** in your organization or personal account settings.
-2.  **Give it necessary permissions** (e.g., "read" access to PRs, and to Checks for private repositories, plus Commit statuses if commits there carry commit statuses).
+2.  **Give it necessary permissions** (e.g., "read" access to PRs and Checks, plus Commit statuses if your commits carry them).
 3.  **Install the app** on the repositories you want to monitor. During installation, you can choose to grant access to **all repositories** (of your organization) or only to **specific ones**. For better security, it's recommended to select only the repositories you intend to monitor.
 4.  **Add the App ID and Private Key** as secrets in the repository where your workflow runs.
 5.  **Use a token generation action** (like `actions/create-github-app-token`) in your workflow to generate a temporary token.
