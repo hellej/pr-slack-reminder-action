@@ -140,7 +140,7 @@ on:
     types: [submitted, dismissed]
   issue_comment:
     types: [created, deleted]
-  workflow_run: # optional: runs an update when a listed workflow completes
+  workflow_run:
     workflows: ["CI"] # the workflows running your required checks
     types: [completed]
 
