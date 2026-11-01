@@ -138,9 +138,9 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - `PR.RequiredChecks` carries `omitempty`, so no existing state snapshot gains the key. The merged PR cache never holds a known status
 - A failure never fails `FindOpenPRs`:
   - A query, repository or transport error leaves every PR of that batch unknown
-  - A per-PR error leaves only that PR unknown: a `pullRequestError`, as `failsOnlyOnePullRequest` reads it, a field error below the PR, or a PR missing from the answer. A field error on `statusCheckRollup` is what a token lacking the permission could get, so it must reach the warning too
+  - A per-PR error leaves only that PR unknown: a `pullRequestError`, as `failsOnlyOnePullRequest` reads it, a field error below the PR, or a PR missing from the answer. A token lacking the permission could get a field error on `statusCheckRollup`, so that error goes into `CheckStatusErr` and the warning like any other
   - Either sets `OpenPRsResult.CheckStatusErr`, joining the batches' errors
-  - A batch error names the repository when it is scoped to one, through `pullRequestBatchError`, which `enrichPRsWithReviewInfoError` becomes with its message text unchanged
+  - A batch error names the repository when it is scoped to one. `enrichPRsWithReviewInfoError` is renamed `pullRequestBatchError`, and the enrichment's error text does not change
   - Batches fail independently: unlike `enrichPRsWithReviewInfo`'s `errgroup.WithContext`, one failed batch does not cancel the others
   - A decode error and an expired context count as a failed batch too
 - A rollup with `hasNextPage` true is logged
@@ -157,7 +157,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
   - No fixture PR is set up and no private repository is checked: the owner has no paid GitHub plan
   - Live, the only check is that `statusCheckRollup` and `isRequired` come back without an error for this repository's PRs: the owner runs `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`, and its job log shows a status line per requested PR, the phase's `rateLimit.cost`, and no check status error line
   - The phase sends a request only when this repository has an open, approved, non-draft PR. Without one the job log shows no phase at all, which confirms nothing
-  - The branch's Build E2E log still gives the phase's `rateLimit.cost`, compared against the last `main` Build run. State the difference in the PR, per AGENTS.md § GitHub API Budget
+  - If the branch's Build E2E log shows the phase, compare its `rateLimit.cost` against the last `main` Build run and state the difference in the PR, per AGENTS.md § GitHub API Budget. If it shows none, say so in the PR
   - If an error line shows, stop and raise it with the user: a permission is needed and the plan has to say which
   - Amend docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository with what the probe shows: a public repository, `GITHUB_TOKEN`, this repository's required checks, and whether they are required through a ruleset or branch protection
 

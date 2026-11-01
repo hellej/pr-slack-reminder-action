@@ -18,7 +18,7 @@ run modes and the pipeline order are in
   - The tracked PR fetch failing in update mode
   - The delete failing in update mode
   - The merge stats left out: their merged PR fetch failing
-  - The required check status fetch failing in whole or in part, in either mode: `Failed to fetch required check status: <error>`. Each PR keeps the status the loaded state remembers
+  - The required check status fetch failing for a batch or for one PR, in either mode: `Failed to fetch required check status: <error>`. A PR the failure left unknown reads failing when the loaded state lists it, and unknown otherwise
   - A merged PR in the merge stats fetch without complete reviewer info, one warning per PR naming it. It stays in the line's merged count
 - `Run(getGitHubClient, getSlackClient, isMergeStatsDay)` is the action's entrypoint. It loads config, resolves the Slack channel ID by name when only that is configured, fetches open and recently-merged PRs once, dispatches to post or update mode, refreshes the canvas when configured, and persists state
 - Both modes load the previous state once, after the open-PR fetch and before the merged-PR fetch. In update mode, a load error fails the run, but only after the merged fetch and the canvas refresh have run
@@ -89,5 +89,5 @@ run modes and the pipeline order are in
 - The week before's window can differ in length from the shown one, such as after `show-merge-stats-in-message` changes. The medians are still compared
 - A team far east of UTC posting early on its Monday posts on a UTC Sunday, so its line lands on its Tuesday post
 - In update mode, a state that fails to load fails the run. The canvas refresh still runs, with no remembered failing PRs applied
-- A PR filtered out, snoozed, or turned draft with the canvas off leaves the failing set. When it comes back with pending checks, it reads green
+- A PR that is filtered out or snoozed, or that turns draft while the canvas is off, leaves the failing set. When it returns approved with pending checks, its status is unknown, so it shows under "Ready to merge"
 - A failed canvas write still reports the previous content hash, so the next run retries the same write rather than treating it as already applied
