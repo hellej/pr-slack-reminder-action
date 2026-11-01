@@ -1016,6 +1016,21 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Inferred, not documented: `workflow_run` doesn't react to an external CI app's checks
 - Not documented: whether `completed` fires again for a re-run, and whether it fires for a fork PR's run. The [secure use page](https://docs.github.com/en/actions/reference/security/secure-use) only implies the second, by warning against `workflow_run` with untrusted PRs
 
+## GitHub Actions runs no `pull_request` workflow while the PR has a merge conflict [2026-11-01]
+
+- Source: [Events that trigger workflows § pull_request](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+- "Workflows will not run on `pull_request` activity if the pull request has a merge conflict. The merge conflict must be resolved first"
+- `pull_request_target` runs even with a conflict
+- The page says nothing about `pull_request_review` or `issue_comment` on a conflicting PR
+- Inferred, not checked live: a push to a conflicting PR's branch gets no check run from a `pull_request` workflow, so that head commit's checks stay missing
+
+## Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one [2026-11-01]
+
+- Source: [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets), the availability callout, read with `curl`: WebFetch's markdown conversion drops it
+- "Rulesets are available in public repositories with GitHub Free and GitHub Free for organizations, and in public and private repositories with GitHub Pro, GitHub Team, and GitHub Enterprise Cloud"
+- So on a free plan, a check required through a ruleset can only be set up in a public repository
+- The API agrees: `gh api repos/hellej/pr-slack-reminder-test-repo-1/rulesets`, `.../rules/branches/main` and `.../branches/main/protection` all answer 403, "Upgrade to GitHub Pro or make this repository public to enable this feature." Branch protection is gated the same way, so the private E2E test repositories cannot reproduce any review rule
+
 ## A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set [2026-11-01]
 
 - Source: `gh api graphql` against `hellej/pr-slack-reminder-action` PRs 5, 6, 19 and 52, whose ruleset sets `dismiss_stale_reviews_on_push: true`
@@ -1032,11 +1047,6 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - No page defines a "reviewable push". A third-party report ([community discussion 37266](https://github.com/orgs/community/discussions/37266)) saw a conflict-free rebase keep the approvals valid
 - Undocumented: whether `reviewDecision` reads `REVIEW_REQUIRED` while the latest push is unapproved, and whether it also does so for a required approval count not yet met
 - No `PullRequest` field says whether the latest push is approved. `Ref.rules` exposes `PullRequestParameters.requireLastPushApproval`, with an undocumented token permission
-
-## Rulesets and branch protection are unavailable on a private repository without GitHub Pro: the API answers 403 [2026-11-01]
-
-- Source: `gh api repos/hellej/pr-slack-reminder-test-repo-1/rulesets`, `.../rules/branches/main` and `.../branches/main/protection`, all answering `{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}`
-- So the private E2E test repositories cannot reproduce any review rule. A public repository can
 
 ## Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` kept the enrichment query's cost [2026-11-01]
 
