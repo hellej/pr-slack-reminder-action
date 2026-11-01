@@ -3,7 +3,7 @@
 date: 2026-11-01
 status: draft
 
-Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on [plan 019](019_demote-approved-PRs-with-failing-checks.md), implemented, whose merge blockers, such as `CI failing`, stay last in the reviewer list. Independent of [plan 020](020_show-merge-blockers-on-PR-rows.md), which adds a merge blocker.
+Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on plans [019](019_demote-approved-PRs-with-failing-checks.md) and [020](020_show-merge-blockers-on-PR-rows.md), both implemented, whose merge blockers, `CI failing` and `conflicts`, stay last in the reviewer list.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
 ### Non-goals
 
 - The "Require approval of the most recent reviewable push" rule. Its approvals stay `APPROVED`, and telling which ones went stale needs the review's commit, which GraphQL forbids on a private repository under `pull-requests: read`. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
-- No bucket change for a PR with a merge conflict (`mergeable` is `CONFLICTING`) whose only approvals were push-dismissed: it stays in "waiting for review"
+- No bucket change for a PR with a merge conflict (`mergeable` is `CONFLICTING`) whose only approvals were push-dismissed: it stays in "waiting for review", its row reading `(🔁 Dana Davis / conflicts)`
 - No `🔁` on draft or collapsed rows
 - No new section, sort order or Slack mention
 
@@ -137,7 +137,7 @@ Touches no files. Step 1's repo-3 PRs are the setup.
 
 Touches `README.md`.
 
-- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
+- `README.md` § Example Output, beside the paragraphs on collapsed rows and on `conflicts`: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
 - Done means `make check-style` passes
 
 ## Consequences
