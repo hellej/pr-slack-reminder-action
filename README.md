@@ -15,37 +15,25 @@ This GitHub Action sends a friendly Slack reminder about open Pull Requests. The
 
 </details>
 
-2 or more PRs by one author in `collapse-prs-from-authors` (Dependabot and Renovate by default) in a section collapse into one row of linked PR numbers: `🤖 dependabot: #101 #102 #103`. The label links to a GitHub search for that author's PRs.
-
 ## GitHub's Built-in vs This Action
 
 You may not need this action; GitHub provides [built-in scheduled reminders for teams](https://docs.github.com/en/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team) which works well in many situations.
 
 **When to use GitHub's built-in reminders:**
 
-- Your team structure aligns well with GitHub teams
-- The CODEOWNERS files of your repositories accurately match your team structure (-> reviews are automatically requested from the right people)
-- You're okay with the 5 repository limit per reminder
-- You don't need custom message content or formatting
-- You don't need different filtering options for each repository
-- You prefer a GUI (github.com) for setting up the reminders (as opposed to YAML)
+- Your GitHub teams and CODEOWNERS files match your team
+- You monitor 5 repositories or fewer
+- You prefer setting up reminders in a GUI over YAML
 
 **What's special about this action:**
 
-- Monitor up to 30 repositories
-- Option to ["refresh" the latest PR reminder](#3-update-mode-enabled) when PRs get opened, reviewed or merged (with run-mode: `update`)
-- Option to keep a [Slack canvas](#pr-tracker-canvas) updated with a live tracker of open PRs bucketed by whose turn it is, plus draft and recently merged PRs
+- Monitor up to 30 repositories, with global and repository specific filters
+- Option to ["refresh" the latest PR reminder](#3-update-mode-enabled) when PRs get opened, reviewed or merged
+- Option to keep a [Slack canvas](#pr-tracker-canvas) updated as a live PR tracker
 - Snooze individual PRs with a [`/snooze` comment](#-tips)
-- Highlight old PRs that need attention (with optional age threshold input)
-- PR age counts from when it was first marked ready for review, so draft time doesn't count
-- Weekends don't count towards the old-PR threshold: under a 48 hour threshold, a PR opened Friday morning isn't flagged old on Monday morning
-- Concise review status info for each PR with emojis (incl. approvers & commenters)
-- Merge stats on Monday's message, or on every post: PRs merged since the previous stats, their median time to a first review and to merge, and each median's change against the week before
-- More customizable message content
-- Global and repository specific filters
-- Anyone can set this up (no need to be a GitHub team maintainer)
-- No need for official GitHub team setup
-- No need for perfect CODEOWNERS files to get reminded about the right PRs
+- Highlight old PRs that need attention
+- Weekly merge stats
+- Anyone can set it up: no GitHub teams, team maintainer rights or CODEOWNERS files needed
 
 ## Getting Started
 
@@ -115,16 +103,12 @@ jobs:
             }
           repository-filters: |
             backend: {"labels": ["ready-for-review"], "ignored-authors": ["intern-bot"]}
-            mobile-app: {}
+            mobile-app: {} # skips the global filters for this repo
 ```
-
-(^ PRs from `mobile-app` repo won't be filtered by the global filters)
 
 #### 3. Update Mode Enabled
 
-Setup where the latest message is also updated when PRs get reviewed/merged.
-An updated message lists the PRs that are open at that moment, including ones opened after the original message.
-PRs that merged since the original message move to the recently merged section, including ones opened after it.
+Setup where the latest message is also updated when PRs get reviewed, merged or opened.
 
 ```yaml
 name: PR Reminder
@@ -177,17 +161,17 @@ jobs:
 | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `slack-bot-token`                   | ✅       | Slack bot token for sending messages<br>Example: `${{ secrets.SLACK_BOT_TOKEN }}`                                                                                                          |
 | `github-token`                      | ✅       | GitHub token for repository access<br>Example: `${{ secrets.GITHUB_TOKEN }}`                                                                                                               |
-| `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (i.e. actions: read), which `update` needs and `post` reads for the previous message and merge stats. Only needed if the default github-token misses permissions. |
+| `github-token-for-state`            | ❌       | GitHub token that can read the state artifact (`actions: read`). Only needed if `github-token` lacks that permission |
 | `run-mode`                          | ❌       | Run mode: `post` (default) posts a new reminder; `update` refreshes an existing reminder                                                                                                   |
-| `state-artifact-name`               | ❌       | Name of the artifact containing state from previous runs (required when `run-mode` is `update`; `post` reads it to mark the previous message stale and compare the merge stats against the week before)<br>Default: `pr-slack-reminder-state` |
+| `state-artifact-name`               | ❌       | Name of the artifact holding state from previous runs<br>Default: `pr-slack-reminder-state` |
 | `slack-channel-name`                | ❌       | Slack channel name (use this OR `slack-channel-id`)                                                                                                                                        |
 | `slack-channel-id`                  | ❌       | Slack channel ID (use this OR `slack-channel-name`)<br>Example: `C1234567890`                                                                                                              |
 | `github-repositories`               | ❌       | Repositories to monitor (max 30) - defaults to current repo<br>Example:<br>`owner/repo1`<br>`owner/repo2`                                                                                  |
 | `filters`                           | ❌       | Global filters (JSON)<br>Example:<br>`{"authors": ["alice"], "ignored-labels": ["wip"]}`                                                                                                   |
 | `repository-filters`                | ❌       | Repository-specific filters<br>Example:<br>`repo1: {"labels": ["bug"]}`<br>`repo2: {"ignored-authors": ["bot"]}`                                                                           |
 | `github-user-slack-user-id-mapping` | ❌       | Map of GitHub usernames to Slack user IDs<br>Example:<br>`alice: U1234567890`<br>`kronk: U2345678901`                                                                                      |
-| `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line: a run with no open PRs then still posts the recently merged ones; a run with nothing at all to show sends no message, and in `update` mode deletes the message it was updating<br>Example: `All caught up! 🎉` |
-| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Age counts from when the PR was first marked ready for review, or from its creation if it was never a draft. The hours are weekday hours: Saturdays and Sundays (UTC) are left out |
+| `no-prs-message`                    | ❌       | Line to show above the sections when no open PRs are found (defaults to `No open PRs - happy coding! 🎉`). Set it to `""` to show no line<br>Example: `All caught up! 🎉` |
+| `old-pr-threshold-hours`            | ❌       | PR age in hours after which a PR is highlighted as old with alarm emoji and bold age text (defaults to `96`). Weekends don't count |
 | `group-by-repository`               | ❌       | Group PRs by repository with repository sub-headings in each section (defaults to `false`).                                                                                               |
 | `collapse-prs-from-authors`         | ❌       | GitHub logins whose PRs collapse into one row of linked PR numbers per author, in every section with 2 or more of them (defaults to `dependabot[bot]` and `renovate[bot]`). Set it to `""` to collapse nothing<br>Example:<br>`dependabot[bot]`<br>`renovate[bot]` |
 | `show-merged-prs-in-message`        | ❌       | Show the recently merged PRs section in the message (defaults to `true`). Set it to `false` to hide the merged section. The [PR Tracker Canvas](#pr-tracker-canvas) keeps its merged section either way |
@@ -212,15 +196,7 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 <img src="docs/examples/example_canvas.png" alt="Example PR tracker canvas" width="600" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px;">
 
-Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts or fails a required check; ready to merge (3) is an approved PR with nothing outstanding and no failing required check.
-
-A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes. The message lists such a PR under the same heading, with the same `CI failing`.
-
-A PR that conflicts with its base branch shows `conflicts` in its reviewer list, after `CI failing` when both apply. It does so in every open section of the canvas and the message, except in a collapsed row, which has no reviewer list.
-
-Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
-
-As in the message, 2 or more PRs by one author in `collapse-prs-from-authors` in a section collapse into one row of linked PR numbers.
+It has the same sections as the message, plus draft PRs.
 
 ### Setup
 
@@ -239,17 +215,11 @@ to be in the same channel as the canvas to have write access.
 ### Good to know
 
 - ⚠️ The action owns the whole canvas. A write replaces all of its content, so anything typed there by hand survives only until the next write.
-- The canvas notifies nobody. Authors and reviewers are shown as plain GitHub names, never as Slack mentions, because every run would otherwise re-notify all of them.
-- These inputs shape the canvas too: `github-repositories`, `filters`, `repository-filters`, `old-pr-threshold-hours`, `group-by-repository`, `collapse-prs-from-authors` and `/snooze` comments. `no-prs-message`, `github-user-slack-user-id-mapping` and `show-merged-prs-in-message` don't apply: the canvas has fixed headings, no mentions, and always lists recently merged PRs.
-- A failing canvas update fails the run, but never stops the reminder message from being sent or updated.
-- The `_Updated <ts>_` footer says when the canvas was last written, not when the action last ran.
 - A canvas that shows duplicated headings or PR rows is a rendering artifact in the Slack client, not corrupted data. Reload the canvas to see its real content (Cmd + R or Ctrl + R).
 
 ## 💡 Tips
 
-- **Highlight old PRs**: Set a reasonable `old-pr-threshold-hours` to highlight stale PRs
 - **Snooze a PR**: Comment `/snooze for 3 days` (or `/snooze PR reminder for 3 days`) on a PR to temporarily hide it from reminders. To unsnooze, delete the comment or post `/snooze for 0 days`.
-- **Use cron scheduling**: Run reminders at times that work for your team (avoid weekends!)
 - **Customize the empty-day message**: Set `no-prs-message` to fit your team's culture, or to `""` for no message on days with nothing to show
 
 ## 💬 Slack Bot Token Scopes
@@ -278,7 +248,7 @@ permissions:
   pull-requests: read # listing/fetching PRs and reviews
   checks: read # reading required check status (not needed in a public repository)
   issues: read # reading PR comments (incl. /snooze comments)
-  actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale and compare the merge stats week over week
+  actions: read # downloading the state artifact (update mode, stale marking, merge stats)
 ```
 
 > If your commits carry commit statuses, e.g. from an external CI, also grant `statuses: read`. A missing permission shows as a warning on the run page.
@@ -297,7 +267,7 @@ For better security and granular permissions, especially when monitoring multipl
 
 1.  **Create a GitHub App** in your organization or personal account settings.
 2.  **Give it necessary permissions** (e.g., "read" access to PRs and Checks, plus Commit statuses if your commits carry them).
-3.  **Install the app** on the repositories you want to monitor. During installation, you can choose to grant access to **all repositories** (of your organization) or only to **specific ones**. For better security, it's recommended to select only the repositories you intend to monitor.
+3.  **Install the app** on the repositories you want to monitor.
 4.  **Add the App ID and Private Key** as secrets in the repository where your workflow runs.
 5.  **Use a token generation action** (like `actions/create-github-app-token`) in your workflow to generate a temporary token.
 
