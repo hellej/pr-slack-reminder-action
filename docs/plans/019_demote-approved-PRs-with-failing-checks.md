@@ -238,7 +238,7 @@ Touches `README.md`.
 - The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check. A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
-- `README.md` § Required Permissions: `checks: read` in the permissions block, and a line no wider than step 1 and the facts entries show: an App token in a private repository needs `checks: read`, `GITHUB_TOKEN` there is untested, and `GITHUB_TOKEN` in a public repository needs only `pull-requests: read`. The update-mode example's `permissions:` block gains `checks: read` too. A short side note says a private repository whose commits carry commit statuses, posted by an app, a script or a person, also needs `statuses: read`
+- `README.md` § Required Permissions: `checks: read` in the permissions block, commented as needed in a private repository. The update-mode example's `permissions:` block gains it too. One short side note: a private repository whose commits carry commit statuses also needs `statuses: read`, and a missing permission shows as a warning on the run page
 - `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, listing the workflows that run the required checks. Its own comment explains it, with no text under the example:
   ```yaml
     workflow_run: # optional: runs an update when a listed workflow completes
