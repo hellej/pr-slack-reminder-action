@@ -17,6 +17,9 @@ Read the plan file, then check it against:
 - AGENTS.md § Purpose, § Reference Deployment and § Code Style. Reading them in full is mandatory
 - The tree itself
 
+Never judge a plan's format against past plans in `docs/plans/` or `.local/plans/`. See the
+`plan` skill § Past Plans Are Not Examples.
+
 ## How Detailed a Plan Has To Be
 
 The `plan` skill § How Detailed a Plan Has To Be sets it.

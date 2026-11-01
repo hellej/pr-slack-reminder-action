@@ -16,6 +16,12 @@ Before drafting an implementation plan, read the following. Each read is mandato
 - **What starts a run**: when a change makes a run's output depend on time or on earlier runs, list the events that start a run (the README's trigger examples, `.github/workflows/`) and what the message and canvas show between two consecutive runs
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
 
+## Past Plans Are Not Examples
+
+- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. This skill and AGENTS.md § Output Style are the only reference for how a plan looks
+- Read a past plan only for its content: when the new plan builds on it, depends on it, or the user points to it. Even then, copy nothing of its shape
+- Listing a plans directory for the next sequence number is fine
+
 ## Mandatory Plan Steps
 
 1. Create the plan file in `.local/plans/` (gitignored), unless the user gives another path, e.g. `docs/plans/` (committed)
@@ -45,7 +51,6 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 - Don't enumerate call sites, test cases, or the edits inside a function
 - State the size instead: "rename across ~8 call sites", "new field, no behaviour change"
 - Counts convey size, so keep them approximate (use "~N" format). An exact one invites a correction round
-- Plans already in `docs/plans/` were written under older rules. Don't copy their shape
 
 ## Structure
 

@@ -61,6 +61,9 @@ parallel, one question area each:
 
 Don't fan out what one grep answers.
 
+Never brief a researcher to read past plans for how a plan looks. See
+the `plan` skill § Past Plans Are Not Examples.
+
 ## Draft
 
 Write the plan file per the `plan` skill § Structure.
