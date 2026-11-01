@@ -36,6 +36,8 @@ type requiredChecksRunOptions struct {
 	passingPRNumbers []int
 	pendingPRNumbers []int
 	checkStatusError error
+	// Answers a FORBIDDEN field error on these PRs' statusCheckRollup
+	prNumbersForbiddingCheckStatus []int
 	// Defaults to PR 1, approved by bob
 	prs               []*github.PullRequest
 	reviewsByPRNumber map[int][]*github.PullRequestReview
@@ -100,6 +102,7 @@ func runWithRequiredChecks(t *testing.T, options requiredChecksRunOptions) requi
 			PassingRequiredCheckPRNumbers: options.passingPRNumbers,
 			PendingRequiredCheckPRNumbers: options.pendingPRNumbers,
 			CheckStatusError:              options.checkStatusError,
+			CheckStatusForbiddenPRNumbers: options.prNumbersForbiddingCheckStatus,
 			MockPreviousState:             loadedState,
 			Recording:                     options.recording,
 		}),
@@ -341,6 +344,50 @@ func TestPostAndUpdateWarnWhenTheCheckStatusFetchFails(t *testing.T) {
 				t.Errorf("Expected one check status warning, got %q", warningLines)
 			}
 		})
+	}
+}
+
+const missingPermissionsHint = ". In a private repository, the token needs checks: read, " +
+	"and statuses: read if an app posts commit statuses"
+
+// The hint names both permissions once, however many PRs the FORBIDDEN error hit.
+func TestCheckStatusWarningNamesThePermissionsOnlyOnAForbiddenError(t *testing.T) {
+	testCases := []struct {
+		name                           string
+		checkStatusError               error
+		prNumbersForbiddingCheckStatus []int
+		expectHint                     bool
+	}{
+		{name: "FORBIDDEN on two PRs", prNumbersForbiddingCheckStatus: []int{1, 2}, expectHint: true},
+		{name: "a failed request", checkStatusError: errors.New("resource not accessible by integration")},
+	}
+
+	for _, runMode := range bothRunModes {
+		for _, tc := range testCases {
+			t.Run(string(runMode)+": "+tc.name, func(t *testing.T) {
+				run := runWithRequiredChecks(t, requiredChecksRunOptions{
+					runMode: runMode,
+					prs: []*github.PullRequest{
+						approvedPRFixture(1, "Fix retry loop"),
+						approvedPRFixture(2, "Bump the SDK"),
+					},
+					reviewsByPRNumber:              approvedByBob(1, 2),
+					checkStatusError:               tc.checkStatusError,
+					prNumbersForbiddingCheckStatus: tc.prNumbersForbiddingCheckStatus,
+				})
+
+				warningLines := testhelpers.LogLinesStartingWith(run.logOutput, "::warning")
+				if len(warningLines) != 1 {
+					t.Fatalf("Expected one check status warning, got %q", warningLines)
+				}
+				if hasHint := strings.HasSuffix(warningLines[0], missingPermissionsHint); hasHint != tc.expectHint {
+					t.Errorf("Expected the permissions hint: %v, got %q", tc.expectHint, warningLines[0])
+				}
+				if count := strings.Count(warningLines[0], "checks: read"); tc.expectHint && count != 1 {
+					t.Errorf("Expected the hint once, got it %d times in %q", count, warningLines[0])
+				}
+			})
+		}
 	}
 }
 

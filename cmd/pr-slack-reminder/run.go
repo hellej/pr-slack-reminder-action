@@ -63,7 +63,7 @@ func Run(
 		return err
 	}
 	if openPRs.CheckStatusErr != nil {
-		logWarning(fmt.Sprintf("Failed to fetch required check status: %v", openPRs.CheckStatusErr))
+		logWarning(checkStatusWarning(openPRs.CheckStatusErr))
 	}
 	loadedState, loadStateErr := loadPreviousState(githubClient, cfg)
 	openPRs.PRs = withRememberedFailingChecks(openPRs.PRs, loadedState)
@@ -275,6 +275,15 @@ func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State
 		}
 	}
 	return prsWithRememberedFailingChecks
+}
+
+func checkStatusWarning(checkStatusErr error) string {
+	warning := fmt.Sprintf("Failed to fetch required check status: %v", checkStatusErr)
+	if errors.Is(checkStatusErr, githubclient.ErrForbidden) {
+		return warning + ". In a private repository, the token needs checks: read, " +
+			"and statuses: read if an app posts commit statuses"
+	}
+	return warning
 }
 
 func mergedPRCacheToReuse(runMode config.RunMode, loadedState *state.State) []githubclient.PR {

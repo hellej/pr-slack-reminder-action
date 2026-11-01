@@ -43,6 +43,9 @@ type MockGitHubClientOptions struct {
 	PassingRequiredCheckPRNumbers []int
 	PendingRequiredCheckPRNumbers []int
 	CheckStatusError              error // fails the check status request only
+	// Each answers a FORBIDDEN field error on its PR's statusCheckRollup, as a token lacking
+	// checks: read gets in a private repository
+	CheckStatusForbiddenPRNumbers []int
 	PRServiceError                error
 	IssueServiceError             error
 	MockPreviousState             *state.State
@@ -327,7 +330,19 @@ func (t GraphQLTransport) checkStatusResponse(variables map[string]any) (int, js
 
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
 	for index, ref := range postedPullRequestRefs(variables) {
-		response.Data[fmt.Sprintf("p%d", index)] = map[string]any{"pullRequest": map[string]any{
+		alias := fmt.Sprintf("p%d", index)
+		if slices.Contains(t.opts.CheckStatusForbiddenPRNumbers, ref.number) {
+			response.Data[alias] = map[string]any{"pullRequest": map[string]any{
+				"number": ref.number, "statusCheckRollup": nil,
+			}}
+			response.Errors = append(response.Errors, renderedError{
+				Type:    "FORBIDDEN",
+				Path:    []any{alias, "pullRequest", "statusCheckRollup"},
+				Message: "Resource not accessible by integration",
+			})
+			continue
+		}
+		response.Data[alias] = map[string]any{"pullRequest": map[string]any{
 			"number":            ref.number,
 			"statusCheckRollup": t.statusCheckRollupJSON(ref.number),
 		}}

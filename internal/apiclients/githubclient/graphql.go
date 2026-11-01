@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -106,6 +107,16 @@ type fieldError struct {
 
 func (e fieldError) Error() string {
 	return fmt.Sprintf("field error on %s: %s", formatPath(e.path), describeError(e.errorType, e.message))
+}
+
+const forbiddenErrorType = "FORBIDDEN"
+
+// Matches a field error GitHub typed FORBIDDEN, such as a token lacking checks: read gets on
+// statusCheckRollup in a private repository.
+var ErrForbidden = errors.New("GitHub answered FORBIDDEN")
+
+func (e fieldError) Is(target error) bool {
+	return target == ErrForbidden && e.errorType == forbiddenErrorType
 }
 
 type queryError struct {

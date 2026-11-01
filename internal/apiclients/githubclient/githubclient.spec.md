@@ -33,6 +33,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - Else `RequiredChecksPassing` when there is at least one required context, every one is passing, and `hasNextPage` is false
   - Else `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
   - A failure never fails `FindOpenPRs`. A failed batch (query, repository, transport or decode error, or an expired context) leaves its PRs unknown without cancelling the other batches. An error on one PR (on its `pullRequest` node or on a field below that node) leaves only that PR unknown. `OpenPRsResult.CheckStatusErr` joins every such error
+  - `errors.Is(err, ErrForbidden)` is true when any part of the error is a field error GitHub typed `FORBIDDEN`, such as a token lacking `checks: read` or `statuses: read` gets in a private repository. A `FORBIDDEN` request, repository or pull request error does not match
   - The phase logs:
     - a status line per PR with a status
     - an error line per PR with a per-PR error
