@@ -86,7 +86,7 @@ Non-breaking, **minor**. Row text changes, with no input or permission change.
 
 ### 1. Fetch push-dismissed approvals in `githubclient` (checkpoint)
 
-Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.github/actions/e2e-tests/action.yml`, `docs/third-party-facts.md`.
+Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`.
 
 - The connection populates on a private repository under `pull-requests: read` alone. See docs/third-party-facts.md § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
   - Its fixture stays: PR 7 of private `hellej/pr-slack-reminder-test-repo-1` carries a manually dismissed approval by `hellej`, so every E2E run reads a private-repo `ReviewDismissedEvent`
@@ -94,7 +94,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.gi
 - `prWithReviewers` derives `StaleApprovedByUsers` beside `deriveReviewers`
 - Unit tests cover: dedupe by login, bots and the PR author left out, a null versus a set `dismissalMessage`, and a later `APPROVED` review cancelling the stale entry
 - `mockgithubclient`: `MockGitHubClientOptions` gains `ReviewDismissalsByPRNumber`, the dismissal events per PR
-- Add public `hellej/pr-slack-reminder-test-repo-3` to every E2E run that lists repositories, beside `-1` and `-2`. A ruleset on its `main` dismisses approvals on push. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) set up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
+- The grouped canvas E2E runs already list public `hellej/pr-slack-reminder-test-repo-3`, added by plan 019. A ruleset on its `main` dismisses approvals on push. [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7) set up four open PRs to `main`, authored by `github-actions[bot]` and approved by `hellej`:
   - PR 10, **push-dismissed**: approved, then a push
   - PR 11, **manually dismissed**: approved, then dismissed with a message
   - PR 12, **current approval**: approved
@@ -105,7 +105,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `.gi
 - Verifying it done:
   - `make test`
   - The implementation PR's Build run: the E2E job log shows no enrichment error line
-  - Put the enrichment `rateLimit.cost` per enriched PR in the implementation PR's description, next to the same figure from the last `main` Build run, per AGENTS.md § GitHub API Budget. Compare per enriched PR, since repo-3 adds PRs to every listing
+  - Put the enrichment `rateLimit.cost` in the implementation PR's description, next to the same figure from the last `main` Build run, per AGENTS.md § GitHub API Budget
 
 ### 2. Render `♻️` in the reviewer list
 
