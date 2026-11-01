@@ -27,6 +27,8 @@ Every added or edited sentence in Markdown and YAML files: `git diff <base> -- '
 with the base the brief gives, untracked files too. Read each sentence with the ones before
 it, to check its pronouns.
 
+On a re-check, read every added or changed line in full in its file, never only from grep output.
+
 ## Flag
 
 - **Two readings**, each a `medium` Fix. Write both readings out. Watch for:
