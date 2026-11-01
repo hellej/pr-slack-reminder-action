@@ -49,6 +49,30 @@ func brokenLinks(paths []string, r repo) ([]string, error) {
 	return broken, nil
 }
 
+// A PR description links its own branch or main, so any other branch is likely a typo, which brokenLinks would skip as external.
+func blobURLsOnOtherBranches(paths []string, r repo) ([]string, error) {
+	if r.blobURLRoot == "" {
+		return nil, nil
+	}
+	var found []string
+	for _, markdownPath := range pathsWithStyle(paths, markdownProse) {
+		content, err := os.ReadFile(markdownPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
+		}
+		for i, line := range linesOutsideCodeBlocks(string(content)) {
+			for _, match := range markdownLink.FindAllStringSubmatch(withoutCodeSpans(line), -1) {
+				link := match[1]
+				isOnKnownBranch := slices.ContainsFunc(r.blobURLPrefixes, func(prefix string) bool { return strings.HasPrefix(link, prefix) })
+				if strings.HasPrefix(link, r.blobURLRoot) && !isOnKnownBranch {
+					found = append(found, fmt.Sprintf("%s:%d: %s: not on main or the current branch", markdownPath, i+1, link))
+				}
+			}
+		}
+	}
+	return found, nil
+}
+
 func checkLink(holdingPath string, link linkTarget, repoRoot string) (string, error) {
 	written := link.path
 	if link.fragment != "" {

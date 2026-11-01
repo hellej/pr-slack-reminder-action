@@ -5,7 +5,9 @@
 - `.github/scripts/check-style.sh` runs it from the repository root, passing the files to scan
   - Prints one line per broken reference: `<path>:<line>: <reference>: <problem>`
   - Exits 0 either way: `check-style.sh` fails on any output. Exits 2 when it can't run, such as on a file it can't read
-- `make check-pr-description` runs it with `-pr-description` on a PR description file, skipping the repository path check: a description may name a path the PR deletes
+- `make check-pr-description` runs it with `-pr-description` on a PR description file:
+  - Skips the repository path check: a description may name a path the PR deletes
+  - Reports a blob URL into this repository on a branch other than `main` and the current one, likely a typo
 - Section pointers, preferred in agent files, specs and code comments:
   - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing"
   - `AGENTS.md § Git and § Testing`: the second pointer reuses the file
@@ -55,7 +57,7 @@
   - `AGENTS.md § Git. Then this file's § Local` looks for "Local" in `AGENTS.md`
   - After a skipped pointer into an external page, it is skipped too
 - Reads `Makefile` rule lines by pattern: a target made through a variable or an `include` is missed
-- A blob URL on any branch other than `main` and the current one is skipped as external: a branch name may hold slashes, so the path can't be found without knowing the branch. In CI, on a detached HEAD, only `main` counts
+- Outside `-pr-description`, a blob URL on any branch other than `main` and the current one is skipped as external: a branch name may hold slashes, so the path can't be found without knowing the branch. In CI, on a detached HEAD, only `main` counts
 - A blob URL is checked against the working tree, not the branch it names
 - Anchors approximate GitHub's rule as "keep letters, digits, `-` and `_`"
 - A code span wrapping onto the next line isn't recognised as one

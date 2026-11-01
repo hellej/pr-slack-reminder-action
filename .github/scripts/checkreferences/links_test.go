@@ -142,3 +142,24 @@ func TestBrokenLinksFailsOnUnreadableFile(t *testing.T) {
 		t.Error("want an error for a file that can't be read")
 	}
 }
+
+func TestBlobURLsOnOtherBranches(t *testing.T) {
+	description := filepath.Join(t.TempDir(), "pr.md")
+	writeFile(t, description, "[ok](https://github.com/o/r/blob/main/README.md)\n"+
+		"[ok](https://github.com/o/r/blob/claude/x/README.md)\n"+
+		"[typo](https://github.com/o/r/blob/claude/y/README.md)\n"+
+		"[other repo](https://github.com/o/other/blob/claude/y/README.md)")
+	r := newRepo("", nil)
+	r.blobURLRoot = "https://github.com/o/r/blob/"
+	r.blobURLPrefixes = []string{"https://github.com/o/r/blob/main/", "https://github.com/o/r/blob/claude/x/"}
+
+	got, err := blobURLsOnOtherBranches([]string{description}, r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{description + ":3: https://github.com/o/r/blob/claude/y/README.md: not on main or the current branch"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

@@ -9,8 +9,7 @@ import (
 )
 
 func main() {
-	// A PR description may name a path the PR deletes.
-	isPRDescription := flag.Bool("pr-description", false, "skip the repository path check")
+	isPRDescription := flag.Bool("pr-description", false, "skip the repository path check, and fail a blob URL on a branch other than main or the current one")
 	flag.Parse()
 	paths := flag.Args()
 	r, err := loadRepo(".")
@@ -21,20 +20,20 @@ func main() {
 	if err != nil {
 		exitWithError(err)
 	}
-	var findings []string
-	for _, check := range []func() ([]string, error){
+	checks := []func() ([]string, error){
 		func() ([]string, error) { return brokenLinks(paths, r) },
 		func() ([]string, error) { return brokenSectionPointers(paths, r) },
-		func() ([]string, error) {
-			if *isPRDescription {
-				return nil, nil
-			}
-			return brokenRepoPaths(paths, r)
-		},
 		func() ([]string, error) { return brokenSkillAndAgentNames(paths, r) },
 		func() ([]string, error) { return brokenFrontmatterNames(paths) },
 		func() ([]string, error) { return brokenMakeTargets(paths, isMakeTargetByName) },
-	} {
+	}
+	if *isPRDescription {
+		checks = append(checks, func() ([]string, error) { return blobURLsOnOtherBranches(paths, r) })
+	} else {
+		checks = append(checks, func() ([]string, error) { return brokenRepoPaths(paths, r) })
+	}
+	var findings []string
+	for _, check := range checks {
 		checkFindings, err := check()
 		if err != nil {
 			exitWithError(err)

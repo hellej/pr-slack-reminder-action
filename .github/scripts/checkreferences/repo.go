@@ -14,6 +14,8 @@ type repo struct {
 	root string
 	// Every file git lists, tracked or untracked but not ignored, plus every directory holding one.
 	isListedByPath map[string]bool
+	// Blob URLs into this repository start with blobURLRoot, such as "https://github.com/o/r/blob/"
+	blobURLRoot string
 	// Blob URL prefixes into this repository on `main` and the current branch, as a PR description links them
 	blobURLPrefixes []string
 }
@@ -29,7 +31,9 @@ func loadRepo(root string) (repo, error) {
 		return repo{}, fmt.Errorf("listing repository files: %w", err)
 	}
 	r := newRepo(root, strings.Split(strings.TrimSpace(string(output)), "\n"))
-	r.blobURLPrefixes = blobURLPrefixes(gitOutput(root, "remote", "get-url", "origin"), gitOutput(root, "branch", "--show-current"))
+	remoteURL := gitOutput(root, "remote", "get-url", "origin")
+	r.blobURLRoot = blobURLRoot(remoteURL)
+	r.blobURLPrefixes = blobURLPrefixes(remoteURL, gitOutput(root, "branch", "--show-current"))
 	return r, nil
 }
 
@@ -43,10 +47,19 @@ func gitOutput(root string, args ...string) string {
 
 var githubRemote = regexp.MustCompile(`^(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?$`)
 
-// A branch name may hold slashes, so a blob URL's path is found by its known branch, not by position.
-func blobURLPrefixes(remoteURL, currentBranch string) []string {
+// Empty for a remote not on GitHub.
+func blobURLRoot(remoteURL string) string {
 	match := githubRemote.FindStringSubmatch(remoteURL)
 	if match == nil {
+		return ""
+	}
+	return "https://github.com/" + match[1] + "/blob/"
+}
+
+// A branch name may hold slashes, so a blob URL's path is found by its known branch, not by position.
+func blobURLPrefixes(remoteURL, currentBranch string) []string {
+	root := blobURLRoot(remoteURL)
+	if root == "" {
 		return nil
 	}
 	branches := []string{"main"}
@@ -54,7 +67,7 @@ func blobURLPrefixes(remoteURL, currentBranch string) []string {
 		branches = append(branches, currentBranch)
 	}
 	return utilities.Map(branches, func(branch string) string {
-		return "https://github.com/" + match[1] + "/blob/" + branch + "/"
+		return root + branch + "/"
 	})
 }
 
