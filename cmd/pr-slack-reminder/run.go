@@ -21,7 +21,8 @@ import (
 )
 
 // An open-PR fetch is a listing, a wave of enrichment batches and a wave of check status batches,
-// each call retried for up to 52s. The merged list, merge stats and by-ref fetches share the limit.
+// each call retried for up to 52s. The merged list, merge stats and by-ref fetches each get a limit
+// this long too.
 const prFetchTimeout = 3 * time.Minute
 
 // Monday's stats cover the whole work week before it.

@@ -8,7 +8,7 @@ Persists and reloads the tracked PRs, Slack message reference, last written mess
 - State also carries `MergedPRCache`, merged PRs as enriched, and `ShownMergeStats`, the [internal/mergestats](../mergestats/mergestats.spec.md) value the post computed, nil when it computed none
 - `RecentMergeStats` (type `RecentMergeStats`, a slice of `mergestats.MergeStats`) holds the recent merge stats, oldest `ComputedAt` first, so a post computing stats finds the week before. An entry's date is the UTC date of its `ComputedAt`
 - `FailingRequiredCheckPRs` holds the refs of the open PRs the last run saw failing a required check
-- `PRsWithRememberedFailingChecks(prs, loadedState)` returns copies of the PRs in which each `RequiredChecksUnknown` PR whose ref the loaded state lists is `RequiredChecksFailing`. A passing or failing status the run fetched wins. A nil state changes nothing
+- `PRsWithRememberedFailingChecks(prs, loadedState)` returns copies of the PRs. A PR with `RequiredChecksUnknown` whose ref the loaded state lists becomes `RequiredChecksFailing`. A passing or failing status the run fetched wins. A nil state changes nothing
 - `FailingRequiredCheckPRRefs(prs)` returns the refs of the `RequiredChecksFailing` PRs, in the PRs' order
 - `Load()` fetches the most recent saved state for a repository (via a GitHub Actions artifact)
 - `NewPostState()` builds state from a "post" run's PR views, Slack send result, summary text, `generatedAt` and merge stats. The only place stamping the schema version and `MessagePostedAt`, and it leaves the canvas hash empty for the caller to fill in
@@ -39,7 +39,7 @@ Persists and reloads the tracked PRs, Slack message reference, last written mess
 - `MergedPRCache` (JSON key `mergedPRCache`) was added the same way. An artifact saved before it decodes no cache, and an empty cache saves no key
 - `ShownMergeStats` (JSON key `shownMergeStats`) was added the same way. An artifact saved before it decodes no stats, and nil stats save no key
 - `RecentMergeStats` (JSON key `recentMergeStats`) was added the same way. An artifact saved before it decodes no entries, and an empty slice saves no key
-- `FailingRequiredCheckPRs` (JSON key `failingRequiredCheckPRs`) was added the same way. An artifact saved before it decodes no set, so the first run after an upgrade remembers no failing PR, and an empty set saves no key
+- `FailingRequiredCheckPRs` (JSON key `failingRequiredCheckPRs`) was added the same way. An artifact saved before the field existed decodes no set, so the first run after an upgrade remembers no failing PR, and an empty set saves no key
 - An update run rewrites only `LastWrittenMessage`, the canvas hash, the tracked PRs, the merged PR cache and `FailingRequiredCheckPRs`. `MessageRef`, `MessagePostedAt`, `ShownMergeStats` and `RecentMergeStats` stay the post run's
 - `Save()` indents the stored blocks with the rest of the file, so they load back with the same JSON but not the same bytes as sent
 - `MessagePostedAt`, `MessageRef` and `TrackedPRs` save as `messagePostedAt`, `messageRef` and `trackedPRs`. Loading still reads the keys older releases wrote, `createdAt`, `slackMessage` and `pullRequests`, when the new key is absent or empty. A later release drops that fallback

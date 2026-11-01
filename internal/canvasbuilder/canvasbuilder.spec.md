@@ -19,7 +19,7 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 - Footer: a blank line, a line holding a lone non-breaking space, another blank line, a `---` divider, then `_Updated <YYYY-MM-DD HH:MM UTC>_` from `Content.GeneratedAt`. `GeneratedAt` is converted to UTC
 - No cap note for the merged section, though open and WIP get one: it is always the newest 6 by design. A capped open or WIP fetch adds an italic line above the `Updated` line naming the fetch limit, with the counts read from `githubclient.MaxPRsToFetch` and `MaxDraftPRsToFetch`. Both caps are named in one line. It never claims how many rows the canvas shows: `canvascontent` prunes inactive drafts after the fetch
 - Everything coming from GitHub (PR titles, author and reviewer names, collapsed row labels, repository names) is backslash-escaped for `\`, `` ` ``, `*`, `_`, `[`, `]`, `~`, `<`, `>` and `&`, the backslash first so later replacements aren't double-escaped
-  - The reviewer list's glue segments, the `❌` group included, go through the same escaping. None of them holds one of those characters, so it leaves them unchanged
+  - The reviewer list's glue segments, the `❌` group included, go through the same escaping. None of the glue segments holds a character the escaping changes, so they come out unchanged
 - The rendered markdown is covered by golden files in `testdata/`, re-recorded with `make update-test-snapshots`
 
 ## Doesn't Do

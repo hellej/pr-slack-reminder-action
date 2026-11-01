@@ -104,7 +104,7 @@ type PR struct {
 	FirstReviewAt *time.Time
 	// False after a failed enrichment. See githubclient.spec.md § Behaviour
 	HasCompleteReviewerInfo bool
-	// Left out of a saved merged PR cache when unknown, which every merged PR is
+	// Never saved in a merged PR cache. See githubclient.spec.md § Oddities
 	RequiredChecks RequiredChecksStatus `json:",omitempty"`
 }
 

@@ -173,11 +173,11 @@ func (c *client) fetchRequiredCheckStatusBatch(
 		alias := query.aliases[index]
 		pullRequest, aliasError := checkStatusPullRequest(data.ByAlias[alias], errorsForAlias(alias, err, fieldErrors))
 		if aliasError != nil {
-			pullRequestError := fmt.Errorf(
+			statusFetchErr := fmt.Errorf(
 				"error fetching required check status of PR %s: %w", pullRequestPath(reference), aliasError,
 			)
-			log.Print(pullRequestError)
-			pullRequestErrors = append(pullRequestErrors, pullRequestError)
+			log.Print(statusFetchErr)
+			pullRequestErrors = append(pullRequestErrors, statusFetchErr)
 			continue
 		}
 		statusByRef[reference] = classifyRequiredChecks(pullRequest.StatusCheckRollup)

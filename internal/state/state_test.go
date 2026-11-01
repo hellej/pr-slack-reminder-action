@@ -16,6 +16,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/mergestats"
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
+	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
 func LoadFromFile(filePath string) (*State, error) {
@@ -592,55 +593,24 @@ func prWithRequiredChecks(number int, status githubclient.RequiredChecksStatus) 
 	}
 }
 
+// Only an unknown PR the state lists turns failing, in a copy. requiredchecks_test.go covers the
+// rest through Run, which cannot see whether the given PRs changed.
 func TestPRsWithRememberedFailingChecks(t *testing.T) {
 	prs := []githubclient.PR{
 		prWithRequiredChecks(1, githubclient.RequiredChecksUnknown),
-		prWithRequiredChecks(2, githubclient.RequiredChecksPassing),
-		prWithRequiredChecks(3, githubclient.RequiredChecksFailing),
-		prWithRequiredChecks(4, githubclient.RequiredChecksUnknown),
+		prWithRequiredChecks(2, githubclient.RequiredChecksUnknown),
 	}
-	listingAllButFour := &State{FailingRequiredCheckPRs: []models.PullRequestRef{
-		prs[2].GetPullRequestRef(), prs[1].GetPullRequestRef(), prs[0].GetPullRequestRef(),
-	}}
+	listingOne := &State{FailingRequiredCheckPRs: []models.PullRequestRef{prs[0].GetPullRequestRef()}}
 
-	tests := []struct {
-		name        string
-		loadedState *State
-		expected    []githubclient.RequiredChecksStatus
-	}{
-		{
-			name:        "no loaded state",
-			loadedState: nil,
-			expected: []githubclient.RequiredChecksStatus{
-				githubclient.RequiredChecksUnknown, githubclient.RequiredChecksPassing,
-				githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown,
-			},
-		},
-		{
-			name:        "only an unknown PR the state lists turns failing",
-			loadedState: listingAllButFour,
-			expected: []githubclient.RequiredChecksStatus{
-				githubclient.RequiredChecksFailing, githubclient.RequiredChecksPassing,
-				githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown,
-			},
-		},
+	result := PRsWithRememberedFailingChecks(prs, listingOne)
+
+	statuses := utilities.Map(result, func(pr githubclient.PR) githubclient.RequiredChecksStatus { return pr.RequiredChecks })
+	expected := []githubclient.RequiredChecksStatus{githubclient.RequiredChecksFailing, githubclient.RequiredChecksUnknown}
+	if !slices.Equal(statuses, expected) {
+		t.Errorf("RequiredChecks = %q, expected %q", statuses, expected)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := PRsWithRememberedFailingChecks(prs, tt.loadedState)
-
-			statuses := make([]githubclient.RequiredChecksStatus, len(result))
-			for index, pr := range result {
-				statuses[index] = pr.RequiredChecks
-			}
-			if !slices.Equal(statuses, tt.expected) {
-				t.Errorf("RequiredChecks = %q, expected %q", statuses, tt.expected)
-			}
-			if prs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
-				t.Error("the given PRs were changed, expected copies")
-			}
-		})
+	if prs[0].RequiredChecks != githubclient.RequiredChecksUnknown {
+		t.Error("the given PRs were changed, expected copies")
 	}
 }
 

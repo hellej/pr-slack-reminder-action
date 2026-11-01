@@ -103,7 +103,7 @@ The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob /
 Non-breaking, **minor**. Bucketing and row text change for users with a failing required check, with no input or permission change, as plans 012 and 014 did.
 
 - State gains `failingRequiredCheckPRs`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
-- `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before it decodes `""`, unknown
+- `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
 - The first run after upgrading re-buckets every PR, and the canvas rewrites once wherever a PR moves
 - A downgrade ignores both keys
 
@@ -152,7 +152,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - `mockgithubclient`:
   - The transport routes a query containing `statusCheckRollup` before its `pullRequest(number:` branch. The default answer is a null rollup, unknown, so existing fixtures with an approved PR keep their buckets
   - `MockGitHubClientOptions.FailingRequiredCheckPRNumbers []int`, `PassingRequiredCheckPRNumbers []int` and `PendingRequiredCheckPRNumbers []int` answer those PRs with one required check run that failed, passed or is in progress
-  - `MockGitHubClientOptions.CheckStatusError error` fails this request only with a 403, as `MergedPRsSearchError` does for the merged search
+  - `MockGitHubClientOptions.CheckStatusError error` fails this request only, with a 403. `MergedPRsSearchError` does the same for the merged search
   - `FetchRecording.CheckStatusRequests` records the refs of each request, so a test can assert which PRs were asked for. These requests never enter `EnrichmentRequests`
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
@@ -172,7 +172,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 Touches `internal/prview`.
 
 - `GetNextAction`, `MergeBlocker` and `MergeBlockers()` as in § Target shape. Size: one condition, one type, one method
-- A package test on `MergeBlockers()` for what the snapshots do not reach: an unapproved PR with a remembered failing status, and a nil embedded PR. Also an approved failing PR with a waiting thread, and one with a conflict: the mock renders neither, so no snapshot shows that both keep `CI`
+- A package test on `MergeBlockers()` for what the snapshots do not reach: an unapproved PR with a remembered failing status, and a nil embedded PR. Also an approved failing PR with a waiting thread, and an approved failing PR with a conflict. The mock has no waiting thread or conflict row, so no snapshot shows `❌ CI` on either
 - Update `prview.spec.md`: a `MergeBlocker` and `MergeBlockers()` line, the list of conditions, the "only demotes" line beside the conflict one, and an Oddities line that a failing check on an unapproved PR moves nothing
 
 ### 3. Render `❌ CI` in the reviewer list
@@ -199,7 +199,7 @@ Touches `internal/state`, `cmd/pr-slack-reminder` (`run.go`), `AGENTS.md`.
 - `State.FailingRequiredCheckPRs`, `PRsWithRememberedFailingChecks` and `FailingRequiredCheckPRRefs` as in § Target shape. Size: one field, two pure functions
 - `Run` applies and saves them as in § Target shape. It logs one line per PR made failing from the state, naming it
 - `cmd/pr-slack-reminder/requiredchecks_test.go`, beside `main_test.go`, covers each CI status rule of § Requirements and each `Run` bullet of § Target shape, in post and update mode, and a PR the loaded state lists as failing that this run did not fetch for check status (no longer approved, or a draft). It also covers update mode's deleted and kept message paths saving this run's set. `getTestState` gains an option for the failing refs
-- `run.go`'s `withRememberedFailingChecks` applies the state function and logs each PR it made failing
+- `run.go`'s `withRememberedFailingChecks` calls `state.PRsWithRememberedFailingChecks` and logs each PR it made failing
 - The state snapshots built from the step 3 fixture carry the failing PR in `failingRequiredCheckPRs`
 - Update `state.spec.md`:
   - The opening sentence and § Behaviour: the field and both functions
@@ -243,9 +243,9 @@ Touches `README.md`.
       types: [completed]
   ```
   - A three-bullet list under the example, stating each fact without pointing a user at AGENTS.md or the facts file:
-  - Why: without it, a fixed PR stays red until the next PR, review or comment event or post
-  - Its limits: it reacts to GitHub Actions workflows only, not to an external CI app's checks, and the reminder workflow file must be on the default branch. See docs/third-party-facts.md § `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created
-  - Cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR plus 1 per repository. See AGENTS.md § GitHub API Budget
+    - Why: without it, a fixed PR stays red until the next PR, review or comment event or post
+    - Its limits: it reacts to GitHub Actions workflows only, not to an external CI app's checks, and the reminder workflow file must be on the default branch. See docs/third-party-facts.md § `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created
+    - Cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR plus 1 per repository. See AGENTS.md § GitHub API Budget
   - The example's `run-mode` expression and concurrency group already send a `workflow_run` event to `update` and to the non-scheduled group, so neither changes
 - Done means `make check-style` passes and the trigger example stays one valid `on:` block
 

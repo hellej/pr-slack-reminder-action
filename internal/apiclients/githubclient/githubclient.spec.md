@@ -31,9 +31,9 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - A required context is failing when it is a completed `CheckRun` whose conclusion is not `SUCCESS`, `NEUTRAL` or `SKIPPED`, or a `StatusContext` in `FAILURE` or `ERROR`. Passing is a completed `CheckRun` with one of those three, or a `StatusContext` in `SUCCESS`
   - `RequiredChecksFailing` when any required context is failing
   - Else `RequiredChecksPassing` when there is at least one required context, every one is passing, and `hasNextPage` is false
-  - Else `RequiredChecksUnknown`: a null rollup, no required context, a pending one, or more than 100 contexts
+  - Else `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
   - A failure never fails `FindOpenPRs`. A failed batch (query, repository, transport or decode error, or an expired context) leaves its PRs unknown without cancelling the other batches. An error on one PR (on its `pullRequest` node or on a field below that node) leaves only that PR unknown. `OpenPRsResult.CheckStatusErr` joins every such error
-  - The phase logs one status line per PR it requested, and a line for a rollup with `hasNextPage` true
+  - The phase logs a status line per PR it got a status for, an error line per PR with a per-PR error, one error line naming every PR of a failed batch, and a line for a rollup with `hasNextPage` true
 - The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
 - `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (6) the cap
 - The merged search runs one aliased `search(type: ISSUE, first: 100)` per repository in a single request, with the query string `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`. `search` filters on merge date server-side, which `Repository.pullRequests` cannot do: it orders by comments, creation or update time only, and any post-merge comment or label bumps the update time
@@ -100,7 +100,7 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
 - Snooze day counts above 365 are silently capped to 365 rather than rejected, also counts too large for an `int`
 - The earliest ready-for-review event is read as the timeline's first, an order GitHub doesn't document. See docs/third-party-facts.md § `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only
 - `UpdatedAt` overstates freshness as an activity time: a comment or a label change moves it without a push. It bounds the last push from above, so a PR is never wrongly dropped as inactive
-- A commit with over 100 check contexts never reads `RequiredChecksPassing`: a failing required context among the first 100 still reads failing, but a passing set reads unknown
+- A commit with over 100 check contexts never gets `RequiredChecksPassing`: a failing required context among the first 100 still reads failing, but a passing set reads unknown
 - A context carries `isRequired` only once it has reported, so a required check that never started is not seen: a PR reads passing once the required checks that reported have passed
 - A failed check re-run on the same commit is unverified. If the rollup shows only the re-run's attempt, the PR reads unknown while it runs. If it keeps the failed attempt beside a passing re-run, the PR reads failing until a new commit. See docs/third-party-facts.md § GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree
 - `RequiredChecks` is left out of a saved merged PR cache when unknown, which every merged PR is, so a cache carries no such key

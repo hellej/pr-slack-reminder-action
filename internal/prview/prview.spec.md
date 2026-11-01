@@ -28,9 +28,9 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `GetNextAction()` says what a PR needs next, as the first of three ordered checks that matches: approved with no waiting thread, no conflict and no failing required check is `NextActionReadyToMerge`; an approval, an outstanding changes request or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording
 - The checks being ordered is what settles the overlaps: a reviewer who requested changes and then approved leaves the PR ready to merge, since the approval is read before the changes request
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
-- A failing required check (`RequiredChecks` is `RequiredChecksFailing`) only demotes too, the same way
+- A failing required check (`RequiredChecks` is `RequiredChecksFailing`) also only demotes: it keeps an approved PR out of `NextActionReadyToMerge` and moves an unapproved one nowhere
 - A `MergeBlocker` names one thing blocking a PR's merge, its value the text the row shows. The one value is `MergeBlockerFailingChecks` (`"CI"`)
-- `MergeBlockers()` returns `MergeBlockerFailingChecks` for a PR with an approver and `RequiredChecksFailing`, also when a waiting thread or a conflict keeps it in `NextActionWaitingForAuthor`. Nil for an unapproved PR, and for a PR without its fetched half
+- `MergeBlockers()` returns `MergeBlockerFailingChecks` for a PR that has an approver and is `RequiredChecksFailing`, also when a waiting thread or a conflict keeps it in `NextActionWaitingForAuthor`. Nil for an unapproved PR, and for a PR without its fetched half
 - `GetNextAction` reads `Conflicting`, `HasThreadWaitingForAuthor`, `HasOutstandingChangesRequest` and `RequiredChecks` off the fetched PR, and the approvals off `Approvers`, the same list a row's reviewer segment names, so a next action can never disagree with the row beside it
 - `GroupPRsByRepositoriesInGivenOrder(prs)` buckets PRs into `[]RepositoryPRs`, ordered by each repository's first PR in the given list; PRs keep their given order within a bucket. Feeding it an already-sorted list puts the repository holding the leading PR first, whatever the sort was. It carries no display text, so each renderer supplies its own headings and links
 - `PRSection` is one section's rows: the flat `Rows`, or `Groups` of `RepositoryRows` (a `models.Repository` and its `Rows`). `HasRows` reports whether either holds anything
@@ -57,9 +57,9 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 
 ## Oddities
 
-- `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered and no conflict, files as ready to merge
-- Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered and no conflict
-- A failing required check on an unapproved PR moves nothing: it stays in `NextActionWaitingForReview` with no `❌ CI`. Its check status is never fetched, so a failing one there is only what the state remembers
+- `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered, no conflict and no failing required check, files as ready to merge
+- Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered, no conflict and no failing required check
+- A failing required check on an unapproved PR moves nothing: it stays in `NextActionWaitingForReview` with no `❌ CI`. The check status of an unapproved PR is never fetched, so a failing status on such a PR is only one the state remembers
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
 - Age and activity text are rounded to whole units, singular at a count of 1 and plural otherwise (0 included), so a one-day-old PR reads "1 day" (and "idle 1 day") and a 23.6-hour-old PR reads "24 hours"
 - A PR with a zero ready-for-review time, which takes a zero creation time and no ready-for-review event, counts as old whenever a threshold is set, whatever the threshold value

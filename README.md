@@ -219,7 +219,7 @@ Optional: keep a Slack canvas updated with a live view of open, draft and recent
 
 Open PRs are split by whose turn it is: waiting for review (1) is every open PR not in the other two; waiting for the author (2) is a PR carrying a changes request whose reviewer hasn't been re-requested, or a review thread its author hasn't answered, or an approved one that now conflicts or fails a required check; ready to merge (3) is an approved PR with nothing outstanding and no failing required check.
 
-A failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list, until every required check passes. The message files it the same way.
+A failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list, until every required check passes. The message lists such a PR under the same heading, with the same `❌ CI`.
 
 Each open section is listed oldest first, WIP PRs by most recent activity, merged PRs by most recent merge. At most 5 drafts idle for over 24 hours are shown. The merged section lists at most 6 PRs merged within the last 7 days.
 

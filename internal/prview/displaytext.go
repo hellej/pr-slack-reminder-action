@@ -68,8 +68,8 @@ func (pr PR) GetPRAgeDisplayText() string {
 
 // GetReviewersTextSegments renders approvers and commenters as "(✅ a, b / 💬 c)", split into one
 // text run per segment so a renderer can style or escape the names separately from the glue.
-// Merge blockers add a last " / ❌ CI" glue segment. No reviewers and no blockers yield no
-// segments. Approvers and commenters are given explicitly, so a caller wanting the
+// Merge blockers add a last glue segment, " / ❌ " and the blockers joined by ", ". No reviewers
+// and no blockers yield no segments. Approvers and commenters are given explicitly, so a caller wanting the
 // commenters-only rendering passes no approvers.
 func GetReviewersTextSegments(approvers, commenters []Collaborator, mergeBlockers []MergeBlocker) []string {
 	if len(approvers) == 0 && len(commenters) == 0 {
