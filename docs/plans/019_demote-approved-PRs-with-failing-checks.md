@@ -3,7 +3,7 @@
 date: 2026-11-01
 status: draft
 
-Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-reminder-action/issues/100). The work lands on the feature branch `claude/fervent-wozniak-lwnedy` and its PR, not on `main`.
+Issue: [hellej/pr-slack-reminder-action#100](https://github.com/hellej/pr-slack-reminder-action/issues/100).
 
 ## Requirements
 
