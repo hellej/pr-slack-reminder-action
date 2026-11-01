@@ -281,7 +281,7 @@ permissions:
 
 In a private repository, a GitHub App token needs `checks: read` besides `pull-requests: read` to read required check status. `GITHUB_TOKEN` there is untested, so grant it too. Without it, each run with an approved PR warns `Failed to fetch required check status`, and a PR not already shown failing is listed as if it had no required checks. In a public repository, `GITHUB_TOKEN` needs only `pull-requests: read`.
 
-> Side note: in a private repository where an app posts commit statuses (such as an external CI or deploy previews), also grant `statuses: read`. Without it, a PR carrying such a status, required or not, can't have its check status read, and each run warns.
+> Side note: in a private repository where commit statuses are posted (by an app such as an external CI or deploy previews, or through the statuses API), also grant `statuses: read`. Without it, an approved PR whose head commit carries such a status, required or not, can't have its check status read, and each run warns.
 
 ### Option 1: Default Token (Single Repository)
 
@@ -296,7 +296,7 @@ github-token: ${{ secrets.GITHUB_TOKEN }}
 For better security and granular permissions, especially when monitoring multiple repositories, using a GitHub App is the recommended approach.
 
 1.  **Create a GitHub App** in your organization or personal account settings.
-2.  **Give it necessary permissions** (e.g., "read" access to PRs, and to Checks for private repositories, plus Commit statuses if an app posts them there).
+2.  **Give it necessary permissions** (e.g., "read" access to PRs, and to Checks for private repositories, plus Commit statuses if commits there carry commit statuses).
 3.  **Install the app** on the repositories you want to monitor. During installation, you can choose to grant access to **all repositories** (of your organization) or only to **specific ones**. For better security, it's recommended to select only the repositories you intend to monitor.
 4.  **Add the App ID and Private Key** as secrets in the repository where your workflow runs.
 5.  **Use a token generation action** (like `actions/create-github-app-token`) in your workflow to generate a temporary token.

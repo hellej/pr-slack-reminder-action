@@ -990,6 +990,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer. For a GitHub App token in a private repository, see § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field
   - Where this repository's required checks come from, branch protection or a ruleset
   - A failing or pending required check, or a branch with no protection
+- Later, job 124842120624 of run 41304537007: the E2E App token, holding read-only `checks` and no `statuses`, read public `hellej/pr-slack-reminder-test-repo-3` PR 14's ruleset-required commit status `fixture-check` as failing, with no error. So in a public repository an App token reads a `StatusContext` without `statuses`, and `isRequired` reports a ruleset-required status
 
 ## GitHub documents nothing about re-run attempts in `statusCheckRollup.contexts`, and third-party reports disagree [2026-10-31]
 
@@ -1037,9 +1038,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - A field error, not a failed request: the rest of the query answered
 - With read-only `checks` granted to the App (job 124838563499, attempt 2 of run 41302392021): all five E2E scenarios read PR 49 without an error, `Required check status of PR hellej/pr-slack-reminder-test-repo-1/49: unknown`, `rateLimit.cost` 1 per request of that one PR
   - PR 49 has no required context (free plan, private repository, no ruleset), so unknown was the expected status
+- Job 124842120624 of run 41304537007 read 4 PRs in one request at `rateLimit.cost` 1
+- Without `checks`, the error lands on the whole field, `[p0 pullRequest statusCheckRollup]`. Without `statuses`, it lands on one context node instead. Neither path names the context type
+- Which contexts it covers, inferred from the two entries, not from a GitHub page: `checks` covers `CheckRun` contexts, the ones GitHub Actions and Checks API apps create
 - Not shown:
   - `GITHUB_TOKEN` in a private repository: only the App token was run there
-  - A request of more than one PR, so the cost at 25 PRs per request
+  - The cost of a request of 25 PRs
 - PR 49 then held check runs only. For a commit status, see § `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not
 
 ## `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not [2026-11-01]
@@ -1047,9 +1051,11 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: Build workflow E2E job 124853212380, attempt 3 of run 41306641743, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token, which holds read-only `checks` and no `statuses`
 - The owner posted a commit status `probe-status`, `success`, not required, on PR 49's head `0a7770a`, beside its one check run `build`
 - All five E2E scenarios logged `field error on [p0 pullRequest statusCheckRollup contexts nodes 1]: FORBIDDEN Resource not accessible by integration`
-  - Node 1 is the `StatusContext`. Node 0, the `CheckRun`, read without an error
-  - So a status that is not required still triggers it, and one such status leaves the whole PR's check status unreadable
-  - The run warned `Failed to fetch required check status` and stayed green
+  - Node 1 is the `StatusContext`. GitHub returned node 0, the `CheckRun`, without an error
+  - So a status that is not required still triggers it
+  - The path names a node index, not its type: unlike the missing `checks` case, which fails the whole `statusCheckRollup` field
+  - The action reads any error under a PR as that PR's check status unknown, so it warned `Failed to fetch required check status` and stayed green
+- Which contexts it covers, inferred, not from a GitHub page: `statuses` covers `StatusContext` contexts, the ones posted through the Statuses API by an app, a script or a person
 - Not shown:
   - `GITHUB_TOKEN` in a private repository
   - The same read with `statuses: read` granted

@@ -277,11 +277,13 @@ func withRememberedFailingChecks(prs []githubclient.PR, loadedState *state.State
 	return prsWithRememberedFailingChecks
 }
 
+const missingCheckStatusPermissionsHint = ". In a private repository, the token needs checks: read, " +
+	"and statuses: read if commits there carry commit statuses"
+
 func checkStatusWarning(checkStatusErr error) string {
 	warning := fmt.Sprintf("Failed to fetch required check status: %v", checkStatusErr)
 	if errors.Is(checkStatusErr, githubclient.ErrForbidden) {
-		return warning + ". In a private repository, the token needs checks: read, " +
-			"and statuses: read if an app posts commit statuses"
+		return warning + missingCheckStatusPermissionsHint
 	}
 	return warning
 }

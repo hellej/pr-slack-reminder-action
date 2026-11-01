@@ -31,13 +31,12 @@ type requiredChecksRunOptions struct {
 	runMode                    config.RunMode
 	rememberedFailingPRNumbers []int
 	// Only a post can run without a loaded state
-	noLoadedState    bool
-	failingPRNumbers []int
-	passingPRNumbers []int
-	pendingPRNumbers []int
-	checkStatusError error
-	// Answers a FORBIDDEN field error on these PRs' statusCheckRollup
-	prNumbersForbiddingCheckStatus []int
+	noLoadedState                 bool
+	failingPRNumbers              []int
+	passingPRNumbers              []int
+	pendingPRNumbers              []int
+	checkStatusError              error
+	checkStatusForbiddenPRNumbers []int
 	// Defaults to PR 1, approved by bob
 	prs               []*github.PullRequest
 	reviewsByPRNumber map[int][]*github.PullRequestReview
@@ -102,7 +101,7 @@ func runWithRequiredChecks(t *testing.T, options requiredChecksRunOptions) requi
 			PassingRequiredCheckPRNumbers: options.passingPRNumbers,
 			PendingRequiredCheckPRNumbers: options.pendingPRNumbers,
 			CheckStatusError:              options.checkStatusError,
-			CheckStatusForbiddenPRNumbers: options.prNumbersForbiddingCheckStatus,
+			CheckStatusForbiddenPRNumbers: options.checkStatusForbiddenPRNumbers,
 			MockPreviousState:             loadedState,
 			Recording:                     options.recording,
 		}),
@@ -348,17 +347,17 @@ func TestPostAndUpdateWarnWhenTheCheckStatusFetchFails(t *testing.T) {
 }
 
 const missingPermissionsHint = ". In a private repository, the token needs checks: read, " +
-	"and statuses: read if an app posts commit statuses"
+	"and statuses: read if commits there carry commit statuses"
 
 // The hint names both permissions once, however many PRs the FORBIDDEN error hit.
 func TestCheckStatusWarningNamesThePermissionsOnlyOnAForbiddenError(t *testing.T) {
 	testCases := []struct {
-		name                           string
-		checkStatusError               error
-		prNumbersForbiddingCheckStatus []int
-		expectHint                     bool
+		name                          string
+		checkStatusError              error
+		checkStatusForbiddenPRNumbers []int
+		expectHint                    bool
 	}{
-		{name: "FORBIDDEN on two PRs", prNumbersForbiddingCheckStatus: []int{1, 2}, expectHint: true},
+		{name: "FORBIDDEN on two PRs", checkStatusForbiddenPRNumbers: []int{1, 2}, expectHint: true},
 		{name: "a failed request", checkStatusError: errors.New("resource not accessible by integration")},
 	}
 
@@ -371,9 +370,9 @@ func TestCheckStatusWarningNamesThePermissionsOnlyOnAForbiddenError(t *testing.T
 						approvedPRFixture(1, "Fix retry loop"),
 						approvedPRFixture(2, "Bump the SDK"),
 					},
-					reviewsByPRNumber:              approvedByBob(1, 2),
-					checkStatusError:               tc.checkStatusError,
-					prNumbersForbiddingCheckStatus: tc.prNumbersForbiddingCheckStatus,
+					reviewsByPRNumber:             approvedByBob(1, 2),
+					checkStatusError:              tc.checkStatusError,
+					checkStatusForbiddenPRNumbers: tc.checkStatusForbiddenPRNumbers,
 				})
 
 				warningLines := testhelpers.LogLinesStartingWith(run.logOutput, "::warning")

@@ -71,7 +71,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - `prview.GetReviewersTextSegments` gains a `mergeBlockers []MergeBlocker` parameter and renders ` / ` and the blockers joined by `, ` before the closing parenthesis, so both builders share it
   - With no approvers or commenters it renders ` (CI failing)`. A PR with `CI failing` is approved, so no row reaches that case before plan 020
   - Only open rows pass `MergeBlockers()`. Draft and merged rows pass nil
-- Action inputs: none new. Permissions: `checks: read` in a private repository, plus `statuses: read` there when an app posts commit statuses. None new in a public one. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field, and § `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not
+- Action inputs: none new. Permissions: `checks: read` in a private repository, plus `statuses: read` there when commits carry commit statuses. None new in a public one. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field, and § `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not
   - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
   - Step 1's checkpoint covers a required check set by a ruleset in the public `hellej/pr-slack-reminder-test-repo-3`, and an approved PR without required checks in a private repository under the E2E App token
 
@@ -102,7 +102,7 @@ The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob /
 
 Non-breaking, **minor**. Bucketing and row text change for users with a failing required check, with no input change, as plans 012 and 014 did.
 
-- A private repository needs `checks: read` for the check status fetch, and `statuses: read` too when an app posts commit statuses there. A workflow without them still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and a PR the state does not remember as failing files as it does today. Nothing that worked stops working, so it stays minor. The README names both permissions
+- A private repository needs `checks: read` for the check status fetch, and `statuses: read` too when commits there carry commit statuses. A workflow without them still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and a PR the state does not remember as failing files as it does today. Nothing that worked stops working, so it stays minor. The README names both permissions
 
 - State gains `prsWithFailingRequiredChecks`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
 - `PR.RequiredChecksStatus` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
@@ -238,7 +238,7 @@ Touches `README.md`.
 - The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check. A failing required check puts an approved PR under waiting for the author, with `CI failing` in its reviewer list, until every required check passes
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
-- `README.md` § Required Permissions: `checks: read` in the permissions block, and a line no wider than step 1 and the facts entries show: an App token in a private repository needs `checks: read`, `GITHUB_TOKEN` there is untested, and `GITHUB_TOKEN` in a public repository needs only `pull-requests: read`. The update-mode example's `permissions:` block gains `checks: read` too. A short side note says a private repository where an app posts commit statuses also needs `statuses: read`
+- `README.md` § Required Permissions: `checks: read` in the permissions block, and a line no wider than step 1 and the facts entries show: an App token in a private repository needs `checks: read`, `GITHUB_TOKEN` there is untested, and `GITHUB_TOKEN` in a public repository needs only `pull-requests: read`. The update-mode example's `permissions:` block gains `checks: read` too. A short side note says a private repository whose commits carry commit statuses, posted by an app, a script or a person, also needs `statuses: read`
 - `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, listing the workflows that run the required checks. Its own comment explains it, with no text under the example:
   ```yaml
     workflow_run: # optional: runs an update when a listed workflow completes

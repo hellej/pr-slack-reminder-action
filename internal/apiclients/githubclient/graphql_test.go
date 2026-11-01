@@ -644,18 +644,20 @@ func TestOnlyAForbiddenFieldErrorIsErrForbidden(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
+		target   error
 		expected bool
 	}{
-		{"a FORBIDDEN field error, wrapped and joined", errors.Join(errors.New("other"), fmt.Errorf("PR 1: %w", forbidden)), true},
-		{"another field error", fieldError{alias: "p0", errorType: "RESOURCE_LIMITS_EXCEEDED"}, false},
-		{"a FORBIDDEN pull request error", pullRequestError{alias: "p0", errorType: "FORBIDDEN"}, false},
-		{"a transport error", transportError{status: 403, err: errors.New("forbidden")}, false},
+		{"a FORBIDDEN field error, wrapped and joined", errors.Join(errors.New("other"), fmt.Errorf("PR 1: %w", forbidden)), ErrForbidden, true},
+		{"a FORBIDDEN field error against another sentinel", forbidden, ErrNoArtifactFound, false},
+		{"another field error", fieldError{alias: "p0", errorType: "RESOURCE_LIMITS_EXCEEDED"}, ErrForbidden, false},
+		{"a FORBIDDEN pull request error", pullRequestError{alias: "p0", errorType: "FORBIDDEN"}, ErrForbidden, false},
+		{"a transport error", transportError{status: 403, err: errors.New("forbidden")}, ErrForbidden, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := errors.Is(tt.err, ErrForbidden); got != tt.expected {
-				t.Errorf("errors.Is(err, ErrForbidden) = %v, expected %v", got, tt.expected)
+			if got := errors.Is(tt.err, tt.target); got != tt.expected {
+				t.Errorf("errors.Is(err, %v) = %v, expected %v", tt.target, got, tt.expected)
 			}
 		})
 	}
