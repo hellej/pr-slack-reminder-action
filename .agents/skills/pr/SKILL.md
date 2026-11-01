@@ -8,7 +8,10 @@ argument-hint: "Optional: draft, or what the PR is for"
 
 - Merge the latest `main` first (AGENTS.md § Git)
 - Fill [the PR template](../../../.github/pull_request_template.md). Drop a section that would be empty
-- Summarize in a few bullets. Don't copy a plan or spec into the description
+- Bullets only, no prose. Don't copy a plan or spec into the description
+  - Problem: 2 to 3 short bullets
+  - Solution: 2 to 5 short bullets, with a few short sub bullets where needed
+- When the PR resolves an issue, start with `Closes #<issue>`, so merging closes it. Use `Fixes #<issue>` for a bug
 - List every `.md` file the PR adds or changes under `## Docs`, each linked on the PR's branch:
   `[019_x.md](https://github.com/<owner>/<repo>/blob/<branch>/<path>)`
 - Keep each link under 150 characters. See docs/third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link
