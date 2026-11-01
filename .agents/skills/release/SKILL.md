@@ -77,6 +77,7 @@ gh run watch "$RUN_ID" --exit-status 2>&1 | tail -20
   GH_PAGER=cat gh run view "$RUN_ID" --log-failed
   ```
   Do not proceed with publishing.
+- If **Release** failed at `Create release tag` with `[remote rejected] v3 -> v3 (failure)` / `fatal error in commit_refs`, GitHub failed the major tag push (transient). The full tag is already pushed, so never rerun the workflow: it would cut the next version. Finish by hand: `git fetch origin tag <tag>`, `git tag -f -a v3 -m "<version without v>" '<tag>^{}'`, `git push origin v3 --force`, then `GH_PAGER=cat make draft-release` and continue at step 4. The Slack notification step is skipped
 - If **Build** failed at `Commit built binary` with `! [rejected] main -> main (fetch first)`, someone pushed to `main` during the run. Nothing is tagged yet: `git pull --ff-only origin main`, then rerun step 2
 
 ### 4. Clean Up the Draft Release Notes
