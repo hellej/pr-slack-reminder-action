@@ -987,7 +987,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - So a PR with no checks reads a null rollup, not an empty `contexts`
 - `build` appears twice in PR 99's contexts, as two distinct check runs, so a consumer keyed by check name would merge them
 - Not shown by this run:
-  - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer
+  - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer. For a GitHub App token in a private repository, see § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field
   - Where this repository's required checks come from, branch protection or a ruleset
   - A failing or pending required check, or a branch with no protection
 
@@ -1029,3 +1029,15 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets), the availability callout, read with `curl`: WebFetch's markdown conversion drops it
 - "Rulesets are available in public repositories with GitHub Free and GitHub Free for organizations, and in public and private repositories with GitHub Pro, GitHub Team, and GitHub Enterprise Cloud"
 - So on a free plan, a check required through a ruleset can only be set up in a public repository
+
+## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
+
+- Source: Build workflow E2E job logs, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token
+- Without `checks` (job 124834970388 of run 41302085617, the App holding `pull-requests: read`): `field error on [p0 pullRequest statusCheckRollup]: FORBIDDEN Resource not accessible by integration`
+  - A field error, not a failed request: the rest of the query answered
+- With read-only `checks` granted to the App (job 124838563499, attempt 2 of run 41302392021): all five E2E scenarios read PR 49 without an error, `Required check status of PR hellej/pr-slack-reminder-test-repo-1/49: unknown`, `rateLimit.cost` 1 per request of that one PR
+  - PR 49 has no required context (free plan, private repository, no ruleset), so unknown was the expected status
+- Not shown:
+  - Whether `statuses: read` is also needed for a required `StatusContext` in a private repository
+  - `GITHUB_TOKEN` in a private repository: only the App token was run there
+  - A request of more than one PR, so the cost at 25 PRs per request
