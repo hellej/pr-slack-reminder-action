@@ -137,7 +137,7 @@ Touches no files. Step 1's repo-3 PRs are the setup.
 
 Touches `README.md`.
 
-- `README.md` § Example Output, beside the paragraphs on collapsed rows and on `conflicts`: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
+- `README.md` § Example Output, beside the paragraph on collapsed rows: on a PR waiting for review and on a merged PR, an approval a push dismissed is listed under `🔁` instead of `💬`, in the message and on the canvas, until the reviewer approves again
 - Done means `make check-style` passes
 
 ## Consequences
