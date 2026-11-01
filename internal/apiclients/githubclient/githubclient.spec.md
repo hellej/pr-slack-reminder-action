@@ -33,7 +33,11 @@ Fetches and enriches PR data from GitHub. See [AGENTS.md](../../../AGENTS.md) fo
   - Else `RequiredChecksPassing` when there is at least one required context, every one is passing, and `hasNextPage` is false
   - Else `RequiredChecksUnknown`: a null rollup, no required context, a pending required context, or more than 100 contexts
   - A failure never fails `FindOpenPRs`. A failed batch (query, repository, transport or decode error, or an expired context) leaves its PRs unknown without cancelling the other batches. An error on one PR (on its `pullRequest` node or on a field below that node) leaves only that PR unknown. `OpenPRsResult.CheckStatusErr` joins every such error
-  - The phase logs a status line per PR it got a status for, an error line per PR with a per-PR error, one error line naming every PR of a failed batch, and a line for a rollup with `hasNextPage` true
+  - The phase logs:
+    - a status line per PR with a status
+    - an error line per PR with a per-PR error
+    - one error line naming every PR of a failed batch
+    - a line for each rollup with `hasNextPage` true, saying the PR has more than 100 check contexts and only the first 100 are read
 - The canvas reads a PR's last activity off `UpdatedAt`, the PR's own update time, selected by the open-PR listing and by `GetPRs`. A zero value means unknown activity
 - `FindRecentlyMergedPRs` takes the window start as a parameter, never a clock read, so the merged list and the canvas footer share one "now". `RecentlyMergedWindow` (7 days) is the length the caller is expected to pass, `MaxMergedPRsToFetch` (6) the cap
 - The merged search runs one aliased `search(type: ISSUE, first: 100)` per repository in a single request, with the query string `repo:<owner>/<name> is:pr is:merged merged:>=<YYYY-MM-DD>`. `search` filters on merge date server-side, which `Repository.pullRequests` cannot do: it orders by comments, creation or update time only, and any post-merge comment or label bumps the update time
