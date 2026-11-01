@@ -82,7 +82,7 @@ Touches no files.
   - An unreviewed PR in `hellej/pr-slack-reminder-test-repo-2`, made conflicting. `-2` avoids the `alice` author filter of `-1`'s grouped runs. It carries no `ignore-reminder` label
   - Plan 019's fixture PR in this repository, made conflicting by a commit on `fixture/required-check-base`
 - The branch's Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) show the unreviewed PR under "Waiting for review" with `(❌ conflicts)`, in the message and on the canvas
-- `gh workflow run pr-reminder.yml --ref claude/practical-bardeen-ll0yuz -f run-mode=post -f build-first=true`, then the same with `-f run-mode=update`, show plan 019's fixture under "Waiting for author" with `❌ CI, conflicts`, in the dev channel's message and on its canvas
+- `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`, then the same with `-f run-mode=update`, show plan 019's fixture under "Waiting for author" with `❌ CI, conflicts`, in the dev channel's message and on its canvas
 - Done means all three rows show as described
 
 ### 3. Docs
