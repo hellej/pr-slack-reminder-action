@@ -3,7 +3,7 @@
 date: 2026-11-01
 status: draft
 
-Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on [plan 019](019_demote-approved-PRs-with-failing-checks.md), implemented, whose `❌` group stays last in the reviewer list. Independent of [plan 020](020_show-merge-blockers-on-PR-rows.md), which adds to that `❌` group.
+Lands on the feature branch `plan-020-stale-approvals`, through a PR. Builds on [plan 019](019_demote-approved-PRs-with-failing-checks.md), implemented, whose merge blockers, such as `CI failing`, stay last in the reviewer list. Independent of [plan 020](020_show-merge-blockers-on-PR-rows.md), which adds a merge blocker.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
   - Cost: 27 points instead of 26 over 25 PRs. See docs/third-party-facts.md § Adding `headRefOid`, `reviewDecision`, a review's `commit { oid }` and a second filtered `timelineItems` added at most 1 point to the enrichment query
   - Populates under `pull-requests: read` on `GITHUB_TOKEN`, in a public and a private repository
 - `prview.PR` gains `StaleApprovers []Collaborator`, with Slack IDs attached as for `Approvers`
-- `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders the groups `✅`, `♻️`, `💬`, then plan 019's `❌`, in that order, separated by ` / `
+- `prview.GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders the groups `✅`, `♻️`, `💬`, then the merge blockers, in that order, separated by ` / `: `(✅ Dana Davis / ♻️ Erin Evans / 💬 Frank Fisher / CI failing)`
   - Open and merged rows pass `StaleApprovers`. Draft rows pass none, as they pass no approvers
 - `GetNextAction` doesn't change
 - Action inputs: none new. Permissions: none new
