@@ -209,6 +209,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - The Build workflow's "Smoke/E2E test" step (`.github/actions/e2e-tests/`): runs each PR's own build against the real GitHub API and the dev Slack channels, in post and update mode. Its job log shows a query or Slack call working live
   - It uses a GitHub App token, not `GITHUB_TOKEN`. Fork PRs skip it
   - It lists PRs from `hellej/pr-slack-reminder-test-repo-1` and `-2`, both private, so its log checks a new GitHub field against a private repository (§ Reference Deployment)
+  - Its grouped canvas runs also list `hellej/pr-slack-reminder-test-repo-3`, public, which holds the approved PR failing a required check that a ruleset sets
 - `make check-fmt`: fail if any file needs `gofmt`
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`

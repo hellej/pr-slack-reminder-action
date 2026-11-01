@@ -73,7 +73,7 @@ Serves § **Purpose**: "ready to merge" stops naming PRs whose merge button is r
   - Only open rows pass `MergeBlockers()`. Draft and merged rows pass nil
 - Action inputs: none new. Permissions: `checks: read` in a private repository, none new in a public one. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field
   - `statusCheckRollup` and `isRequired` populate under `pull-requests: read` alone on `GITHUB_TOKEN` in a public repository. See docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
-  - Step 1's checkpoint covers a required check set by a ruleset in this public repository, and an approved PR without required checks in a private repository under the E2E App token
+  - Step 1's checkpoint covers a required check set by a ruleset in the public `hellej/pr-slack-reminder-test-repo-3`, and an approved PR without required checks in a private repository under the E2E App token
 
 Message states for an approved PR whose required check fails, then gets a fix:
 
@@ -159,12 +159,13 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
 - Update `githubclient.spec.md`: the status, the phase, the failure behaviour, and Oddities for the 100-context limit and for a re-run (see § Consequences)
 - Verifying it done:
   - `make test`, and the new phase's request carries exactly the approved non-draft refs
-  - The owner's free GitHub plan cannot require checks through a ruleset in a private repository. See docs/third-party-facts.md § Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one. So the fixture lives in this public repository, `hellej/pr-slack-reminder-action`. The repository owner sets it up as a standing fixture, kept after this plan for [plan 020](020_show-merge-blockers-on-PR-rows.md):
+  - The owner's free GitHub plan cannot require checks through a ruleset in a private repository. See docs/third-party-facts.md § Rulesets need GitHub Pro, Team or Enterprise Cloud in a private repository, and are free in a public one. So the fixture lives in a public repository, `hellej/pr-slack-reminder-test-repo-3`, which the Build E2E grouped canvas runs list. The repository owner sets it up as a standing fixture, PR 14, kept after this plan for [plan 020](020_show-merge-blockers-on-PR-rows.md):
     - A base branch `fixture/required-check-base`, cut from `main`, and a ruleset targeting only that branch that requires a status check named `fixture-check`. That is the ruleset case docs/third-party-facts.md does not cover yet
     - A PR into that base branch, approved by a human other than its author, carrying no `ignore-reminder` label
-    - A failing `fixture-check` status on the PR's head commit, posted by hand: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=failure -f context=fixture-check`. No workflow file is added
+      - PR 14's author is `github-actions[bot]`, opened by repo-3's `create-fixture-pr` workflow, and `hellej` approved it: `hellej` is repo-3's only human collaborator, and a bot's approval does not count
+    - A failing `fixture-check` status on the PR's head commit, posted by hand: `gh api repos/hellej/pr-slack-reminder-test-repo-3/statuses/<head sha> -f state=failure -f context=fixture-check`. No workflow file is added
   - The owner also keeps an approved, non-draft open PR in `hellej/pr-slack-reminder-test-repo-1`, a Dependabot one, so the Build E2E runs read `statusCheckRollup` in a private repository, per AGENTS.md § Reference Deployment. Dependabot closes a PR a newer version supersedes, so the owner replaces it when that happens
-  - After pushing the implementation branch, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. Its job log, under `GITHUB_TOKEN`, shows the fixture PR's status line reading `failing` and no check status error line
+  - After pushing the implementation branch, the Build E2E grouped canvas runs ("Run with filters, canvas link and merge stats: post" and "Run with filters and canvas link: update") read PR 14 under the E2E App token. Their job log shows its status line reading `failing` and no check status error line
   - The Build job log, under the E2E App token, shows the Dependabot PR's status line reading `unknown`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line. The E2E App token holds read-only `checks`, granted after the first run's `FORBIDDEN`, and still no `statuses`
   - If an error line shows in either log, stop and raise it with the user: a permission is needed and the plan has to say which
   - Result: an error line showed in the Build log. The App token without `checks` got `FORBIDDEN` on `statusCheckRollup` for PR 49. With read-only `checks` granted, the re-run read PR 49 as `unknown` with no error. The permission is `checks: read`, now in the README and docs/third-party-facts.md
@@ -224,10 +225,9 @@ Touches `cmd/pr-slack-reminder` (`run.go`), `run.spec.md`.
 
 Touches no files. The step 1 fixture PR is the setup.
 
-- After step 5, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. It shows the fixture PR under "Waiting for author" with `❌ CI` in its reviewer list, in the dev channel's message and on its canvas
-- Then the owner posts a pending status on the fixture's head commit: `gh api repos/hellej/pr-slack-reminder-action/statuses/<head sha> -f state=pending -f context=fixture-check`
-- Right after, dispatch the same with `-f run-mode=update`. The edited message still shows `❌ CI`, and the job log has the line naming the fixture PR as made failing from the state
-  - Run the two dispatches back to back: an event-driven `pr-reminder.yml` run in between uses the released binary, and saves a state without `prsWithFailingRequiredChecks`
+- After step 5, the branch's Build E2E grouped canvas runs show PR 14 under "Waiting for author" with `❌ CI` in its reviewer list, in the dev channel's message and on its canvas
+- Then the owner posts a pending status on PR 14's head commit: `gh api repos/hellej/pr-slack-reminder-test-repo-3/statuses/<head sha> -f state=pending -f context=fixture-check`
+- The next Build E2E post and update pair, within the state artifact's 1-day retention, still shows `❌ CI`, and its job log has the line naming PR 14 as made failing from the state
 - Last, the owner posts `-f state=failure` again, so the fixture stays red for plan 020
 - Done means both surfaces show `❌ CI` and neither shows the PR under "Ready to merge"
 
@@ -264,7 +264,7 @@ Touches `README.md`.
 ### Caveats
 
 - Without the optional `workflow_run` trigger, check completion runs no `update`, so a PR keeps its bucket until the next PR, review or comment event or post: a fixed PR stays red, and one whose check fails after the 09:00 post stays ready
-- The fixture PR stays open in this repository, so it shows in the dev `github` channel's daily reminder and on that channel's canvas. The PR's base is not `main`, so `build.yml` never runs on it
+- The fixture PR stays open in `hellej/pr-slack-reminder-test-repo-3`, so it shows in every Build E2E grouped canvas run's message and canvas
 - Collapsed rows have no reviewer list, so no `❌ CI`: a bot PR demoted by a failing check sits in "waiting for author" without saying why
 - Without a loaded state (first run, failed load), pending checks read as green, so a PR can read as ready for the minutes its checks run
 - A context carries `isRequired` only once it has reported. A required check that never started is not seen. So a PR reads green once the required checks that reported have passed, before a slower required check in another workflow registers
