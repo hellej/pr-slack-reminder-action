@@ -1038,6 +1038,18 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - With read-only `checks` granted to the App (job 124838563499, attempt 2 of run 41302392021): all five E2E scenarios read PR 49 without an error, `Required check status of PR hellej/pr-slack-reminder-test-repo-1/49: unknown`, `rateLimit.cost` 1 per request of that one PR
   - PR 49 has no required context (free plan, private repository, no ruleset), so unknown was the expected status
 - Not shown:
-  - Whether `statuses: read` is also needed for a required `StatusContext` in a private repository
   - `GITHUB_TOKEN` in a private repository: only the App token was run there
   - A request of more than one PR, so the cost at 25 PRs per request
+- PR 49 then held check runs only. For a commit status, see § `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not
+
+## `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not [2026-11-01]
+
+- Source: Build workflow E2E job 124853212380, attempt 3 of run 41306641743, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token, which holds read-only `checks` and no `statuses`
+- The owner posted a commit status `probe-status`, `success`, not required, on PR 49's head `0a7770a`, beside its one check run `build`
+- All five E2E scenarios logged `field error on [p0 pullRequest statusCheckRollup contexts nodes 1]: FORBIDDEN Resource not accessible by integration`
+  - Node 1 is the `StatusContext`. Node 0, the `CheckRun`, read without an error
+  - So a status that is not required still triggers it, and one such status leaves the whole PR's check status unreadable
+  - The run warned `Failed to fetch required check status` and stayed green
+- Not shown:
+  - `GITHUB_TOKEN` in a private repository
+  - The same read with `statuses: read` granted
