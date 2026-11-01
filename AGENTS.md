@@ -28,7 +28,7 @@ One known setup as an example. It's not the only supported one. Use it to weigh 
 ## GitHub API Budget
 
 - Target: a run over 20 open PRs costs at most 80 GraphQL points, so 60 runs an hour fit in a token's 5,000-point hourly limit
-  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`. The required check status fetch is not in that figure: it adds one request per 25 approved PRs, which a Build E2E log showed costing 1 point for a one-PR request
+  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`. The required check status fetch is not in that figure: it adds one request per 25 approved PRs. A Build E2E log showed a request of one PR costing 1 point. The cost at 25 PRs is not read yet
 - The limit is shared: `GITHUB_TOKEN`'s with the whole repository, a personal token's with everything its owner runs
 - A change to a GraphQL query compares `rateLimit.cost` in the Build E2E job log against the last run on `main`, and states the difference in its plan or PR
 

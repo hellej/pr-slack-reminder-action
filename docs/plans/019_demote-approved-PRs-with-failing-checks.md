@@ -102,7 +102,7 @@ The canvas row reads `**[Fix retry loop](url)** _2 days ago_ by alice (✅ bob /
 
 Non-breaking, **minor**. Bucketing and row text change for users with a failing required check, with no input change, as plans 012 and 014 did.
 
-- A private repository needs `checks: read` for the check status fetch. A workflow without it still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and the PR files as it does today. Nothing that worked stops working, so it stays minor. The README names the permission
+- A private repository needs `checks: read` for the check status fetch. A workflow without it still succeeds: each run with an approved PR warns `Failed to fetch required check status`, and a PR the state does not remember as failing files as it does today. Nothing that worked stops working, so it stays minor. The README names the permission
 
 - State gains `failingRequiredCheckPRs`. An artifact saved before it decodes no set, so the first run after upgrading counts a PR without a failing required check as green
 - `PR.RequiredChecks` carries `omitempty`, so the merged PR cache saves it only when known. Merged PRs are not fetched for check status, so a cache never carries the key, and a cache saved before the field existed decodes `""`, unknown
@@ -167,7 +167,7 @@ Touches `internal/apiclients/githubclient`, `testhelpers/mockgithubclient`, `cmd
   - After pushing the implementation branch, dispatch `gh workflow run pr-reminder.yml --ref <implementation branch> -f run-mode=post -f build-first=true`. Its job log, under `GITHUB_TOKEN`, shows the fixture PR's status line reading `failing` and no check status error line
   - The Build job log, under the E2E App token, shows the Dependabot PR's status line reading `unknown`, the phase's `rateLimit.cost` with its difference against the last `main` Build run (state it in the PR, per AGENTS.md § GitHub API Budget), and no check status error line. The E2E App token holds read-only `checks`, granted after the first run's `FORBIDDEN`, and still no `statuses`
   - If an error line shows in either log, stop and raise it with the user: a permission is needed and the plan has to say which
-  - It did, in the Build log: the App token without `checks` got `FORBIDDEN` on `statusCheckRollup` for PR 49. With read-only `checks` granted, the re-run read PR 49 as `unknown` with no error. The permission is `checks: read`, now in the README and docs/third-party-facts.md
+  - Result: an error line showed in the Build log. The App token without `checks` got `FORBIDDEN` on `statusCheckRollup` for PR 49. With read-only `checks` granted, the re-run read PR 49 as `unknown` with no error. The permission is `checks: read`, now in the README and docs/third-party-facts.md
   - Add what this confirms to docs/third-party-facts.md, and amend the "not shown" list of docs/third-party-facts.md § `PullRequest.statusCheckRollup` and `isRequired` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository
 
 ### 2. Keep failing PRs out of "ready to merge" in `prview`
@@ -238,17 +238,13 @@ Touches `README.md`.
 - The bucket paragraph under `README.md` § PR Tracker Canvas: "ready to merge" is an approved PR with nothing outstanding and no failing required check. A failing required check puts an approved PR under waiting for the author, with `❌ CI` in its reviewer list, until every required check passes
 - The line under the H1 that lists the three buckets needs no change
 - The screenshots in `docs/examples/` stay: no sample shows a failing check
-- `README.md` § Required Permissions: one line saying check status needs nothing beyond `pull-requests: read`, confirmed for `GITHUB_TOKEN` in a public repository, no wider than the facts entry shows. Widen it once step 1 has shown more
-- `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, commented as optional, listing the workflows that run the required checks:
+- `README.md` § Required Permissions: `checks: read` in the permissions block, and a line no wider than step 1 and the facts entries show: an App token in a private repository needs `checks: read`, `GITHUB_TOKEN` there is untested, and `GITHUB_TOKEN` in a public repository needs only `pull-requests: read`. The update-mode example's `permissions:` block gains `checks: read` too
+- `README.md` § 3. Update Mode Enabled: the trigger example gains an optional `workflow_run` trigger, listing the workflows that run the required checks. Its own comment explains it, with no text under the example:
   ```yaml
-    workflow_run:
+    workflow_run: # optional: runs an update when a listed workflow completes
       workflows: ["CI"] # the workflows running your required checks
       types: [completed]
   ```
-  - A three-bullet list under the example, stating each fact without pointing a user at AGENTS.md or the facts file:
-    - Why: without it, a fixed PR stays red until the next PR, review or comment event or post
-    - Its limits: it reacts to GitHub Actions workflows only, not to an external CI app's checks, and the reminder workflow file must be on the default branch. See docs/third-party-facts.md § `workflow_run` runs the default branch's workflow file on another workflow's completion, and `check_suite` and `check_run` skip suites GitHub Actions created
-    - Cost: each completion of a listed workflow runs an `update`, about 1 GraphQL point per open PR plus 1 per repository. See AGENTS.md § GitHub API Budget
   - The example's `run-mode` expression and concurrency group already send a `workflow_run` event to `update` and to the non-scheduled group, so neither changes
 - Done means `make check-style` passes and the trigger example stays one valid `on:` block
 

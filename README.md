@@ -140,7 +140,7 @@ on:
     types: [submitted, dismissed]
   issue_comment:
     types: [created, deleted]
-  workflow_run: # optional, see below
+  workflow_run: # optional: runs an update when a listed workflow completes
     workflows: ["CI"] # the workflows running your required checks
     types: [completed]
 
@@ -170,12 +170,6 @@ jobs:
           path: pr-slack-reminder-state.json
           retention-days: 4
 ```
-
-The optional `workflow_run` trigger:
-
-- Turns a fixed PR green as soon as its required checks pass. Without it, the PR stays red until the next PR, review or comment event or post
-- Reacts to GitHub Actions workflows only, not to an external CI app's checks. The reminder's workflow file must be on the default branch
-- Runs an `update` on each completion of a listed workflow, costing about 1 GraphQL point per open PR plus 1 per repository
 
 ## ➡️ Inputs
 
@@ -285,7 +279,7 @@ permissions:
   actions: read # downloading the previous run's state artifact: needed for run-mode: update, and lets post mark the previous message stale and compare the merge stats week over week
 ```
 
-In a private repository, reading required check status needs `checks: read` besides `pull-requests: read`. Without it, each run with an approved PR warns `Failed to fetch required check status`, and the PR is listed as if it had no required checks. A public repository needs only `pull-requests: read`.
+In a private repository, a GitHub App token needs `checks: read` besides `pull-requests: read` to read required check status. `GITHUB_TOKEN` there is untested, so grant it too. Without it, each run with an approved PR warns `Failed to fetch required check status`, and a PR not already shown failing is listed as if it had no required checks. In a public repository, `GITHUB_TOKEN` needs only `pull-requests: read`.
 
 ### Option 1: Default Token (Single Repository)
 
