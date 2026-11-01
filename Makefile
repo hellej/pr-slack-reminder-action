@@ -41,7 +41,11 @@ check-style:
 
 # FILE is a PR description, such as .local/pr/<branch>.md. MCP=1 also checks link lengths. See the pr skill
 check-pr-description:
-	go run ./.github/scripts/checkprdescription $(if $(MCP),-mcp) $(FILE)
+	@failed=0; \
+	go run ./.github/scripts/checkprdescription $(if $(MCP),-mcp) $(FILE) || failed=1; \
+	broken_references=$$(go run ./.github/scripts/checkreferences -pr-description $(FILE)) || exit 2; \
+	if [ -n "$$broken_references" ]; then echo "$$broken_references"; failed=1; fi; \
+	exit $$failed
 
 lint: check-fmt check-vet check-dead-code check-vulnerabilities check-style
 

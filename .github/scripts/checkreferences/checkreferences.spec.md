@@ -5,6 +5,7 @@
 - `.github/scripts/check-style.sh` runs it from the repository root, passing the files to scan
   - Prints one line per broken reference: `<path>:<line>: <reference>: <problem>`
   - Exits 0 either way: `check-style.sh` fails on any output. Exits 2 when it can't run, such as on a file it can't read
+- `make check-pr-description` runs it with `-pr-description` on a PR description file, skipping the repository path check: a description may name a path the PR deletes
 - Section pointers, preferred in agent files, specs and code comments:
   - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing"
   - `AGENTS.md § Git and § Testing`: the second pointer reuses the file
@@ -15,6 +16,7 @@
 - Links, preferred in docs read on GitHub, such as `README.md`:
   - `[spec](../state/state.spec.md)`: the file exists
   - `[tips](#-tips)` or `[tips](README.md#-tips)`: a heading with that GitHub anchor exists
+  - A blob URL into this repository on `main` or the current branch, such as `https://github.com/<owner>/<repo>/blob/main/README.md#-tips`: checked the same way, its path read from the repository root in the working tree. `<owner>/<repo>` comes from the `origin` remote
 - Repository paths: `` `internal/state/` `` exists in the files git lists. An untracked new file counts, a gitignored one doesn't
 - Skill and agent names:
   - `` the `coding` skill ``, `` the `plan` and `writing` skills ``, `` the `reviewer` agent ``: each exists under `.agents/`
@@ -31,7 +33,7 @@
 ## Doesn't Do
 
 - A link or `§` pointer in a code span or code block: an example, such as `` `See docs/third-party-facts.md § <heading>` ``
-- External links, and a pointer right after one: `[Limits](https://…) § Timeouts`
+- External links, other than the blob URLs above, and a pointer right after one: `[Limits](https://…) § Timeouts`
 - References without `§`: `AGENTS.md **Code Style**`, "the plan skill's Structure"
 - Bare file names: `run.go`, `chat.go`. Most name third-party files
 - Placeholders, globs, commands and module paths: `internal/<pkg>/`, `internal/**/*.go`, `./...`, `slack-go@v0.29.0/chat.go`
@@ -53,5 +55,7 @@
   - `AGENTS.md § Git. Then this file's § Local` looks for "Local" in `AGENTS.md`
   - After a skipped pointer into an external page, it is skipped too
 - Reads `Makefile` rule lines by pattern: a target made through a variable or an `include` is missed
+- A blob URL on any branch other than `main` and the current one is skipped as external: a branch name may hold slashes, so the path can't be found without knowing the branch. In CI, on a detached HEAD, only `main` counts
+- A blob URL is checked against the working tree, not the branch it names
 - Anchors approximate GitHub's rule as "keep letters, digits, `-` and `_`"
 - A code span wrapping onto the next line isn't recognised as one

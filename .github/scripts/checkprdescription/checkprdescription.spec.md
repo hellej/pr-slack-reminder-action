@@ -21,6 +21,7 @@
 - Reads the stored PR description. The agent checks its local file before creating or editing the PR
 - Sections other than the summary's, such as `## Docs`
 - Whether a stated issue or PR state is true
+- Whether a link resolves: `make check-pr-description` runs `checkreferences` on the file for that
 - Whether a `## Docs` link points to the first heading the PR adds or changes
 - Whether `## Docs` lists every `.md` file the PR changes
 

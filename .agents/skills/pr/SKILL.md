@@ -9,6 +9,7 @@ argument-hint: "Optional: draft, or what the PR is for"
 1. Merge the latest `main` (AGENTS.md § Git)
 2. Write the description to `.local/pr/<branch>.md`, from [the PR template](../../../.github/pull_request_template.md), following the `writing` skill
 3. Run `make check-pr-description FILE=.local/pr/<branch>.md`. Fix and rerun until it prints nothing
+   - It also checks each link into this repo, on `main` or this branch, resolves to a file and heading in the working tree
 4. Create or edit the PR from that file, either:
    - With `gh`: `gh pr create --body-file <file>`, or `gh pr edit --body-file <file>`
    - If `gh` is unavailable, with the GitHub MCP tools: rerun step 3 with `MCP=1`, pass the file's content, then read the stored description back

@@ -3,12 +3,16 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 )
 
 func main() {
-	paths := os.Args[1:]
+	// A PR description may name a path the PR deletes.
+	isPRDescription := flag.Bool("pr-description", false, "skip the repository path check")
+	flag.Parse()
+	paths := flag.Args()
 	r, err := loadRepo(".")
 	if err != nil {
 		exitWithError(err)
@@ -19,9 +23,14 @@ func main() {
 	}
 	var findings []string
 	for _, check := range []func() ([]string, error){
-		func() ([]string, error) { return brokenLinks(paths) },
+		func() ([]string, error) { return brokenLinks(paths, r) },
 		func() ([]string, error) { return brokenSectionPointers(paths, r) },
-		func() ([]string, error) { return brokenRepoPaths(paths, r) },
+		func() ([]string, error) {
+			if *isPRDescription {
+				return nil, nil
+			}
+			return brokenRepoPaths(paths, r)
+		},
 		func() ([]string, error) { return brokenSkillAndAgentNames(paths, r) },
 		func() ([]string, error) { return brokenFrontmatterNames(paths) },
 		func() ([]string, error) { return brokenMakeTargets(paths, isMakeTargetByName) },

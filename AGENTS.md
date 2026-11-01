@@ -214,7 +214,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
 - `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
-- `make check-pr-description FILE=<path>`: fail on a PR description over the [pr skill](.agents/skills/pr/SKILL.md)'s limits
+- `make check-pr-description FILE=<path>`: fail on a PR description over the [pr skill](.agents/skills/pr/SKILL.md)'s limits, or with a link into this repo that doesn't resolve
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)
 - `go run .github/scripts/check_inputs.go`: validate action.yml, config.go constants and the README inputs table are in sync
