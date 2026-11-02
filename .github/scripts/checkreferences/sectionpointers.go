@@ -19,6 +19,8 @@ type sectionPointer struct {
 	writtenTargetFile string
 	// Lines of a wrapped pointer are joined by "\n". See checkreferences.spec.md § Oddities
 	text string
+	// The whole section name when the pointer sits in bold text, else empty. See checkreferences.spec.md § Behaviour
+	boldName string
 }
 
 const sectionSign = "§"
@@ -29,6 +31,7 @@ var (
 	boldText               = regexp.MustCompile(`\*\*([^*]+)\*\*`)
 	factsEntryDateTail     = regexp.MustCompile(`\s+\[\d{4}-\d{2}-\d{2}\]$`)
 	whitespaceRun          = regexp.MustCompile(`\s+`)
+	trailingConnector      = regexp.MustCompile(`(\s+(and|or))?[,\s]*$`)
 )
 
 func brokenSectionPointers(paths []string, r repo) ([]string, error) {
@@ -68,7 +71,11 @@ func checkSectionPointer(holdingPath string, pointer sectionPointer, r repo) (st
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", targetPath, err)
 	}
-	if !startsWithAnyLabel(pointer.text, sectionLabels(string(target))) {
+	labels := sectionLabels(string(target))
+	if pointer.boldName != "" && !slices.Contains(labels, pointer.boldName) {
+		return fmt.Sprintf("%s: no heading or bold text named %q in %s", location, pointer.boldName, targetPath), nil
+	}
+	if pointer.boldName == "" && !startsWithAnyLabel(pointer.text, labels) {
 		return fmt.Sprintf("%s: no heading or bold text starting it in %s", location, targetPath), nil
 	}
 	return "", nil
@@ -138,14 +145,30 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 			if target.isIntoExternalPageOrLinkText {
 				continue
 			}
+			text := pointerText(line[signIndex+len(sectionSign):], lines[i+1:])
 			pointers = append(pointers, sectionPointer{
 				line:              i + 1,
 				writtenTargetFile: target.writtenTargetFile,
-				text:              pointerText(line[signIndex+len(sectionSign):], lines[i+1:]),
+				text:              text,
+				boldName:          boldPointerName(line[:signIndex], text),
 			})
 		}
 	}
 	return pointers
+}
+
+// Empty unless the sign sits in bold text: the name then ends at the closing bold or the next sign.
+func boldPointerName(lineBeforeSign, text string) string {
+	const boldMarker = "**"
+	if strings.Count(lineBeforeSign, boldMarker)%2 == 0 {
+		return ""
+	}
+	name := text
+	for _, end := range []string{boldMarker, sectionSign} {
+		name, _, _ = strings.Cut(name, end)
+	}
+	name = trailingConnector.ReplaceAllString(name, "")
+	return whitespaceRun.ReplaceAllString(name, " ")
 }
 
 func sectionSignIndexes(line string) []int {

@@ -15,6 +15,7 @@
   - `` the `plan` skill § Structure ``: looks in `.agents/skills/plan/SKILL.md`. `` the `reviewer` agent § … `` looks in `.agents/agents/reviewer.md`
   - `§ Oddities` alone: a heading of the file holding it. In a code comment this fails, since a comment must name its file
   - `See docs/third-party-facts.md § <full heading>`: the heading's ` [YYYY-MM-DD]` tail is left out
+  - `**AGENTS.md § Package Specs**`: in bold text, the name ends at the closing `**` or the next `§`, a trailing `,`, `and` or `or` dropped, and must equal a heading or bold label. `**AGENTS.md § Git, § Testing and § Purpose**` checks each name this way
   - A named file resolves next to the file holding the pointer, then from the repository root
 - Links, preferred in docs read on GitHub, such as `README.md`:
   - `[spec](../state/state.spec.md)`: the file exists
@@ -52,6 +53,8 @@
 - A section name has no end marker, so a label that starts the text is enough:
   - `§ Git Hooks` passes against a `## Git` heading
   - `§ Purpose` passes against a bold "Purpose" anywhere in the file
+  - A pointer in bold text is exact instead: `**AGENTS.md § Git Hooks**` fails against a `## Git` heading
+- A `§` counts as in bold text when an odd number of `**` comes before it on its line. A bold span opened on an earlier line is not seen
 - A pointer's file comes from right before its `§`, with only spaces, backticks or `**` between:
   - `checks docs/facts.md files (see § References)` points into its own file
   - A file named at the end of the line before doesn't count

@@ -23,9 +23,37 @@ func TestSectionPointers(t *testing.T) {
 			name:    "chained pointers share the file named first, bold is unwrapped",
 			content: "- **AGENTS.md § Purpose, § **Testing** and more",
 			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § **Testing** and more"},
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Testing** and more"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § **Testing** and more", boldName: "Purpose"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Testing** and more", boldName: "Testing"},
 			},
+		},
+		{
+			name:    "a pointer in bold text is named up to the closing bold",
+			content: "- **AGENTS.md § Package Specs**, then every spec",
+			wantPointers: []sectionPointer{
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Package Specs**, then every spec", boldName: "Package Specs"},
+			},
+		},
+		{
+			name:    "pointers chained in bold text end at the next sign, a trailing connector dropped",
+			content: "**AGENTS.md § Purpose, § Reference Deployment and § Third-party Facts**",
+			wantPointers: []sectionPointer{
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § Reference Deployment and § Third-party Facts**", boldName: "Purpose"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Reference Deployment and § Third-party Facts**", boldName: "Reference Deployment"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Third-party Facts**", boldName: "Third-party Facts"},
+			},
+		},
+		{
+			name:    "a bold pointer's name wraps onto the next line",
+			content: "**AGENTS.md § Package\nSpecs**",
+			wantPointers: []sectionPointer{
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Package\nSpecs**", boldName: "Package Specs"},
+			},
+		},
+		{
+			name:         "bold ended before the sign leaves the pointer unbolded",
+			content:      "**Note** AGENTS.md § Package Specs and more",
+			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "AGENTS.md", text: "Package Specs and more"}},
 		},
 		{
 			name:    "backticks or bold between the file and the sign still name it",
@@ -157,7 +185,11 @@ func TestBrokenSectionPointers(t *testing.T) {
 		"The `plan` skill § Structure and § Style\n"+
 		"The `nope` skill § Structure\n"+
 		"[AGENTS.md](../../AGENTS.md) § Git2\n"+
-		"[AGENTS.md](../../AGENTS.md) § `nope` heading")
+		"[AGENTS.md](../../AGENTS.md) § `nope` heading\n"+
+		"**[AGENTS.md](../../AGENTS.md) § Git**, then more\n"+
+		"**[AGENTS.md](../../AGENTS.md) § Git Hooks**\n"+
+		"**[AGENTS.md](../../AGENTS.md) § Git, § Code Style and § Name a map**\n"+
+		"**[AGENTS.md](../../AGENTS.md) § Git and § Code**")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
 	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
@@ -178,6 +210,8 @@ func TestBrokenSectionPointers(t *testing.T) {
 		skill + ":9: § Structure: target file .agents/skills/nope/SKILL.md not found",
 		skill + ":10: § Git2: no heading or bold text starting it in " + agentsFile,
 		skill + ":11: § `nope` heading: no heading or bold text starting it in " + agentsFile,
+		skill + ":13: § Git Hooks**: no heading or bold text named \"Git Hooks\" in " + agentsFile,
+		skill + ":15: § Code**: no heading or bold text named \"Code\" in " + agentsFile,
 		goSource + ":1: § Oddities: no heading or bold text starting it in " + pkgSpec,
 		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
 		dependabotConfig + ":1: § Gitt: no heading or bold text starting it in " + agentsFile,
