@@ -6,7 +6,7 @@ toolchain go1.26.10
 
 require (
 	github.com/google/go-github/v78 v78.0.0
-	github.com/slack-go/slack v0.30.1
+	github.com/slack-go/slack v0.32.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
