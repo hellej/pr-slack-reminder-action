@@ -47,7 +47,7 @@ func (row CollapsedRow) GetAuthorLabel() string {
 	return strings.TrimSuffix(row.AuthorLogin, "[bot]")
 }
 
-// See prview.spec.md § Behaviour for the rule.
+// For the rule, see prview.spec.md § Behaviour.
 func RowsCollapsingPRsFromAuthors(prs []PR, collapsePRsFromAuthors []string) []Row {
 	authorsToCollapse := utilities.UniqueFunc(collapsePRsFromAuthors, func(a, b string) bool { return a == b })
 	collapsedRows := utilities.Filter(

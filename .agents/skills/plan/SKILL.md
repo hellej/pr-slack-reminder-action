@@ -18,7 +18,7 @@ Before drafting an implementation plan, read the following. Each read is mandato
 
 ## Past Plans Are Not Examples
 
-- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. This skill and AGENTS.md § Output Style are the only reference for how a plan looks
+- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. For how a plan looks, use only this skill and AGENTS.md § Output Style
 - Read a past plan only for its content: when the new plan builds on it, depends on it, or the user points to it. Even then, copy nothing of its shape
 - Listing a plans directory for the next sequence number is fine
 

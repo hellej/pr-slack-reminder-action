@@ -1079,13 +1079,13 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Populated in the same query, no error: `headRefOid`, `reviewDecision` (null, no rules on a free private repository), the review's `state` and `author`, and an empty `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])`
 - A `ReviewDismissedEvent` node populates on a private repository under `pull-requests: read` alone: PR 7 of `hellej/pr-slack-reminder-test-repo-1`, with a manual dismissal, returned `previousReviewState`, `dismissalMessage` and `review { author { login __typename ... on User { name } } }`, no error. Source: the probe reported in [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7), branch `probe-review-dismissed-event` (since deleted), job log `Metadata: read`, `PullRequests: read`
 - REST under the same token: `GET /repos/{o}/{r}/pulls/2/reviews` returns each review's `commit_id`, and `GET /repos/{o}/{r}/pulls/2` returns `head.sha`
-- So a public repository is no test of a GraphQL field's permission: § A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository does not carry over
+- So a public repository is no test of a GraphQL field's permission: the result in a public repository does not carry over to a private one (§ A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository)
 - `Ref.rules` read from another repository's workflow token on public `hellej/pr-slack-reminder-action` returned its ruleset, `requireLastPushApproval: true` and `dismissStaleReviewsOnPush: true`
 
 ## A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage` [2026-11-01]
 
 - Source: [dismiss a review for a pull request](https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request): `message` is required, "The message for the pull request review dismissal"
-- The four push dismissals in § A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set all read `dismissalMessage: null`
+- All four push dismissals read `dismissalMessage: null` (§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set)
 - Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null

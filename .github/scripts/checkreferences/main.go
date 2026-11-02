@@ -1,4 +1,4 @@
-// Prints every broken reference in the files given as arguments. See AGENTS.md § References for the forms it checks.
+// Prints every broken reference in the files given as arguments. For the forms it checks, see AGENTS.md § References.
 // check-style.sh runs it from the repository root. make check-pr-description runs it with -pr-description.
 package main
 

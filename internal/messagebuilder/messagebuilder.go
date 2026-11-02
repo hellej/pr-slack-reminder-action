@@ -28,8 +28,8 @@ const (
 	mergedPRsHeading        = "🚀 Recently merged"
 )
 
-// Slack rejects a message of more than 50 blocks. See messagebuilder.spec.md § Oddities for
-// when grouping by repository reaches it.
+// Slack rejects a message of more than 50 blocks. For when grouping by
+// repository reaches it, see messagebuilder.spec.md § Oddities.
 const maximumBlocksInSlackMessage = 50
 
 const (

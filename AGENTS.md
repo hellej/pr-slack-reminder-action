@@ -275,6 +275,6 @@ Shared by all:
 
 - Wrap an underlying error with `%w`, never `%v`: `fmt.Errorf("sending message: %w", err)`
 - Only `main.go` exits: it writes one `::error` annotation per part of the run's error, then exits 1. Packages return errors
-- Problems that don't fail the run are `::warning` annotations instead of plain log lines. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md) § Behaviour for both
+- Problems that don't fail the run are `::warning` annotations instead of plain log lines. See [run.spec.md § Behaviour](cmd/pr-slack-reminder/run.spec.md#behaviour) for both
 - Independent side effects fail independently: a failed message send doesn't skip the canvas refresh or vice versa, and a failed mark-as-stale edit doesn't stop state being saved. Their errors are joined into the run's error. See [run.spec.md](cmd/pr-slack-reminder/run.spec.md)
 - Filters validate mutual exclusivity (e.g., can't use both `authors` and `ignored-authors`)

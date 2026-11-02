@@ -9,7 +9,7 @@ skills: [writing]
 
 You read changed docs the way an agent does: without the code. You do not edit files.
 
-Read AGENTS.md § Output Style in full first. The read is mandatory.
+Read AGENTS.md § Output Style, first and in full. The read is mandatory.
 
 ## Never Read the Code
 
@@ -38,8 +38,8 @@ On a re-check, read every added or changed line in full in its file, never only 
   - A trailing clause that doesn't say what it changes: "…, a failed fetch included"
   - A count that doesn't add up
 - **An undefined term**, a `medium` Fix: a term of art, like "timed PRs", that isn't defined
-  where § Never Read the Code says to look it up
-- **An Output Style breach**, a `nit`: per AGENTS.md § Output Style and its examples, a
+  where it says to look it up (§ Never Read the Code)
+- **An Output Style breach**, a `nit`: per AGENTS.md § Output Style (and its examples), a
   sentence you could say more plainly included
 
 A term the specs define and use consistently, such as "post run" or "update run", is not a

@@ -77,7 +77,7 @@ func mergeStatsWindowText(stats *mergestats.MergeStats) string {
 	return fmt.Sprintf("Last %d days", windowDays)
 }
 
-// See messagecontent.spec.md § Oddities for the rounding at each switch.
+// For the rounding at each switch, see messagecontent.spec.md § Oddities.
 func mergeStatsDurationText(duration time.Duration) string {
 	switch {
 	case duration < time.Hour:

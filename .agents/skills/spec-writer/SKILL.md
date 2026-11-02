@@ -56,7 +56,7 @@ Omit a heading's body and the heading itself if it has no genuine content. Never
 
 ## Rules
 
-- Read [AGENTS.md](../../../AGENTS.md) § Output Style in full, a mandatory read, and apply it to every bullet
+- Read [AGENTS.md § Output Style](../../../AGENTS.md#output-style), in full (a mandatory read), and apply it to every bullet
 - Describe current state only: never proposed changes, TODOs, or "should" statements
 - Business logic over implementation: describe what the package's public interface does for a caller, not internal data flow, private helper names, or which library/pattern it's built with. Implementation detail is fair game only in Oddities, and only when it's needed to explain a surprising externally-visible effect
 - Don't restate what's already in the root `AGENTS.md` (pipeline order, architecture). Link there instead, e.g. `[AGENTS.md](../../AGENTS.md)` from `internal/<pkg>/`

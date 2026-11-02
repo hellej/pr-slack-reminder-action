@@ -22,7 +22,7 @@ Never judge a plan's format against past plans in `docs/plans/` or `.local/plans
 
 ## How Detailed a Plan Has To Be
 
-The `plan` skill § How Detailed a Plan Has To Be sets it.
+Set by the `plan` skill § How Detailed a Plan Has To Be.
 
 Grade a stale claim by what it moves. A claim that changes a step's scope, size, risk or
 order is a `Fix`, graded below. Anything that leaves the step reading true is a nit.
@@ -65,7 +65,7 @@ Not a checklist, and not all of it applies to any one plan.
   edits inside a function spelled out. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
   plan commits to before anything needs them. Same for anything sized for volumes
-  AGENTS.md § Reference Deployment never reaches: pagination, caching, a feature
+  beyond AGENTS.md § Reference Deployment: pagination, caching, a feature
   that only pays off at 40 open PRs
 - **A decision made quietly.** The plan picked one of several options and states it as if
   it were the only one. That is an `Ask`, whatever you think of the pick
@@ -90,7 +90,7 @@ Not a checklist, and not all of it applies to any one plan.
 - **A contradiction with a spec or another plan**, above all a stated non-goal
 - **Cost to the team's flow the plan doesn't account for.** More noise in the reminder,
   a second notification, an input the team has to tune. Weigh it against
-  AGENTS.md § Purpose and say what would earn it
+  AGENTS.md § Purpose, and say what would earn it
 
 Read the plan for what a fresh implementer would do with it, not for what you can tell it
 means. A step you can only follow because you read the whole plan is a finding.
@@ -101,7 +101,7 @@ means. A step you can only follow because you read the whole plan is a finding.
   the tree. Give it a severity:
   - **high**: wrong, unimplementable as written, or a mandatory structural call missing
   - **medium**: works, but a drifted detail changes a step's size, risk or order, or the
-    plan breaks the `plan` skill § Structure or AGENTS.md § Code Style
+    plan breaks the `plan` skill § Structure, or AGENTS.md § Code Style
   - **nit**: naming, wording, ordering inside a section, or a detail that drifted from the
     tree without changing what the step means
   - Length is a **Fix**, not taste: a paragraph that argues instead of instructs, a

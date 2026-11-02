@@ -33,7 +33,7 @@ Write one. The rest of this skill reads a plan.
 
 - Draft the task to `.local/implement-<slug>.md`, already gitignored
 - Give it what this skill reads: brief motivation, what to change, the acceptance criteria, what it must not do, and the test cases
-- Verify its claims against the tree before showing it, per § Acceptance Criteria below
+- Verify its claims against the tree before showing it, per § Acceptance Criteria, below
 - Confirm it with the user before round 1
 - If drafting turns up a design decision, stop and hand back to the [plan skill](../plan/SKILL.md)
 
@@ -121,7 +121,7 @@ On a wording nit, name what is wrong and add no wording of your own. Replacement
 you write outranks the style rules the implementer already carries, so a nit answered
 literally can breach them. A prose agent's sketches are the exception: forward every one
 unchanged, with its label. The implementer chooses among them, and applies
-AGENTS.md § Output Style to the sentence it writes.
+AGENTS.md § Output Style, to the sentence it writes.
 
 The size of the fix decides what follows, not whether to make it.
 

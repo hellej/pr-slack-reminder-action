@@ -10,12 +10,14 @@
   - Reports a blob URL into this repository on a branch other than `main` or the current branch, likely a typo. A blob URL on a commit SHA or a tag is not reported
   - Prints a note on stderr, without failing, when `origin` is missing or not a GitHub URL it recognises: blob URLs then go unchecked
 - Section pointers, preferred in agent files, specs and code comments:
-  - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing"
+  - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing", and the label ends at a separator or where the pointer's text ends
+  - A separator after the name: `,` `;` `:` `)` `?` `!`, a `.` before a space or the end, `**`, `'s`, ` (`, or ` §`, ` and §`, ` or §` for chained pointers. `§ Git hooks run` fails against `## Git`. Bold the pointer to end it mid-sentence: `**AGENTS.md § Git** runs first`
+  - A pointer's text runs to the blank line, so a name ending its line ends there too, however the next line goes on
   - `AGENTS.md § Git and § Testing`: the second pointer reuses the file
   - `` the `plan` skill § Structure ``: looks in `.agents/skills/plan/SKILL.md`. `` the `reviewer` agent § … `` looks in `.agents/agents/reviewer.md`
   - `§ Oddities` alone: a heading of the file holding it. In a code comment this fails, since a comment must name its file
   - `See docs/third-party-facts.md § <full heading>`: the heading's ` [YYYY-MM-DD]` tail is left out
-  - `**AGENTS.md § Package Specs**`: in bold text, the name ends at the closing `**` or the next `§`, a trailing `,`, `and` or `or` dropped, and must equal a heading or bold label. `**AGENTS.md § Git, § Testing and § Purpose**` checks each name this way
+  - `[AGENTS.md](AGENTS.md) § Testing`: fails when the name matches a heading, which a link can reach: `[AGENTS.md § Testing](AGENTS.md#testing)`. Passes when it matches only bold text, which has no anchor
   - A named file resolves next to the file holding the pointer, then from the repository root
 - Links, preferred in docs read on GitHub, such as `README.md`:
   - `[spec](../state/state.spec.md)`: the file exists
@@ -50,11 +52,10 @@
 
 ## Oddities
 
-- A section name has no end marker, so a label that starts the text is enough:
-  - `§ Git Hooks` passes against a `## Git` heading
+- A label only has to start the text, up to a separator:
   - `§ Purpose` passes against a bold "Purpose" anywhere in the file
-  - A pointer in bold text is exact instead: `**AGENTS.md § Git Hooks**` fails against a `## Git` heading
-- A `§` counts as in bold text when an odd number of `**` comes before it on its line. A bold span opened on an earlier line is not seen
+  - `§ Git, hooks` passes against a `## Git` heading
+  - A name wrapped onto a second line passes when its first line ends in a heading: `§ Git` then `hooks` on the next line
 - A pointer's file comes from right before its `§`, with only spaces, backticks or `**` between:
   - `checks docs/facts.md files (see § References)` points into its own file
   - A file named at the end of the line before doesn't count

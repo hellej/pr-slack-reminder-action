@@ -23,37 +23,9 @@ func TestSectionPointers(t *testing.T) {
 			name:    "chained pointers share the file named first, bold is unwrapped",
 			content: "- **AGENTS.md § Purpose, § **Testing** and more",
 			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § **Testing** and more", boldName: "Purpose"},
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Testing** and more", boldName: "Testing"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § **Testing** and more"},
+				{line: 1, writtenTargetFile: "AGENTS.md", text: "Testing** and more"},
 			},
-		},
-		{
-			name:    "a pointer in bold text is named up to the closing bold",
-			content: "- **AGENTS.md § Package Specs**, then every spec",
-			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Package Specs**, then every spec", boldName: "Package Specs"},
-			},
-		},
-		{
-			name:    "pointers chained in bold text end at the next sign, a trailing connector dropped",
-			content: "**AGENTS.md § Purpose, § Reference Deployment and § Third-party Facts**",
-			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Purpose, § Reference Deployment and § Third-party Facts**", boldName: "Purpose"},
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Reference Deployment and § Third-party Facts**", boldName: "Reference Deployment"},
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Third-party Facts**", boldName: "Third-party Facts"},
-			},
-		},
-		{
-			name:    "a bold pointer's name wraps onto the next line",
-			content: "**AGENTS.md § Package\nSpecs**",
-			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "AGENTS.md", text: "Package\nSpecs**", boldName: "Package Specs"},
-			},
-		},
-		{
-			name:         "bold ended before the sign leaves the pointer unbolded",
-			content:      "**Note** AGENTS.md § Package Specs and more",
-			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "AGENTS.md", text: "Package Specs and more"}},
 		},
 		{
 			name:    "backticks or bold between the file and the sign still name it",
@@ -71,7 +43,15 @@ func TestSectionPointers(t *testing.T) {
 		{
 			name:         "a link's target wins over its text",
 			content:      "See [run.spec.md](cmd/run.spec.md#x) § Behaviour",
-			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour"}},
+			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour", isAfterLink: true}},
+		},
+		{
+			name:    "chained pointers after a link share it",
+			content: "See [run.spec.md](cmd/run.spec.md) § Behaviour, § Oddities",
+			wantPointers: []sectionPointer{
+				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour, § Oddities", isAfterLink: true},
+				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Oddities", isAfterLink: true},
+			},
 		},
 		{
 			name:    "a skill or agent named before the pointer targets its file",
@@ -158,6 +138,43 @@ func TestSectionLabels(t *testing.T) {
 	}
 }
 
+func TestStartsWithAnyLabel(t *testing.T) {
+	labels := []string{"Git", "Code Style", "Name a map"}
+	tests := []struct {
+		name        string
+		pointerText string
+		want        bool
+	}{
+		{name: "the whole text is the label", pointerText: "Git", want: true},
+		{name: "a comma ends the name", pointerText: "Git, a mandatory read", want: true},
+		{name: "a sentence end ends the name", pointerText: "Code Style. Then more", want: true},
+		{name: "a period inside a word does not", pointerText: "Git.md", want: false},
+		{name: "a closing parenthesis ends the name", pointerText: "Git) and more", want: true},
+		{name: "a possessive ends the name", pointerText: "Code Style's comment rule", want: true},
+		{name: "a closing bold ends the name", pointerText: "Git** then more", want: true},
+		{name: "a parenthesis after a space ends the name", pointerText: "Git (the rule)", want: true},
+		{name: "another sign after a space ends the name", pointerText: "Git § Code Style", want: true},
+		{name: "and before another sign ends the name", pointerText: "Git and § Code Style", want: true},
+		{name: "or before another sign ends the name", pointerText: "Git or § Code Style", want: true},
+		{name: "a word after the label does not", pointerText: "Git hooks run", want: false},
+		{name: "and before a word does not", pointerText: "Git and the rest", want: false},
+		{name: "a word wrapped onto the next line does not", pointerText: "Git hooks\nrun", want: false},
+		{name: "a label longer than the text does not", pointerText: "Code", want: false},
+		{name: "a name cut short of a letter does not", pointerText: "Gitt", want: false},
+		{name: "a digit after the label does not", pointerText: "Git2", want: false},
+		{name: "a name wrapped over two lines", pointerText: "Code\nStyle", want: true},
+		{name: "a label ending a line ends the name", pointerText: "Git\n- next bullet", want: true},
+		{name: "a label ending a wrapped line ends the name", pointerText: "Name a\nmap\n- next bullet", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := startsWithAnyLabel(tt.pointerText, labels); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestShortened(t *testing.T) {
 	long := "Output Stile now, in full, and apply it. The read is mandatory"
 	if got := shortened(long + "\nnext line"); got != "Output Stile now, in full, and apply it.…" {
@@ -175,8 +192,8 @@ func TestBrokenSectionPointers(t *testing.T) {
 	planSkill := filepath.Join(root, ".agents", "skills", "plan", "SKILL.md")
 	writeFile(t, planSkill, "## Structure")
 	skill := filepath.Join(root, "skills", "a", "SKILL.md")
-	writeFile(t, skill, "See [AGENTS.md](../../AGENTS.md) § Git, a read\n"+
-		"[AGENTS.md](../../AGENTS.md) § Code Style's comment rule\n"+
+	writeFile(t, skill, "See AGENTS.md § Git, a read\n"+
+		"AGENTS.md § Code Style's comment rule\n"+
 		"[AGENTS.md](../../AGENTS.md) § Name a map\n"+
 		"[AGENTS.md](../../AGENTS.md) § Gitt\n"+
 		"[MISSING.md](../../MISSING.md) § Git\n"+
@@ -186,10 +203,14 @@ func TestBrokenSectionPointers(t *testing.T) {
 		"The `nope` skill § Structure\n"+
 		"[AGENTS.md](../../AGENTS.md) § Git2\n"+
 		"[AGENTS.md](../../AGENTS.md) § `nope` heading\n"+
-		"**[AGENTS.md](../../AGENTS.md) § Git**, then more\n"+
-		"**[AGENTS.md](../../AGENTS.md) § Git Hooks**\n"+
-		"**[AGENTS.md](../../AGENTS.md) § Git, § Code Style and § Name a map**\n"+
-		"**[AGENTS.md](../../AGENTS.md) § Git and § Code**")
+		"**AGENTS.md § Git**, then more\n"+
+		"**AGENTS.md § Git Hooks**\n"+
+		"**AGENTS.md § Git, § Code Style and § Name a map**\n"+
+		"**AGENTS.md § Git and § Code**\n"+
+		"AGENTS.md § Git hooks run\n"+
+		"[AGENTS.md](../../AGENTS.md) § Git, then more\n"+
+		"[AGENTS.md](../../AGENTS.md) § Git, § Name a map\n"+
+		"[AGENTS.md](../../AGENTS.md) § Name a map")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
 	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
@@ -203,18 +224,21 @@ func TestBrokenSectionPointers(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		skill + ":4: § Gitt: no heading or bold text starting it in " + agentsFile,
+		skill + ":4: § Gitt: no heading or bold text matching it in " + agentsFile,
 		skill + ":5: § Git: target file ../../MISSING.md not found",
-		skill + ":7: § Nowhere: no heading or bold text starting it in " + skill,
-		skill + ":8: § Style: no heading or bold text starting it in " + planSkill,
+		skill + ":7: § Nowhere: no heading or bold text matching it in " + skill,
+		skill + ":8: § Style: no heading or bold text matching it in " + planSkill,
 		skill + ":9: § Structure: target file .agents/skills/nope/SKILL.md not found",
-		skill + ":10: § Git2: no heading or bold text starting it in " + agentsFile,
-		skill + ":11: § `nope` heading: no heading or bold text starting it in " + agentsFile,
-		skill + ":13: § Git Hooks**: no heading or bold text named \"Git Hooks\" in " + agentsFile,
-		skill + ":15: § Code**: no heading or bold text named \"Code\" in " + agentsFile,
-		goSource + ":1: § Oddities: no heading or bold text starting it in " + pkgSpec,
+		skill + ":10: § Git2: no heading or bold text matching it in " + agentsFile,
+		skill + ":11: § `nope` heading: no heading or bold text matching it in " + agentsFile,
+		skill + ":13: § Git Hooks**: no heading or bold text matching it in " + agentsFile,
+		skill + ":15: § Code**: no heading or bold text matching it in " + agentsFile,
+		skill + ":16: § Git hooks run: no heading or bold text matching it in " + agentsFile,
+		skill + ":17: § Git, then more: a heading of " + agentsFile + ", link it instead of using §",
+		skill + ":18: § Git, § Name a map: a heading of " + agentsFile + ", link it instead of using §",
+		goSource + ":1: § Oddities: no heading or bold text matching it in " + pkgSpec,
 		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
-		dependabotConfig + ":1: § Gitt: no heading or bold text starting it in " + agentsFile,
+		dependabotConfig + ":1: § Gitt: no heading or bold text matching it in " + agentsFile,
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

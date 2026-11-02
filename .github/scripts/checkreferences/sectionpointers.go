@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
@@ -18,9 +17,8 @@ type sectionPointer struct {
 	// Empty when the pointer names no file: it points into the file holding it.
 	writtenTargetFile string
 	// Lines of a wrapped pointer are joined by "\n". See checkreferences.spec.md § Oddities
-	text string
-	// The whole section name when the pointer sits in bold text, else empty. See checkreferences.spec.md § Behaviour
-	boldName string
+	text        string
+	isAfterLink bool
 }
 
 const sectionSign = "§"
@@ -31,7 +29,7 @@ var (
 	boldText               = regexp.MustCompile(`\*\*([^*]+)\*\*`)
 	factsEntryDateTail     = regexp.MustCompile(`\s+\[\d{4}-\d{2}-\d{2}\]$`)
 	whitespaceRun          = regexp.MustCompile(`\s+`)
-	trailingConnector      = regexp.MustCompile(`(\s+(and|or))?[,\s]*$`)
+	nameSeparator          = regexp.MustCompile(`^([,;:)?!]|\.(\s|$)|\*\*|'s\b| \(| §| (and|or) §)`)
 )
 
 func brokenSectionPointers(paths []string, r repo) ([]string, error) {
@@ -71,12 +69,11 @@ func checkSectionPointer(holdingPath string, pointer sectionPointer, r repo) (st
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", targetPath, err)
 	}
-	labels := sectionLabels(string(target))
-	if pointer.boldName != "" && !slices.Contains(labels, pointer.boldName) {
-		return fmt.Sprintf("%s: no heading or bold text named %q in %s", location, pointer.boldName, targetPath), nil
+	if pointer.isAfterLink && startsWithAnyLabel(pointer.text, headingLabels(string(target))) {
+		return fmt.Sprintf("%s: a heading of %s, link it instead of using %s", location, targetPath, sectionSign), nil
 	}
-	if pointer.boldName == "" && !startsWithAnyLabel(pointer.text, labels) {
-		return fmt.Sprintf("%s: no heading or bold text starting it in %s", location, targetPath), nil
+	if !startsWithAnyLabel(pointer.text, sectionLabels(string(target))) {
+		return fmt.Sprintf("%s: no heading or bold text matching it in %s", location, targetPath), nil
 	}
 	return "", nil
 }
@@ -101,22 +98,45 @@ func resolveTargetFile(holdingPath, writtenTargetFile, repoRoot string) (string,
 	})
 }
 
-// `§ Gitt` doesn't match `Git`. See checkreferences.spec.md § Oddities
+// A pointer's name ends at a separator, or where its text ends. See checkreferences.spec.md § Behaviour
 func startsWithAnyLabel(pointerText string, labels []string) bool {
-	text := whitespaceRun.ReplaceAllString(pointerText, " ")
+	lines := strings.Split(pointerText, "\n")
 	return slices.ContainsFunc(labels, func(label string) bool {
-		rest, hasPrefix := strings.CutPrefix(text, label)
-		next, _ := utf8.DecodeRuneInString(rest)
-		return hasPrefix && (rest == "" || !(unicode.IsLetter(next) || unicode.IsDigit(next)))
+		return slices.ContainsFunc(wrappedPrefixes(lines), func(text string) bool {
+			rest, hasPrefix := strings.CutPrefix(text, label)
+			return hasPrefix && (rest == "" || nameSeparator.MatchString(rest))
+		})
 	})
 }
 
-// Facts file headings end in their date, which pointers leave out. See checkreferences.spec.md § Behaviour
+// The first line, the first two lines, and so on, each joined into one line of single spaces.
+func wrappedPrefixes(lines []string) []string {
+	prefixes := make([]string, len(lines))
+	for i := range lines {
+		prefixes[i] = whitespaceRun.ReplaceAllString(strings.Join(lines[:i+1], " "), " ")
+	}
+	return prefixes
+}
+
 func sectionLabels(markdown string) []string {
+	return slices.Concat(headingLabels(markdown), boldLabels(markdown))
+}
+
+// Facts file headings end in their date, which pointers leave out. See checkreferences.spec.md § Behaviour
+func headingLabels(markdown string) []string {
 	var labels []string
 	for _, line := range linesOutsideCodeBlocks(markdown) {
 		if match := markdownHeading.FindStringSubmatch(line); match != nil {
 			labels = append(labels, factsEntryDateTail.ReplaceAllString(match[1], ""))
+		}
+	}
+	return labels
+}
+
+func boldLabels(markdown string) []string {
+	var labels []string
+	for _, line := range linesOutsideCodeBlocks(markdown) {
+		if markdownHeading.MatchString(line) {
 			continue
 		}
 		for _, match := range boldText.FindAllStringSubmatch(line, -1) {
@@ -145,30 +165,15 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 			if target.isIntoExternalPageOrLinkText {
 				continue
 			}
-			text := pointerText(line[signIndex+len(sectionSign):], lines[i+1:])
 			pointers = append(pointers, sectionPointer{
 				line:              i + 1,
 				writtenTargetFile: target.writtenTargetFile,
-				text:              text,
-				boldName:          boldPointerName(line[:signIndex], text),
+				text:              pointerText(line[signIndex+len(sectionSign):], lines[i+1:]),
+				isAfterLink:       target.isAfterLink,
 			})
 		}
 	}
 	return pointers
-}
-
-// Empty unless the sign sits in bold text: the name then ends at the closing bold or the next sign.
-func boldPointerName(lineBeforeSign, text string) string {
-	const boldMarker = "**"
-	if strings.Count(lineBeforeSign, boldMarker)%2 == 0 {
-		return ""
-	}
-	name := text
-	for _, end := range []string{boldMarker, sectionSign} {
-		name, _, _ = strings.Cut(name, end)
-	}
-	name = trailingConnector.ReplaceAllString(name, "")
-	return whitespaceRun.ReplaceAllString(name, " ")
 }
 
 func sectionSignIndexes(line string) []int {
@@ -186,6 +191,7 @@ func sectionSignIndexes(line string) []int {
 type pointerTarget struct {
 	writtenTargetFile            string
 	isIntoExternalPageOrLinkText bool
+	isAfterLink                  bool
 }
 
 // See checkreferences.spec.md § Oddities
@@ -197,7 +203,7 @@ func fileNamedRightBefore(lineBeforeSign string) (pointerTarget, bool) {
 	nearestEnd := -1
 	for _, match := range markdownLink.FindAllStringSubmatchIndex(lineBeforeSign, -1) {
 		path, _, isRelative := splitRelativeLink(lineBeforeSign[match[2]:match[3]])
-		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative}, match[1]
+		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative, isAfterLink: true}, match[1]
 	}
 	for _, match := range bareMarkdownFile.FindAllStringIndex(lineBeforeSign, -1) {
 		if match[1] > nearestEnd {
