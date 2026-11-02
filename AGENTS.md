@@ -32,6 +32,7 @@ Most users run the action on private repositories. Docs and examples assume a pr
 - Target: a run over 20 open PRs costs at most 80 GraphQL points, so 60 runs an hour fit in a token's 5,000-point hourly limit
   - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`. The required check status fetch is not in that figure: it adds one request per 25 approved PRs. A Build E2E log showed a request of one PR costing 1 point. The cost at 25 PRs is not read yet
 - The limit is shared: `GITHUB_TOKEN`'s with the whole repository, a personal token's with everything its owner runs
+- Adding or widening a workflow trigger is the user's call: ask first. An event firing for every commit, such as `workflow_run` completed, multiplies the runs an hour
 - A change to a GraphQL query compares `rateLimit.cost` in the Build E2E job log against the last run on `main`, and states the difference in its plan or PR
 
 ## Output Style
