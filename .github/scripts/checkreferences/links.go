@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"unicode"
 
@@ -18,13 +17,16 @@ type linkTarget struct {
 	// Empty for a link to a heading of the file holding it.
 	path     string
 	fragment string
+	text     string
+	isImage  bool
 	// A blob URL into this repository, such as one in a PR description, names its path from the repository root.
 	isPathFromRepoRoot bool
 }
 
 var (
 	// Matches [text](target), ![alt](target), <target> in angle brackets, and an optional "title".
-	markdownLink    = regexp.MustCompile(`!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)`)
+	// Groups: the leading "!", the text, the target.
+	markdownLink    = regexp.MustCompile(`(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)`)
 	urlWithScheme   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 	markdownHeading = regexp.MustCompile(`^\s{0,3}#{1,6}\s+(.+?)\s*$`)
 	// Release tags here start with `v`, such as v3.9.0. See checkreferences.spec.md § Oddities
@@ -32,8 +34,10 @@ var (
 )
 
 type writtenLink struct {
-	line   int
-	target string
+	line    int
+	target  string
+	text    string
+	isImage bool
 }
 
 func brokenLinks(paths []string, r repo) ([]string, error) {
@@ -105,17 +109,43 @@ func checkLink(holdingPath string, link linkTarget, repoRoot string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", targetPath, err)
 	}
-	if !slices.Contains(headingAnchors(string(target)), link.fragment) {
+	headingText, hasHeading := headingTextByAnchor(string(target))[link.fragment]
+	if !hasHeading {
 		return fmt.Sprintf("%s: no heading with this anchor in %s", location, targetPath), nil
 	}
+	wantText := linkTextForHeading(holdingPath, targetPath, headingText)
+	if !isLinkTextAccepted(holdingPath, link, wantText) {
+		return fmt.Sprintf("%s: link text should be %q", location, wantText), nil
+	}
 	return "", nil
+}
+
+// `file.md § Heading` for a heading of another file, `§ Heading` for one of the file holding the link.
+func linkTextForHeading(holdingPath, targetPath, headingText string) string {
+	text := sectionSign + " " + factsEntryDateTail.ReplaceAllString(headingText, "")
+	if filepath.Clean(holdingPath) == filepath.Clean(targetPath) {
+		return text
+	}
+	return filepath.Base(targetPath) + " " + text
+}
+
+// README is for users: its links may read freely, as long as they don't use the `§` form wrongly.
+// Images and blob URLs (a PR description's links) are free too.
+func isLinkTextAccepted(holdingPath string, link linkTarget, wantText string) bool {
+	switch {
+	case link.text == wantText, link.isImage, link.isPathFromRepoRoot:
+		return true
+	case filepath.Base(holdingPath) == "README.md":
+		return !strings.Contains(link.text, sectionSign)
+	}
+	return false
 }
 
 func writtenLinks(markdown string) []writtenLink {
 	var links []writtenLink
 	for i, line := range linesOutsideCodeBlocks(markdown) {
 		for _, match := range markdownLink.FindAllStringSubmatch(withoutCodeSpans(line), -1) {
-			links = append(links, writtenLink{line: i + 1, target: match[1]})
+			links = append(links, writtenLink{line: i + 1, target: match[3], text: match[2], isImage: match[1] == "!"})
 		}
 	}
 	return links
@@ -126,7 +156,7 @@ func linkTargetsInRepo(markdown string, knownBranchBlobURLPrefixes []string) []l
 	var targets []linkTarget
 	for _, link := range writtenLinks(markdown) {
 		if target, isInRepo := linkTargetInRepo(link.target, knownBranchBlobURLPrefixes); isInRepo {
-			target.line = link.line
+			target.line, target.text, target.isImage = link.line, link.text, link.isImage
 			targets = append(targets, target)
 		}
 	}
@@ -160,8 +190,8 @@ func splitRelativeLink(target string) (path, fragment string, isRelative bool) {
 }
 
 // A repeated heading gets `-1`, `-2` and so on, as GitHub numbers them.
-func headingAnchors(markdown string) []string {
-	var anchors []string
+func headingTextByAnchor(markdown string) map[string]string {
+	headingTextByAnchor := map[string]string{}
 	seenCountByAnchor := map[string]int{}
 	for _, line := range linesOutsideCodeBlocks(markdown) {
 		match := markdownHeading.FindStringSubmatch(line)
@@ -170,13 +200,13 @@ func headingAnchors(markdown string) []string {
 		}
 		anchor := githubAnchor(match[1])
 		if seenCount := seenCountByAnchor[anchor]; seenCount > 0 {
-			anchors = append(anchors, fmt.Sprintf("%s-%d", anchor, seenCount))
+			headingTextByAnchor[fmt.Sprintf("%s-%d", anchor, seenCount)] = match[1]
 		} else {
-			anchors = append(anchors, anchor)
+			headingTextByAnchor[anchor] = match[1]
 		}
 		seenCountByAnchor[anchor]++
 	}
-	return anchors
+	return headingTextByAnchor
 }
 
 // See docs/third-party-facts.md § GitHub builds a heading's anchor by lowercasing it, dropping punctuation and turning spaces into hyphens

@@ -202,7 +202,7 @@ func fileNamedRightBefore(lineBeforeSign string) (pointerTarget, bool) {
 	var nearest pointerTarget
 	nearestEnd := -1
 	for _, match := range markdownLink.FindAllStringSubmatchIndex(lineBeforeSign, -1) {
-		path, _, isRelative := splitRelativeLink(lineBeforeSign[match[2]:match[3]])
+		path, _, isRelative := splitRelativeLink(lineBeforeSign[match[6]:match[7]])
 		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative, isAfterLink: true}, match[1]
 	}
 	for _, match := range bareMarkdownFile.FindAllStringIndex(lineBeforeSign, -1) {

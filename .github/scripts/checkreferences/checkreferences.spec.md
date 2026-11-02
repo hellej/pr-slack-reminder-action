@@ -21,7 +21,8 @@
   - A named file resolves next to the file holding the pointer, then from the repository root
 - Links, preferred in docs read on GitHub, such as `README.md`:
   - `[spec](../state/state.spec.md)`: the file exists
-  - `[tips](#-tips)` or `[tips](README.md#-tips)`: a heading with that GitHub anchor exists
+  - `[AGENTS.md § Testing](AGENTS.md#testing)`: a heading with that GitHub anchor exists, and the text is `<file name> § <heading>`, with the heading's ` [YYYY-MM-DD]` tail left out. A heading of the file holding the link reads `[§ Oddities](#oddities)`
+  - Free text such as `[tips](#-tips)` is allowed in `README.md`, but not text with a `§` that isn't in that form. Images and blob URLs are free too
   - A blob URL into this repository on `main` or the current branch, such as `https://github.com/<owner>/<repo>/blob/main/README.md#-tips`: checked the same way, its path read from the repository root in the working tree. `<owner>/<repo>` comes from the `origin` remote: `git@github.com:`, `ssh://git@github.com/` or `https://github.com/`, with or without credentials before the host
 - Repository paths: `` `internal/state/` `` exists in the files git lists. An untracked new file counts, a gitignored one doesn't
 - Skill and agent names:

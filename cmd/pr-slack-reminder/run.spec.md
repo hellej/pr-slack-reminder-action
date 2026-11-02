@@ -8,7 +8,7 @@ run modes and the pipeline order are in
 ## Behaviour
 
 - `main` sends all log output to stdout, the stream for workflow commands, so log lines and annotations share one ordered stream. It sets no log line prefix: the runner reads a command only at a line's start
-- A failing run writes one `::error` annotation per part of its joined error, then exits 1. An escaped newline shows as a space on the run page, running the parts together. See [docs/third-party-facts.md: an escaped newline is a line break in the job log and the API, but a space on the run's summary page](../../docs/third-party-facts.md#an-escaped-newline-is-a-line-break-in-the-job-log-and-the-api-but-a-space-on-the-runs-summary-page-2026-09-26)
+- A failing run writes one `::error` annotation per part of its joined error, then exits 1. An escaped newline shows as a space on the run page, running the parts together. See [third-party-facts.md § An escaped newline is a line break in the job log and the API, but a space on the run's summary page](../../docs/third-party-facts.md#an-escaped-newline-is-a-line-break-in-the-job-log-and-the-api-but-a-space-on-the-runs-summary-page-2026-09-26)
   - Parts are split recursively through nested joins. An error wrapping several errors in one `fmt.Errorf` message stays one annotation, since splitting it would drop its own text
 - Each annotation line reads `::<warning|error> title=PR Slack Reminder::<message>`, with no `file`, `line` or `col`. The message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`
 - A `::warning` annotation replaces the log line for each of these, none failing the run:
