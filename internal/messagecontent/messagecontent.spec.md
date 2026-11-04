@@ -7,6 +7,7 @@ Structures PR views into the sections a reminder message shows, and words its su
 - `GetContent(openPRs, trackedPRs, recentlyMergedPRs, mergeStats, mergeStatsWeekBefore, messagePostedAt, generatedAt, contentInputs)` fills four sections: `ReadyToMerge`, `WaitingForAuthor`, `WaitingForReview` and `Merged`
 - `openPRs` are open right now and already draft-filtered by the caller; `trackedPRs` are the PRs the message has listed in an open section since it was posted, as re-fetched, in whatever state they are now
 - Open sections: `openPRs` sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest`, then bucketed by `prview.PR.GetNextAction()`, each bucket keeping that order
+- `WaitingForReview` then moves its PRs with stale approvers ahead of the rest, via `prview.SortPRsWithStaleApproversFirst`. Both sets stay oldest first. A stale approver approving again can move such a PR on. The other open sections show no stale approvers, so they keep the oldest first order
 - Merged section, ordered newest merge first:
   - every `trackedPRs` entry that has since merged, however long ago
   - every `recentlyMergedPRs` entry merged after `messagePostedAt`
@@ -15,7 +16,7 @@ Structures PR views into the sections a reminder message shows, and words its su
 - A zero `messagePostedAt` means no message is posted yet, so every untracked merge counts against the cap
 - A tracked PR is recognised by its `models.PullRequestRef`, from `prview.PR.GetPullRequestRef()` rather than through `state`
 - Closed-but-not-merged `trackedPRs` reach no section
-- Each section is a `prview.PRSection`. It is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order
+- Each section is a `prview.PRSection`. It is bucketed by repository when configured, through `prview.GroupPRsByRepositoriesInGivenOrder`, so each section's repositories are ordered by its own PR order. When grouped by repository, the leading repository of `WaitingForReview` is the one holding the oldest PR in that section with stale approvers. With no such PR, it is the one holding the section's oldest PR
 - Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingPRsFromAuthors` with `CollapsePRsFromAuthors`, so collapsing runs after every sort, cap and bucket. When grouped, the 2 PR threshold counts within one repository
 - `SummaryText`, the text Slack shows in notifications, counts the open PRs per next action, e.g. `"2 PRs to review, 1 waiting for author, 1 to merge 👀"`. It is never empty
   - Parts in the order review, author, merge. A zero count is left out

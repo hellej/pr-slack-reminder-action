@@ -24,6 +24,8 @@ type testPROptions struct {
 	createdAt   time.Time
 	updatedAt   time.Time
 	mergedAt    *time.Time
+	// Stale approvers show as 🔁 and order waiting for review. GetNextAction doesn't read them.
+	staleApproved bool
 	// The signals PR.GetNextAction reads.
 	approved                  bool
 	conflicting               bool
@@ -42,6 +44,12 @@ func testPR(options testPROptions) prview.PR {
 			prview.NewCollaborator(githubclient.Collaborator{Login: "approver"}, ""),
 		}
 	}
+	var staleApprovers []prview.Collaborator
+	if options.staleApproved {
+		staleApprovers = []prview.Collaborator{
+			prview.NewCollaborator(githubclient.Collaborator{Login: "stale-approver"}, ""),
+		}
+	}
 	return prview.PR{
 		PR: &githubclient.PR{
 			PullRequest: &githubclient.PullRequest{
@@ -57,8 +65,13 @@ func testPR(options testPROptions) prview.PR {
 			HasThreadWaitingForAuthor:    options.threadWaiting,
 			HasOutstandingChangesRequest: options.outstandingChangesRequest,
 		},
-		Approvers: approvers,
+		Approvers:      approvers,
+		StaleApprovers: staleApprovers,
 	}
+}
+
+func createdHoursAgo(hours int) time.Time {
+	return generatedAt.Add(-time.Duration(hours) * time.Hour)
 }
 
 func activityAgo(age time.Duration) time.Time {
@@ -134,16 +147,13 @@ func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 // Every bucket is filtered out of one sorted list, so each stays oldest first. The given order
 // is newest first in each bucket, so an unsorted implementation fails this.
 func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
-	hoursAgo := func(hours int) time.Time {
-		return generatedAt.Add(-time.Duration(hours) * time.Hour)
-	}
 	prs := []prview.PR{
-		testPR(testPROptions{number: 1, approved: true, createdAt: hoursAgo(2)}),
-		testPR(testPROptions{number: 2, threadWaiting: true, createdAt: hoursAgo(3)}),
-		testPR(testPROptions{number: 3, createdAt: hoursAgo(4)}),
-		testPR(testPROptions{number: 4, approved: true, createdAt: hoursAgo(20)}),
-		testPR(testPROptions{number: 5, threadWaiting: true, createdAt: hoursAgo(30)}),
-		testPR(testPROptions{number: 6, createdAt: hoursAgo(40)}),
+		testPR(testPROptions{number: 1, approved: true, createdAt: createdHoursAgo(2)}),
+		testPR(testPROptions{number: 2, threadWaiting: true, createdAt: createdHoursAgo(3)}),
+		testPR(testPROptions{number: 3, createdAt: createdHoursAgo(4)}),
+		testPR(testPROptions{number: 4, approved: true, createdAt: createdHoursAgo(20)}),
+		testPR(testPROptions{number: 5, threadWaiting: true, createdAt: createdHoursAgo(30)}),
+		testPR(testPROptions{number: 6, createdAt: createdHoursAgo(40)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -153,6 +163,30 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{4, 1})
 	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 2})
 	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{6, 3})
+}
+
+// The stale approved PRs are the newest of their buckets, so a missing reorder fails this.
+// Ready to merge and waiting for author keep their oldest first order: 🔁 shows on waiting for
+// review rows only.
+func TestGetContentListsWaitingForReviewPRsWithStaleApproversFirst(t *testing.T) {
+	prs := []prview.PR{
+		testPR(testPROptions{number: 1, createdAt: createdHoursAgo(9)}),
+		testPR(testPROptions{number: 2, createdAt: createdHoursAgo(2), staleApproved: true}),
+		testPR(testPROptions{number: 3, createdAt: createdHoursAgo(7)}),
+		testPR(testPROptions{number: 4, createdAt: createdHoursAgo(1), staleApproved: true}),
+		testPR(testPROptions{number: 5, createdAt: createdHoursAgo(8), threadWaiting: true}),
+		testPR(testPROptions{number: 6, createdAt: createdHoursAgo(3), threadWaiting: true, staleApproved: true}),
+		testPR(testPROptions{number: 7, createdAt: createdHoursAgo(6), approved: true}),
+		testPR(testPROptions{number: 8, createdAt: createdHoursAgo(4), approved: true, staleApproved: true}),
+	}
+
+	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
+		GeneratedAt: generatedAt,
+	})
+
+	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{2, 4, 1, 3})
+	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 6})
+	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{7, 8})
 }
 
 // The repository paths of a grouped section, so its whole group order is one expectation.
@@ -190,6 +224,28 @@ func TestGetContentGroupsOpenPRsByRepositoryOldestPRsRepositoryFirst(t *testing.
 	)
 	assertEqual(t, "first group PRs", prNumbers(content.WaitingForReview.Groups[0].Rows), []int{1, 3})
 	assertEqual(t, "second group PRs", prNumbers(content.WaitingForReview.Groups[1].Rows), []int{2})
+}
+
+// repo-two holds the oldest PR, so oldest first grouping alone puts repo-two first.
+func TestGetContentGroupsWaitingForReviewByRepositoryStaleApprovedPRsRepositoryFirst(t *testing.T) {
+	prs := []prview.PR{
+		testPR(testPROptions{number: 1, repository: "repo-two", createdAt: createdHoursAgo(9)}),
+		testPR(testPROptions{number: 2, repository: "repo-one", createdAt: createdHoursAgo(4), staleApproved: true}),
+		testPR(testPROptions{number: 3, repository: "repo-one", createdAt: createdHoursAgo(6)}),
+	}
+
+	content := canvascontent.GetContent(
+		prs,
+		nil,
+		config.ContentInputs{GroupByRepository: true},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	assertEqual(
+		t, "waiting for review group paths", groupPaths(content.WaitingForReview.Groups),
+		[]string{"test-org/repo-one", "test-org/repo-two"},
+	)
+	assertEqual(t, "first group PRs", prNumbers(content.WaitingForReview.Groups[0].Rows), []int{2, 3})
 }
 
 // Each bucket is grouped on its own, so one repository can lead two sections and appear under

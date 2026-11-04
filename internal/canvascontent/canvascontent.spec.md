@@ -8,9 +8,11 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 - The open PRs are bucketed by `PR.GetNextAction()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
 - The open PRs are sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest` before bucketing
 - Bucketing filters the list rather than sorting each bucket, so every bucket keeps the sorted order
+- `WaitingForReview` then moves its PRs with stale approvers ahead of the rest, via `prview.SortPRsWithStaleApproversFirst`. Both sets stay oldest first. A stale approver approving again can move such a PR on. The other open buckets show no stale approvers, so they keep the oldest first order
 - Each section is a `prview.PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prview.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `Rows` list. One constructor fills one shape, so both are never filled at once
 - Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingPRsFromAuthors` with `CollapsePRsFromAuthors`, after every sort, prune and cap. When grouped, the 2 PR threshold counts within one repository
-- Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket, the most recently touched WIP PR, the most recently merged PR. Bucketing never re-sorts PRs within a bucket, and nothing dedupes a repository across sections
+- Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket (for `WaitingForReview`, see the sub-bullet), the most recently touched WIP PR, the most recently merged PR. Grouping by repository never re-sorts PRs within a repository group, and nothing dedupes a repository across sections
+  - When grouped by repository, the leading repository of `WaitingForReview` is the one holding the oldest PR in that bucket with stale approvers. With no such PR, it is the one holding the bucket's oldest PR
 - WIP PRs are sorted most recent activity first via `prview.SortPRsNewestFirst` on `PR.LastActivityAt()`. Unknown activity sorts last, keeping the given order among such PRs
 - Drafts whose update time is older than `MaxDraftPRInactivity` (60 days) are left out, via `prview.PR.IsActiveAsOf(GeneratedAt, MaxDraftPRInactivity)`. A draft with a zero update time is kept: unknown is not stale
 - At most `MaxInactiveWIPPRs` (5) drafts without recent activity reach the WIP section, the 5 most recently touched of them, via `prview.PR.IsActiveAsOf(GeneratedAt, prview.RecentActivityThreshold)`. Recently touched drafts are never capped, nor are drafts with a zero update time. The cap runs after the staleness prune, on the whole WIP list rather than per repository
@@ -24,7 +26,7 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 - Doesn't read the clock: `GeneratedAt` is given by the caller, keeping `canvasbuilder`'s output deterministic under test
 - Doesn't read `NoPRsMessage`: canvas headings and fallback lines are fixed strings owned by `canvasbuilder`
 - Doesn't have a whole-canvas "nothing to show" case: each section falls back on its own, and an empty open bucket is `canvasbuilder`'s to hide
-- Doesn't re-sort within a bucket, and filters the open PRs only by next action: no PR the fetch returned is dropped
+- Doesn't re-sort an open bucket beyond moving PRs with stale approvers first in `WaitingForReview`, and filters the open PRs only by next action: no PR the fetch returned is dropped
 
 ## Oddities
 

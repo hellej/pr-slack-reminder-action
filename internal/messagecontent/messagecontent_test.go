@@ -21,6 +21,7 @@ type testPROptions struct {
 	createdAt                    time.Time
 	mergedAt                     *time.Time
 	approvers                    []string
+	staleApprovers               []string
 	commenters                   []string
 	conflicting                  bool
 	hasOutstandingChangesRequest bool
@@ -46,8 +47,9 @@ func testPR(options testPROptions) prview.PR {
 			Conflicting:                  options.conflicting,
 			HasOutstandingChangesRequest: options.hasOutstandingChangesRequest,
 		},
-		Approvers:  collaborators(options.approvers),
-		Commenters: collaborators(options.commenters),
+		Approvers:      collaborators(options.approvers),
+		StaleApprovers: collaborators(options.staleApprovers),
+		Commenters:     collaborators(options.commenters),
 	}
 }
 
@@ -95,6 +97,10 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 	assertEqual(t, "merged", prNumbers(content.Merged.Rows), nil)
 }
 
+func repositoryNames(groups []prview.RepositoryRows) []string {
+	return utilities.Map(groups, func(group prview.RepositoryRows) string { return group.Repository.Name })
+}
+
 func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 	openPRs := []prview.PR{
 		testPR(testPROptions{number: 1, repository: "zebra", createdAt: generatedAt.Add(-9 * time.Hour)}),
@@ -110,12 +116,59 @@ func TestGetContentGroupsEachSectionByRepositoryInItsOwnOrder(t *testing.T) {
 	}
 	assertEqual(
 		t, "grouped repositories",
-		utilities.Map(waitingForReview.Groups, func(group prview.RepositoryRows) string {
-			return group.Repository.Name
-		}),
+		repositoryNames(waitingForReview.Groups),
 		[]string{"zebra", "alpha"},
 	)
 	assertEqual(t, "zebra PRs", prNumbers(waitingForReview.Groups[0].Rows), []int{1, 3})
+}
+
+// The stale approved PRs are the newest of their buckets, so a missing reorder fails this.
+// Ready to merge and waiting for author keep their oldest first order: 🔁 shows on waiting for
+// review rows only.
+func TestGetContentListsWaitingForReviewPRsWithStaleApproversFirst(t *testing.T) {
+	openPRs := []prview.PR{
+		testPR(testPROptions{number: 1, createdAt: generatedAt.Add(-9 * time.Hour)}),
+		testPR(testPROptions{number: 2, createdAt: generatedAt.Add(-2 * time.Hour), staleApprovers: []string{"frank"}}),
+		testPR(testPROptions{number: 3, createdAt: generatedAt.Add(-7 * time.Hour)}),
+		testPR(testPROptions{number: 4, createdAt: generatedAt.Add(-1 * time.Hour), staleApprovers: []string{"grace"}}),
+		testPR(testPROptions{number: 5, createdAt: generatedAt.Add(-8 * time.Hour), hasOutstandingChangesRequest: true}),
+		testPR(testPROptions{
+			number: 6, createdAt: generatedAt.Add(-3 * time.Hour),
+			hasOutstandingChangesRequest: true, staleApprovers: []string{"frank"},
+		}),
+		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-6 * time.Hour), approvers: []string{"dana"}}),
+		testPR(testPROptions{
+			number: 8, createdAt: generatedAt.Add(-4 * time.Hour),
+			approvers: []string{"dana"}, staleApprovers: []string{"frank"},
+		}),
+	}
+
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
+
+	assertEqual(t, "waiting for review", prNumbers(content.WaitingForReview.Rows), []int{2, 4, 1, 3})
+	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 6})
+	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.Rows), []int{7, 8})
+}
+
+// zebra holds the oldest PR, so oldest first grouping alone puts zebra first.
+func TestGetContentGroupsWaitingForReviewByRepositoryStaleApprovedPRsRepositoryFirst(t *testing.T) {
+	openPRs := []prview.PR{
+		testPR(testPROptions{number: 1, repository: "zebra", createdAt: generatedAt.Add(-9 * time.Hour)}),
+		testPR(testPROptions{
+			number: 2, repository: "alpha", createdAt: generatedAt.Add(-4 * time.Hour), staleApprovers: []string{"frank"},
+		}),
+		testPR(testPROptions{number: 3, repository: "alpha", createdAt: generatedAt.Add(-6 * time.Hour)}),
+	}
+
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{GroupByRepository: true})
+
+	groups := content.WaitingForReview.Groups
+	assertEqual(
+		t, "grouped repositories",
+		repositoryNames(groups),
+		[]string{"alpha", "zebra"},
+	)
+	assertEqual(t, "alpha PRs", prNumbers(groups[0].Rows), []int{2, 3})
 }
 
 // The two repositories have different owners, so a group carrying the name alone, or one fixed
