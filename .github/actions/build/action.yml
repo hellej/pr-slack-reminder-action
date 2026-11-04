@@ -33,4 +33,4 @@ runs:
         git add invoke-binary.js dist/
         git status
         git commit -m "Update action executables" || echo "No changes to commit"
-        git push
+        ./retry.sh git push

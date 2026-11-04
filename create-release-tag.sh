@@ -66,7 +66,7 @@ fi
 
 echo "New version: $NEW_VERSION"
 git tag -a "$NEW_VERSION" -m "${NEW_VERSION#v}"
-git push --tags
+./retry.sh git push origin "$NEW_VERSION"
 
 # Below we also move the major version tag to the new version as suggested in
 # https://github.com/actions/toolkit/blob/master/docs/action-versioning.md#recommendations
@@ -82,10 +82,10 @@ fi
 if [[ "$MAJOR_VERSION" == "v0" ]]; then
     TAG="v1-beta"
     git tag -f -a $TAG -m "${NEW_VERSION#v}"
-    git push origin $TAG --force
+    ./retry.sh git push origin $TAG --force
     echo "Pushed tag: $TAG"
 else
     git tag -f -a $MAJOR_VERSION -m "${NEW_VERSION#v}"
-    git push origin $MAJOR_VERSION --force
+    ./retry.sh git push origin $MAJOR_VERSION --force
     echo "Pushed tag: $MAJOR_VERSION"
 fi
