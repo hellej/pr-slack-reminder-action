@@ -132,6 +132,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - Each Go package under `internal/` has a `<package>.spec.md` describing its current behaviour, non-goals, and oddities. Read it before reading the package's source, plus any related package's spec needed to understand how a change fits
 - `cmd/pr-slack-reminder` has one too, [run.spec.md](cmd/pr-slack-reminder/run.spec.md), covering the run orchestration in `run.go`, `canvas.go` and `annotations.go`
 - `.github/scripts/checkreferences/` and `.github/scripts/checkprdescription/` have one too: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md), [checkprdescription.spec.md](.github/scripts/checkprdescription/checkprdescription.spec.md)
+- The root `retry.sh`, used by the release workflow's pushes, has one too: [retry.spec.md](retry.spec.md)
 - Writing/updating procedure: [.agents/skills/spec-writer/SKILL.md](.agents/skills/spec-writer/SKILL.md)
 - Update a package's spec file whenever its behaviour changes, in the same change
   - A rough edge you knowingly leave, because the fix would need significant complexity for a rare case, goes in the spec's **Oddities** section
