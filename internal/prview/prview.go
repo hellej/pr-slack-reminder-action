@@ -230,6 +230,17 @@ func SortPRsNewestFirst(prs []PR, timestamp func(PR) *time.Time) []PR {
 	return sorted
 }
 
+func SortPRsWithStaleApproversFirst(prs []PR) []PR {
+	return slices.Concat(
+		utilities.Filter(prs, PR.hasStaleApprovers),
+		utilities.Filter(prs, func(pr PR) bool { return !pr.hasStaleApprovers() }),
+	)
+}
+
+func (pr PR) hasStaleApprovers() bool {
+	return len(pr.StaleApprovers) > 0
+}
+
 func SortPRsOldestToNewest(prs []PR) []PR {
 	slices.SortStableFunc(prs, func(a, b PR) int {
 		if !a.ReadyForReviewAt().Equal(b.ReadyForReviewAt()) {

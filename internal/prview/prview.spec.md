@@ -18,6 +18,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Unknown activity (a zero `UpdatedAt`) yields empty activity text but counts as active for both `IsActiveAsOf` and `IsRecentlyUpdated`
 - `SortPRsOldestToNewest(prs)` orders PRs by ready-for-review time, oldest first, a tie going to the earlier `UpdatedAt`. It sorts the given slice in place and returns it
 - `SortPRsNewestFirst(prs, timestamp)` returns PRs ordered newest first by the given timestamp, nil timestamps last, given order kept among equals. It leaves the given slice untouched
+- `SortPRsWithStaleApproversFirst(prs)` returns the PRs with any `StaleApprovers` first, then the rest. Both sets keep their given order. It leaves the given slice untouched
 - `GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 🔁 c / 💬 d)`, returning one text run per segment so a renderer can style or escape names separately from the glue. The groups keep that order, and a group without names is left out. Every group is a parameter, so the caller decides who goes where
   - Merge blockers add a last glue segment, ` / ` and the blockers joined by `, `, such as ` / CI failing`. Without reviewers, the blockers render alone, as ` (conflicts)`
   - No reviewers and no merge blockers yield no segments

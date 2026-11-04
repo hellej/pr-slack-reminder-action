@@ -21,42 +21,6 @@
             "elements": [
               {
                 "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/76",
-                "text": "Sitting here since last week",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 🚨 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "7 days old",
-                "style": {
-                  "bold": true,
-                  "code": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Frank Foster",
-                "style": {}
-              }
-            ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
                 "url": "https://github.com/test-org/test-repo/pull/74",
                 "text": "Commented on, still waiting for review",
                 "style": {
@@ -108,6 +72,42 @@
               {
                 "type": "text",
                 "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/76",
+                "text": "Sitting here since last week",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 🚨 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "7 days old",
+                "style": {
+                  "bold": true,
+                  "code": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
                 "style": {}
               }
             ]

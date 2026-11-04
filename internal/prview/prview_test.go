@@ -626,6 +626,75 @@ func TestSortPRsNewestFirst(t *testing.T) {
 	}
 }
 
+func testPRViewWithStaleApprovers(number int, staleApproverLogins ...string) prview.PR {
+	pr := testPRView(number, time.Time{}, time.Time{})
+	pr.StaleApprovers = utilities.Map(staleApproverLogins, func(login string) prview.Collaborator {
+		return prview.NewCollaborator(githubclient.Collaborator{Login: login}, "")
+	})
+	return pr
+}
+
+// The wanted orders are neither ascending nor descending by PR number, so a sort by number fails these.
+func TestSortPRsWithStaleApproversFirst(t *testing.T) {
+	testCases := []struct {
+		name  string
+		given []prview.PR
+		want  []int
+	}{
+		{
+			name: "stale approved PRs move ahead, each part in its given order",
+			given: []prview.PR{
+				testPRViewWithStaleApprovers(4),
+				testPRViewWithStaleApprovers(2, "frank"),
+				testPRViewWithStaleApprovers(9),
+				testPRViewWithStaleApprovers(7, "grace", "heidi"),
+			},
+			want: []int{2, 7, 4, 9},
+		},
+		{
+			name: "none with stale approvers keeps the given order",
+			given: []prview.PR{
+				testPRViewWithStaleApprovers(3),
+				testPRViewWithStaleApprovers(1),
+				testPRViewWithStaleApprovers(2),
+			},
+			want: []int{3, 1, 2},
+		},
+		{
+			name: "all with stale approvers keeps the given order",
+			given: []prview.PR{
+				testPRViewWithStaleApprovers(3, "frank"),
+				testPRViewWithStaleApprovers(1, "grace"),
+				testPRViewWithStaleApprovers(2, "heidi"),
+			},
+			want: []int{3, 1, 2},
+		},
+		{
+			name:  "empty",
+			given: nil,
+			want:  nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := utilities.Map(prview.SortPRsWithStaleApproversFirst(tc.given), prview.PR.GetNumber)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestSortPRsWithStaleApproversFirstLeavesTheGivenSliceUntouched(t *testing.T) {
+	given := []prview.PR{testPRViewWithStaleApprovers(1), testPRViewWithStaleApprovers(2, "frank")}
+
+	prview.SortPRsWithStaleApproversFirst(given)
+
+	if givenNumbers := utilities.Map(given, prview.PR.GetNumber); !slices.Equal(givenNumbers, []int{1, 2}) {
+		t.Errorf("expected the given slice to keep its order, got %v", givenNumbers)
+	}
+}
+
 func nextActionPR(approverLogins []string, prFlags githubclient.PR) prview.PR {
 	prFlags.PullRequest = &githubclient.PullRequest{
 		Author: githubclient.Collaborator{Login: "author"},

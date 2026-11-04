@@ -21,6 +21,61 @@
             "elements": [
               {
                 "type": "link",
+                "url": "https://github.com/test-org/test-repo/pull/65",
+                "text": "Commented on, still waiting for review",
+                "style": {
+                  "bold": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " 6 hours ago",
+                "style": {
+                  "italic": true
+                }
+              },
+              {
+                "type": "text",
+                "text": " by ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Erin Evans",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " (🔁 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Grace Green",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": " / 💬 ",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": "Frank Foster",
+                "style": {}
+              },
+              {
+                "type": "text",
+                "text": ")",
+                "style": {}
+              }
+            ]
+          },
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "link",
                 "url": "https://github.com/test-org/test-repo/pull/64",
                 "text": "Sitting here since last week",
                 "style": {
@@ -83,61 +138,6 @@
               {
                 "type": "text",
                 "text": " (💬 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Frank Foster",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": ")",
-                "style": {}
-              }
-            ]
-          },
-          {
-            "type": "rich_text_section",
-            "elements": [
-              {
-                "type": "link",
-                "url": "https://github.com/test-org/test-repo/pull/65",
-                "text": "Commented on, still waiting for review",
-                "style": {
-                  "bold": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " 6 hours ago",
-                "style": {
-                  "italic": true
-                }
-              },
-              {
-                "type": "text",
-                "text": " by ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Erin Evans",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " (🔁 ",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": "Grace Green",
-                "style": {}
-              },
-              {
-                "type": "text",
-                "text": " / 💬 ",
                 "style": {}
               },
               {

@@ -40,10 +40,11 @@ type GetContentOptions struct {
 
 // GetContent splits the given PRs into the three open sections and a work-in-progress section,
 // and takes the merged section from its own list. Open PRs are bucketed by next action,
-// each bucket keeping the given order (oldest first); WIP PRs are ordered most recent activity
-// first, with long-inactive ones dropped and the rest of the drafts without recent activity
-// capped at MaxInactiveWIPPRs; merged PRs are ordered newest merge first. Each section is
-// bucketed by repository when configured, in that same order.
+// each bucket oldest first, the waiting for review bucket putting its PRs with stale approvers
+// ahead of the rest; WIP PRs are ordered most recent activity first, with long-inactive ones
+// dropped and the rest of the drafts without recent activity capped at MaxInactiveWIPPRs;
+// merged PRs are ordered newest merge first. Each section is bucketed by repository when
+// configured, in that same order.
 func GetContent(
 	prs []prview.PR,
 	mergedPRs []prview.PR,
@@ -63,7 +64,9 @@ func GetContent(
 
 	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
 	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
-	waitingForReview := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview)
+	waitingForReview := prview.SortPRsWithStaleApproversFirst(
+		prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview),
+	)
 
 	log.Printf(
 		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
