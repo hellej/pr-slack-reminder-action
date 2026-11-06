@@ -30,7 +30,7 @@ Serves AGENTS.md § Purpose: a PR whose approval a push dismissed looks untouche
 - `githubclient.PR` gains `StaleApprovedByUsers []Collaborator`: the users with a push-dismissed approval and no `APPROVED` review
   - Deduped by login, no bots, never the PR author
   - `CommentedByUsers` leaves them out. `ApprovedByUsers` is unchanged
-- A push-dismissed approval is a `ReviewDismissedEvent` with `previousReviewState` `APPROVED` and a null `dismissalMessage`. Its `review`'s author is the stale approver. A manual dismissal carries a message, since the API requires one. See docs/third-party-facts.md § A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage`
+- A push-dismissed approval is a `ReviewDismissedEvent` with `previousReviewState` `APPROVED` and a null `dismissalMessage`. Its `review`'s author is the stale approver. A manual dismissal carries a message, since the API requires one. See docs/third-party-facts.md § A manual review dismissal requires a message, and a push dismissal reads a null `dismissalMessage`
 - Both selections, `enrichedPullRequestSelection` and `fullPullRequestSelection`, gain one aliased connection beside the existing `timelineItems`:
   ```
   reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100){ nodes { ... on ReviewDismissedEvent {

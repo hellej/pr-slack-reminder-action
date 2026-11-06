@@ -74,10 +74,8 @@ type reviewRequestNode struct {
 	RequestedReviewer *authorNode `json:"requestedReviewer"`
 }
 
-// A dismissal by a push carries a null dismissalMessage. See docs/third-party-facts.md § A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage`
 type reviewDismissedEventNode struct {
 	PreviousReviewState string               `json:"previousReviewState"`
-	DismissalMessage    *string              `json:"dismissalMessage"`
 	Review              *dismissedReviewNode `json:"review"`
 }
 
@@ -186,14 +184,14 @@ func prWithReviewers(
 ) PR {
 	submittedReviews := utilities.Filter(node.Reviews.Nodes, isSubmittedUserReview)
 	approvingReviews := utilities.Filter(submittedReviews, isApprovingReviewNode)
-	pushDismissedApprovals := utilities.Filter(node.ReviewDismissals.Nodes, isPushDismissedUserApproval)
+	dismissedApprovals := utilities.Filter(node.ReviewDismissals.Nodes, isDismissedUserApproval)
 	commentsFromUsers := utilities.Filter(node.Comments.Nodes, hasValidCommentAuthor)
 	timelineComments := utilities.Map(node.Comments.Nodes, timelineCommentFromNode)
 
 	approvedByUsers, staleApprovedByUsers, commentedByUsers := deriveReviewers(
 		pullRequest.Author.Login,
 		utilities.Map(approvingReviews, reviewAuthor),
-		utilities.Map(pushDismissedApprovals, dismissedReviewAuthor),
+		utilities.Map(dismissedApprovals, dismissedReviewAuthor),
 		utilities.Map(submittedReviews, reviewAuthor),
 		utilities.Map(commentsFromUsers, commentAuthor),
 	)
@@ -285,9 +283,8 @@ func isApprovingReviewNode(review reviewNode) bool {
 
 // The schema makes the review nullable, and a deleted account leaves its author null.
 // See docs/third-party-facts.md § `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not
-func isPushDismissedUserApproval(dismissal reviewDismissedEventNode) bool {
+func isDismissedUserApproval(dismissal reviewDismissedEventNode) bool {
 	return dismissal.PreviousReviewState == approvedReviewState &&
-		dismissal.DismissalMessage == nil &&
 		dismissal.Review != nil &&
 		hasKnownNonBotAuthorNode(dismissal.Review.Author)
 }

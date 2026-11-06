@@ -22,8 +22,8 @@ type PR struct {
 	*githubclient.PR
 	Author         Collaborator
 	Approvers      []Collaborator
-	Commenters     []Collaborator // Users who commented on the PR, neither approving it nor holding an approval a push dismissed
-	StaleApprovers []Collaborator // Users whose approval a push dismissed
+	Commenters     []Collaborator // Users who commented on the PR, neither approving it nor a stale approver
+	StaleApprovers []Collaborator // Users whose approval was dismissed
 	IsOldPR        bool           // Weekday age past the old-PR threshold
 }
 

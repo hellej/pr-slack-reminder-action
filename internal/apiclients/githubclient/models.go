@@ -91,8 +91,8 @@ type PR struct {
 	*PullRequest
 	Repository       models.Repository
 	ApprovedByUsers  []Collaborator
-	CommentedByUsers []Collaborator // reviewers who commented the PR, neither approving it nor holding an approval a push dismissed
-	// Users whose approval a push dismissed. See githubclient.spec.md § Oddities
+	CommentedByUsers []Collaborator // reviewers who commented the PR, neither approving it nor a stale approver
+	// Users whose approval was dismissed. See githubclient.spec.md § Oddities
 	StaleApprovedByUsers []Collaborator `json:",omitempty"`
 	SnoozedUntil         *time.Time
 	// An unresolved review thread whose last comment is neither the author's nor a bot's. A
@@ -166,12 +166,12 @@ func (c Collaborator) GetGitHubName() string {
 
 func deriveReviewers(
 	authorLogin string,
-	approvers, pushDismissedApprovers, reviewAuthors, timelineCommenters []Collaborator,
+	approvers, dismissedApprovers, reviewAuthors, timelineCommenters []Collaborator,
 ) (approvedBy, staleApprovedBy, commentedBy []Collaborator) {
 	approvedBy = utilities.UniqueFunc(approvers, isUniqueCollaborator)
 
 	staleApprovedBy = utilities.Filter(
-		utilities.UniqueFunc(pushDismissedApprovers, isUniqueCollaborator),
+		utilities.UniqueFunc(dismissedApprovers, isUniqueCollaborator),
 		isNotAuthorOrListedReviewer(authorLogin, approvedBy),
 	)
 

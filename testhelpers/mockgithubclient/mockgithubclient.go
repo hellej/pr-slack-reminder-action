@@ -158,12 +158,10 @@ func NewTimelineComment(login, name, body string, createdAt time.Time, userType 
 // A ReviewDismissedEvent: go-github has no type for the GraphQL timeline node.
 type ReviewDismissal struct {
 	PreviousReviewState string
-	DismissalMessage    *string
 	Reviewer            *github.User
 }
 
-// GitHub leaves dismissalMessage null on a dismissal by a push.
-func NewPushDismissedApproval(login, name string, userType ...string) ReviewDismissal {
+func NewDismissedApproval(login, name string, userType ...string) ReviewDismissal {
 	return ReviewDismissal{PreviousReviewState: "APPROVED", Reviewer: newUser(login, name, userType...)}
 }
 
@@ -535,7 +533,6 @@ func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
 func reviewDismissedEventNodeJSON(dismissal ReviewDismissal) map[string]any {
 	return map[string]any{
 		"previousReviewState": dismissal.PreviousReviewState,
-		"dismissalMessage":    dismissal.DismissalMessage,
 		"review":              map[string]any{"author": authorNodeJSON(dismissal.Reviewer)},
 	}
 }

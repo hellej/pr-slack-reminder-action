@@ -129,7 +129,7 @@ func TestDeriveReviewers(t *testing.T) {
 		name                    string
 		authorLogin             string
 		approvers               []Collaborator
-		pushDismissedApprovers  []Collaborator
+		dismissedApprovers      []Collaborator
 		reviewAuthors           []Collaborator
 		timelineCommenters      []Collaborator
 		expectedApprovedBy      []Collaborator
@@ -164,7 +164,7 @@ func TestDeriveReviewers(t *testing.T) {
 			// A dismissed review is still a submitted review, so its author is a review author too.
 			name:        "stale approvers deduped and left out of the commenters",
 			authorLogin: "author",
-			pushDismissedApprovers: []Collaborator{
+			dismissedApprovers: []Collaborator{
 				{Login: "stale-approver"}, {Login: "second-stale-approver"}, {Login: "stale-approver"},
 			},
 			reviewAuthors: []Collaborator{
@@ -178,7 +178,7 @@ func TestDeriveReviewers(t *testing.T) {
 			name:                    "a stale approver who approved again is an approver only",
 			authorLogin:             "author",
 			approvers:               []Collaborator{{Login: "re-approver"}},
-			pushDismissedApprovers:  []Collaborator{{Login: "re-approver"}, {Login: "stale-approver"}},
+			dismissedApprovers:      []Collaborator{{Login: "re-approver"}, {Login: "stale-approver"}},
 			reviewAuthors:           []Collaborator{{Login: "re-approver"}, {Login: "stale-approver"}},
 			expectedApprovedBy:      []Collaborator{{Login: "re-approver"}},
 			expectedStaleApprovedBy: []Collaborator{{Login: "stale-approver"}},
@@ -186,7 +186,7 @@ func TestDeriveReviewers(t *testing.T) {
 		{
 			name:                    "the PR author is never a stale approver",
 			authorLogin:             "author",
-			pushDismissedApprovers:  []Collaborator{{Login: "author"}, {Login: "stale-approver"}},
+			dismissedApprovers:      []Collaborator{{Login: "author"}, {Login: "stale-approver"}},
 			expectedStaleApprovedBy: []Collaborator{{Login: "stale-approver"}},
 		},
 	}
@@ -194,7 +194,7 @@ func TestDeriveReviewers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			approvedBy, staleApprovedBy, commentedBy := deriveReviewers(
-				tt.authorLogin, tt.approvers, tt.pushDismissedApprovers, tt.reviewAuthors, tt.timelineCommenters,
+				tt.authorLogin, tt.approvers, tt.dismissedApprovers, tt.reviewAuthors, tt.timelineCommenters,
 			)
 			if !reflect.DeepEqual(approvedBy, tt.expectedApprovedBy) {
 				t.Errorf("approvedBy = %+v, expected %+v", approvedBy, tt.expectedApprovedBy)

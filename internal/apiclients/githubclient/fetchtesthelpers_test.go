@@ -25,7 +25,7 @@ const testReadyForReviewEventSelection = "timelineItems(itemTypes: [READY_FOR_RE
 	"{ nodes { ... on ReadyForReviewEvent { createdAt } } }"
 
 const testReviewDismissalsSelection = "reviewDismissals: timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100)" +
-	"{ nodes { ... on ReviewDismissedEvent { previousReviewState dismissalMessage " +
+	"{ nodes { ... on ReviewDismissedEvent { previousReviewState " +
 	"review { author { login __typename ... on User { name } } } } } }"
 
 type enrichFixture struct {

@@ -22,7 +22,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `GetReviewersTextSegments(approvers, staleApprovers, commenters, mergeBlockers)` renders reviewer names as `(✅ a, b / 🔁 c / 💬 d)`, returning one text run per segment so a renderer can style or escape names separately from the glue. The groups keep that order, and a group without names is left out. Every group is a parameter, so the caller decides who goes where
   - Merge blockers add a last glue segment, ` / ` and the blockers joined by `, `, such as ` / CI failing`. Without reviewers, the blockers render alone, as ` (conflicts)`
   - No reviewers and no merge blockers yield no segments
-- `StaleApprovers` are the users whose approval a push dismissed, from `githubclient.PR.StaleApprovedByUsers`
+- `StaleApprovers` are the users whose approval was dismissed, from `githubclient.PR.StaleApprovedByUsers`
 - `ReviewerGroupsForOpenRow()` returns the stale approvers and commenters an open row shows. On a `NextActionWaitingForReview` PR: `StaleApprovers` and `Commenters` as they are, since a stale approver approving again can move the PR on. On any other PR: no stale approvers, and `Commenters` followed by `StaleApprovers`, all under `💬`
 - `IsMerged` reports whether a PR was merged
 - `GetPullRequestRef()` returns the `models.PullRequestRef` (repository + number) that identifies a PR across fetches, independent of its current state
