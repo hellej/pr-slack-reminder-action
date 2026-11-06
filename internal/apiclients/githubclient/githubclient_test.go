@@ -978,7 +978,7 @@ func TestFetchedPRsCarryStaleApprovers(t *testing.T) {
 			7: {mockgithubclient.NewReview("carol", "Carol", "DISMISSED")},
 		},
 		ReviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
-			7: {mockgithubclient.NewPushDismissedApproval("carol", "Carol")},
+			7: {mockgithubclient.NewDismissedApproval("carol", "Carol")},
 		},
 	})
 

@@ -689,26 +689,30 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 				"author":{"login":"dave","__typename":"User","name":"Dave"}},
 			{"state":"DISMISSED","submittedAt":"2026-10-07T10:00:00Z","createdAt":"2026-10-07T10:00:00Z",
 				"author":{"login":"erin","__typename":"User","name":"Erin"}},
+			{"state":"DISMISSED","submittedAt":"2026-10-07T11:00:00Z","createdAt":"2026-10-07T11:00:00Z",
+				"author":{"login":"gina","__typename":"User","name":"Gina"}},
 			{"state":"APPROVED","submittedAt":"2026-10-08T09:00:00Z","createdAt":"2026-10-08T09:00:00Z",
 				"author":{"login":"erin","__typename":"User","name":"Erin"}}
 		]},
 		"reviewDismissals":{"nodes":[
-			{"previousReviewState":"APPROVED","dismissalMessage":null,
+			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"carol","__typename":"User","name":"Carol"}}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,
+			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"carol","__typename":"User","name":"Carol"}}},
 			{"previousReviewState":"APPROVED","dismissalMessage":"Outdated after the rework",
 				"review":{"author":{"login":"dave","__typename":"User","name":"Dave"}}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,
+			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"erin","__typename":"User","name":"Erin"}}},
-			{"previousReviewState":"CHANGES_REQUESTED","dismissalMessage":null,
+			{"previousReviewState":"CHANGES_REQUESTED",
 				"review":{"author":{"login":"frank","__typename":"User","name":"Frank"}}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,
+			{"previousReviewState":"APPROVED","dismissalMessage":"The base branch was changed.",
+				"review":{"author":{"login":"gina","__typename":"User","name":"Gina"}}},
+			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"reviewer-app","__typename":"Bot"}}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,
+			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"alice","__typename":"User","name":"Alice"}}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,"review":{"author":null}},
-			{"previousReviewState":"APPROVED","dismissalMessage":null,"review":null}
+			{"previousReviewState":"APPROVED","review":{"author":null}},
+			{"previousReviewState":"APPROVED","review":null}
 		]}
 	}`
 	var node pullRequestNode
@@ -718,7 +722,9 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 
 	pr := prWithReviewers(pullRequestFromNode(node), models.Repository{}, node)
 
-	expectedStaleApprovedBy := []Collaborator{{Login: "carol", Name: "Carol"}}
+	expectedStaleApprovedBy := []Collaborator{
+		{Login: "carol", Name: "Carol"}, {Login: "dave", Name: "Dave"}, {Login: "gina", Name: "Gina"},
+	}
 	if !reflect.DeepEqual(pr.StaleApprovedByUsers, expectedStaleApprovedBy) {
 		t.Errorf("StaleApprovedByUsers = %+v, expected %+v", pr.StaleApprovedByUsers, expectedStaleApprovedBy)
 	}
@@ -726,9 +732,8 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 	if !reflect.DeepEqual(pr.ApprovedByUsers, expectedApprovedBy) {
 		t.Errorf("ApprovedByUsers = %+v, expected %+v", pr.ApprovedByUsers, expectedApprovedBy)
 	}
-	expectedCommentedBy := []Collaborator{{Login: "dave", Name: "Dave"}}
-	if !reflect.DeepEqual(pr.CommentedByUsers, expectedCommentedBy) {
-		t.Errorf("CommentedByUsers = %+v, expected %+v", pr.CommentedByUsers, expectedCommentedBy)
+	if len(pr.CommentedByUsers) != 0 {
+		t.Errorf("CommentedByUsers = %+v, expected none", pr.CommentedByUsers)
 	}
 	expectedFirstReviewAt := timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC))
 	if !reflect.DeepEqual(pr.FirstReviewAt, expectedFirstReviewAt) {

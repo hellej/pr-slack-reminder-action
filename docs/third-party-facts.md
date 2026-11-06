@@ -1082,13 +1082,20 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - So a public repository is no test of a GraphQL field's permission: the result in a public repository does not carry over to a private one (§ A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository)
 - `Ref.rules` read from another repository's workflow token on public `hellej/pr-slack-reminder-action` returned its ruleset, `requireLastPushApproval: true` and `dismissStaleReviewsOnPush: true`
 
-## A manual review dismissal requires a message, so an automatic one is told apart by a null `dismissalMessage` [2026-11-01]
+## A manual review dismissal requires a message, and a push dismissal reads a null `dismissalMessage` [2026-11-01]
 
 - Source: [dismiss a review for a pull request](https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request): `message` is required, "The message for the pull request review dismissal"
 - All four push dismissals read `dismissalMessage: null` (§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set)
 - Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
+- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message (§ A base branch change dismisses approvals with a message, reported as "The base branch was changed.")
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
+
+## A base branch change dismisses approvals with a message, reported as "The base branch was changed." [2026-11-06]
+
+- Source: community reports, [discussion 45921](https://github.com/orgs/community/discussions/45921) and [discussion 57513](https://github.com/orgs/community/discussions/57513). Both quote GitHub support calling the dismissal "by design"
+- The dismissal happens when someone changes a PR's base branch, and on GitHub's automatic retarget too: in a PR stack, merging the lower PR and deleting its branch moves the upper PR's base to `main`. One May 2026 report in discussion 57513 saw the dismissal on that retarget
+- Unverified: the exact `dismissalMessage` text GraphQL returns, not yet read from a live PR
 
 ## `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not [2026-11-01]
 

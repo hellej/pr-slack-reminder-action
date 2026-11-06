@@ -597,12 +597,12 @@ func snapshotScenarios() []snapshotScenario {
 					mockgithubclient.NewReview("grace", "Grace Green", "DISMISSED"),
 				},
 			},
-			// A push dismissed an approval on a PR waiting for review (#74), on one waiting for
+			// An approval was dismissed on a PR waiting for review (#74), on one waiting for
 			// its author (#73) and on a merged one that has a current approver too (#83).
 			reviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
-				73: {mockgithubclient.NewPushDismissedApproval("bob", "Bob Brown")},
-				74: {mockgithubclient.NewPushDismissedApproval("frank", "Frank Foster")},
-				83: {mockgithubclient.NewPushDismissedApproval("grace", "Grace Green")},
+				73: {mockgithubclient.NewDismissedApproval("bob", "Bob Brown")},
+				74: {mockgithubclient.NewDismissedApproval("frank", "Frank Foster")},
+				83: {mockgithubclient.NewDismissedApproval("grace", "Grace Green")},
 			},
 		},
 		{
@@ -940,7 +940,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				59: {mockgithubclient.NewReview("frank", "Frank Foster", "APPROVED")},
 			},
 			reviewDismissalsByPRNumber: map[int][]mockgithubclient.ReviewDismissal{
-				65: {mockgithubclient.NewPushDismissedApproval("grace", "Grace Green")},
+				65: {mockgithubclient.NewDismissedApproval("grace", "Grace Green")},
 			},
 			requestedReviewerLoginsByPRNumber: map[int][]string{60: {"frank"}},
 		},
