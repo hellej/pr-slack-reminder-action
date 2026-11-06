@@ -1088,14 +1088,30 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - All four push dismissals read `dismissalMessage: null` (§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set)
 - Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
-- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message (§ A base branch change dismisses approvals with a message, reported as "The base branch was changed.")
+- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message (§ A base branch change, by hand or by GitHub's retarget of a stacked PR, dismisses approvals with the message "The base branch was changed." and a null `pullRequestCommit`)
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
 
-## A base branch change dismisses approvals with a message, reported as "The base branch was changed." [2026-11-06]
+## A base branch change, by hand or by GitHub's retarget of a stacked PR, dismisses approvals with the message "The base branch was changed." and a null `pullRequestCommit` [2026-11-06]
 
-- Source: community reports, [discussion 45921](https://github.com/orgs/community/discussions/45921) and [discussion 57513](https://github.com/orgs/community/discussions/57513). Both quote GitHub support calling the dismissal "by design"
-- The dismissal happens when someone changes a PR's base branch, and on GitHub's automatic retarget too: in a PR stack, merging the lower PR and deleting its branch moves the upper PR's base to `main`. One May 2026 report in discussion 57513 saw the dismissal on that retarget
-- Unverified: the exact `dismissalMessage` text GraphQL returns, not yet read from a live PR
+- Source: [hellej/pr-slack-reminder-action#111](https://github.com/hellej/pr-slack-reminder-action/issues/111#issuecomment-6693643222), public `hellej/pr-slack-reminder-test-repo-3` under ruleset 26307879 (`dismiss_stale_reviews_on_push: true`). REST `GET /repos/hellej/pr-slack-reminder-test-repo-3/issues/{16,17}/timeline`, and GraphQL `timelineItems` from workflow run 42280476611 (`pull-requests: read`)
+- PR 16, stacked on PR 15's branch: after PR 15 merged and its branch was deleted with the web UI's "Delete branch" button, GitHub retargeted PR 16 to `main` and dismissed its `github-actions` bot approval
+- PR 17: editing the base by hand dismissed its bot approval the same way
+- Both `ReviewDismissedEvent`s read:
+  - `dismissalMessage: "The base branch was changed."`, trailing period included
+  - `pullRequestCommit: null`. REST `dismissed_review` has no `dismissal_commit_id` key
+  - `previousReviewState: APPROVED`, and the review's `state` afterwards `DISMISSED`
+  - `actor`: the user who deleted the branch or edited the base, not a bot
+- PR 16's `reviewDecision` read `REVIEW_REQUIRED` afterwards
+- The retarget records an `AutomaticBaseChangeSucceededEvent` (`oldBase`, `newBase`) at the dismissal's timestamp, and no `BaseRefChangedEvent`. The manual change records a `BaseRefChangedEvent` (`previousRefName`, `currentRefName`)
+- Community reports agree: [discussion 45921](https://github.com/orgs/community/discussions/45921) (2023-01-31) quotes the message, and has a 2026-05-14 report of the retarget dismissal. [Discussion 57513](https://github.com/orgs/community/discussions/57513) relays a support reply calling it "by design" (2023-11-27)
+- Unverified: whether the dismissal happens with `dismiss_stale_reviews_on_push` off
+
+## Deleting a stacked PR's base branch with `gh pr merge --delete-branch` closed the upper PR instead of retargeting it [2026-11-06]
+
+- Source: [hellej/pr-slack-reminder-action#111](https://github.com/hellej/pr-slack-reminder-action/issues/111#issuecomment-6693643222), PR 16 of public `hellej/pr-slack-reminder-test-repo-3`
+- `gh pr merge 15 --merge --delete-branch` deleted PR 15's branch through the API. PR 16's timeline then shows `base_ref_deleted` and `closed`, and its approval stayed `APPROVED`, no dismissal
+- Deleting the same branch with the web UI's "Delete branch" button on PR 15 retargeted PR 16 instead
+- Unverified: whether only this API path skips the retarget, or the repository's auto-delete setting matters
 
 ## `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not [2026-11-01]
 

@@ -5,6 +5,7 @@
 - `make check-pr-description FILE=<path>` runs it on a PR description in a local file
   - Prints one line per problem and exits 1 if any, or 2 when it can't read the file. `make` itself exits 2 on any failure
 - Reads CRLF line endings the same as LF: `gh pr view` returns a description edited on GitHub with CRLF
+- A footer, from the first line that is exactly `---` to the end, is left out of every check except the MCP link length
 - Checks the sections under `### The problem` and `### The solution`, each up to the next heading:
   - The heading's summary, its text after a colon: at most 8 words, and not the template's `<a few words` placeholder
   - A problem heading with no summary is reported. A solution heading may have none
@@ -34,5 +35,6 @@
 
 - A heading is found by prefix, so `### The problems: x` is taken as `### The problem`. The text after that prefix starts with `s`, not a colon, so it fails with `summary not after a colon`
 - A template HTML comment left in is reported as prose
+- A `---` line used as a rule mid-description takes everything below it as footer, unchecked
 - Words are split on spaces, Markdown syntax included: `[a b](url)` is 2 words
 - A link anchor of digits after `#`, such as `README.md#2-setup`, reads as an issue number under `## Related`

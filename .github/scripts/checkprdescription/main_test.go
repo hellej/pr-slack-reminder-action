@@ -190,6 +190,18 @@ func TestProblems(t *testing.T) {
 			},
 		},
 		{
+			name: "attribution footer after a --- line, below ## Related",
+			description: validDescription + "\n## Related\n\n- Merged PR #9\n\n---\n\n" +
+				"🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nSee #3 in https://claude.ai/code/session_x\n",
+			wantProblems: nil,
+		},
+		{
+			name:         "link over 150 characters in the footer, for the GitHub MCP tools",
+			forMCPTools:  true,
+			description:  validDescription + "\n---\n\n[x](https://github.com/" + strings.Repeat("a", 132) + ")\n",
+			wantProblems: []string{"link URL over 150 characters: https://github.com/" + strings.Repeat("a", 132)},
+		},
+		{
 			name:         "link over 150 characters, for the GitHub MCP tools",
 			forMCPTools:  true,
 			description:  validDescription + "- [x](https://github.com/" + strings.Repeat("a", 132) + ")\n",

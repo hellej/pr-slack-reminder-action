@@ -35,6 +35,8 @@ var markdownLinkURL = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 const (
 	relatedHeading = "## Related"
 	openHeading    = "## Open"
+
+	footerSeparator = "---"
 )
 
 var (
@@ -67,7 +69,7 @@ func main() {
 
 func problems(description string, forMCPTools bool) []string {
 	description = strings.ReplaceAll(description, "\r\n", "\n")
-	lines := strings.Split(description, "\n")
+	lines := linesAboveFooter(strings.Split(description, "\n"))
 	var found []string
 	summaryWords := 0
 	for _, section := range summarySections {
@@ -84,6 +86,14 @@ func problems(description string, forMCPTools bool) []string {
 		found = append(found, longLinks(description)...)
 	}
 	return found
+}
+
+func linesAboveFooter(lines []string) []string {
+	footerIndex := slices.Index(lines, footerSeparator)
+	if footerIndex == -1 {
+		return lines
+	}
+	return lines[:footerIndex]
 }
 
 func linesNotListItems(lines []string) []string {
