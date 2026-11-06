@@ -31,6 +31,7 @@ argument-hint: "Optional: draft, or what the PR is for"
   - Link a section the same way, by its heading's anchor
   - Start each issue or PR with its state: `Open issue #12`, `Closed issue #7`, `Merged PR #95`, `Closed PR #90`
 - Drop a template section that would be empty
+- Put lines your session asks to end the description with, such as attribution, below a `---` line at the very end. The check skips everything below it
 - [checkprdescription.spec.md](../../../.github/scripts/checkprdescription/checkprdescription.spec.md) has the word and link limits
 
 ## Later Changes
