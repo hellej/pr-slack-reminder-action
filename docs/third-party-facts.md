@@ -1088,14 +1088,19 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - All four push dismissals read `dismissalMessage: null` (§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set)
 - Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
-- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message (§ A base branch change dismisses approvals with a message, reported as "The base branch was changed.")
+- Unverified: whether a null message marks every automatic dismissal. Community reports quote a message on a base branch change dismissal (§ Community reports say a base branch change dismisses approvals with the message "The base branch was changed", unread on a live PR)
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
 
-## A base branch change dismisses approvals with a message, reported as "The base branch was changed." [2026-11-06]
+## Community reports say a base branch change dismisses approvals with the message "The base branch was changed", unread on a live PR [2026-11-06]
 
-- Source: community reports, [discussion 45921](https://github.com/orgs/community/discussions/45921) and [discussion 57513](https://github.com/orgs/community/discussions/57513). Both quote GitHub support calling the dismissal "by design"
-- The dismissal happens when someone changes a PR's base branch, and on GitHub's automatic retarget too: in a PR stack, merging the lower PR and deleting its branch moves the upper PR's base to `main`. One May 2026 report in discussion 57513 saw the dismissal on that retarget
-- Unverified: the exact `dismissalMessage` text GraphQL returns, not yet read from a live PR
+- Source: [discussion 45921](https://github.com/orgs/community/discussions/45921) and [discussion 57513](https://github.com/orgs/community/discussions/57513), read 2026-11-06 via WebFetch summaries. No live PR read
+- 45921's original post (2023-01-31) quotes the message "The base branch was changed"
+- 45921 has a 2026-05-14 report: in a PR stack, merging PR A made GitHub retarget PR B to `master`, and B's approvals were dismissed
+- 57513 (2023-06-08) describes the same retarget dismissal in a stack, and quotes GitHub: approvals are dismissed when "a related pull request is merged into the target branch"
+- Only 57513 relays a support reply calling it "by design" (2023-11-27)
+- Neither thread names deleting the lower PR's branch as a cause
+- Unverified: whether the dismissal happens with `dismiss_stale_reviews_on_push` off, and on a manual base change
+- Unverified: `dismissalMessage`, `pullRequestCommit` and `actor` on the `ReviewDismissedEvent`. A probe on public `hellej/pr-slack-reminder-test-repo-3` could not run on 2026-11-06: the session was refused access to that repository
 
 ## `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not [2026-11-01]
 
