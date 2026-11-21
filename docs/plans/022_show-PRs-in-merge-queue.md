@@ -32,7 +32,7 @@ status: draft
   - Rows render with the open PR row renderer
 - Summary text gains a last part, `in merge queue`: `"1 PR to review, 2 to merge, 1 in merge queue 👀"`, `"1 PR in merge queue 👀"`
 - No change to action inputs or state keys
-- The README's permission list stays the same. Unverified: whether every token holding it reads `isInMergeQueue`. See § Caveats
+- The README's permission list stays the same. Unverified: whether a token with those permissions can read `isInMergeQueue`. See § Caveats
 
 Message sketches, ungrouped. Posted by the 09:00 post, while PR #41 is queued:
 
@@ -97,7 +97,7 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 
 - `internal/prview/prview.go`: `NextActionInMergeQueue` first in `GetNextAction`
 - Table cases in the existing `GetNextAction` test: queued over conflicting, over failing checks, over a waiting thread and over no approval
-- `prview.spec.md`: the next action
+- `prview.spec.md`: the next action, and an Oddity: a PR the queue removed, such as for a failing merge group check, goes back to the section its own state gives it, often "Ready to merge", since the merge group's checks never reach its head commit. It moves on once its own checks or reviews change
 
 ### 3: "In merge queue" section in the message
 
@@ -107,7 +107,7 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 - `internal/messagebuilder/`: the `🚛 In merge queue` section, between `ReadyToMerge` and `Merged`
 - `cmd/pr-slack-reminder/`: a new snapshot scenario with a queued PR, post and update. Every existing snapshot stays as recorded: that is the no-queue check
 - `messagecontent.spec.md`: the section and the summary part
-- `messagebuilder.spec.md`: the section order, and both block cap Oddities, the ungrouped and the grouped one. Each section costs one more block set:
+- `messagebuilder.spec.md`: the section order, and both block cap Oddities, the ungrouped and the grouped one. Adding a section adds blocks:
   - Ungrouped, a section is a heading and one list block. Five sections, the merge stats line and the footer make at most 12 blocks, not 10
   - Grouped, a section is 1 + 2 × repositories blocks. With all five sections, 4 repositories fit (5 × 9 = 45 content blocks), not 5 (5 × 11 = 55)
 
@@ -141,7 +141,7 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
   - open PRs also lose their snooze and their check status fetch
   - merged rows lose their reviewers
   - the merge stats fetch warns once per merged PR
-- The Build E2E checks the App token against private repositories. `GITHUB_TOKEN` on a private repository is unverified
+- The Build E2E shows whether the App token, which lacks "Merge queues", can read the field on private repositories. `GITHUB_TOKEN` on a private repository is unverified
 - No live run against a queued PR: unit and snapshot tests cover the queued row instead
 - Unverified: whether a `dequeued` sent by the queue starts an Actions run. If it does not, a queue merge still shows through `closed`, and a removal shows only once another event starts a run
 - Each queue merge sends `dequeued` beside `closed`, and each enqueue sends `enqueued`: up to two more update runs per merged PR. Within AGENTS.md § GitHub API Budget at the PR counts of AGENTS.md § Reference Deployment
