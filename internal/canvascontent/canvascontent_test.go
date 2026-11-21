@@ -31,6 +31,7 @@ type testPROptions struct {
 	conflicting               bool
 	threadWaiting             bool
 	outstandingChangesRequest bool
+	inMergeQueue              bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -64,6 +65,7 @@ func testPR(options testPROptions) prview.PR {
 			Conflicting:                  options.conflicting,
 			HasThreadWaitingForAuthor:    options.threadWaiting,
 			HasOutstandingChangesRequest: options.outstandingChangesRequest,
+			InMergeQueue:                 options.inMergeQueue,
 		},
 		Approvers:      approvers,
 		StaleApprovers: staleApprovers,
@@ -133,6 +135,8 @@ func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 		testPR(testPROptions{number: 5, threadWaiting: true}),
 		testPR(testPROptions{number: 6, conflicting: true}),
 		testPR(testPROptions{number: 7, approved: true}),
+		testPR(testPROptions{number: 8, approved: true, inMergeQueue: true}),
+		testPR(testPROptions{number: 9, conflicting: true, inMergeQueue: true}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -140,6 +144,7 @@ func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 	})
 
 	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{1, 7})
+	assertEqual(t, "PRs in merge queue", prNumbers(content.InMergeQueue.Rows), []int{8, 9})
 	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{2, 4, 5})
 	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{3, 6})
 }
@@ -154,6 +159,8 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 		testPR(testPROptions{number: 4, approved: true, createdAt: createdHoursAgo(20)}),
 		testPR(testPROptions{number: 5, threadWaiting: true, createdAt: createdHoursAgo(30)}),
 		testPR(testPROptions{number: 6, createdAt: createdHoursAgo(40)}),
+		testPR(testPROptions{number: 7, inMergeQueue: true, createdAt: createdHoursAgo(5)}),
+		testPR(testPROptions{number: 8, inMergeQueue: true, createdAt: createdHoursAgo(50)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -161,6 +168,7 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 	})
 
 	assertEqual(t, "ready to merge PRs", prNumbers(content.ReadyToMerge.Rows), []int{4, 1})
+	assertEqual(t, "PRs in merge queue", prNumbers(content.InMergeQueue.Rows), []int{8, 7})
 	assertEqual(t, "PRs waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 2})
 	assertEqual(t, "PRs waiting for review", prNumbers(content.WaitingForReview.Rows), []int{6, 3})
 }
@@ -786,4 +794,32 @@ func TestGetContentCollapsesEachRepositoryGroupOnItsOwn(t *testing.T) {
 	assertEqual(t, "repo-one rows", testhelpers.DescribeRows(groups[0].Rows), []string{"#5", "#1"})
 	assertEqual(t, "repo-two rows", testhelpers.DescribeRows(groups[1].Rows), []string{"#3"})
 	assertEqual(t, "repo-three rows", testhelpers.DescribeRows(groups[2].Rows), []string{"dependabot[bot]: #8 #7"})
+}
+
+// repo-two holds the oldest PR, so its group leads, and only its two dependabot PRs collapse.
+func TestGetContentGroupsAndCollapsesTheMergeQueueSection(t *testing.T) {
+	queuedPR := func(number int, repository, authorLogin string, ageHours int) prview.PR {
+		return testPR(testPROptions{
+			number: number, repository: repository, authorLogin: authorLogin,
+			createdAt: createdHoursAgo(ageHours), inMergeQueue: true,
+		})
+	}
+	prs := []prview.PR{
+		queuedPR(1, "repo-one", "dependabot[bot]", 2),
+		queuedPR(2, "repo-two", "dependabot[bot]", 9),
+		queuedPR(3, "repo-two", "alice", 5),
+		queuedPR(4, "repo-two", "dependabot[bot]", 4),
+	}
+
+	content := canvascontent.GetContent(
+		prs,
+		nil,
+		config.ContentInputs{GroupByRepository: true, CollapsePRsFromAuthors: []string{"dependabot[bot]"}},
+		canvascontent.GetContentOptions{GeneratedAt: generatedAt},
+	)
+
+	groups := content.InMergeQueue.Groups
+	assertEqual(t, "group paths", groupPaths(groups), []string{"test-org/repo-two", "test-org/repo-one"})
+	assertEqual(t, "repo-two rows", testhelpers.DescribeRows(groups[0].Rows), []string{"#3", "dependabot[bot]: #2 #4"})
+	assertEqual(t, "repo-one rows", testhelpers.DescribeRows(groups[1].Rows), []string{"#1"})
 }

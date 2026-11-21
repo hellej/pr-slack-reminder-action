@@ -50,8 +50,8 @@ type MockGitHubClientOptions struct {
 	// Each answers its PR's mergeable as CONFLICTING. Any other PR's node leaves mergeable out,
 	// which githubclient reads as not conflicting
 	ConflictingPRNumbers []int
-	// Each answers its PR's isInMergeQueue as true, any other PR's as false, whenever the query
-	// selects the field
+	// A PR in this list answers isInMergeQueue true, any other PR false, once the query selects
+	// the field
 	InMergeQueuePRNumbers []int
 	PRServiceError        error
 	IssueServiceError     error
@@ -602,8 +602,8 @@ type pullRequestRef struct {
 	number    int
 }
 
-// Unlike the other fields, isInMergeQueue is answered only when the query selects it, so a test
-// sees the false a missing selection decodes to.
+// Unlike the other fields, isInMergeQueue is answered only when the query selects it, so a query
+// that forgets it reads false.
 func selectsIsInMergeQueue(query string) bool {
 	return strings.Contains(query, "isInMergeQueue")
 }

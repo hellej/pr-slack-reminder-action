@@ -10,12 +10,14 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/models"
 	"github.com/hellej/pr-slack-reminder-action/internal/prview"
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
+	"github.com/hellej/pr-slack-reminder-action/testhelpers"
 )
 
 var generatedAt = time.Date(2026, 8, 8, 6, 15, 0, 0, time.UTC)
 
 type testPROptions struct {
 	number                       int
+	authorLogin                  string
 	owner                        string
 	repository                   string
 	createdAt                    time.Time
@@ -25,6 +27,7 @@ type testPROptions struct {
 	commenters                   []string
 	conflicting                  bool
 	hasOutstandingChangesRequest bool
+	inMergeQueue                 bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -42,10 +45,12 @@ func testPR(options testPROptions) prview.PR {
 				CreatedAt: options.createdAt,
 				MergedAt:  options.mergedAt,
 				Merged:    options.mergedAt != nil,
+				Author:    githubclient.Collaborator{Login: options.authorLogin},
 			},
 			Repository:                   repository,
 			Conflicting:                  options.conflicting,
 			HasOutstandingChangesRequest: options.hasOutstandingChangesRequest,
+			InMergeQueue:                 options.inMergeQueue,
 		},
 		Approvers:      collaborators(options.approvers),
 		StaleApprovers: collaborators(options.staleApprovers),
@@ -87,11 +92,16 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 		testPR(testPROptions{
 			number: 5, createdAt: generatedAt.Add(-3 * time.Hour), approvers: []string{"dana"}, conflicting: true,
 		}),
+		testPR(testPROptions{
+			number: 6, createdAt: generatedAt.Add(-2 * time.Hour), approvers: []string{"dana"}, inMergeQueue: true,
+		}),
+		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-8 * time.Hour), inMergeQueue: true}),
 	}
 
 	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
 
 	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.Rows), []int{2})
+	assertEqual(t, "in merge queue", prNumbers(content.InMergeQueue.Rows), []int{7, 6})
 	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{3, 5})
 	assertEqual(t, "waiting for review", prNumbers(content.WaitingForReview.Rows), []int{4, 1})
 	assertEqual(t, "merged", prNumbers(content.Merged.Rows), nil)
@@ -148,6 +158,31 @@ func TestGetContentListsWaitingForReviewPRsWithStaleApproversFirst(t *testing.T)
 	assertEqual(t, "waiting for review", prNumbers(content.WaitingForReview.Rows), []int{2, 4, 1, 3})
 	assertEqual(t, "waiting for author", prNumbers(content.WaitingForAuthor.Rows), []int{5, 6})
 	assertEqual(t, "ready to merge", prNumbers(content.ReadyToMerge.Rows), []int{7, 8})
+}
+
+// zebra holds the oldest PR, so its group leads, and only its two dependabot PRs collapse.
+func TestGetContentGroupsAndCollapsesTheMergeQueueSection(t *testing.T) {
+	queuedPR := func(number int, repository, authorLogin string, ageHours int) prview.PR {
+		return testPR(testPROptions{
+			number: number, repository: repository, authorLogin: authorLogin,
+			createdAt: generatedAt.Add(-time.Duration(ageHours) * time.Hour), inMergeQueue: true,
+		})
+	}
+	openPRs := []prview.PR{
+		queuedPR(1, "alpha", "dependabot[bot]", 2),
+		queuedPR(2, "zebra", "dependabot[bot]", 9),
+		queuedPR(3, "zebra", "alice", 5),
+		queuedPR(4, "zebra", "dependabot[bot]", 4),
+	}
+
+	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{
+		GroupByRepository: true, CollapsePRsFromAuthors: []string{"dependabot[bot]"},
+	})
+
+	groups := content.InMergeQueue.Groups
+	assertEqual(t, "grouped repositories", repositoryNames(groups), []string{"zebra", "alpha"})
+	assertEqual(t, "zebra rows", testhelpers.DescribeRows(groups[0].Rows), []string{"#3", "dependabot[bot]: #2 #4"})
+	assertEqual(t, "alpha rows", testhelpers.DescribeRows(groups[1].Rows), []string{"#1"})
 }
 
 // zebra holds the oldest PR, so oldest first grouping alone puts zebra first.
@@ -264,6 +299,10 @@ func readyToMergePR(number int) prview.PR {
 	return testPR(testPROptions{number: number, approvers: []string{"dana"}})
 }
 
+func inMergeQueuePR(number int) prview.PR {
+	return testPR(testPROptions{number: number, approvers: []string{"dana"}, inMergeQueue: true})
+}
+
 func waitingForAuthorPR(number int) prview.PR {
 	return testPR(testPROptions{number: number, hasOutstandingChangesRequest: true})
 }
@@ -299,6 +338,27 @@ func TestGetContentSummaryAndNoOpenPRsText(t *testing.T) {
 				readyToMergePR(1), waitingForAuthorPR(2), waitingForReviewPR(3), waitingForReviewPR(4),
 			},
 			expectedSummary: "2 PRs to review, 1 waiting for author, 1 to merge 👀",
+		},
+		{
+			name: "review and merge with the merge queue last",
+			openPRs: []prview.PR{
+				inMergeQueuePR(1), readyToMergePR(2), waitingForReviewPR(3), readyToMergePR(4),
+			},
+			expectedSummary: "1 PR to review, 2 to merge, 1 in merge queue 👀",
+		},
+		{
+			name: "all four: review, author, merge, merge queue",
+			openPRs: []prview.PR{
+				inMergeQueuePR(1), readyToMergePR(2), waitingForAuthorPR(3), waitingForReviewPR(4),
+				inMergeQueuePR(5), waitingForAuthorPR(6), readyToMergePR(7), readyToMergePR(8),
+				waitingForReviewPR(9), waitingForReviewPR(10), waitingForReviewPR(11),
+			},
+			expectedSummary: "4 PRs to review, 2 waiting for author, 3 to merge, 2 in merge queue 👀",
+		},
+		{
+			name:            "only in merge queue",
+			openPRs:         []prview.PR{inMergeQueuePR(1)},
+			expectedSummary: "1 PR in merge queue 👀",
 		},
 		{
 			name:            "only waiting for author",

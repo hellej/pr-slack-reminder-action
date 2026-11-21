@@ -43,6 +43,7 @@ func NewCollaborator(c githubclient.Collaborator, slackUserId string) Collaborat
 type PRNextAction string
 
 const (
+	NextActionInMergeQueue     PRNextAction = "in merge queue"
 	NextActionReadyToMerge     PRNextAction = "ready to merge"
 	NextActionWaitingForAuthor PRNextAction = "waiting for author"
 	NextActionWaitingForReview PRNextAction = "waiting for review"
@@ -59,6 +60,9 @@ func (pr PR) GetNextAction() PRNextAction {
 		return NextActionWaitingForReview
 	}
 
+	if pr.InMergeQueue {
+		return NextActionInMergeQueue
+	}
 	if pr.isApproved() && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
 		return NextActionReadyToMerge
 	}

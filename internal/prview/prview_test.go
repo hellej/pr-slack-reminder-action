@@ -850,6 +850,38 @@ func TestGetNextAction(t *testing.T) {
 			},
 			expected: prview.NextActionWaitingForAuthor,
 		},
+		{
+			name:           "queued with nothing outstanding",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{InMergeQueue: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued but conflicting",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{InMergeQueue: true, Conflicting: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued but failing a required check",
+			approverLogins: []string{"bob"},
+			prFlags: githubclient.PR{
+				InMergeQueue: true, RequiredChecksStatus: githubclient.RequiredChecksFailing,
+			},
+			expected: prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued with a thread waiting for the author",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{InMergeQueue: true, HasThreadWaitingForAuthor: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			// A repository whose rules let a PR merge without an approval can queue it unreviewed.
+			name:     "queued without an approval",
+			prFlags:  githubclient.PR{InMergeQueue: true},
+			expected: prview.NextActionInMergeQueue,
+		},
 	}
 
 	for _, tt := range tests {

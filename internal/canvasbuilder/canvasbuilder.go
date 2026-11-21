@@ -16,6 +16,7 @@ const (
 	waitingForReviewHeading  = "## 👀 Waiting for review"
 	waitingForAuthorHeading  = "## 💬 Waiting for author"
 	readyToMergeHeading      = "## ✅ Ready to merge"
+	inMergeQueueHeading      = "## 🚛 In merge queue"
 	openPRsHeading           = "## Open"
 	mergedPRsHeading         = "## 🚀 Merged"
 	wipPRsHeading            = "## 🔧 WIP"
@@ -50,12 +51,13 @@ func BuildMarkdown(content canvascontent.Content) string {
 	return strings.Join(blocks, "\n\n") + "\n"
 }
 
-// All three buckets empty falls back to the single "Open" heading with "No open PRs" text.
+// All four buckets empty falls back to the single "Open" heading with "No open PRs" text.
 func renderOpenSections(content canvascontent.Content) []string {
 	nextActionSections := []section{
 		openSection(waitingForReviewHeading, content.WaitingForReview, content.GroupedByRepository),
 		openSection(waitingForAuthorHeading, content.WaitingForAuthor, content.GroupedByRepository),
 		openSection(readyToMergeHeading, content.ReadyToMerge, content.GroupedByRepository),
+		openSection(inMergeQueueHeading, content.InMergeQueue, content.GroupedByRepository),
 	}
 
 	blocks := utilities.FlatMap(utilities.Map(nextActionSections, renderSectionBlocks))
