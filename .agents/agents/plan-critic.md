@@ -48,6 +48,8 @@ that it is there, not that it is true.
 
 - No source: `Verify`. A bare assertion about a method, field, permission or OAuth scope
   is running on memory
+- A claim a checkpoint step gates on the PR's Build E2E log is not a `Verify`: CI checks it
+  before anything builds on it
 - A citation too vague to point at anything, or pointing at the wrong page: `Fix`, at the
   severity the claim's weight earns
 
