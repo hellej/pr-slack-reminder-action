@@ -20,7 +20,7 @@ status: draft
 
 ## Target Shape
 
-- New field `githubclient.PR.InMergeQueue`, from `PullRequest.isInMergeQueue`, tagged `json:",omitempty"`. See docs/third-party-facts.md § `PullRequest.isInMergeQueue` is a non-null `Boolean!`, and GitHub CLI selects it on every `gh pr merge` whatever the repository
+- New field `githubclient.PR.IsInMergeQueue`, from `PullRequest.isInMergeQueue`, tagged `json:",omitempty"`. See docs/third-party-facts.md § `PullRequest.isInMergeQueue` is a non-null `Boolean!`, and GitHub CLI selects it on every `gh pr merge` whatever the repository
   - Read by the enrichment query (`enrichedPullRequestSelection`), beside `mergeable`, so every enriched open PR gets it, approved or not
   - A PR left without reviewer info by a failed enrichment reads false, like its other merge flags
   - Merged PRs read false, so the merged PR cache stays byte for byte the same
@@ -81,17 +81,17 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 
 ### 1: Read `isInMergeQueue` in the enrichment query (checkpoint)
 
-- `internal/apiclients/githubclient/`: add `isInMergeQueue` to `enrichedPullRequestSelection` and an `IsInMergeQueue` field to `pullRequestNode`, and set `PR.InMergeQueue` from it in `prWithReviewers`
+- `internal/apiclients/githubclient/`: add `isInMergeQueue` to `enrichedPullRequestSelection` and an `IsInMergeQueue` field to `pullRequestNode`, and set `PR.IsInMergeQueue` from it in `prWithReviewers`
   - `enrichPRsWithReviewInfo` runs that selection for `FindOpenPRs`, `FindRecentlyMergedPRs` and `FindPRsMergedSince`
-  - `fullPullRequestSelection` stays as it is, so `GetPRs` PRs read `InMergeQueue` false. They are only read for their merged state
+  - `fullPullRequestSelection` stays as it is, so `GetPRs` PRs read `IsInMergeQueue` false. They are only read for their merged state
 - `testhelpers/mockgithubclient/`: the enrichment route answers `isInMergeQueue` from a new fixture option listing the queued PR numbers, all others false
 - Tests pinning the enrichment query text change with the selection
 - `githubclient.spec.md`: Behaviour, beside the merge flags, and that `GetPRs` PRs read it false, as they read `RequiredChecksUnknown`
-- Done when, before step 2:
-  - The Build E2E job log of this branch's PR shows the enrichment of the private `hellej/pr-slack-reminder-test-repo-1` and `-2`, and the public `-3`, with no field error. The user confirmed the job's App token lacks the "Merge queues" permission
-  - `rateLimit.cost` of the enrichment request against the last run on `main`, stated in the PR
-  - A field error stops the loop: the target shape goes back to the user
-  - Record the result in the `isInMergeQueue` facts entry, replacing its unverified permission line for the App token
+- Checkpoint before step 2, passed in Build E2E run 44934692097:
+  - The job log shows the enrichment of the private `hellej/pr-slack-reminder-test-repo-1` and `-2`, and the public `-3`, with no field error. The user confirmed the job's App token lacks the "Merge queues" permission
+  - The enrichment request's `rateLimit.cost` equals the main-code run 44914969961's at the same PR counts: 1 PR 1, 19 PRs 20, 20 PRs 21, 25 PRs 27
+  - A field error would have stopped the loop and sent the target shape back to the user
+  - The result is recorded in the `isInMergeQueue` facts entry, replacing its unverified permission line for the App token
 
 ### 2: Next action in `prview`
 
@@ -104,8 +104,9 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 - `internal/messagecontent/`: `Content.InMergeQueue`, filled and grouped like `ReadyToMerge`
   - `HasPRs` counts it
   - The summary text's last part, as in § Target Shape
+  - The "Putting …" log line names its PR count
 - `internal/messagebuilder/`: the `🚛 In merge queue` section, between `ReadyToMerge` and `Merged`
-- `cmd/pr-slack-reminder/`: a new snapshot scenario with a queued PR, post and update. Every existing snapshot stays as recorded: that is the no-queue check
+- `cmd/pr-slack-reminder/`: new snapshot scenarios: a post with a queued PR beside one ready to merge, and a post and an update whose only open PR is queued. The last two show a queued PR alone still posts or edits the message, since `HasPRs` counts it. Every existing snapshot stays as recorded: that is the no-queue check
 - `messagecontent.spec.md`: the section and the summary part
 - `messagebuilder.spec.md`: the section order, and both block cap Oddities, the ungrouped and the grouped one. Adding a section adds blocks:
   - Ungrouped, a section is a heading and one list block. Five sections, the merge stats line and the footer make at most 12 blocks, not 10
@@ -141,7 +142,7 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
   - open PRs also lose their snooze and their check status fetch
   - merged rows lose their reviewers
   - the merge stats fetch warns once per merged PR
-- The Build E2E shows whether the App token, which lacks "Merge queues", can read the field on private repositories. `GITHUB_TOKEN` on a private repository is unverified
+- Build E2E run 44934692097 read the field with the App token, which lacks "Merge queues", on private repositories with no field error. `GITHUB_TOKEN` on a private repository is unverified
 - No live run against a queued PR: unit and snapshot tests cover the queued row instead
 - Unverified: whether a `dequeued` sent by the queue starts an Actions run. If it does not, a queue merge still shows through `closed`, and a removal shows only once another event starts a run
 - Each queue merge sends `dequeued` beside `closed`, and each enqueue sends `enqueued`: up to two more update runs per merged PR. Within AGENTS.md § GitHub API Budget at the PR counts of AGENTS.md § Reference Deployment

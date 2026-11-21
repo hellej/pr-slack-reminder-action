@@ -1213,7 +1213,8 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `PullRequest` has `isInMergeQueue: Boolean!`, `isMergeQueueEnabled: Boolean!` ("whether the pull request's base ref has a merge queue enabled") and a nullable `mergeQueueEntry: MergeQueueEntry` (`position: Int!`, `state: MergeQueueEntryState!`, `enqueuedAt`)
 - Timeline item types `ADDED_TO_MERGE_QUEUE_EVENT` and `REMOVED_FROM_MERGE_QUEUE_EVENT`. `RemovedFromMergeQueueEvent` has `createdAt: DateTime!`, `reason: String`, `beforeCommit: Commit`, `actor` and `enqueuer`
 - GitHub CLI v2.105.0 (e1219499) selects `isInMergeQueue` and `isMergeQueueEnabled` in `pkg/cmd/pr/merge/merge.go` `NewMergeContext` for every repository, gated only on the schema having the field (`internal/featuredetection/feature_detection.go`). Indirect evidence that a repository without a queue reads `false` rather than an error
-- Unverified: whether a token without the GitHub App "Merge queues" repository permission reads these fields in a private repository. `GITHUB_TOKEN` has no merge queue permission at all (`data/reusables/actions/github-token-scope-descriptions.md` in github/docs)
+- A GitHub App token without the "Merge queues" repository permission reads `isInMergeQueue` with no field error, in private and public repositories alike, at no extra `rateLimit.cost`. Source: this repo's Build E2E run 44934692097, 2026-11-21, enriching the private `hellej/pr-slack-reminder-test-repo-1` and `-2` and the public `-3`
+- Unverified: whether `GITHUB_TOKEN` reads it in a private repository. `GITHUB_TOKEN` has no merge queue permission at all (`data/reusables/actions/github-token-scope-descriptions.md` in github/docs)
 - Unverified: what the two timeline item types return on a PR that never used a queue. Expected: no items
 
 ## `RemovedFromMergeQueueEvent.beforeCommit` is undocumented, and live reports point it at the merge group commit, not the PR head [2026-11-21]

@@ -20,6 +20,7 @@ const MaxInactiveWIPPRs = 5
 
 type Content struct {
 	ReadyToMerge         prview.PRSection
+	InMergeQueue         prview.PRSection
 	WaitingForAuthor     prview.PRSection
 	WaitingForReview     prview.PRSection
 	WIP                  prview.PRSection
@@ -38,7 +39,7 @@ type GetContentOptions struct {
 	GeneratedAt          time.Time
 }
 
-// GetContent splits the given PRs into the three open sections and a work-in-progress section,
+// GetContent splits the given PRs into the four open sections and a work-in-progress section,
 // and takes the merged section from its own list. Open PRs are bucketed by next action,
 // each bucket oldest first, the waiting for review bucket putting its PRs with stale approvers
 // ahead of the rest; WIP PRs are ordered most recent activity first, with long-inactive ones
@@ -63,22 +64,24 @@ func GetContent(
 	})
 
 	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	inMergeQueue := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionInMergeQueue)
 	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
 	waitingForReview := prview.SortPRsWithStaleApproversFirst(
 		prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview),
 	)
 
 	log.Printf(
-		"Putting %d ready to merge, %d waiting for author and %d waiting for review pull requests, "+
-			"%d work-in-progress pull requests and %d merged pull requests on the canvas, "+
+		"Putting %d ready to merge, %d in merge queue, %d waiting for author and %d waiting for review "+
+			"pull requests, %d work-in-progress pull requests and %d merged pull requests on the canvas, "+
 			"leaving out %d inactive work-in-progress pull requests",
-		len(readyToMerge), len(waitingForAuthor), len(waitingForReview),
+		len(readyToMerge), len(inMergeQueue), len(waitingForAuthor), len(waitingForReview),
 		len(wipPRs), len(sortedMergedPRs),
 		len(sortedActiveDraftPRs)-len(wipPRs),
 	)
 
 	return Content{
 		ReadyToMerge:         newPRSection(readyToMerge, contentInputs),
+		InMergeQueue:         newPRSection(inMergeQueue, contentInputs),
 		WaitingForAuthor:     newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:     newPRSection(waitingForReview, contentInputs),
 		WIP:                  newPRSection(wipPRs, contentInputs),

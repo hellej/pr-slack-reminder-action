@@ -24,6 +24,7 @@ const noOpenPRsSummaryText = "Nothing waiting for review 🎉"
 type Content struct {
 	SummaryText         string
 	ReadyToMerge        prview.PRSection
+	InMergeQueue        prview.PRSection
 	WaitingForAuthor    prview.PRSection
 	WaitingForReview    prview.PRSection
 	Merged              prview.PRSection
@@ -34,7 +35,7 @@ type Content struct {
 }
 
 func (c Content) HasPRs() bool {
-	return c.ReadyToMerge.HasRows() || c.WaitingForAuthor.HasRows() ||
+	return c.ReadyToMerge.HasRows() || c.InMergeQueue.HasRows() || c.WaitingForAuthor.HasRows() ||
 		c.WaitingForReview.HasRows() || c.Merged.HasRows()
 }
 
@@ -51,6 +52,7 @@ func GetContent(
 ) Content {
 	sortedOpenPRs := prview.SortPRsOldestToNewest(openPRs)
 	readyToMerge := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionReadyToMerge)
+	inMergeQueue := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionInMergeQueue)
 	waitingForAuthor := prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForAuthor)
 	waitingForReview := prview.SortPRsWithStaleApproversFirst(
 		prsWhoseNextActionIs(sortedOpenPRs, prview.NextActionWaitingForReview),
@@ -61,14 +63,17 @@ func GetContent(
 	}
 
 	log.Printf(
-		"Putting %d waiting for review, %d waiting for author and %d ready to merge pull requests "+
-			"and %d merged pull requests in the message",
-		len(waitingForReview), len(waitingForAuthor), len(readyToMerge), len(mergedPRs),
+		"Putting %d waiting for review, %d waiting for author, %d ready to merge and %d in merge queue "+
+			"pull requests and %d merged pull requests in the message",
+		len(waitingForReview), len(waitingForAuthor), len(readyToMerge), len(inMergeQueue), len(mergedPRs),
 	)
 
 	content := Content{
-		SummaryText:         getSummaryText(len(waitingForReview), len(waitingForAuthor), len(readyToMerge)),
+		SummaryText: getSummaryText(
+			len(waitingForReview), len(waitingForAuthor), len(readyToMerge), len(inMergeQueue),
+		),
 		ReadyToMerge:        newPRSection(readyToMerge, contentInputs),
+		InMergeQueue:        newPRSection(inMergeQueue, contentInputs),
 		WaitingForAuthor:    newPRSection(waitingForAuthor, contentInputs),
 		WaitingForReview:    newPRSection(waitingForReview, contentInputs),
 		Merged:              newPRSection(mergedPRs, contentInputs),
@@ -142,11 +147,14 @@ type summaryPart struct {
 	nextAction string
 }
 
-func getSummaryText(waitingForReviewCount, waitingForAuthorCount, readyToMergeCount int) string {
+func getSummaryText(
+	waitingForReviewCount, waitingForAuthorCount, readyToMergeCount, inMergeQueueCount int,
+) string {
 	nonEmptyParts := utilities.Filter([]summaryPart{
 		{prCount: waitingForReviewCount, nextAction: "to review"},
 		{prCount: waitingForAuthorCount, nextAction: "waiting for author"},
 		{prCount: readyToMergeCount, nextAction: "to merge"},
+		{prCount: inMergeQueueCount, nextAction: "in merge queue"},
 	}, func(part summaryPart) bool { return part.prCount > 0 })
 	if len(nonEmptyParts) == 0 {
 		return noOpenPRsSummaryText
