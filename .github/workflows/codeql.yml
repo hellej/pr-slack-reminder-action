@@ -1,0 +1,43 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'dist/**'
+      - 'invoke-binary.js'
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (go)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Autobuild would first run `make`, which is `make test` here.
+      # See docs/third-party-facts.md § CodeQL supports only the autobuild and manual build modes for Go, and Go autobuild first runs `make`
+      - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea #v4.39.4
+        with:
+          languages: go
+          build-mode: manual
+
+      # `./...` skips dot directories, so the scripts under .github/ are named apart. tools/ is a separate module holding only tool directives.
+      - name: Build
+        run: go build ./... ./.github/scripts/...
+
+      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea #v4.39.4
+        with:
+          category: /language:go
