@@ -1199,3 +1199,47 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Code-Review: approved changesets over all changesets among the recent default branch commits. An approval needs a reviewer other than the author
   - An approved bot-authored changeset is dropped from both counts, so approving Dependabot PRs can't lift a solo maintainer's score above 0
 - SAST: with CodeQL configured, `(3 × PR share + 7 × 10) / 10`, where PR share is the merged PRs among the recent commits that have a SAST check run, scaled to 10. Direct pushes aren't counted. All PRs checked scores 10
+
+## Merge queue is available only in organization-owned repositories: public ones, or private ones on GitHub Enterprise Cloud [2026-11-21]
+
+- Source: `data/reusables/gated-features/merge-queue.md` in github/docs at d7487f5d, the banner of [managing a merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue)
+- Quote: "Pull request merge queues are available in any public repository owned by an organization, or in private repositories owned by organizations using GitHub Enterprise Cloud."
+- So no repository owned by a user account can have one, public or private. That includes this repository and the `hellej/pr-slack-reminder-test-repo-*` E2E repositories
+- An admin turns it on per branch, through the "Require merge queue" branch protection or ruleset setting
+
+## `PullRequest.isInMergeQueue` is a non-null `Boolean!`, and GitHub CLI selects it on every `gh pr merge` whatever the repository [2026-11-21]
+
+- Source: [GitHub's public GraphQL schema](https://docs.github.com/public/fpt/schema.docs.graphql), fetched 2026-11-21. No preview or deprecation directive on any field below
+- `PullRequest` has `isInMergeQueue: Boolean!`, `isMergeQueueEnabled: Boolean!` ("whether the pull request's base ref has a merge queue enabled") and a nullable `mergeQueueEntry: MergeQueueEntry` (`position: Int!`, `state: MergeQueueEntryState!`, `enqueuedAt`)
+- Timeline item types `ADDED_TO_MERGE_QUEUE_EVENT` and `REMOVED_FROM_MERGE_QUEUE_EVENT`. `RemovedFromMergeQueueEvent` has `createdAt: DateTime!`, `reason: String`, `beforeCommit: Commit`, `actor` and `enqueuer`
+- GitHub CLI v2.105.0 (e1219499) selects `isInMergeQueue` and `isMergeQueueEnabled` in `pkg/cmd/pr/merge/merge.go` `NewMergeContext` for every repository, gated only on the schema having the field (`internal/featuredetection/feature_detection.go`). Indirect evidence that a repository without a queue reads `false` rather than an error
+- Unverified: whether a token without the GitHub App "Merge queues" repository permission reads these fields in a private repository. `GITHUB_TOKEN` has no merge queue permission at all (`data/reusables/actions/github-token-scope-descriptions.md` in github/docs)
+- Unverified: what the two timeline item types return on a PR that never used a queue. Expected: no items
+
+## `RemovedFromMergeQueueEvent.beforeCommit` is undocumented, and live reports point it at the merge group commit, not the PR head [2026-11-21]
+
+- Source: the schema's only description, "Identifies the before commit SHA for the 'removed_from_merge_queue' event"
+- Third-party live data, unverified: [moq-dev/quest#391](https://github.com/moq-dev/quest/pull/391) shows a squash group commit whose parent is the base branch, [sachkov-inside/platform#2378](https://github.com/sachkov-inside/platform/issues/2378) a `beforeCommit` equal to the merge group head SHA
+- So comparing it with the PR's `headRefOid` cannot tell whether the author pushed since the removal
+- `reason` is a free `String`, not an enum. Third-party reports show `failed_checks` and `checks_timed_out`. The REST issue event types page documents neither merge queue event
+
+## A PR's timeline orders commits by branch order, not push time, and `Commit.pushedDate` is gone [2026-11-21]
+
+- Source: [the 2020-07-14 changelog](https://github.blog/changelog/2020-07-14-pull-request-commits-now-ordered-chronologically/): commits "are ordered according to their chronological order in the head branch", in the REST list commits endpoint and the GraphQL `PullRequest` timeline
+- The schema marks `Commit.pushedDate` "no longer supported. Removal on 2023-07-01 UTC."
+- `PullRequestCommit` carries no timestamp of its own. `HeadRefForcePushedEvent` has `createdAt`, the push time
+- So GitHub documents no push time for a plain push. A commit's `committedDate` is the committer's clock when the commit was made
+
+## `pull_request` activity types `enqueued` and `dequeued` are not defaults, and GitHub publishes `dequeued` for every removal, a merge by the queue included [2026-11-21]
+
+- Source: [events that trigger workflows § pull_request](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#pull_request), whose table lists `enqueued` and `dequeued`. "By default, a workflow only runs when a `pull_request` event's activity type is `opened`, `synchronize`, or `reopened`."
+- [Merge queue GA changelog, 2023-07-12](https://github.blog/changelog/2023-07-12-pull-request-merge-queue-is-now-generally-available/): "A `pull_request.dequeued` webhook event is now consistently published whenever a pull request is removed from the queue for any reason, including when it has been merged by the queue."
+- Queue merges are attributed to the GitHub Merge Queue bot, not `GITHUB_TOKEN` ([changelog, 2023-06-21](https://github.blog/changelog/2023-06-21-merges-by-pull-request-merge-queue-now-attributed-to-the-github-merge-queue-bot)), so the rule that `GITHUB_TOKEN` events start no run does not name them
+- Unverified in GitHub's docs: that a queue-initiated `dequeued` starts an Actions run. A third-party report saw `dequeued` runs start after queue merges ([zenn.dev scrap, 2024-09-18](https://zenn.dev/ishii1648/scraps/308618fcd7f851))
+- `merge_group` (`checks_requested` only in Actions) is "separate from the `pull_request` and `push` events", and runs on the merge group's SHA and ref
+
+## Merge queue checks run on a temporary `gh-readonly-queue/<base branch>` branch with its own SHA, apart from the PR head that `statusCheckRollup` reads [2026-11-21]
+
+- Source: [managing a merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue): "the special prefix `gh-readonly-queue/{base_branch}` ... These are the temporary branches that are created on your behalf by a merge queue and contain a different `sha` from the pull request."
+- The schema describes `PullRequest.statusCheckRollup` as "Check and Status rollup information for the PR's head ref."
+- So a failed merge group check never shows in the PR's own rollup. The queue removes the PR, "Configured CI service is reporting test failures for a merge group" being one documented removal reason (`data/reusables/pull_requests/merge-queue-removal-reasons.md`)
