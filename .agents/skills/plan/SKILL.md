@@ -15,7 +15,7 @@ Before drafting an implementation plan, read the following. Each read is mandato
 - **Other runs of the action**: when a change makes a run mode read or write something new (state, artifacts, messages), list every workflow and composite action that runs it (`.github/workflows/`, `.github/actions/`) and what each reads and writes
 - **What starts a run**: when a change makes a run's output depend on time or on earlier runs, list the events that start a run (the README's trigger examples, `.github/workflows/`) and what the message and canvas show between two consecutive runs. Adding or widening a trigger is a question for the user (AGENTS.md § GitHub API Budget)
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
-  - A claim the PR's CI will check needs no verifying before drafting, such as a new field read during the Build E2E runs against the private test repositories. Make the step that relies on it a checkpoint, with the E2E log as its "Verify done" and a stop if the check fails. Don't plan a probe for it ahead of implementation
+  - Unless the PR's Build E2E checks it, such as a new GitHub field read on the private test repositories. Then make the step that relies on it a checkpoint, done when the E2E log shows the claim holds. The implementation stops if it doesn't
 
 ## Past Plans Are Not Examples
 
