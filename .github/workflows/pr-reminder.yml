@@ -30,6 +30,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'schedule' && 'scheduled' || 'other' }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   reminder:
     if: github.actor != 'dependabot[bot]'
