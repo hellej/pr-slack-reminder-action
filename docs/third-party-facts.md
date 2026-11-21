@@ -1158,3 +1158,44 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - This repository's default `make` target is `test`, so autobuild would run the whole test suite before extracting
 - Extraction is "similar to running `go build ./...`". `_test.go` files are left out unless `CODEQL_EXTRACTOR_GO_OPTION_EXTRACT_TESTS` is `true`
 - The CodeQL starter workflow marks the job's `actions: read` "only required for workflows in private repositories" ([actions/starter-workflows code-scanning/codeql.yml](https://github.com/actions/starter-workflows/blob/main/code-scanning/codeql.yml))
+
+## OpenSSF Scorecard's Branch-Protection check reads repository rulesets, and any bypass actor in any matching ruleset fails "applies to administrators", whatever its bypass mode [2026-11-21]
+
+- Source: `clients/githubrepo/branches.go` and `checks/evaluation/branch_protection.go` in `ossf/scorecard` v5.7.0, the version `ossf/scorecard-action` v2.6.0 pins in its `go.mod`
+- One GraphQL query reads `rulesets(first: 100)` with their rules and `bypassActors(first: 100)`. Only `ACTIVE` rulesets targeting `BRANCH` count. `~DEFAULT_BRANCH`, `~ALL` and fnmatch patterns are matched
+- A second query reads classic branch protection. Its "Resource not accessible" error is ignored when a ruleset exists
+- `EnforceAdmins` is `len(bypassActors.nodes) == 0`. `bypassMode` is fetched but never read, so `PULL_REQUEST` and `EXEMPT` count the same as `ALWAYS`
+- Merging several rulesets keeps the strictest value of each setting, but `EnforceAdmins` turns false if any one ruleset has a bypass actor. A second ruleset without bypass actors can't lift it. Open issue: [ossf/scorecard#3480](https://github.com/ossf/scorecard/issues/3480)
+- Tiers must be met in order. A tier partly met adds its share of points, then scoring stops. The final score is truncated to an integer
+  - Tier 1, 3 points: block deletion, block force push
+  - Tier 2, 3 points: at least 1 required approval (weight 2), PRs required, up-to-date branch or merge queue, last-push approval
+  - Tier 3, 2 points: at least 1 required status check
+  - Tier 4, 1 point: at least 2 required approvals, code owner review with a `CODEOWNERS` file present
+  - Tier 5, 1 point: dismiss stale approvals, applies to administrators
+- So any bypass actor caps the check at 9 (9.5 truncated). 1 required approval caps it at 8 (8.5 truncated)
+- Release branches are the `target_commitish` of each release, when that is a branch name
+
+## A read-only token sees a ruleset's rules and bypass actor count, but every bypass actor node reads null [2026-11-21]
+
+- Source: `gh api graphql` with the owner's token (`viewerPermission: READ`) against the rulesets of `ossf/scorecard`, `cli/cli`, `github/docs` and `actions/checkout`, `errors` absent from every response
+- `bypassActors { totalCount nodes { bypassMode } }` returns `totalCount: 2` with `nodes: [null, null]`. A ruleset without bypass actors returns `nodes: []`
+- So Scorecard under a read-only token still finds the bypass actors: its `len(nodes)` counts the nulls
+- Unauthenticated REST `GET /repos/{owner}/{repo}/rulesets/{id}` on a public repository returns the rules but `bypass_actors: null`
+- Unverified: the same read under an Actions `GITHUB_TOKEN`, which is an installation token, not a user token. A GraphQL error there would fail Scorecard's whole rulesets query
+- `ossf/scorecard-action` v2.6.0's README says rulesets "are accessible to Scorecard Action with the workflow's default `GITHUB_TOKEN`". Classic branch protection needs a token with `Administration: Read-only` ([fine-grained-auth-token.md](https://github.com/ossf/scorecard-action/blob/v2.6.0/docs/authentication/fine-grained-auth-token.md))
+
+## OpenSSF Scorecard's overall score weights each check by risk, and leaves out checks scoring -1 [2026-11-21]
+
+- Source: `docs/checks/internal/checks.yaml` in `ossf/scorecard` v5.7.0, and a `scorecard` v5.7.0 CLI run on `hellej/pr-slack-reminder-action` whose 7.8 matches this formula
+- Weights: Critical 10, High 7.5, Medium 5, Low 2.5. Overall is the weighted mean of the checks with a score of 0 or more
+- Critical: Dangerous-Workflow, Webhooks. High: Binary-Artifacts, Branch-Protection, Code-Review, Dependency-Update-Tool, Maintained, Signed-Releases, Token-Permissions, Vulnerabilities. Medium: Fuzzing, Packaging, Pinned-Dependencies, SAST, SBOM, Security-Policy. Low: CI-Tests, CII-Best-Practices, Contributors, License
+
+## OpenSSF Scorecard scoring rules for Binary-Artifacts, Security-Policy, Code-Review and SAST [2026-11-21]
+
+- Source: `checks/evaluation/*.go`, `checks/raw/security_policy.go` and `probes/codeApproved/impl.go` in `ossf/scorecard` v5.7.0, and a `scorecard` v5.7.0 CLI run on `hellej/pr-slack-reminder-action`
+- Binary-Artifacts: 10 minus 1 per binary file found. The run flagged both `dist/main-linux-*` ELF files, which have no extension: score 8
+- Security-Policy: a policy file present, then 6 points for a URL or an email in it, 3 for enough text, 1 for disclosure or vulnerability wording
+  - URL pattern: `(http|https)://[a-zA-Z0-9./?=_%:-]*`. Prose like "the Security tab" earns nothing
+- Code-Review: approved changesets over all changesets among the recent default branch commits. An approval needs a reviewer other than the author
+  - An approved bot-authored changeset is dropped from both counts, so approving Dependabot PRs can't lift a solo maintainer's score above 0
+- SAST: with CodeQL configured, `(3 × PR share + 7 × 10) / 10`, where PR share is the merged PRs among the recent commits that have a SAST check run, scaled to 10. Direct pushes aren't counted. All PRs checked scores 10
