@@ -20,7 +20,7 @@ status: draft
 
 ## Target Shape
 
-- New field `githubclient.PR.InMergeQueue`, from `PullRequest.isInMergeQueue`, tagged `json:",omitempty"`. See docs/third-party-facts.md § `PullRequest.isInMergeQueue` is a non-null `Boolean!`, and GitHub CLI selects it on every `gh pr merge` whatever the repository
+- New field `githubclient.PR.IsInMergeQueue`, from `PullRequest.isInMergeQueue`, tagged `json:",omitempty"`. See docs/third-party-facts.md § `PullRequest.isInMergeQueue` is a non-null `Boolean!`, and GitHub CLI selects it on every `gh pr merge` whatever the repository
   - Read by the enrichment query (`enrichedPullRequestSelection`), beside `mergeable`, so every enriched open PR gets it, approved or not
   - A PR left without reviewer info by a failed enrichment reads false, like its other merge flags
   - Merged PRs read false, so the merged PR cache stays byte for byte the same
@@ -81,9 +81,9 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 
 ### 1: Read `isInMergeQueue` in the enrichment query (checkpoint)
 
-- `internal/apiclients/githubclient/`: add `isInMergeQueue` to `enrichedPullRequestSelection` and an `IsInMergeQueue` field to `pullRequestNode`, and set `PR.InMergeQueue` from it in `prWithReviewers`
+- `internal/apiclients/githubclient/`: add `isInMergeQueue` to `enrichedPullRequestSelection` and an `IsInMergeQueue` field to `pullRequestNode`, and set `PR.IsInMergeQueue` from it in `prWithReviewers`
   - `enrichPRsWithReviewInfo` runs that selection for `FindOpenPRs`, `FindRecentlyMergedPRs` and `FindPRsMergedSince`
-  - `fullPullRequestSelection` stays as it is, so `GetPRs` PRs read `InMergeQueue` false. They are only read for their merged state
+  - `fullPullRequestSelection` stays as it is, so `GetPRs` PRs read `IsInMergeQueue` false. They are only read for their merged state
 - `testhelpers/mockgithubclient/`: the enrichment route answers `isInMergeQueue` from a new fixture option listing the queued PR numbers, all others false
 - Tests pinning the enrichment query text change with the selection
 - `githubclient.spec.md`: Behaviour, beside the merge flags, and that `GetPRs` PRs read it false, as they read `RequiredChecksUnknown`

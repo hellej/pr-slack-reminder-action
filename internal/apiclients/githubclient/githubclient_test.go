@@ -1128,13 +1128,13 @@ func TestFindOpenPRsReadsWhichPRsAreInAMergeQueue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	inMergeQueueByPRNumber := map[int]bool{}
+	isInMergeQueueByPRNumber := map[int]bool{}
 	for _, pr := range result.PRs {
-		inMergeQueueByPRNumber[pr.GetNumber()] = pr.InMergeQueue
+		isInMergeQueueByPRNumber[pr.GetNumber()] = pr.IsInMergeQueue
 	}
 	expected := map[int]bool{7: true, 8: true, 9: false, 10: false}
-	if !maps.Equal(inMergeQueueByPRNumber, expected) {
-		t.Errorf("InMergeQueue by PR number = %v, expected %v", inMergeQueueByPRNumber, expected)
+	if !maps.Equal(isInMergeQueueByPRNumber, expected) {
+		t.Errorf("IsInMergeQueue by PR number = %v, expected %v", isInMergeQueueByPRNumber, expected)
 	}
 }
 
@@ -1153,7 +1153,7 @@ func TestGetPRsReadsNoPRAsInAMergeQueue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(prs) != 1 || prs[0].InMergeQueue {
+	if len(prs) != 1 || prs[0].IsInMergeQueue {
 		t.Errorf("expected one PR not in a merge queue, got %+v", prs)
 	}
 }

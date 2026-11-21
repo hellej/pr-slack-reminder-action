@@ -31,7 +31,7 @@ type testPROptions struct {
 	conflicting               bool
 	threadWaiting             bool
 	outstandingChangesRequest bool
-	inMergeQueue              bool
+	isInMergeQueue            bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -65,7 +65,7 @@ func testPR(options testPROptions) prview.PR {
 			Conflicting:                  options.conflicting,
 			HasThreadWaitingForAuthor:    options.threadWaiting,
 			HasOutstandingChangesRequest: options.outstandingChangesRequest,
-			InMergeQueue:                 options.inMergeQueue,
+			IsInMergeQueue:               options.isInMergeQueue,
 		},
 		Approvers:      approvers,
 		StaleApprovers: staleApprovers,
@@ -135,8 +135,8 @@ func TestGetContentBucketsOpenPRsByNextAction(t *testing.T) {
 		testPR(testPROptions{number: 5, threadWaiting: true}),
 		testPR(testPROptions{number: 6, conflicting: true}),
 		testPR(testPROptions{number: 7, approved: true}),
-		testPR(testPROptions{number: 8, approved: true, inMergeQueue: true}),
-		testPR(testPROptions{number: 9, conflicting: true, inMergeQueue: true}),
+		testPR(testPROptions{number: 8, approved: true, isInMergeQueue: true}),
+		testPR(testPROptions{number: 9, conflicting: true, isInMergeQueue: true}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -159,8 +159,8 @@ func TestGetContentKeepsEachOpenBucketOldestFirst(t *testing.T) {
 		testPR(testPROptions{number: 4, approved: true, createdAt: createdHoursAgo(20)}),
 		testPR(testPROptions{number: 5, threadWaiting: true, createdAt: createdHoursAgo(30)}),
 		testPR(testPROptions{number: 6, createdAt: createdHoursAgo(40)}),
-		testPR(testPROptions{number: 7, inMergeQueue: true, createdAt: createdHoursAgo(5)}),
-		testPR(testPROptions{number: 8, inMergeQueue: true, createdAt: createdHoursAgo(50)}),
+		testPR(testPROptions{number: 7, isInMergeQueue: true, createdAt: createdHoursAgo(5)}),
+		testPR(testPROptions{number: 8, isInMergeQueue: true, createdAt: createdHoursAgo(50)}),
 	}
 
 	content := canvascontent.GetContent(prs, nil, config.ContentInputs{}, canvascontent.GetContentOptions{
@@ -801,7 +801,7 @@ func TestGetContentGroupsAndCollapsesTheMergeQueueSection(t *testing.T) {
 	queuedPR := func(number int, repository, authorLogin string, ageHours int) prview.PR {
 		return testPR(testPROptions{
 			number: number, repository: repository, authorLogin: authorLogin,
-			createdAt: createdHoursAgo(ageHours), inMergeQueue: true,
+			createdAt: createdHoursAgo(ageHours), isInMergeQueue: true,
 		})
 	}
 	prs := []prview.PR{

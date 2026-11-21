@@ -207,8 +207,8 @@ func prWithReviewers(
 		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
 			node.ReviewThreads.Nodes, pullRequest.Author,
 		),
-		Conflicting:  node.Mergeable == conflictingMergeableState,
-		InMergeQueue: node.IsInMergeQueue,
+		Conflicting:    node.Mergeable == conflictingMergeableState,
+		IsInMergeQueue: node.IsInMergeQueue,
 		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
 			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
 		),

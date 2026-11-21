@@ -27,7 +27,7 @@ type testPROptions struct {
 	commenters                   []string
 	conflicting                  bool
 	hasOutstandingChangesRequest bool
-	inMergeQueue                 bool
+	isInMergeQueue               bool
 }
 
 func testPR(options testPROptions) prview.PR {
@@ -50,7 +50,7 @@ func testPR(options testPROptions) prview.PR {
 			Repository:                   repository,
 			Conflicting:                  options.conflicting,
 			HasOutstandingChangesRequest: options.hasOutstandingChangesRequest,
-			InMergeQueue:                 options.inMergeQueue,
+			IsInMergeQueue:               options.isInMergeQueue,
 		},
 		Approvers:      collaborators(options.approvers),
 		StaleApprovers: collaborators(options.staleApprovers),
@@ -93,9 +93,9 @@ func TestGetContentBucketsOpenPRsByNextActionOldestFirst(t *testing.T) {
 			number: 5, createdAt: generatedAt.Add(-3 * time.Hour), approvers: []string{"dana"}, conflicting: true,
 		}),
 		testPR(testPROptions{
-			number: 6, createdAt: generatedAt.Add(-2 * time.Hour), approvers: []string{"dana"}, inMergeQueue: true,
+			number: 6, createdAt: generatedAt.Add(-2 * time.Hour), approvers: []string{"dana"}, isInMergeQueue: true,
 		}),
-		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-8 * time.Hour), inMergeQueue: true}),
+		testPR(testPROptions{number: 7, createdAt: generatedAt.Add(-8 * time.Hour), isInMergeQueue: true}),
 	}
 
 	content := GetContent(openPRs, nil, nil, nil, nil, time.Time{}, generatedAt, config.ContentInputs{})
@@ -165,7 +165,7 @@ func TestGetContentGroupsAndCollapsesTheMergeQueueSection(t *testing.T) {
 	queuedPR := func(number int, repository, authorLogin string, ageHours int) prview.PR {
 		return testPR(testPROptions{
 			number: number, repository: repository, authorLogin: authorLogin,
-			createdAt: generatedAt.Add(-time.Duration(ageHours) * time.Hour), inMergeQueue: true,
+			createdAt: generatedAt.Add(-time.Duration(ageHours) * time.Hour), isInMergeQueue: true,
 		})
 	}
 	openPRs := []prview.PR{
@@ -300,7 +300,7 @@ func readyToMergePR(number int) prview.PR {
 }
 
 func inMergeQueuePR(number int) prview.PR {
-	return testPR(testPROptions{number: number, approvers: []string{"dana"}, inMergeQueue: true})
+	return testPR(testPROptions{number: number, approvers: []string{"dana"}, isInMergeQueue: true})
 }
 
 func waitingForAuthorPR(number int) prview.PR {

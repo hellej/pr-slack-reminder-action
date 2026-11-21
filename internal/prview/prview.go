@@ -60,7 +60,7 @@ func (pr PR) GetNextAction() PRNextAction {
 		return NextActionWaitingForReview
 	}
 
-	if pr.InMergeQueue {
+	if pr.IsInMergeQueue {
 		return NextActionInMergeQueue
 	}
 	if pr.isApproved() && !pr.HasThreadWaitingForAuthor && !pr.Conflicting && !pr.isFailingRequiredChecks() {
