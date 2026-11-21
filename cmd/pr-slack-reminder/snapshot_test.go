@@ -104,6 +104,16 @@ func assertSavedStateMatchesSnapshot(t *testing.T, stateFilePath string) {
 	assertMatchesSnapshot(t, normalisedState, getSnapshotFilePath(t, ".state.json"))
 }
 
+// Run stamps the canvas footer with the real clock.
+func assertCanvasMatchesSnapshot(t *testing.T, mockSlackAPI *mockslackclient.MockSlackAPI) {
+	t.Helper()
+	if !mockSlackAPI.ReplacedCanvas.Called {
+		t.Fatalf("Expected the canvas written")
+	}
+	markdown := canvasFooterLine.ReplaceAllString(mockSlackAPI.ReplacedCanvas.Markdown, "_Updated 1970-01-01 00:00 UTC_")
+	assertMatchesSnapshot(t, []byte(markdown), getSnapshotFilePath(t, ".canvas.md"))
+}
+
 func assertMatchesSnapshot(t *testing.T, actual []byte, snapshotFilePath string) {
 	t.Helper()
 	if *updateSnapshots {
@@ -147,7 +157,9 @@ type snapshotScenario struct {
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
-	previousPostStateAt                  func(runStart time.Time) state.State
+	// Most scenarios leave the canvas off, as most users do.
+	writesCanvas        bool
+	previousPostStateAt func(runStart time.Time) state.State
 }
 
 func (scenario snapshotScenario) previousPostState(runStart time.Time) *state.State {
@@ -346,12 +358,18 @@ func collapsePRsFromAuthorsScenario(name string, groupByRepository bool) snapsho
 	}
 }
 
+func withCanvas(scenario snapshotScenario) snapshotScenario {
+	scenario.writesCanvas = true
+	return scenario
+}
+
 func snapshotScenarios() []snapshotScenario {
 	return []snapshotScenario{
 		collapsePRsFromAuthorsScenario("collapse PRs from authors", false),
-		collapsePRsFromAuthorsScenario("collapse PRs from authors grouped by repository", true),
+		withCanvas(collapsePRsFromAuthorsScenario("collapse PRs from authors grouped by repository", true)),
 		{
-			name: "grouped by repository over two repositories",
+			name:         "grouped by repository over two repositories",
+			writesCanvas: true,
 			configOverrides: map[string]any{
 				config.InputGithubRepositories: "test-org/repo-one; test-org/repo-two",
 				config.InputGroupByRepository:  true,
@@ -506,7 +524,8 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
-			name: "every section under load",
+			name:         "every section under load",
+			writesCanvas: true,
 			configOverrides: map[string]any{
 				config.InputOldPRThresholdHours: 48,
 			},
@@ -545,6 +564,16 @@ func snapshotScenarios() []snapshotScenario {
 					Number: 77, Title: "Approved but a required check fails", AuthorLogin: "grace",
 					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/77",
 					AgeHours: 7,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 78, Title: "Spike: retry the uploads", AuthorLogin: "bob",
+					AuthorName: "Bob Brown", HTMLURL: "https://github.com/test-org/test-repo/pull/78",
+					AgeHours: 50, Draft: github.Ptr(true), UpdatedDaysAgo: 0.25,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 79, Title: "Draft the migration guide", AuthorLogin: "carol",
+					AuthorName: "Carol Clark", HTMLURL: "https://github.com/test-org/test-repo/pull/79",
+					AgeHours: 400, Draft: github.Ptr(true), UpdatedDaysAgo: 10,
 				}),
 			},
 			prNumbersWithFailingRequiredChecks: []int{77},
@@ -624,7 +653,8 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
-			name: "one open PR and one merged PR, merged section hidden",
+			name:         "one open PR and one merged PR, merged section hidden",
+			writesCanvas: true,
 			configOverrides: map[string]any{
 				config.InputShowMergedPRsInMessage: false,
 			},
@@ -673,7 +703,8 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
-			name: "a PR in merge queue beside one ready to merge",
+			name:         "a PR in merge queue beside one ready to merge",
+			writesCanvas: true,
 			prs: []*github.PullRequest{
 				getTestPR(GetTestPROptions{
 					Number: 111, Title: "Fix login redirect", AuthorLogin: "alice",
@@ -725,7 +756,8 @@ func snapshotScenarios() []snapshotScenario {
 			inMergeQueuePRNumbers: []int{115},
 		},
 		{
-			name: "no PRs message",
+			name:         "no PRs message",
+			writesCanvas: true,
 			configOverrides: map[string]any{
 				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
 			},
@@ -788,13 +820,19 @@ func TestSnapshotsPostMode(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			overrides, sentSlackBlocksFilePath := getFilePathOverrides(t)
 			maps.Copy(overrides, scenario.configOverrides)
+			if scenario.writesCanvas {
+				overrides[config.InputPRTrackerCanvasLink] = testCanvasLink
+			}
 			testhelpers.SetTestEnvironment(t, testhelpers.GetDefaultConfigMinimal(), &overrides)
 
 			runStart := time.Now()
-			runSnapshotScenario(t, scenario, scenario.previousPostState(runStart), "")
+			mockSlackAPI := runSnapshotScenario(t, scenario, scenario.previousPostState(runStart), "")
 
 			assertSentBlocksMatchSnapshot(t, sentSlackBlocksFilePath)
 			assertSavedStateMatchesSnapshot(t, overrides[config.EnvStateFilePath].(string))
+			if scenario.writesCanvas {
+				assertCanvasMatchesSnapshot(t, mockSlackAPI)
+			}
 		})
 	}
 }

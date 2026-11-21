@@ -213,7 +213,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 
 - `make test`: run all tests, including `.github/scripts/`
 - `make test-with-coverage`: run tests with coverage report (clears cache first)
-- `make update-test-snapshots`: re-record the Slack payload and saved state snapshots in `cmd/pr-slack-reminder/testdata/snapshots/` and the canvas markdown in `internal/canvasbuilder/testdata/`
+- `make update-test-snapshots`: re-record the Slack payload, saved state and canvas markdown snapshots of full runs in `cmd/pr-slack-reminder/testdata/snapshots/`, and the canvas builder's golden files in `internal/canvasbuilder/testdata/`
 - `make run`: run locally (requires env vars, see Makefile for the pattern)
 - `make build`: build linux binaries
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change

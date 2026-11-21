@@ -132,10 +132,6 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 		number: 1, title: "Add pagination to the PR listing", authorName: "Alice Anderson",
 		age: hoursAge, approvers: []string{"Dana Davis"}, commenters: []string{"Erin Evans"},
 	})
-	otherOpenPR := testPR(prOptions{
-		number: 2, title: "Bump the Slack SDK", repository: "repo-two", authorName: "Bob Brown",
-		age: minutesAge,
-	})
 	// The WIP and merged PRs are approved and failing, so a row naming the failing checks
 	// anywhere but in an open section shows up in the snapshots. Both have a stale approver too:
 	// a WIP row naming them, or a merged row splitting its groups as an open row does, shows up.
@@ -275,42 +271,6 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			},
 		},
 		{
-			name: "collapsed rows grouped by repository",
-			content: canvascontent.Content{
-				WaitingForReview: prview.PRSection{Groups: []prview.RepositoryRows{
-					{Repository: testRepository("test-repo"), Rows: []prview.Row{openPR, renovateRow}},
-					{
-						Repository: testRepository("repo-two"),
-						Rows: []prview.Row{collapsedRow("dependabot[bot]",
-							prOptions{number: 7, repository: "repo-two"}, prOptions{number: 8, repository: "repo-two"},
-						)},
-					},
-				}},
-				Merged: prview.PRSection{Groups: []prview.RepositoryRows{
-					{Repository: testRepository("test-repo"), Rows: []prview.Row{mergedDependabotRow}},
-					{Repository: testRepository("repo-two"), Rows: []prview.Row{otherMergedPR}},
-				}},
-				WIP: prview.PRSection{Groups: []prview.RepositoryRows{
-					{Repository: testRepository("test-repo"), Rows: []prview.Row{wipPR, wipBotRow}},
-				}},
-				GroupedByRepository: true,
-				GeneratedAt:         generatedAt,
-			},
-		},
-		{
-			// A whole canvas at a real day's volume, so the golden file shows what three
-			// open headings cost a reader.
-			name: "flat open PRs and WIP PRs",
-			content: canvascontent.Content{
-				ReadyToMerge:     flatSection(readyToMergePRs),
-				WaitingForAuthor: flatSection(waitingForAuthorPRs),
-				WaitingForReview: flatSection(waitingForReviewPRs),
-				WIP:              flatSection([]prview.PR{wipPR, otherWIPPR}),
-				Merged:           flatSection([]prview.PR{otherMergedPR, mergedPR}),
-				GeneratedAt:      generatedAt,
-			},
-		},
-		{
 			// A queued row shows its reviewers and merge blockers like any open row.
 			name: "a PR in merge queue beside one ready to merge",
 			content: canvascontent.Content{
@@ -336,15 +296,6 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			},
 		},
 		{
-			name: "open PRs grouped by repository",
-			content: canvascontent.Content{
-				WaitingForReview:    groupedSection([]prview.PR{openPR, otherOpenPR}),
-				GroupedByRepository: true,
-				WIP:                 flatSection([]prview.PR{wipPR}),
-				GeneratedAt:         generatedAt,
-			},
-		},
-		{
 			// Each section's groups come in their own order, so the repository leading one
 			// section need not lead the next, and nothing dedupes a repository across
 			// sections: the golden file shows what the ### headings add up to.
@@ -355,35 +306,6 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 				WaitingForReview:    groupedSection(waitingForReviewPRs),
 				WIP:                 groupedSection([]prview.PR{otherWIPPR, wipPR}),
 				Merged:              groupedSection([]prview.PR{otherMergedPR, mergedPR}),
-				GroupedByRepository: true,
-				GeneratedAt:         generatedAt,
-			},
-		},
-		{
-			// The two empty buckets render nothing at all, heading included.
-			name: "ready to merge PRs only",
-			content: canvascontent.Content{
-				ReadyToMerge: flatSection(readyToMergePRs),
-				WIP:          flatSection([]prview.PR{wipPR}),
-				GeneratedAt:  generatedAt,
-			},
-		},
-		{
-			name: "nothing ready to merge",
-			content: canvascontent.Content{
-				WaitingForAuthor: flatSection(waitingForAuthorPRs),
-				WaitingForReview: flatSection(waitingForReviewPRs),
-				WIP:              flatSection([]prview.PR{wipPR}),
-				GeneratedAt:      generatedAt,
-			},
-		},
-		{
-			// A hidden bucket while grouping: only the populated section gets its ###
-			// sub-headings.
-			name: "ready to merge PRs only, grouped by repository",
-			content: canvascontent.Content{
-				ReadyToMerge:        groupedSection(readyToMergePRs),
-				WIP:                 groupedSection([]prview.PR{wipPR}),
 				GroupedByRepository: true,
 				GeneratedAt:         generatedAt,
 			},
@@ -401,30 +323,6 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 				GroupedByRepository: true,
 				WIP:                 flatSection([]prview.PR{wipPR}),
 				GeneratedAt:         generatedAt,
-			},
-		},
-		{
-			name: "no WIP PRs",
-			content: canvascontent.Content{
-				WaitingForReview: flatSection([]prview.PR{openPR}),
-				GeneratedAt:      generatedAt,
-			},
-		},
-		{
-			name:    "no PRs at all",
-			content: canvascontent.Content{GeneratedAt: generatedAt},
-		},
-		{
-			name: "old open PR",
-			content: canvascontent.Content{
-				WaitingForReview: flatSection([]prview.PR{
-					testPR(prOptions{
-						number: 4, title: "Old PR past the threshold", authorName: "Bob Brown",
-						age: oldAge, isOldPR: true,
-					}),
-					openPR,
-				}),
-				GeneratedAt: generatedAt,
 			},
 		},
 		{
