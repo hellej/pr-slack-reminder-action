@@ -1181,7 +1181,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `bypassActors { totalCount nodes { bypassMode } }` returns `totalCount: 2` with `nodes: [null, null]`. A ruleset without bypass actors returns `nodes: []`
 - So Scorecard under a read-only token still finds the bypass actors: its `len(nodes)` counts the nulls
 - Unauthenticated REST `GET /repos/{owner}/{repo}/rulesets/{id}` on a public repository returns the rules but `bypass_actors: null`
-- Unverified: the same read under an Actions `GITHUB_TOKEN`, which is an installation token, not a user token. A GraphQL error there would fail Scorecard's whole rulesets query
+- Under an Actions `GITHUB_TOKEN` too: `scorecard-action` v2.6.0 published Branch-Protection 8 for this repo on 2026-11-21, the same as the admin token, so it saw the bypass actors
 - `ossf/scorecard-action` v2.6.0's README says rulesets "are accessible to Scorecard Action with the workflow's default `GITHUB_TOKEN`". Classic branch protection needs a token with `Administration: Read-only` ([fine-grained-auth-token.md](https://github.com/ossf/scorecard-action/blob/v2.6.0/docs/authentication/fine-grained-auth-token.md))
 
 ## OpenSSF Scorecard's overall score weights each check by risk, and leaves out checks scoring -1 [2026-11-21]
