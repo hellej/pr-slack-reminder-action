@@ -24,8 +24,7 @@ func durationText(duration time.Duration) string {
 	}
 }
 
-// Renders how long ago something happened: "just now" under a minute, "N minutes/hours/days ago"
-// otherwise.
+// Renders "N minutes/hours/days ago", or "just now" under a minute.
 func timeAgoText(duration time.Duration) string {
 	if duration < time.Minute {
 		return "just now"
@@ -40,9 +39,8 @@ func pluralize(count int, unit string) string {
 	return unit + "s"
 }
 
-// GetActivityText renders how long ago the PR last saw activity: "updated just now" under a
-// minute, "updated N minutes/hours ago" under a day, "idle N days" from a day onwards. Unknown
-// activity, a zero update time, yields no text.
+// GetActivityText renders "updated " plus timeAgoText under a day, "idle N days" from a day on.
+// A zero update time yields no text.
 func (pr PR) GetActivityText() string {
 	updatedAt := pr.GetUpdatedAt()
 	if updatedAt.IsZero() {
@@ -55,10 +53,8 @@ func (pr PR) GetActivityText() string {
 	return "updated " + timeAgoText(inactivity)
 }
 
-// GetMergedText renders how long ago the PR was merged as "merged just now" under a minute,
-// "merged N minutes/hours/days ago" otherwise.
-// The prefix keeps it apart from the age an open row shows in the same style. A PR that was
-// never merged yields no text.
+// GetMergedText renders "merged " plus timeAgoText. The prefix keeps it apart from an open row's
+// age. A PR never merged yields no text.
 func (pr PR) GetMergedText() string {
 	mergedAt := pr.GetMergedAt()
 	if mergedAt == nil {
@@ -67,9 +63,8 @@ func (pr PR) GetMergedText() string {
 	return "merged " + timeAgoText(time.Since(*mergedAt))
 }
 
-// GetPRAgeDisplayText renders the PR's age as "N days old" past the old-PR threshold, otherwise
-// as "just now" under a minute and "N days ago" from a minute on. The warning marker that goes
-// with an old PR belongs to the renderer.
+// GetPRAgeDisplayText renders the age as "3 days old" past the old-PR threshold, else as
+// timeAgoText. The old-PR warning marker belongs to the renderer.
 func (pr PR) GetPRAgeDisplayText() string {
 	if pr.IsOldPR {
 		return pr.GetPRAgeText() + " old"

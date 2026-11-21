@@ -12,7 +12,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - Everything else, the age text included, reads calendar time
 - `GetPRAgeText` renders age as days, hours, or minutes depending on magnitude; `GetPRAgeDisplayText` adds the suffix, "N days old" for a PR flagged old and "N days ago" otherwise. The old-PR warning marker belongs to the renderer
 - `GetActivityText` renders time since `UpdatedAt` in the same magnitudes: "updated N minutes/hours ago" under a day, "idle N days" from a day onwards
-- Every "N ... ago" text reads "just now" under a minute, so a fresh PR never shows "0 minutes ago"
+- Each "... ago" text reads "just now" under a minute
 - `GetMergedText` renders time since `MergedAt` as "merged N minutes/hours/days ago", prefixed like the activity text so a merge time cannot be misread as an age. A PR that was never merged yields no text
 - `IsActiveAsOf(asOf, threshold)` is true when `UpdatedAt` is within `threshold` of `asOf`, inclusive at the boundary. Callers give both, so a caller that can't read the clock passes `time.Now()` itself, and a canvas-generation timestamp stays reusable
 - `IsRecentlyUpdated` is `IsActiveAsOf(time.Now(), RecentActivityThreshold)`, for a caller that can read the wall clock directly. `RecentActivityThreshold` (24 hours) is exported so other packages bucket by the same boundary; it matches where `GetActivityText` flips from "updated" to "idle"
