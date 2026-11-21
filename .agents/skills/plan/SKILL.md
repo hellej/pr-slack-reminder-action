@@ -6,7 +6,7 @@ argument-hint: "Optional: what you're about to plan"
 
 # Mandatory Pre-Plan Read Sequence
 
-Before drafting an implementation plan, read the following. Each read is mandatory:
+Before drafting an implementation plan, bring the branch up to date with `origin/main`, per AGENTS.md § Git. Then read the following. Each read is mandatory:
 
 - **AGENTS.md § Package Specs**, then every touched package's `<package>.spec.md` in full
 - **AGENTS.md § Purpose, § Reference Deployment, § Code Style, § Testing and § Third-party Facts**
