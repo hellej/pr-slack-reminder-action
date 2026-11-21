@@ -81,10 +81,11 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 ### 1: Read `isInMergeQueue` in the enrichment query (checkpoint)
 
 - `internal/apiclients/githubclient/`: `isInMergeQueue` in `enrichedPullRequestSelection`, the node field, and `PR.InMergeQueue` set in `prWithReviewers`
-  - `fullPullRequestSelection` stays as it is: `GetPRs` PRs are only read for their merged state
+  - `enrichPRsWithReviewInfo` runs that selection for `FindOpenPRs`, `FindRecentlyMergedPRs` and `FindPRsMergedSince`
+  - `fullPullRequestSelection` stays as it is, so `GetPRs` PRs read `InMergeQueue` false. They are only read for their merged state
 - `testhelpers/mockgithubclient/`: the enrichment route answers `isInMergeQueue` from a new fixture option listing the queued PR numbers, all others false
 - Tests pinning the enrichment query text change with it
-- `githubclient.spec.md`: Behaviour, beside the merge flags
+- `githubclient.spec.md`: Behaviour, beside the merge flags, and that `GetPRs` PRs read it false, as they read `RequiredChecksUnknown`
 - Verify done, before step 2:
   - The Build E2E job log of this branch's PR shows the enrichment of the private `hellej/pr-slack-reminder-test-repo-1` and `-2`, and the public `-3`, with no field error. The job's App token lacks the "Merge queues" permission
   - `rateLimit.cost` of the enrichment request against the last run on `main`, stated in the PR
@@ -130,7 +131,11 @@ Marked stale by the next post: the staleness warning, then the blocks as last se
 
 ### Caveats
 
-- A token that cannot read `isInMergeQueue` would lose each PR's reviewer info, since a field error fails its PR in the enrichment query. The Build E2E covers the App token on private repositories. `GITHUB_TOKEN` on a private repository is unverified
+- A token that cannot read `isInMergeQueue` gets a field error on every enriched PR, open or merged. Each such PR loses its reviewer info, so:
+  - open PRs also lose their snooze and their check status fetch
+  - merged rows lose their reviewers
+  - the merge stats fetch warns once per merged PR
+- The Build E2E covers that for the App token on private repositories. `GITHUB_TOKEN` on a private repository is unverified
 - No live check of a queued PR: unit and snapshot tests carry that path
 - Unverified: that a queue-initiated `dequeued` starts an Actions run. Without it, a queue merge still shows through `closed`, and a removal at the next run another event starts
 - `dequeued` also fires on each queue merge, beside `closed`: one more update run per merged PR, and one per enqueue. Within § GitHub API Budget at the § Reference Deployment's PR counts
