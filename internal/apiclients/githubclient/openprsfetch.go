@@ -125,7 +125,7 @@ func openPullRequestFromNode(node pullRequestNode) *PullRequest {
 	return pullRequest
 }
 
-const enrichedPullRequestSelection = `  number mergeable
+const enrichedPullRequestSelection = `  number mergeable isInMergeQueue
   reviews(last: 100){ nodes { state submittedAt createdAt author { login __typename ... on User { name } } } }
   comments(last: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
   reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }

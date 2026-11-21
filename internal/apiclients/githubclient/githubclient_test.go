@@ -1105,3 +1105,55 @@ func errorText(err error) string {
 	}
 	return err.Error()
 }
+
+func TestFindOpenPRsReadsWhichPRsAreInAMergeQueue(t *testing.T) {
+	now := time.Now()
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs: []*github.PullRequest{
+			makePRFixture(7, false, now, now),
+			makePRFixture(8, false, now, now),
+			makePRFixture(9, false, now, now),
+			makePRFixture(10, false, now, now),
+		},
+		ReviewsByPRNumber:     approvingReviewsByPRNumber(7, 9),
+		ErrByPRNumber:         map[int]error{10: errors.New("network timeout")},
+		InMergeQueuePRNumbers: []int{7, 8, 10},
+	})
+
+	result, err := client.FindOpenPRs(
+		context.Background(), []models.Repository{{Owner: "o", Name: "repo"}}, noFilters,
+		githubclient.PRFetchOptions{},
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	inMergeQueueByPRNumber := map[int]bool{}
+	for _, pr := range result.PRs {
+		inMergeQueueByPRNumber[pr.GetNumber()] = pr.InMergeQueue
+	}
+	expected := map[int]bool{7: true, 8: true, 9: false, 10: false}
+	if !maps.Equal(inMergeQueueByPRNumber, expected) {
+		t.Errorf("InMergeQueue by PR number = %v, expected %v", inMergeQueueByPRNumber, expected)
+	}
+}
+
+func TestGetPRsReadsNoPRAsInAMergeQueue(t *testing.T) {
+	now := time.Now()
+	client := newTestClient(mockgithubclient.MockGitHubClientOptions{
+		PRs:                   []*github.PullRequest{makePRFixture(7, false, now, now)},
+		InMergeQueuePRNumbers: []int{7},
+	})
+	references := []models.PullRequestRef{
+		{Repository: models.Repository{Owner: "o", Name: "repo"}, Number: 7},
+	}
+
+	prs, err := client.GetPRs(context.Background(), references, noFilters)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(prs) != 1 || prs[0].InMergeQueue {
+		t.Errorf("expected one PR not in a merge queue, got %+v", prs)
+	}
+}

@@ -49,7 +49,10 @@ type MockGitHubClientOptions struct {
 	CheckStatusForbiddenPRNumbers []int
 	// Each answers its PR's mergeable as CONFLICTING. Any other PR's node leaves mergeable out,
 	// which githubclient reads as not conflicting
-	ConflictingPRNumbers  []int
+	ConflictingPRNumbers []int
+	// Each answers its PR's isInMergeQueue as true, any other PR's as false, whenever the query
+	// selects the field
+	InMergeQueuePRNumbers []int
 	PRServiceError        error
 	IssueServiceError     error
 	MockPreviousState     *state.State
@@ -205,7 +208,7 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
 		t.recordPullRequestsRequest(request.Query, request.Variables)
-		return t.enrichedPRsResponse(request.Variables)
+		return t.enrichedPRsResponse(request.Variables, selectsIsInMergeQueue(request.Query))
 	}
 	if strings.Contains(request.Query, "search(") {
 		return t.mergedPRsResponse(request.Variables)
@@ -271,7 +274,9 @@ func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.R
 
 // An ErrByPRNumber entry renders as a PR-level error, a reference with no PR fixture as a
 // PR-level NOT_FOUND, and an IssueServiceError as a field error on every PR's comments connection.
-func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, json.RawMessage, error) {
+func (t GraphQLTransport) enrichedPRsResponse(
+	variables map[string]any, answersIsInMergeQueue bool,
+) (int, json.RawMessage, error) {
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
 	for index, ref := range postedPullRequestRefs(variables) {
 		alias := fmt.Sprintf("p%d", index)
@@ -294,7 +299,9 @@ func (t GraphQLTransport) enrichedPRsResponse(variables map[string]any) (int, js
 			})
 			continue
 		}
-		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(pr, ref.number)}
+		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(
+			pr, ref.number, answersIsInMergeQueue,
+		)}
 		if t.opts.IssueServiceError != nil {
 			response.Errors = append(response.Errors, renderedError{
 				Type:    "RESOURCE_LIMITS_EXCEEDED",
@@ -423,7 +430,7 @@ func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullReques
 
 // GetPRs selects state, merged and labels alongside the scalars both phases share.
 func (t GraphQLTransport) enrichedPullRequestNodeJSON(
-	pr *github.PullRequest, number int,
+	pr *github.PullRequest, number int, answersIsInMergeQueue bool,
 ) map[string]any {
 	node := pullRequestScalarsJSON(pr)
 	node["number"] = number
@@ -442,6 +449,9 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	)
 	if slices.Contains(t.opts.ConflictingPRNumbers, number) {
 		node["mergeable"] = "CONFLICTING"
+	}
+	if answersIsInMergeQueue {
+		node["isInMergeQueue"] = slices.Contains(t.opts.InMergeQueuePRNumbers, number)
 	}
 	return node
 }
@@ -590,6 +600,12 @@ type pullRequestRef struct {
 	repoOwner string
 	repoName  string
 	number    int
+}
+
+// Unlike the other fields, isInMergeQueue is answered only when the query selects it, so a test
+// sees the false a missing selection decodes to.
+func selectsIsInMergeQueue(query string) bool {
+	return strings.Contains(query, "isInMergeQueue")
 }
 
 // Both GetPRs and the enrichment phase select a PR by number; only GetPRs spreads the fullPr
