@@ -115,9 +115,11 @@ func GetInputList(name string) []string {
 }
 
 func GetInputMapping(inputName string) (map[string]string, error) {
-	name := inputNameAsEnv(inputName)
+	return parseMapping(inputName, os.Getenv(inputNameAsEnv(inputName)))
+}
+
+func parseMapping(inputName string, val string) (map[string]string, error) {
 	valueByKey := make(map[string]string)
-	val := os.Getenv(name)
 	if val == "" {
 		return valueByKey, nil
 	}
