@@ -1149,3 +1149,12 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Not shown:
   - `GITHUB_TOKEN` in a private repository
   - The same read with `statuses: read` granted
+
+## CodeQL supports only the autobuild and manual build modes for Go, and Go autobuild first runs `make` [2026-11-21]
+
+- Source: [Build options for compiled languages § Building Go](https://github.com/github/docs/blob/main/content/code-security/reference/code-scanning/codeql/build-options-for-compiled-languages.md), read with `gh api` from the `github/docs` repository
+- "CodeQL supports build modes `autobuild` or `manual` for Go code". No `none` mode, unlike C#, Java and Rust
+- Autobuild invokes `make`, `ninja`, `./build` or `./build.sh` in that order, until one succeeds and a `go list ./...` after it succeeds too. Only then does it fall back to `go.mod` and `go get`
+  - This repository's default `make` target is `test`, so autobuild would run the whole test suite before extracting
+- Extraction is "similar to running `go build ./...`". `_test.go` files are left out unless `CODEQL_EXTRACTOR_GO_OPTION_EXTRACT_TESTS` is `true`
+- The CodeQL starter workflow marks the job's `actions: read` "only required for workflows in private repositories" ([actions/starter-workflows code-scanning/codeql.yml](https://github.com/actions/starter-workflows/blob/main/code-scanning/codeql.yml))
