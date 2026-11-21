@@ -5,11 +5,11 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 ## Behaviour
 
 - `GetContent(prs, mergedPRs, contentInputs, options)` splits the first list itself on `PR.IsDraft()`/`PR.IsOpen()`: drafts go to the WIP section, everything else to the open sections. The caller passes one unsplit fetch result. Merged PRs come as their own list, from their own fetch
-- The open PRs are bucketed by `PR.GetNextAction()` into `ReadyToMerge`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
+- The open PRs are bucketed by `PR.GetNextAction()` into `ReadyToMerge`, `InMergeQueue`, `WaitingForAuthor` and `WaitingForReview`, so a canvas reader picks their next action off a heading. Drafts and merged PRs never reach the rule
 - The open PRs are sorted oldest to newest by ready-for-review time via `prview.SortPRsOldestToNewest` before bucketing
 - Bucketing filters the list rather than sorting each bucket, so every bucket keeps the sorted order
 - `WaitingForReview` then moves its PRs with stale approvers ahead of the rest, via `prview.SortPRsWithStaleApproversFirst`. Both sets stay oldest first. A stale approver approving again can move such a PR on. The other open buckets show no stale approvers, so they keep the oldest first order
-- Each section is a `prview.PRSection` on `Content`: the three open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prview.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `Rows` list. One constructor fills one shape, so both are never filled at once
+- Each section is a `prview.PRSection` on `Content`: the four open ones, `WIP` and `Merged`. A section is bucketed by repository into its `Groups` via `prview.GroupPRsByRepositoriesInGivenOrder` when `GroupByRepository` is on, and otherwise stays its flat `Rows` list. One constructor fills one shape, so both are never filled at once
 - Each flat section, or each repository group, turns its PRs into rows through `prview.RowsCollapsingPRsFromAuthors` with `CollapsePRsFromAuthors`, after every sort, prune and cap. When grouped, the 2 PR threshold counts within one repository
 - Each section is bucketed in its own order, so the leading repository is the one holding the section's leading PR: the oldest PR of that open bucket (for `WaitingForReview`, see the sub-bullet), the most recently touched WIP PR, the most recently merged PR. Grouping by repository never re-sorts PRs within a repository group, and nothing dedupes a repository across sections
   - When grouped by repository, the leading repository of `WaitingForReview` is the one holding the oldest PR in that bucket with stale approvers. With no such PR, it is the one holding the bucket's oldest PR
@@ -18,8 +18,8 @@ Structures PR views into the sections of the PR tracker canvas, ready for `canva
 - At most `MaxInactiveWIPPRs` (5) drafts without recent activity reach the WIP section, the 5 most recently touched of them, via `prview.PR.IsActiveAsOf(GeneratedAt, prview.RecentActivityThreshold)`. Recently touched drafts are never capped, nor are drafts with a zero update time. The cap runs after the staleness prune, on the whole WIP list rather than per repository
 - Merged PRs are sorted newest merge first via `prview.SortPRsNewestFirst` on `MergedAt`. They are neither pruned nor capped here: the fetch already did both
 - `Content.MergedPRsUnavailable` comes from the options, and says the merged fetch failed rather than that nothing was merged
-- `Content.GeneratedAt`, `OpenPRsCapped` and `WIPPRsCapped` come from the options. `OpenPRsCapped` is one flag over all three open sections: it reports what the fetch capped, and the fetch knows nothing about buckets. The cap flags are never derived from section length: the staleness prune and the inactive cap shrink the WIP list further
-- Logs how many PRs each of the three open buckets, the WIP section and the merged section ended up with, plus how many inactive drafts the cap left out, so a missing draft has an explanation
+- `Content.GeneratedAt`, `OpenPRsCapped` and `WIPPRsCapped` come from the options. `OpenPRsCapped` is one flag over all four open sections: it reports what the fetch capped, and the fetch knows nothing about buckets. The cap flags are never derived from section length: the staleness prune and the inactive cap shrink the WIP list further
+- Logs how many PRs each of the four open buckets, the WIP section and the merged section ended up with, plus how many inactive drafts the cap left out, so a missing draft has an explanation
 
 ## Doesn't Do
 

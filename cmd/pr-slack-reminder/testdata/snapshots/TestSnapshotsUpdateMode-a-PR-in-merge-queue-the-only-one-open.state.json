@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "messagePostedAt": "1970-01-01T00:00:00Z",
+  "messageRef": {
+    "channelId": "C12345678",
+    "messageTs": "1623850245.000200"
+  },
+  "trackedPRs": [
+    {
+      "repository": {
+        "Owner": "test-org",
+        "Name": "test-repo"
+      },
+      "number": 121
+    }
+  ],
+  "canvasContentHash": "",
+  "lastWrittenMessage": {
+    "blocks": [
+      {
+        "type": "header",
+        "text": {
+          "type": "plain_text",
+          "text": "🚛 In merge queue",
+          "emoji": true
+        },
+        "block_id": "heading_in_merge_queue",
+        "level": 2
+      },
+      {
+        "type": "rich_text",
+        "block_id": "section_in_merge_queue",
+        "elements": [
+          {
+            "type": "rich_text_list",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  {
+                    "type": "link",
+                    "url": "https://github.com/test-org/test-repo/pull/121",
+                    "text": "Cache API tokens",
+                    "style": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " 2 days ago",
+                    "style": {
+                      "italic": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": " by ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Grace Green",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": " (✅ ",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": "Heidi Hill",
+                    "style": {}
+                  },
+                  {
+                    "type": "text",
+                    "text": ")",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": "bullet",
+            "indent": 0,
+            "border": 0,
+            "offset": 0
+          }
+        ]
+      },
+      {
+        "type": "context",
+        "block_id": "update_time_footer",
+        "elements": [
+          {
+            "type": "mrkdwn",
+            "text": "_Live, updated \u003c!date^0^{time}|00:00 UTC\u003e_"
+          }
+        ]
+      }
+    ],
+    "summaryText": "1 PR in merge queue 👀",
+    "generatedAt": "1970-01-01T00:00:00Z"
+  }
+}

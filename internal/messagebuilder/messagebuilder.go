@@ -23,6 +23,7 @@ import (
 // untracked merges only.
 const (
 	readyToMergeHeading     = "✅ Ready to merge"
+	inMergeQueueHeading     = "🚛 In merge queue"
 	waitingForAuthorHeading = "💬 Waiting for author"
 	waitingForReviewHeading = "👀 Waiting for review"
 	mergedPRsHeading        = "🚀 Recently merged"
@@ -79,6 +80,7 @@ func buildSectionBlocks(content messagecontent.Content) []slack.Block {
 		{"waiting_for_review", waitingForReviewHeading, content.WaitingForReview, buildOpenPRBulletPoint},
 		{"waiting_for_author", waitingForAuthorHeading, content.WaitingForAuthor, buildOpenPRBulletPoint},
 		{"ready_to_merge", readyToMergeHeading, content.ReadyToMerge, buildOpenPRBulletPoint},
+		{"in_merge_queue", inMergeQueueHeading, content.InMergeQueue, buildOpenPRBulletPoint},
 		{"merged", mergedPRsHeading, content.Merged, buildMergedPRBulletPoint},
 	}
 

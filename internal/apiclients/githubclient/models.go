@@ -100,6 +100,8 @@ type PR struct {
 	HasThreadWaitingForAuthor    bool
 	Conflicting                  bool // cannot be merged as it stands
 	HasOutstandingChangesRequest bool
+	// False for PRs from GetPRs. See githubclient.spec.md § Behaviour
+	InMergeQueue bool `json:",omitempty"`
 	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
 	FirstReadyForReviewEventAt *time.Time
 	// Nil without a submitted review by a person other than the author. See githubclient.spec.md § Behaviour
