@@ -107,6 +107,7 @@ type pullRequestNode struct {
 	Comments  connection[commentNode] `json:"comments"`
 
 	Mergeable      string                        `json:"mergeable"`
+	IsInMergeQueue bool                          `json:"isInMergeQueue"`
 	ReviewThreads  connection[reviewThreadNode]  `json:"reviewThreads"`
 	ReviewRequests connection[reviewRequestNode] `json:"reviewRequests"`
 
@@ -206,7 +207,8 @@ func prWithReviewers(
 		HasThreadWaitingForAuthor: hasThreadWaitingForPRAuthor(
 			node.ReviewThreads.Nodes, pullRequest.Author,
 		),
-		Conflicting: node.Mergeable == conflictingMergeableState,
+		Conflicting:    node.Mergeable == conflictingMergeableState,
+		IsInMergeQueue: node.IsInMergeQueue,
 		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
 			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
 		),

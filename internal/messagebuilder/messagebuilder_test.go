@@ -146,6 +146,7 @@ func TestSectionHeadings(t *testing.T) {
 	onePR := prview.PRSection{Rows: []prview.Row{testPR(testPROptions{title: "PR"})}}
 	message, _ := messagebuilder.BuildMessageToPost(messagecontent.Content{
 		ReadyToMerge:     onePR,
+		InMergeQueue:     onePR,
 		WaitingForAuthor: onePR,
 		WaitingForReview: onePR,
 		Merged:           onePR,
@@ -156,14 +157,16 @@ func TestSectionHeadings(t *testing.T) {
 		"heading_waiting_for_review", "section_waiting_for_review",
 		"heading_waiting_for_author", "section_waiting_for_author",
 		"heading_ready_to_merge", "section_ready_to_merge",
+		"heading_in_merge_queue", "section_in_merge_queue",
 		"heading_merged", "section_merged",
 	})
 	expectedHeadings := []string{
-		"👀 Waiting for review", "💬 Waiting for author", "✅ Ready to merge", "🚀 Recently merged",
+		"👀 Waiting for review", "💬 Waiting for author", "✅ Ready to merge", "🚛 In merge queue",
+		"🚀 Recently merged",
 	}
 	headingBlocks := []slack.Block{
-		message.Blocks.BlockSet[0], message.Blocks.BlockSet[2],
-		message.Blocks.BlockSet[4], message.Blocks.BlockSet[6],
+		message.Blocks.BlockSet[0], message.Blocks.BlockSet[2], message.Blocks.BlockSet[4],
+		message.Blocks.BlockSet[6], message.Blocks.BlockSet[8],
 	}
 	for index, block := range headingBlocks {
 		header := headerBlock(t, block)

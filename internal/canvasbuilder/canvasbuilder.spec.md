@@ -4,12 +4,12 @@ Renders `canvascontent.Content` as the markdown of a Slack canvas, as one string
 
 ## Behaviour
 
-- `BuildMarkdown(content)` renders five sections, each with its own list: the open PRs split into `## 👀 Waiting for review`, `## 💬 Waiting for author` and `## ✅ Ready to merge`, then `## 🚀 Merged`, then `## 🔧 WIP`. The most urgent ask leads. Drafts are the least actionable, so they come last
+- `BuildMarkdown(content)` renders six sections, each with its own list: the open PRs split into `## 👀 Waiting for review`, `## 💬 Waiting for author`, `## ✅ Ready to merge` and `## 🚛 In merge queue`, then `## 🚀 Merged`, then `## 🔧 WIP`. The most urgent ask leads. Drafts are the least actionable, so they come last
 - An open section with no rows renders nothing at all, heading included, so a reader scanning the headings sees only the buckets asking something of them. `## 🚀 Merged` and `## 🔧 WIP` always render
-- All three open sections empty renders one `## Open` heading with `_No open PRs_` in their place, the zero state the canvas had before the open split: a canvas opening at `## 🚀 Merged` would read as a broken render
-- `## Open` is the one heading without an emoji: it stands for all three open buckets, so no single emoji fits it
+- All four open sections empty renders one `## Open` heading with `_No open PRs_` in their place, the zero state the canvas had before the open split: a canvas opening at `## 🚀 Merged` would read as a broken render
+- `## Open` is the one heading without an emoji: it stands for all four open buckets, so no single emoji fits it
 - Any section can render grouped: its rows then get one `###` sub-heading per repository, the repository name without its owner, linking to `models.Repository.GetPullsURL()`. The section heading above them already scopes the rows, so it is not repeated. Each section reads its own grouped slice, so all of them group together, off the one `Content.GroupedByRepository` flag. Nothing dedupes a repository across sections, so one repository can carry a `###` heading under each
-- The three open sections share one PR row renderer, one empty-state line and one heading level: only the heading text and the rows differ. A PR's bucket is `canvascontent`'s to decide
+- The four open sections share one PR row renderer, one empty-state line and one heading level: only the heading text and the rows differ. A PR's bucket is `canvascontent`'s to decide
 - Open PR row: linked title, age text (`🚨` plus a code span past the old-PR threshold, italic otherwise), author, approvers as `prview` holds them, then the stale approvers and commenters as `prview.PR.ReviewerGroupsForOpenRow()` returns them, then a last group in the reviewer list naming the PR's `MergeBlockers()`, such as `CI failing, conflicts`
 - WIP PR row: linked title, author, commenters, then the activity text, styled as a code span when `prview.PR.IsRecentlyUpdated` and in italics otherwise. Unknown activity renders no activity segment at all
 - Merged PR row: linked title, the merge text in italics, the author, then the approvers, stale approvers and commenters as `prview` holds them: never split by next action, and never with a merge blocker. An unknown merge time drops that segment only

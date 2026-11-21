@@ -271,6 +271,22 @@ func TestBuildMarkdownSnapshots(t *testing.T) {
 			},
 		},
 		{
+			// A queued row shows its reviewers and merge blockers like any open row.
+			name: "a PR in merge queue beside one ready to merge",
+			content: canvascontent.Content{
+				WaitingForReview: flatSection([]prview.PR{openPR}),
+				ReadyToMerge:     flatSection(readyToMergePRs[1:2]),
+				InMergeQueue: flatSection([]prview.PR{testPR(prOptions{
+					number: 25, title: "Cache API tokens", authorName: "Grace Green", age: idleAge,
+					approvers: []string{"Heidi Hill"}, commenters: []string{"Bob Brown"},
+					conflicting: true,
+				})}),
+				WIP:         flatSection([]prview.PR{otherWIPPR}),
+				Merged:      flatSection([]prview.PR{otherMergedPR}),
+				GeneratedAt: generatedAt,
+			},
+		},
+		{
 			name: "merged PRs could not be fetched",
 			content: canvascontent.Content{
 				WaitingForReview:     flatSection([]prview.PR{openPR}),
@@ -472,6 +488,12 @@ func TestBuildMarkdownSectionHeadings(t *testing.T) {
 			expectedOpenHeadings: []string{"## ✅ Ready to merge"},
 		},
 		{
+			// A queued PR alone is open, so the all-empty ## Open heading stays away.
+			name:                 "only in merge queue",
+			content:              canvascontent.Content{InMergeQueue: filled},
+			expectedOpenHeadings: []string{"## 🚛 In merge queue"},
+		},
+		{
 			name:                 "only waiting for author",
 			content:              canvascontent.Content{WaitingForAuthor: filled},
 			expectedOpenHeadings: []string{"## 💬 Waiting for author"},
@@ -491,22 +513,24 @@ func TestBuildMarkdownSectionHeadings(t *testing.T) {
 		{
 			name: "every section filled",
 			content: canvascontent.Content{
-				ReadyToMerge: filled, WaitingForAuthor: filled, WaitingForReview: filled,
+				ReadyToMerge: filled, InMergeQueue: filled, WaitingForAuthor: filled, WaitingForReview: filled,
 				WIP: filled, Merged: filled,
 			},
 			expectedOpenHeadings: []string{
 				"## 👀 Waiting for review", "## 💬 Waiting for author", "## ✅ Ready to merge",
+				"## 🚛 In merge queue",
 			},
 		},
 		{
 			name: "every section filled while grouping by repository",
 			content: canvascontent.Content{
-				ReadyToMerge: grouped, WaitingForAuthor: grouped, WaitingForReview: grouped,
+				ReadyToMerge: grouped, InMergeQueue: grouped, WaitingForAuthor: grouped, WaitingForReview: grouped,
 				WIP: grouped, Merged: grouped,
 				GroupedByRepository: true,
 			},
 			expectedOpenHeadings: []string{
 				"## 👀 Waiting for review", "## 💬 Waiting for author", "## ✅ Ready to merge",
+				"## 🚛 In merge queue",
 			},
 		},
 		{

@@ -153,6 +153,7 @@ type snapshotScenario struct {
 	reviewDismissalsByPRNumber         map[int][]mockgithubclient.ReviewDismissal
 	prNumbersWithFailingRequiredChecks []int
 	conflictingPRNumbers               []int
+	inMergeQueuePRNumbers              []int
 
 	firstReadyForReviewEventAtByPRNumber map[int]time.Time
 	isMergeStatsDay                      bool
@@ -702,6 +703,59 @@ func snapshotScenarios() []snapshotScenario {
 			},
 		},
 		{
+			name:         "a PR in merge queue beside one ready to merge",
+			writesCanvas: true,
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 111, Title: "Fix login redirect", AuthorLogin: "alice",
+					AuthorName: "Alice Anderson", HTMLURL: "https://github.com/test-org/test-repo/pull/111",
+					AgeHours: 3,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 112, Title: "Add dark mode", AuthorLogin: "erin",
+					AuthorName: "Erin Evans", HTMLURL: "https://github.com/test-org/test-repo/pull/112",
+					AgeHours: 5,
+				}),
+				getTestPR(GetTestPROptions{
+					Number: 113, Title: "Cache API tokens", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/113",
+					AgeHours: 48,
+				}),
+			},
+			mergedPRs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 114, Title: "Tidy README", AuthorLogin: "ivan",
+					AuthorName: "Ivan Ivers", HTMLURL: "https://github.com/test-org/test-repo/pull/114",
+					AgeHours: 20, State: "closed", Merged: true, MergedHoursAgo: 1,
+				}),
+			},
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				112: {mockgithubclient.NewReview("frank", "Frank Foster", "APPROVED")},
+				113: {
+					mockgithubclient.NewReview("heidi", "Heidi Hill", "APPROVED"),
+					mockgithubclient.NewReview("bob", "Bob Brown", "COMMENTED"),
+				},
+				114: {mockgithubclient.NewReview("judy", "Judy Jones", "APPROVED")},
+			},
+			inMergeQueuePRNumbers: []int{113},
+		},
+		{
+			// With no-prs-message empty, the run posts only when a section has rows, so the merge
+			// queue section must count.
+			name: "only a PR in merge queue, no no-prs-message",
+			prs: []*github.PullRequest{
+				getTestPR(GetTestPROptions{
+					Number: 115, Title: "Cache API tokens", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/115",
+					AgeHours: 48,
+				}),
+			},
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				115: {mockgithubclient.NewReview("heidi", "Heidi Hill", "APPROVED")},
+			},
+			inMergeQueuePRNumbers: []int{115},
+		},
+		{
 			name:         "no PRs message",
 			writesCanvas: true,
 			configOverrides: map[string]any{
@@ -747,6 +801,7 @@ func runSnapshotScenario(
 
 		FailingRequiredCheckPRNumbers: scenario.prNumbersWithFailingRequiredChecks,
 		ConflictingPRNumbers:          scenario.conflictingPRNumbers,
+		InMergeQueuePRNumbers:         scenario.inMergeQueuePRNumbers,
 
 		FirstReadyForReviewEventAtByPRNumber: scenario.firstReadyForReviewEventAtByPRNumber,
 	})
@@ -887,6 +942,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 		requestedReviewerLoginsByPRNumber  map[int][]string
 		prNumbersWithFailingRequiredChecks []int
 		conflictingPRNumbers               []int
+		inMergeQueuePRNumbers              []int
 		mergeStatsOfState                  func(runStart time.Time) (*mergestats.MergeStats, state.RecentMergeStats)
 		deletesTheMessage                  bool
 	}{
@@ -1061,6 +1117,24 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			},
 		},
 		{
+			// With no-prs-message empty, the run edits only when a section has rows, so the merge
+			// queue section must count.
+			name:           "a PR in merge queue, the only one open",
+			statePRNumbers: []int{121},
+			openPRNumbers:  []int{121},
+			prByNumber: map[int]*github.PullRequest{
+				121: getTestPR(GetTestPROptions{
+					Number: 121, Title: "Cache API tokens", AuthorLogin: "grace",
+					AuthorName: "Grace Green", HTMLURL: "https://github.com/test-org/test-repo/pull/121",
+					AgeHours: 48, State: "open",
+				}),
+			},
+			reviewsByPRNumber: map[int][]*github.PullRequestReview{
+				121: {mockgithubclient.NewReview("heidi", "Heidi Hill", "APPROVED")},
+			},
+			inMergeQueuePRNumbers: []int{121},
+		},
+		{
 			name: "no open PRs left with the no-prs-message set",
 			configOverrides: map[string]any{
 				config.InputNoPRsMessage: "No open PRs, happy coding! 🎉",
@@ -1114,6 +1188,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 				RequestedReviewerLoginsByPRNumber: tc.requestedReviewerLoginsByPRNumber,
 				FailingRequiredCheckPRNumbers:     tc.prNumbersWithFailingRequiredChecks,
 				ConflictingPRNumbers:              tc.conflictingPRNumbers,
+				InMergeQueuePRNumbers:             tc.inMergeQueuePRNumbers,
 				MockPreviousState:                 &mockState,
 			})
 			mockSlackAPI := mockslackclient.GetMockSlackAPI(mockslackclient.MockSlackClientOptions{})

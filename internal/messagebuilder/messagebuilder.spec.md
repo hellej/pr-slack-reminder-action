@@ -8,7 +8,7 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 - `BuildMessageWithUpdateTimeFooter(content)` returns the same message ending with an update-time footer, for an edit in place
 - The message has no title block. Its first block is `NoOpenPRsText` as a plain line when that is set, otherwise the heading of its first non-empty section
 - Each non-empty section opens with a `header` block at level 2 holding the heading, then the blocks of its rows: ungrouped, one `rich_text` block. An empty section renders no block at all
-- Sections render top to bottom in this order, under this package's own heading text: `👀 Waiting for review`, `💬 Waiting for author`, `✅ Ready to merge`, `🚀 Recently merged`. The open sections match the canvas's order ([internal/canvasbuilder](../canvasbuilder/canvasbuilder.spec.md))
+- Sections render top to bottom in this order, under this package's own heading text: `👀 Waiting for review`, `💬 Waiting for author`, `✅ Ready to merge`, `🚛 In merge queue`, `🚀 Recently merged`. The open sections match the canvas's order ([internal/canvasbuilder](../canvasbuilder/canvasbuilder.spec.md))
 - Grouped-by-repository case: the section's rows come as two blocks per repository, in the order [internal/messagecontent](../messagecontent/messagecontent.spec.md) gives them, with nothing between repositories:
   - A sub-heading: a `context` block of one mrkdwn element `*<url|name>*`, the repository name without its owner, linked to `models.Repository.GetPullsURL()`
   - A `rich_text` block holding only that repository's bullet list
@@ -37,8 +37,8 @@ Turns `messagecontent.Content` into a Slack message, and marks a sent message st
 
 ## Oddities
 
-- Ungrouped, the block cap is out of reach: the layout spends at most 10 blocks whatever it lists, because a whole section's rows go in one block. Per-block text length is what a huge section would run into instead, and nothing checks it
-- Grouped by repository, a section costs 1 + 2 × repositories blocks (the section heading, then a sub-heading and a list per repository), so the cap is reachable: 5 repositories with PRs in all four sections is the most that fits, at 44 content blocks. 6 build 52 content blocks, of which 4 are dropped
+- Ungrouped, the block cap is out of reach: the layout spends at most 12 blocks whatever it lists, because a whole section's rows go in one block. Per-block text length is what a huge section would run into instead, and nothing checks it
+- Grouped by repository, a section costs 1 + 2 × repositories blocks (the section heading, then a sub-heading and a list per repository), so the cap is reachable: 4 repositories with PRs in all five sections is the most that fits, at 45 content blocks. 5 build 55 content blocks, of which 7 are dropped
 - Truncation leaves no marker in the message: it is sent with its tail cut, and only a log line records it. The cut ignores where a section starts, so a section heading can be left with all of its repositories dropped, and the last content block can be a repository sub-heading with its list dropped
 - The cap keeps a slot for the merge stats line on every day, so a grouped message without the line drops a content block it had room for
 - A message with nothing to list at all is empty, or holds only the no-open-PRs line and the merge stats line, whichever are set, with the update-time footer after them in an edit. None is worth sending, and it is the caller that decides

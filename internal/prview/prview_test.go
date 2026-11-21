@@ -352,20 +352,22 @@ func TestGetReviewersTextSegments(t *testing.T) {
 }
 
 func TestGetPRAgeDisplayText(t *testing.T) {
+	// 7 calendar days always hold 48 weekend hours, so the text tells calendar time from weekday time.
+	sevenDays := 7 * 24 * time.Hour
 	tests := []struct {
 		name     string
+		age      time.Duration
 		isOldPR  bool
 		expected string
 	}{
-		{name: "PR under the old-PR threshold", isOldPR: false, expected: "7 days ago"},
-		{name: "PR past the old-PR threshold", isOldPR: true, expected: "7 days old"},
+		{name: "PR under the old-PR threshold", age: sevenDays, isOldPR: false, expected: "7 days ago"},
+		{name: "PR past the old-PR threshold", age: sevenDays, isOldPR: true, expected: "7 days old"},
+		{name: "PR ready for review under a minute ago", age: 59 * time.Second, expected: "just now"},
 	}
 
-	// 7 calendar days always hold 48 weekend hours, so the text tells calendar time from weekday time.
-	sevenDaysAgo := time.Now().Add(-7 * 24 * time.Hour)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr := testPR(1, sevenDaysAgo, time.Time{})
+			pr := testPR(1, time.Now().Add(-tt.age), time.Time{})
 			prView := prview.PR{PR: &pr, IsOldPR: tt.isOldPR}
 
 			if prView.GetPRAgeDisplayText() != tt.expected {
@@ -392,6 +394,8 @@ func TestGetActivityText(t *testing.T) {
 		expected  string
 	}{
 		{name: "unknown activity", updatedAt: time.Time{}, expected: ""},
+		{name: "under a minute ago", updatedAt: now.Add(-59 * time.Second), expected: "updated just now"},
+		{name: "a minute ago", updatedAt: now.Add(-time.Minute), expected: "updated 1 minute ago"},
 		{
 			name:      "minutes ago",
 			updatedAt: now.Add(-30 * time.Minute),
@@ -453,6 +457,7 @@ func TestGetMergedText(t *testing.T) {
 		expected string
 	}{
 		{name: "never merged", mergedAt: nil, expected: ""},
+		{name: "under a minute ago", mergedAt: timePointer(now.Add(-59 * time.Second)), expected: "merged just now"},
 		{
 			name:     "minutes ago",
 			mergedAt: timePointer(now.Add(-30 * time.Minute)),
@@ -849,6 +854,38 @@ func TestGetNextAction(t *testing.T) {
 				HasOutstandingChangesRequest: true, HasThreadWaitingForAuthor: true,
 			},
 			expected: prview.NextActionWaitingForAuthor,
+		},
+		{
+			name:           "queued with nothing outstanding",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{IsInMergeQueue: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued but conflicting",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{IsInMergeQueue: true, Conflicting: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued but failing a required check",
+			approverLogins: []string{"bob"},
+			prFlags: githubclient.PR{
+				IsInMergeQueue: true, RequiredChecksStatus: githubclient.RequiredChecksFailing,
+			},
+			expected: prview.NextActionInMergeQueue,
+		},
+		{
+			name:           "queued with a thread waiting for the author",
+			approverLogins: []string{"bob"},
+			prFlags:        githubclient.PR{IsInMergeQueue: true, HasThreadWaitingForAuthor: true},
+			expected:       prview.NextActionInMergeQueue,
+		},
+		{
+			// A repository whose rules let a PR merge without an approval can queue it unreviewed.
+			name:     "queued without an approval",
+			prFlags:  githubclient.PR{IsInMergeQueue: true},
+			expected: prview.NextActionInMergeQueue,
 		},
 	}
 
