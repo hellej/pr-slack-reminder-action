@@ -159,6 +159,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 
 - Never amend commits or force push
 - Work on `main` by default. Branch only if the user asks for a branch or mentions a PR
+- Before starting a change, fetch and bring the branch up to date with `origin/main`: `git pull --ff-only` on `main`, `git merge origin/main` on a feature branch
 - Merge the latest `main` into a feature branch before each push and before its PR merges. Resolve conflicts, never rebase
 - Open a PR with [.agents/skills/pr/SKILL.md](.agents/skills/pr/SKILL.md)
 - Stage only the files for the task you were given. Another agent may have unrelated work
