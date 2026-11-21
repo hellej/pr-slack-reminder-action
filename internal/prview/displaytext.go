@@ -24,6 +24,15 @@ func durationText(duration time.Duration) string {
 	}
 }
 
+// Renders how long ago something happened: "just now" under a minute, "N minutes/hours/days ago"
+// otherwise.
+func timeAgoText(duration time.Duration) string {
+	if duration < time.Minute {
+		return "just now"
+	}
+	return durationText(duration) + " ago"
+}
+
 func pluralize(count int, unit string) string {
 	if count == 1 {
 		return unit
@@ -31,9 +40,9 @@ func pluralize(count int, unit string) string {
 	return unit + "s"
 }
 
-// GetActivityText renders how long ago the PR last saw activity: "updated N minutes/hours ago"
-// under a day, "idle N days" from a day onwards. Unknown activity, a zero update time, yields
-// no text.
+// GetActivityText renders how long ago the PR last saw activity: "updated just now" under a
+// minute, "updated N minutes/hours ago" under a day, "idle N days" from a day onwards. Unknown
+// activity, a zero update time, yields no text.
 func (pr PR) GetActivityText() string {
 	updatedAt := pr.GetUpdatedAt()
 	if updatedAt.IsZero() {
@@ -43,10 +52,11 @@ func (pr PR) GetActivityText() string {
 	if inactivity.Hours() >= 24 {
 		return "idle " + durationText(inactivity)
 	}
-	return "updated " + durationText(inactivity) + " ago"
+	return "updated " + timeAgoText(inactivity)
 }
 
-// GetMergedText renders how long ago the PR was merged as "merged N minutes/hours/days ago".
+// GetMergedText renders how long ago the PR was merged as "merged just now" under a minute,
+// "merged N minutes/hours/days ago" otherwise.
 // The prefix keeps it apart from the age an open row shows in the same style. A PR that was
 // never merged yields no text.
 func (pr PR) GetMergedText() string {
@@ -54,16 +64,17 @@ func (pr PR) GetMergedText() string {
 	if mergedAt == nil {
 		return ""
 	}
-	return "merged " + durationText(time.Since(*mergedAt)) + " ago"
+	return "merged " + timeAgoText(time.Since(*mergedAt))
 }
 
-// GetPRAgeDisplayText renders the PR's age as "N days old" past the old-PR threshold and
-// "N days ago" otherwise. The warning marker that goes with an old PR belongs to the renderer.
+// GetPRAgeDisplayText renders the PR's age as "N days old" past the old-PR threshold, otherwise
+// as "just now" under a minute and "N days ago" from a minute on. The warning marker that goes
+// with an old PR belongs to the renderer.
 func (pr PR) GetPRAgeDisplayText() string {
 	if pr.IsOldPR {
 		return pr.GetPRAgeText() + " old"
 	}
-	return pr.GetPRAgeText() + " ago"
+	return timeAgoText(time.Since(pr.ReadyForReviewAt()))
 }
 
 // GetReviewersTextSegments renders the reviewer groups as "(✅ a, b / 🔁 c / 💬 d)", split into
