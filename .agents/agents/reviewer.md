@@ -84,13 +84,19 @@ Pick the targets yourself, and spend them where the tests are the only net:
   what the change that recorded it got wrong
 - Behaviour the change added that no golden file covers
 
-Code an unchanged golden file still covers has a net already. Read those tests instead.
+Code an unchanged golden file or an exact-value assertion still covers has a net already.
+Read those tests instead.
 
-The budget is about one mutant per behaviour the change adds or alters, three at least. A
-pure refactor needs none. Past the budget, name in the report what each extra one was worth.
+Keep mutation small:
 
-A brief listing blind spots gives you candidates, not a checklist. The budget still
-applies, and choosing among them is yours.
+- At most 3 mutants in a review. Spend them on the behaviours whose loss the tests would
+  most likely miss: a boundary, a branch, a filter, an ordering
+- None at a checkpoint review, which the brief names, and none for a pure refactor
+- In a re-review after fixes, re-run only the mutants that survived. Add one only for
+  behaviour the fixes added
+
+A brief listing blind spots gives you candidates, not a checklist. The cap still applies,
+and choosing among them is yours.
 
 ### Mutation protocol
 
@@ -112,8 +118,11 @@ for the build only:
 3. Map each original to its copy in an overlay file, absolute paths, since a relative
    original resolves against the current directory:
    `{"Replace": {"/abs/repo/pkg/thing.go": "/abs/scratchpad/thing.go"}}`
-4. Run `go test -race -overlay=<overlay.json>` over the narrowest packages that should
-   fail. `make test` forwards no flags, so call `go test` directly
+4. Run `go test -count=1 -overlay=<overlay.json> -run '<tests expected to fail>'` over the
+   one package that should fail. `make test` forwards no flags, so call `go test` directly
+   - Leave out `-race`: it slows the build and says nothing about a mutant
+   - If nothing fails, rerun over the whole package without `-run` before calling the
+     mutant survived
 5. Confirm a named `--- FAIL: TestX` failed. `[build failed]` means the mutation didn't
    compile and proves nothing, yet gives the same exit 1 and screen of `FAIL` lines a
    real catch does
@@ -161,8 +170,8 @@ Report back:
   why it matters. Most severe first
 - The comment list: each added comment with its verdict
 - The Outside this change list, each item with `file:line` and the fix you'd make
-- One line on what you mutated, and how many survived. When you mutated in place, that
-  the tree is restored
+- One line on what you mutated, how many survived, and the candidates you skipped. When
+  you mutated in place, that the tree is restored
 - Nothing else. No praise, no summary of what the code does
 
 If you suspect a problem but cannot confirm it from the code, label it `unverified` and
