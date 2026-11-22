@@ -63,8 +63,8 @@ Not a checklist, and not all of it applies to any one plan.
 - **A simpler design would do.** The plan solves the task with more machinery than it
   needs. Say what the simpler shape is and what it gives up, if anything. A vague "this
   feels complex" is not a finding
-- **Too fine-grained.** Exhaustive file lists, every call site, every test case, or the
-  edits inside a function spelled out. Say what it cuts to
+- **Too fine-grained.** Exhaustive file lists, every call site, every test case, the
+  edits inside a function, or internals the implementer should pick. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
   plan commits to before anything needs them. Same for anything sized for volumes
   beyond [AGENTS.md § Reference Deployment](../../AGENTS.md#reference-deployment): pagination, caching, a feature

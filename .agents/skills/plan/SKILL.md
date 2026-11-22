@@ -44,12 +44,19 @@ Before drafting an implementation plan, bring the branch up to date with `origin
 
 ## How Detailed a Plan Has To Be
 
-A plan is not a diff. State what each step touches, how big it is, and what it risks.
+A plan is not a diff. It fixes outcomes and what is costly to undo. What a review can cheaply change is the implementer's call.
 
-- Name the packages a step touches, and the symbols it adds or changes
-- Name files only where a reader needs the specific one. Many files changing the
-  same way get the package and a rough count
-- Don't enumerate call sites, test cases, or the edits inside a function
+- The plan fixes:
+  - Behaviour the user sees in Slack, on the canvas or in the run's annotations
+  - Which package owns the logic (roughly)
+  - Data shapes that cross a package or are saved in state
+  - Action inputs, GitHub API cost, token permissions and Slack scopes
+  - Breaking changes and non-goals
+- The implementer picks funcs, files and helpers, and any refactor near the change
+- State what each step touches, how big it is, and what it risks
+- Name the packages a step touches and what each must do. Name a symbol only when it exists already or crosses a package boundary
+- Don't freeze internals. Instead of "`X` stays unchanged", state what behaviour stays unchanged, e.g. "only `post` marks the previous message stale"
+- Don't enumerate call sites, test cases, or the edits inside a function. A step names the behaviours its tests pin, not the tests
 - State the size instead: "rename across ~8 call sites", "new field, no behaviour change"
 - Counts convey size, so keep them approximate (use "~N" format). An exact one invites a correction round
 
@@ -63,7 +70,7 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 3. Whether the change is breaking or non-breaking, per the [release skill § 1. Determine Semver Bump](../release/SKILL.md#1-determine-semver-bump) (patch/minor/major)
    - For persisted state or artifacts, say what the first run after upgrading does with what the previous version wrote. Mention a downgrade only if it breaks
 4. A short summary listing the steps
-5. The full steps, each naming the files/packages it touches, in that same order: the order they're written is the suggested implementation order, never a separate order/sequence table. The [implement skill](../implement/SKILL.md) runs all steps in one go and reviews the whole diff. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`
+5. The full steps, each naming the packages it touches, in that same order: the order they're written is the suggested implementation order, never a separate order/sequence table. The [implement skill](../implement/SKILL.md) runs all steps in one go and reviews the whole diff. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`
    - Order by dependency. A step calling an external API the repo hasn't used goes early, before the code built on it
    - Mark a step `(checkpoint)` only when the rest builds on it and it earns its own review, such as that external API step
    - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
