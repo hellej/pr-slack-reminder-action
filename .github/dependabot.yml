@@ -20,7 +20,7 @@ updates:
       interval: "weekly"
   # Go records a tool module as // indirect, which version updates skip by default.
   # Keep this list in sync with the tool block of tools/go.mod.
-  # See docs/third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed
+  # See [third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed](../docs/third-party-facts.md#dependabot-skips-go-tool-directive-modules-unless-allow-listed-2026-09-26)
   - package-ecosystem: "gomod"
     directory: "/tools"
     schedule:

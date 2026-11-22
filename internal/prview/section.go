@@ -42,12 +42,12 @@ type CollapsedRow struct {
 
 func (CollapsedRow) isRow() {}
 
-// GitHub ends an app's login in "[bot]". See docs/third-party-facts.md § GitHub App bot logins end in `[bot]`, and GraphQL drops the suffix
+// GitHub ends an app's login in "[bot]". See [third-party-facts.md § GitHub App bot logins end in `[bot]`, and GraphQL drops the suffix](../../docs/third-party-facts.md#github-app-bot-logins-end-in-bot-and-graphql-drops-the-suffix-2026-10-03)
 func (row CollapsedRow) GetAuthorLabel() string {
 	return strings.TrimSuffix(row.AuthorLogin, "[bot]")
 }
 
-// For the rule, see prview.spec.md § Behaviour.
+// For the rule, see [prview.spec.md § Behaviour](prview.spec.md#behaviour).
 func RowsCollapsingPRsFromAuthors(prs []PR, collapsePRsFromAuthors []string) []Row {
 	authorsToCollapse := utilities.UniqueFunc(collapsePRsFromAuthors, func(a, b string) bool { return a == b })
 	collapsedRows := utilities.Filter(
@@ -72,7 +72,7 @@ func (pr PR) getAuthorLogin() string {
 	return pr.PullRequest.Author.Login
 }
 
-// The search lists every PR of the author in that state, not only the row's. See prview.spec.md § Doesn't Do
+// The search lists every PR of the author in that state, not only the row's. See [prview.spec.md § Doesn't Do](prview.spec.md#doesnt-do)
 func (row CollapsedRow) GetSearchURL() string {
 	qualifiers := []string{"is:pr", row.stateQualifier(), row.authorQualifier()}
 	repositories := utilities.UniqueFunc(
@@ -96,7 +96,7 @@ func (row CollapsedRow) stateQualifier() string {
 	return "is:merged"
 }
 
-// GitHub search names an app author as app/<name>, not by its login. See docs/third-party-facts.md § GitHub search matches PRs created by an app with `author:app/USERNAME`
+// GitHub search names an app author as app/<name>, not by its login. See [third-party-facts.md § GitHub search matches PRs created by an app with `author:app/USERNAME`](../../docs/third-party-facts.md#github-search-matches-prs-created-by-an-app-with-authorappusername-2026-10-04)
 func (row CollapsedRow) authorQualifier() string {
 	if strings.HasSuffix(row.AuthorLogin, "[bot]") {
 		return "author:app/" + row.GetAuthorLabel()

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PreToolUse hook on Bash (see .claude/settings.json).
-# Blocks a `git commit` without a `-- <paths>` pathspec, per AGENTS.md § Git: the index is
+# Blocks a `git commit` without a `-- <paths>` pathspec, per [AGENTS.md § Git](../../AGENTS.md#git): the index is
 # shared with other sessions, so a bare commit takes whatever they staged.
 # Matches inside compound commands too, so it doesn't use the `if` filter.
 

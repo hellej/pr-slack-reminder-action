@@ -28,7 +28,7 @@ jobs:
           go-version-file: go.mod
 
       # Autobuild would first run `make`, which is `make test` here.
-      # See docs/third-party-facts.md § CodeQL supports only the autobuild and manual build modes for Go, and Go autobuild first runs `make`
+      # See [third-party-facts.md § CodeQL supports only the autobuild and manual build modes for Go, and Go autobuild first runs `make`](../../docs/third-party-facts.md#codeql-supports-only-the-autobuild-and-manual-build-modes-for-go-and-go-autobuild-first-runs-make-2026-11-21)
       - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea #v4.39.4
         with:
           languages: go

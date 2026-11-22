@@ -53,7 +53,7 @@ date it was last checked. Re-checking an entry moves that date.
 - At most five `AND`, `OR` or `NOT`
 - Bounds how many repositories one query string can name
 - Unverified for the API: OR semantics for repeated `repo:` qualifiers, the alternative to one aliased
-  search per repository. The web search ORs them: see § Repeated `repo:` qualifiers in a GitHub web search OR together
+  search per repository. The web search ORs them: see [§ Repeated `repo:` qualifiers in a GitHub web search OR together](#repeated-repo-qualifiers-in-a-github-web-search-or-together-2026-10-04)
 
 ## In GraphQL, `pullRequests` filters only by label; `search` also filters authors and drafts [2026-08-22]
 
@@ -675,8 +675,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   `%3A` and `,` to `%2C`
 - The runner reads output one line at a time, so an unescaped multiline message annotates its
   first line only, and the rest prints as plain log lines
-- The runner restores real newlines from the escaped form. See § An escaped newline is a line
-  break in the job log and the API, but a space on the run's summary page
+- The runner restores real newlines from the escaped form. See [§ An escaped newline is a line break in the job log and the API, but a space on the run's summary page](#an-escaped-newline-is-a-line-break-in-the-job-log-and-the-api-but-a-space-on-the-runs-summary-page-2026-09-26)
 
 ## The runner parses workflow commands from stderr as well as stdout, but only at a line's start [2026-09-26]
 
@@ -728,7 +727,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The e2e post step's state was uploaded by `actions/upload-artifact` v7.0.1. The update step, two steps later, logged `Found 1 artifacts with name "pr-slack-reminder-e2e-grouped-canvas-state"` and downloaded ID 10903097879, created 2 seconds earlier
 - The next upload's `overwrite: true` logged `Artifact … (ID: 10903097879) deleted`, so the download was this run's artifact, not an earlier run's
 - The e2e GitHub App token downloads them too. On this public repository that says nothing about
-  `actions: read`. See § A public repository's artifacts list and download without `actions: read`
+  `actions: read`. See [§ A public repository's artifacts list and download without `actions: read`](#a-public-repositorys-artifacts-list-and-download-without-actions-read-2026-09-26)
 
 ## Dependabot skips Go tool directive modules unless allow-listed [2026-09-26]
 
@@ -877,13 +876,13 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [rate limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api); `gh api graphql` on `kubernetes/kubernetes`, 2026-10-03
 - By the formula: 25 PRs × `first: 1` is 25 requests, 0.25 points
 - Measured: 25 open PRs with `reviews`, `comments` and `reviewThreads` at `first: 100`, no nested thread `comments`, cost 1, and adding the filtered connection kept it at 1
-- This action's own enrichment query costs about 1 per PR, and adding the connection left that unchanged. See § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`
+- This action's own enrichment query costs about 1 per PR, and adding the connection left that unchanged. See [§ The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`](#the-graphql-cost-formula-overestimated-a-search-but-matches-the-enrichment-querys-logged-cost-of-about-1-per-pr-read-ratelimitcost-2026-10-03)
 
 ## Filtered `timelineItems` returns `ReadyForReviewEvent` under `GITHUB_TOKEN` and a GitHub App token [2026-10-03]
 
 - Source: Build run 37152107647 (E2E step, GitHub App token, 3 repositories) and PR Reminder run 37152109084 (`build-first=true`, `GITHUB_TOKEN` with `pull-requests: read` and `contents: read`), 2026-10-03
 - Both logged `first ready for review: 2026-10-03T20:35:44Z` for `hellej/pr-slack-reminder-action#78`, opened as a draft and marked ready through the API, and `never` for every other PR, all opened as non-draft
-- This doesn't isolate the permission granting it: the repository is public and the job grants both permissions. The REST timeline endpoint takes Issues read or Pull requests read ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)). See § No GitHub page documents the token permission for any GraphQL field
+- This doesn't isolate the permission granting it: the repository is public and the job grants both permissions. The REST timeline endpoint takes Issues read or Pull requests read ([timeline](https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28)). See [§ No GitHub page documents the token permission for any GraphQL field](#no-github-page-documents-the-token-permission-for-any-graphql-field-2026-09-12)
 
 ## A message with `blocks` shows its top-level `text` only in notifications [2026-10-03]
 
@@ -917,7 +916,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `doPost` returns the `http.Client.Do` error unwrapped: a `*url.Error`, a DNS failure or refused connection under it as `*net.OpError` with `Op == "dial"`
 - A 429 with a `Retry-After` header becomes `*slack.RateLimitedError{RetryAfter}`. An unparseable header returns the `strconv` error instead
 - Any other non-200, a 429 without `Retry-After` included, becomes `slack.StatusCodeError{Code, Status}`, its `Error()` `slack server error: <Status>`. The body is not parsed
-- A 200 with `ok: false` is `slack.SlackErrorResponse`. See § `slack-go` v0.29.0 returns a Slack API error as `slack.SlackErrorResponse`, its `Err` the error code
+- A 200 with `ok: false` is `slack.SlackErrorResponse`. See [§ `slack-go` v0.29.0 returns a Slack API error as `slack.SlackErrorResponse`, its `Err` the error code](#slack-go-v0290-returns-a-slack-api-error-as-slackslackerrorresponse-its-err-the-error-code-2026-09-23)
 - `PostMessageContext`, `UpdateMessageContext`, `DeleteMessageContext` and `EditCanvasContext` take a ctx, used as the request's ctx
 - A ctx deadline hit while reading the body, after the headers arrived, returns a bare `context.DeadlineExceeded`, not a `*url.Error`. One hit before the headers returns a `*url.Error`
   - Source: httptest probe with `slack.New(..., slack.OptionAPIURL(<httptest server>))`, the server sending headers and part of the body then stalling, 200ms ctx, Go 1.26.7, slack-go v0.29.0, `UpdateMessageContext` and `PostMessageContext`
@@ -987,7 +986,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - So a PR with no checks reads a null rollup, not an empty `contexts`
 - `build` appears twice in PR 99's contexts, as two distinct check runs, so a consumer keyed by check name would merge them
 - Not shown by this run:
-  - A private repository, or a fine-grained PAT or App token. The repository is public, so see § GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer. For a GitHub App token in a private repository, see § `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field
+  - A private repository, or a fine-grained PAT or App token. The repository is public, so see [§ GitHub's GraphQL API has no anonymous access, so REST's public-resource carve-out does not transfer](#githubs-graphql-api-has-no-anonymous-access-so-rests-public-resource-carve-out-does-not-transfer-2026-09-12). For a GitHub App token in a private repository, see [§ `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field](#pullrequeststatuscheckrollup-needs-checks-read-in-a-private-repository-an-app-token-without-it-gets-forbidden-on-the-field-2026-11-01)
   - Where this repository's required checks come from, branch protection or a ruleset
   - A failing or pending required check, or a branch with no protection
 - Later, job 124842120624 of run 41304537007: the E2E App token, holding read-only `checks` and no `statuses`, read public `hellej/pr-slack-reminder-test-repo-3` PR 14's ruleset-required commit status `fixture-check` as failing, with no error. So in a public repository an App token reads a `StatusContext` without `statuses`, and `isRequired` reports a ruleset-required status
@@ -1058,7 +1057,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - 19 points as-is and 19 with the additions, `errors: null`
 - The added connection was `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 20)`, under its own alias beside the existing unaliased one
 - At `last: 100`, selecting `previousReviewState dismissalMessage review { author { login __typename ... on User { name } } }`, over 25 PRs of `pr-slack-reminder-test-repo-1`, `-2`, `-3` and this repository, under the owner's `gh` token: 26 points without the connection, 27 with it, `errors: null` (2026-11-01)
-- Says nothing about `GITHUB_TOKEN` or an App token: see § Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented
+- Says nothing about `GITHUB_TOKEN` or an App token: see [§ Whether GraphQL `PullRequest.commits` needs `contents: read` is undocumented](#whether-graphql-pullrequestcommits-needs-contents-read-is-undocumented-2026-08-27)
 
 ## A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository [2026-11-01]
 
@@ -1067,7 +1066,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
   - `headRefOid`, `reviewDecision: APPROVED`
   - `reviews(last: 100) { nodes { state commit { oid } } }`: a `DISMISSED` review on the older commit, then a fresh `APPROVED` review by the same user on `headRefOid`
   - `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT], last: 100)` under its own alias: `previousReviewState: APPROVED`, a non-null `pullRequestCommit { id }`, and `review { author { login __typename ... on User { name } } }`
-- Doesn't carry over to a private repository, where the review's `commit` is `FORBIDDEN`: see § On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`
+- Doesn't carry over to a private repository, where the review's `commit` is `FORBIDDEN`: see [§ On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id`](#on-a-private-repository-pull-requests-read-alone-makes-a-reviews-commit-baseref-and-a-pullrequestcommit-timeline-node-forbidden-while-rest-pullsnreviews-returns-commit_id-2026-11-01)
 
 ## On a private repository, `pull-requests: read` alone makes a review's `commit`, `baseRef` and a `PullRequestCommit` timeline node `FORBIDDEN`, while REST `pulls/{n}/reviews` returns `commit_id` [2026-11-01]
 
@@ -1079,16 +1078,16 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Populated in the same query, no error: `headRefOid`, `reviewDecision` (null, no rules on a free private repository), the review's `state` and `author`, and an empty `timelineItems(itemTypes: [REVIEW_DISMISSED_EVENT])`
 - A `ReviewDismissedEvent` node populates on a private repository under `pull-requests: read` alone: PR 7 of `hellej/pr-slack-reminder-test-repo-1`, with a manual dismissal, returned `previousReviewState`, `dismissalMessage` and `review { author { login __typename ... on User { name } } }`, no error. Source: the probe reported in [hellej/pr-slack-reminder-test-repo-3#7](https://github.com/hellej/pr-slack-reminder-test-repo-3/issues/7), branch `probe-review-dismissed-event` (since deleted), job log `Metadata: read`, `PullRequests: read`
 - REST under the same token: `GET /repos/{o}/{r}/pulls/2/reviews` returns each review's `commit_id`, and `GET /repos/{o}/{r}/pulls/2` returns `head.sha`
-- So a public repository is no test of a GraphQL field's permission: the result in a public repository does not carry over to a private one (§ A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository)
+- So a public repository is no test of a GraphQL field's permission: the result in a public repository does not carry over to a private one ([§ A review's `commit { oid }`, `headRefOid`, `reviewDecision` and `ReviewDismissedEvent` populate under `pull-requests: read` on `GITHUB_TOKEN`, in a public repository](#a-reviews-commit--oid--headrefoid-reviewdecision-and-reviewdismissedevent-populate-under-pull-requests-read-on-github_token-in-a-public-repository-2026-11-01))
 - `Ref.rules` read from another repository's workflow token on public `hellej/pr-slack-reminder-action` returned its ruleset, `requireLastPushApproval: true` and `dismissStaleReviewsOnPush: true`
 
 ## A manual review dismissal requires a message, and a push dismissal reads a null `dismissalMessage` [2026-11-01]
 
 - Source: [dismiss a review for a pull request](https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28#dismiss-a-review-for-a-pull-request): `message` is required, "The message for the pull request review dismissal"
-- All four push dismissals read `dismissalMessage: null` (§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set)
+- All four push dismissals read `dismissalMessage: null` ([§ A push that dismisses a stale approval leaves the review `DISMISSED` and records a `ReviewDismissedEvent` with `pullRequestCommit` set](#a-push-that-dismisses-a-stale-approval-leaves-the-review-dismissed-and-records-a-reviewdismissedevent-with-pullrequestcommit-set-2026-11-01))
 - Public `hellej/pr-slack-reminder-test-repo-3` confirms both sides on 2026-11-01: PR 1's push dismissal reads `dismissalMessage: null`, PR 5's manual dismissal reads its message, both with `previousReviewState: APPROVED`
 - Unverified: what GraphQL returns for a manual dismissal sent with an empty string
-- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message (§ A base branch change, by hand or by GitHub's retarget of a stacked PR, dismisses approvals with the message "The base branch was changed." and a null `pullRequestCommit`)
+- A null message doesn't mark every automatic dismissal: a base branch change dismisses with a message ([§ A base branch change, by hand or by GitHub's retarget of a stacked PR, dismisses approvals with the message "The base branch was changed." and a null `pullRequestCommit`](#a-base-branch-change-by-hand-or-by-githubs-retarget-of-a-stacked-pr-dismisses-approvals-with-the-message-the-base-branch-was-changed-and-a-null-pullrequestcommit-2026-11-06))
 - The same page's "List reviews for a pull request" response carries `commit_id`, string or null
 
 ## A base branch change, by hand or by GitHub's retarget of a stacked PR, dismisses approvals with the message "The base branch was changed." and a null `pullRequestCommit` [2026-11-06]
@@ -1134,7 +1133,7 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Not shown:
   - `GITHUB_TOKEN` in a private repository: only the App token was run there
   - The cost of a request of 25 PRs
-- PR 49 then held check runs only. For a commit status, see § `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not
+- PR 49 then held check runs only. For a commit status, see [§ `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not](#pullrequeststatuscheckrollup-needs-statuses-read-for-a-commit-status-in-a-private-repository-an-app-token-without-it-gets-forbidden-on-that-context-required-or-not-2026-11-01)
 
 ## `PullRequest.statusCheckRollup` needs `statuses: read` for a commit status in a private repository: an App token without it gets `FORBIDDEN` on that context, required or not [2026-11-01]
 

@@ -82,7 +82,7 @@ type ContentInputs struct {
 	GroupByRepository           bool
 	CollapsePRsFromAuthors      []string
 	ShowMergedPRsInMessage      bool
-	// Nil leaves the choice to the run. See config.spec.md § Behaviour
+	// Nil leaves the choice to the run. See [config.spec.md § Behaviour](config.spec.md#behaviour)
 	ShowMergeStatsInMessage *bool
 }
 

@@ -217,7 +217,7 @@ func (c *client) FindRecentlyMergedPRs(
 // Returns every PR merged since the given moment, newest merge first, enriched with its
 // reviewers. Unlike FindRecentlyMergedPRs it has no cap and no cache. A query- or
 // repository-scoped enrichment failure fails the call, a PR-scoped one only clears that PR's
-// HasCompleteReviewerInfo. See githubclient.spec.md § Behaviour
+// HasCompleteReviewerInfo. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 func (c *client) FindPRsMergedSince(
 	ctx context.Context,
 	repositories []models.Repository,

@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Whether a PR's required checks block its merge. See githubclient.spec.md § Behaviour
+// Whether a PR's required checks block its merge. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 type RequiredChecksStatus string
 
 const (

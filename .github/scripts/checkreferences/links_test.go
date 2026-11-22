@@ -73,6 +73,11 @@ func TestLinkTargetsInRepo(t *testing.T) {
 			want:     nil,
 		},
 		{
+			name:     "a code span inside link text is kept in the text",
+			markdown: "[facts.md § `go-github` retries](docs/facts.md#go-github-retries)",
+			want:     []linkTarget{{line: 1, path: "docs/facts.md", fragment: "go-github-retries", text: "facts.md § `go-github` retries"}},
+		},
+		{
 			name:     "a link inside a fenced code block is skipped",
 			markdown: "```md\n[a](inside.md)\n```\n~~~\n[b](tilde.md)\n~~~\n[c](after.md)",
 			want:     []linkTarget{{line: 7, path: "after.md", text: "c"}},
@@ -80,7 +85,7 @@ func TestLinkTargetsInRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := linkTargetsInRepo(tt.markdown, []string{"https://github.com/o/r/blob/main/", "https://github.com/o/r/blob/claude/x/"})
+			got := linkTargetsInRepo(tt.markdown, markdownProse, []string{"https://github.com/o/r/blob/main/", "https://github.com/o/r/blob/claude/x/"})
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -111,6 +116,8 @@ func TestBrokenLinks(t *testing.T) {
 	target := filepath.Join(root, "docs", "exists.md")
 	writeFile(t, target, "## Real Heading")
 	writeFile(t, filepath.Join(root, "docs", "facts.md"), "## Fact [2026-09-26]")
+	writeFile(t, filepath.Join(root, ".agents", "skills", "plan", "SKILL.md"), "## Structure")
+	writeFile(t, filepath.Join(root, ".agents", "agents", "reviewer.md"), "## Verify")
 	skill := filepath.Join(root, "skills", "a", "SKILL.md")
 	writeFile(t, skill, "[ok](../../docs/exists.md)\n"+
 		"[broken](../docs/exists.md)\n"+
@@ -128,7 +135,11 @@ func TestBrokenLinks(t *testing.T) {
 		"![image text is free](../../docs/exists.md#real-heading)\n"+
 		"[exists.md § Real](../../docs/exists.md#real-heading)\n"+
 		"[facts.md § Fact](../../docs/facts.md#fact-2026-09-26)\n"+
-		"[exists.md § Real Heading](../../docs/exists.md)")
+		"[exists.md § Real Heading](../../docs/exists.md)\n"+
+		"[plan skill § Structure](../../.agents/skills/plan/SKILL.md#structure)\n"+
+		"[SKILL.md § Structure](../../.agents/skills/plan/SKILL.md#structure)\n"+
+		"[reviewer agent § Verify](../../.agents/agents/reviewer.md#verify)\n"+
+		"[reviewer.md § Verify](../../.agents/agents/reviewer.md#verify)")
 	r := newRepo(root, nil)
 	r.knownBranchBlobURLPrefixes = []string{"https://github.com/o/r/blob/main/"}
 
@@ -146,6 +157,39 @@ func TestBrokenLinks(t *testing.T) {
 		skill + ":12: ../../docs/exists.md#real-heading: link text should be \"exists.md § Real Heading\"",
 		skill + ":13: #own: link text should be \"§ Own\"",
 		skill + ":15: ../../docs/exists.md#real-heading: link text should be \"exists.md § Real Heading\"",
+		skill + ":19: ../../.agents/skills/plan/SKILL.md#structure: link text should be \"plan skill § Structure\"",
+		skill + ":21: ../../.agents/agents/reviewer.md#verify: link text should be \"reviewer agent § Verify\"",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestBrokenLinksInComments(t *testing.T) {
+	root := t.TempDir()
+	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
+	writeFile(t, pkgSpec, "## Oddities")
+	goSource := filepath.Join(root, "pkg", "pkg.go")
+	writeFile(t, goSource, "// See [pkg.spec.md § Oddities](pkg.spec.md#oddities)\n"+
+		"// See [pkg.spec.md § Odd](pkg.spec.md#oddities)\n"+
+		"// See [pkg.spec.md § Gone](pkg.spec.md#gone)\n"+
+		"// See [§ Oddities](#oddities)\n"+
+		"x := \"[a](missing.md)\" // [b](missing.md)\n"+
+		"// e.g. `[c](missing.md)`\n"+
+		"package pkg")
+	workflow := filepath.Join(root, ".github", "ci.yml")
+	writeFile(t, workflow, "# See [pkg.spec.md § Oddities](../pkg/pkg.spec.md#oddities)\n# [missing](../gone.md)")
+
+	got, err := brokenLinks([]string{goSource, workflow}, newRepo(root, nil))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		goSource + ":2: pkg.spec.md#oddities: link text should be \"pkg.spec.md § Oddities\"",
+		goSource + ":3: pkg.spec.md#gone: no heading with this anchor in " + pkgSpec,
+		goSource + ":4: #oddities: a code comment has no headings, name the target file",
+		workflow + ":2: ../gone.md: no such file",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

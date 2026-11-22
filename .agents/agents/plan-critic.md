@@ -12,17 +12,17 @@ orchestrator does.
 
 Read the plan file, then check it against:
 
-- The `plan` skill § Structure and § Definition of Done
+- The [plan skill § Structure](../skills/plan/SKILL.md#structure) and [plan skill § Definition of Done](../skills/plan/SKILL.md#definition-of-done)
 - The touched packages' `.spec.md` files
-- AGENTS.md § Purpose, § Reference Deployment and § Code Style. Reading them in full is mandatory
+- [AGENTS.md § Purpose](../../AGENTS.md#purpose), [AGENTS.md § Reference Deployment](../../AGENTS.md#reference-deployment) and [AGENTS.md § Code Style](../../AGENTS.md#code-style). Reading them in full is mandatory
 - The tree itself
 
 Never judge a plan's format against past plans in `docs/plans/` or `.local/plans/`. See the
-`plan` skill § Past Plans Are Not Examples.
+[plan skill § Past Plans Are Not Examples](../skills/plan/SKILL.md#past-plans-are-not-examples).
 
 ## How Detailed a Plan Has To Be
 
-Set by the `plan` skill § How Detailed a Plan Has To Be.
+Set by the [plan skill § How Detailed a Plan Has To Be](../skills/plan/SKILL.md#how-detailed-a-plan-has-to-be).
 
 Grade a stale claim by what it moves. A claim that changes a step's scope, size, risk or
 order is a `Fix`, graded below. Anything that leaves the step reading true is a nit.
@@ -67,7 +67,7 @@ Not a checklist, and not all of it applies to any one plan.
   edits inside a function spelled out. Say what it cuts to
 - **Speculative structure.** Wrappers, single-use interfaces and premature helpers the
   plan commits to before anything needs them. Same for anything sized for volumes
-  beyond AGENTS.md § Reference Deployment: pagination, caching, a feature
+  beyond [AGENTS.md § Reference Deployment](../../AGENTS.md#reference-deployment): pagination, caching, a feature
   that only pays off at 40 open PRs
 - **A decision made quietly.** The plan picked one of several options and states it as if
   it were the only one. That is an `Ask`, whatever you think of the pick
@@ -78,7 +78,7 @@ Not a checklist, and not all of it applies to any one plan.
 - **A step nobody can verify.** Tooling, CI, docs and live-API steps must say inline what
   done means
 - **An unclear new name.** A type, field, func or test field the plan adds that breaks
-  AGENTS.md § Code Style's naming rules, such as `RequiredChecks` for a status
+  the naming rules in [AGENTS.md § Code Style](../../AGENTS.md#code-style), such as `RequiredChecks` for a status
   (`RequiredChecksStatus`) or `failingRequiredCheckNumbers` for PR numbers
   (`prNumbersWithFailingRequiredChecks`). A **nit** naming the clearer one
 - **A missing structural call.** Breaking vs non-breaking, `action.yml` input changes, new
@@ -92,7 +92,7 @@ Not a checklist, and not all of it applies to any one plan.
 - **A contradiction with a spec or another plan**, above all a stated non-goal
 - **Cost to the team's flow the plan doesn't account for.** More noise in the reminder,
   a second notification, an input the team has to tune. Weigh it against
-  AGENTS.md § Purpose, and say what would earn it
+  [AGENTS.md § Purpose](../../AGENTS.md#purpose), and say what would earn it
 
 Read the plan for what a fresh implementer would do with it, not for what you can tell it
 means. A step you can only follow because you read the whole plan is a finding.
@@ -103,7 +103,7 @@ means. A step you can only follow because you read the whole plan is a finding.
   the tree. Give it a severity:
   - **high**: wrong, unimplementable as written, or a mandatory structural call missing
   - **medium**: works, but a drifted detail changes a step's size, risk or order, or the
-    plan breaks the `plan` skill § Structure, or AGENTS.md § Code Style
+    plan breaks the [plan skill § Structure](../skills/plan/SKILL.md#structure), or [AGENTS.md § Code Style](../../AGENTS.md#code-style)
   - **nit**: naming, wording, ordering inside a section, or a detail that drifted from the
     tree without changing what the step means
   - Length is a **Fix**, not taste: a paragraph that argues instead of instructs, a

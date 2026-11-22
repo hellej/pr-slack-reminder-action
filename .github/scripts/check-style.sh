@@ -54,7 +54,7 @@ check_package_specs() {
 	local dir expected_spec missing=""
 	for dir in $(non_test_go_files | xargs -n1 dirname | sort -u); do
 		expected_spec="$(basename "$dir").spec.md"
-		# The binary's spec covers its run orchestration, see AGENTS.md § Package Specs.
+		# The binary's spec covers its run orchestration, see [AGENTS.md § Package Specs](../../AGENTS.md#package-specs).
 		[ "$dir" = cmd/pr-slack-reminder ] && expected_spec=run.spec.md
 		[ -f "$dir/$expected_spec" ] || missing="$missing$dir/$expected_spec"$'\n'
 	done

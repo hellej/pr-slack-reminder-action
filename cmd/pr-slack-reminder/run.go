@@ -216,7 +216,7 @@ func mergeStatsWindowStart(previousPostState *state.State, generatedAt time.Time
 	return longestWindowStart
 }
 
-// Channel check: see run.spec.md § Behaviour.
+// Channel check: see [run.spec.md § Behaviour](run.spec.md#behaviour).
 func markPreviousMessageStale(
 	slackClient slackclient.Client,
 	previousState state.State,

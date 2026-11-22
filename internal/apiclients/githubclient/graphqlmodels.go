@@ -41,7 +41,7 @@ type labelNode struct {
 	Name string `json:"name"`
 }
 
-// submittedAt is nullable. See docs/third-party-facts.md § `PullRequestReview.submittedAt` is a nullable `DateTime`, and a scalar adds no GraphQL cost by the formula
+// submittedAt is nullable. See [third-party-facts.md § `PullRequestReview.submittedAt` is a nullable `DateTime`, and a scalar adds no GraphQL cost by the formula](../../../docs/third-party-facts.md#pullrequestreviewsubmittedat-is-a-nullable-datetime-and-a-scalar-adds-no-graphql-cost-by-the-formula-2026-10-12)
 type reviewNode struct {
 	State       string      `json:"state"`
 	SubmittedAt *time.Time  `json:"submittedAt"`
@@ -69,7 +69,7 @@ type reviewThreadNode struct {
 	Comments   connection[commentNode] `json:"comments"`
 }
 
-// A requestedReviewer can be null. See githubclient.spec.md § Behaviour
+// A requestedReviewer can be null. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 type reviewRequestNode struct {
 	RequestedReviewer *authorNode `json:"requestedReviewer"`
 }
@@ -112,7 +112,7 @@ type pullRequestNode struct {
 	ReviewRequests connection[reviewRequestNode] `json:"reviewRequests"`
 
 	// Holds the earliest event only, read with first: 1.
-	// See docs/third-party-facts.md § `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only
+	// See [third-party-facts.md § `timelineItems` filters `itemTypes` before paging and returns events oldest first, measured only](../../../docs/third-party-facts.md#timelineitems-filters-itemtypes-before-paging-and-returns-events-oldest-first-measured-only-2026-10-03)
 	ReadyForReviewEvents connection[readyForReviewEventNode]  `json:"timelineItems"`
 	ReviewDismissals     connection[reviewDismissedEventNode] `json:"reviewDismissals"`
 }
@@ -284,7 +284,7 @@ func isApprovingReviewNode(review reviewNode) bool {
 }
 
 // The schema makes the review nullable, and a deleted account leaves its author null.
-// See docs/third-party-facts.md § `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not
+// See [third-party-facts.md § `ReviewDismissedEvent.review` and `dismissalMessage` are nullable, `previousReviewState` is not](../../../docs/third-party-facts.md#reviewdismissedeventreview-and-dismissalmessage-are-nullable-previousreviewstate-is-not-2026-11-01)
 func isDismissedUserApproval(dismissal reviewDismissedEventNode) bool {
 	return dismissal.PreviousReviewState == approvedReviewState &&
 		dismissal.Review != nil &&

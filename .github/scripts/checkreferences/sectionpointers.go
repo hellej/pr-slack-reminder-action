@@ -16,12 +16,14 @@ type sectionPointer struct {
 	line int
 	// Empty when the pointer names no file: it points into the file holding it.
 	writtenTargetFile string
-	// Lines of a wrapped pointer are joined by "\n". See checkreferences.spec.md § Oddities
-	text        string
-	isAfterLink bool
+	// Lines of a wrapped pointer are joined by "\n". See [checkreferences.spec.md § Oddities](checkreferences.spec.md#oddities)
+	text string
 }
 
-const sectionSign = "§"
+const (
+	sectionSign          = "§"
+	commentHasNoHeadings = "a code comment has no headings, name the target file"
+)
 
 var (
 	bareMarkdownFile       = regexp.MustCompile(`[A-Za-z0-9_./-]+\.md\b`)
@@ -55,7 +57,7 @@ func brokenSectionPointers(paths []string, r repo) ([]string, error) {
 func checkSectionPointer(holdingPath string, pointer sectionPointer, r repo) (string, error) {
 	location := fmt.Sprintf("%s:%d: %s %s", holdingPath, pointer.line, sectionSign, shortened(pointer.text))
 	if pointer.writtenTargetFile == "" && commentStyleOf(holdingPath) != markdownProse {
-		return location + ": a code comment has no headings, name the target file", nil
+		return location + ": " + commentHasNoHeadings, nil
 	}
 	targetPath := holdingPath
 	if pointer.writtenTargetFile != "" {
@@ -69,7 +71,7 @@ func checkSectionPointer(holdingPath string, pointer sectionPointer, r repo) (st
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", targetPath, err)
 	}
-	if pointer.isAfterLink && startsWithAnyLabel(pointer.text, headingLabels(string(target))) {
+	if startsWithAnyLabel(pointer.text, headingLabels(string(target))) {
 		return fmt.Sprintf("%s: a heading of %s, link it instead of using %s", location, targetPath, sectionSign), nil
 	}
 	if !startsWithAnyLabel(pointer.text, sectionLabels(string(target))) {
@@ -98,7 +100,7 @@ func resolveTargetFile(holdingPath, writtenTargetFile, repoRoot string) (string,
 	})
 }
 
-// A pointer's name ends at a separator, or where its text ends. See checkreferences.spec.md § Behaviour
+// A pointer's name ends at a separator, or where its text ends. See [checkreferences.spec.md § Behaviour](checkreferences.spec.md#behaviour)
 func startsWithAnyLabel(pointerText string, labels []string) bool {
 	lines := strings.Split(pointerText, "\n")
 	return slices.ContainsFunc(labels, func(label string) bool {
@@ -122,7 +124,7 @@ func sectionLabels(markdown string) []string {
 	return slices.Concat(headingLabels(markdown), boldLabels(markdown))
 }
 
-// Facts file headings end in their date, which pointers leave out. See checkreferences.spec.md § Behaviour
+// Facts file headings end in their date, which pointers leave out. See [checkreferences.spec.md § Behaviour](checkreferences.spec.md#behaviour)
 func headingLabels(markdown string) []string {
 	var labels []string
 	for _, line := range linesOutsideCodeBlocks(markdown) {
@@ -146,7 +148,7 @@ func boldLabels(markdown string) []string {
 	return labels
 }
 
-// See checkreferences.spec.md § Doesn't Do
+// See [checkreferences.spec.md § Doesn't Do](checkreferences.spec.md#doesnt-do)
 func sectionPointers(content string, style commentStyle) []sectionPointer {
 	lines := proseLines(content, style)
 	var pointers []sectionPointer
@@ -169,7 +171,6 @@ func sectionPointers(content string, style commentStyle) []sectionPointer {
 				line:              i + 1,
 				writtenTargetFile: target.writtenTargetFile,
 				text:              pointerText(line[signIndex+len(sectionSign):], lines[i+1:]),
-				isAfterLink:       target.isAfterLink,
 			})
 		}
 	}
@@ -191,10 +192,9 @@ func sectionSignIndexes(line string) []int {
 type pointerTarget struct {
 	writtenTargetFile            string
 	isIntoExternalPageOrLinkText bool
-	isAfterLink                  bool
 }
 
-// See checkreferences.spec.md § Oddities
+// See [checkreferences.spec.md § Oddities](checkreferences.spec.md#oddities)
 func fileNamedRightBefore(lineBeforeSign string) (pointerTarget, bool) {
 	if isInsideLinkText(lineBeforeSign) {
 		return pointerTarget{isIntoExternalPageOrLinkText: true}, true
@@ -203,7 +203,7 @@ func fileNamedRightBefore(lineBeforeSign string) (pointerTarget, bool) {
 	nearestEnd := -1
 	for _, match := range markdownLink.FindAllStringSubmatchIndex(lineBeforeSign, -1) {
 		path, _, isRelative := splitRelativeLink(lineBeforeSign[match[6]:match[7]])
-		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative, isAfterLink: true}, match[1]
+		nearest, nearestEnd = pointerTarget{writtenTargetFile: path, isIntoExternalPageOrLinkText: !isRelative}, match[1]
 	}
 	for _, match := range bareMarkdownFile.FindAllStringIndex(lineBeforeSign, -1) {
 		if match[1] > nearestEnd {

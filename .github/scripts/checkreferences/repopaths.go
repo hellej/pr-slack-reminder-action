@@ -21,7 +21,7 @@ var (
 func brokenRepoPaths(paths []string, r repo) ([]string, error) {
 	var broken []string
 	for _, path := range paths {
-		// It quotes paths from third-party docs. See checkreferences.spec.md § Doesn't Do
+		// It quotes paths from third-party docs. See [checkreferences.spec.md § Doesn't Do](checkreferences.spec.md#doesnt-do)
 		if filepath.Base(path) == "third-party-facts.md" {
 			continue
 		}

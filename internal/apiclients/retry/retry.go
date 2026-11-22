@@ -19,7 +19,7 @@ func DefaultPolicy() Policy {
 	return Policy{
 		WaitsBeforeRetries: []time.Duration{2 * time.Second, 5 * time.Second},
 		// Past GitHub's own 10s processing limit, so its 502 or 504 arrives first. See
-		// docs/third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL
+		// [third-party-facts.md § GitHub ends a request after 10 seconds of processing, with a 502 or 504 on GraphQL](../../../docs/third-party-facts.md#github-ends-a-request-after-10-seconds-of-processing-with-a-502-or-504-on-graphql-2026-09-26)
 		AttemptTimeout:  15 * time.Second,
 		WaitBeforeRetry: waitUnlessCallerIsDone,
 	}

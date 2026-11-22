@@ -9,14 +9,14 @@ import (
 
 const actionNameInActionYML = "PR Slack Reminder"
 
-// See docs/third-party-facts.md § A workflow command's message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`
+// See [third-party-facts.md § A workflow command's message escapes `%`, CR and LF as `%25`, `%0D` and `%0A`](../../docs/third-party-facts.md#a-workflow-commands-message-escapes--cr-and-lf-as-25-0d-and-0a-2026-09-26)
 var annotationMessageEscaper = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A")
 
 func logWarning(message string) {
 	log.Print(annotationLine("warning", message))
 }
 
-// One annotation per joined part: the run page shows an escaped newline as a space. See run.spec.md § Behaviour
+// One annotation per joined part: the run page shows an escaped newline as a space. See [run.spec.md § Behaviour](run.spec.md#behaviour)
 func logError(err error) {
 	for _, part := range splitJoinedError(err) {
 		log.Print(annotationLine("error", part.Error()))
@@ -27,7 +27,7 @@ func annotationLine(annotationType, message string) string {
 	return "::" + annotationType + " title=" + actionNameInActionYML + "::" + annotationMessageEscaper.Replace(message)
 }
 
-// A multi-%w fmt.Errorf also unwraps to a slice. See run.spec.md § Behaviour
+// A multi-%w fmt.Errorf also unwraps to a slice. See [run.spec.md § Behaviour](run.spec.md#behaviour)
 func splitJoinedError(err error) []error {
 	if err == nil {
 		return nil

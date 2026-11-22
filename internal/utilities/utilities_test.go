@@ -327,7 +327,7 @@ func TestIntersperse(t *testing.T) {
 	}
 }
 
-// See utilities.spec.md § Oddities.
+// See [utilities.spec.md § Oddities](utilities.spec.md#oddities).
 func TestSliceHelpersReturnNilWhenThereIsNothingToReturn(t *testing.T) {
 	mappedWithError, _ := MapWithError([]string{}, strconv.Atoi)
 	resultByHelper := map[string][]int{

@@ -43,14 +43,14 @@ func TestSectionPointers(t *testing.T) {
 		{
 			name:         "a link's target wins over its text",
 			content:      "See [run.spec.md](cmd/run.spec.md#x) § Behaviour",
-			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour", isAfterLink: true}},
+			wantPointers: []sectionPointer{{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour"}},
 		},
 		{
 			name:    "chained pointers after a link share it",
 			content: "See [run.spec.md](cmd/run.spec.md) § Behaviour, § Oddities",
 			wantPointers: []sectionPointer{
-				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour, § Oddities", isAfterLink: true},
-				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Oddities", isAfterLink: true},
+				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Behaviour, § Oddities"},
+				{line: 1, writtenTargetFile: "cmd/run.spec.md", text: "Oddities"},
 			},
 		},
 		{
@@ -190,33 +190,35 @@ func TestBrokenSectionPointers(t *testing.T) {
 	agentsFile := filepath.Join(root, "AGENTS.md")
 	writeFile(t, agentsFile, "## Git\n## Code Style\n- **Name a map:** rule")
 	planSkill := filepath.Join(root, ".agents", "skills", "plan", "SKILL.md")
-	writeFile(t, planSkill, "## Structure")
+	writeFile(t, planSkill, "## Structure\n- **Bold:** a label")
 	skill := filepath.Join(root, "skills", "a", "SKILL.md")
-	writeFile(t, skill, "See AGENTS.md § Git, a read\n"+
-		"AGENTS.md § Code Style's comment rule\n"+
+	writeFile(t, skill, "See AGENTS.md § Name a map, a read\n"+
+		"AGENTS.md § Name a map's rule\n"+
 		"[AGENTS.md](../../AGENTS.md) § Name a map\n"+
 		"[AGENTS.md](../../AGENTS.md) § Gitt\n"+
 		"[MISSING.md](../../MISSING.md) § Git\n"+
-		"## Local\n"+
+		"- **Local:** a bold label\n"+
 		"See § Local and § Nowhere\n"+
-		"The `plan` skill § Structure and § Style\n"+
+		"The `plan` skill § Bold and § Style\n"+
 		"The `nope` skill § Structure\n"+
 		"[AGENTS.md](../../AGENTS.md) § Git2\n"+
 		"[AGENTS.md](../../AGENTS.md) § `nope` heading\n"+
-		"**AGENTS.md § Git**, then more\n"+
+		"**AGENTS.md § Name a map**, then more\n"+
 		"**AGENTS.md § Git Hooks**\n"+
-		"**AGENTS.md § Git, § Code Style and § Name a map**\n"+
-		"**AGENTS.md § Git and § Code**\n"+
+		"**AGENTS.md § Name a map and § Code**\n"+
 		"AGENTS.md § Git hooks run\n"+
+		"See AGENTS.md § Git, a read\n"+
 		"[AGENTS.md](../../AGENTS.md) § Git, then more\n"+
-		"[AGENTS.md](../../AGENTS.md) § Git, § Name a map\n"+
-		"[AGENTS.md](../../AGENTS.md) § Name a map")
+		"The `plan` skill § Structure\n"+
+		"## Own\n"+
+		"See § Own\n"+
+		"See [AGENTS.md § Git](../../AGENTS.md#git) and [plan skill § Structure](../../.agents/skills/plan/SKILL.md#structure)")
 	goSource := filepath.Join(root, "pkg", "pkg.go")
-	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\npackage pkg")
+	writeFile(t, goSource, "// See pkg.spec.md § Oddities\n// See AGENTS.md § Git\n// See § Behaviour\n// See AGENTS.md § Name a map\npackage pkg")
 	pkgSpec := filepath.Join(root, "pkg", "pkg.spec.md")
 	writeFile(t, pkgSpec, "## Behaviour")
 	dependabotConfig := filepath.Join(root, ".github", "dependabot.yml")
-	writeFile(t, dependabotConfig, "# See AGENTS.md § Gitt\nversion: 2")
+	writeFile(t, dependabotConfig, "# See AGENTS.md § Gitt\n# See AGENTS.md § Code Style\nversion: 2")
 
 	got, err := brokenSectionPointers([]string{skill, goSource, dependabotConfig}, repoOfFilesUnder(t, root))
 
@@ -232,13 +234,17 @@ func TestBrokenSectionPointers(t *testing.T) {
 		skill + ":10: § Git2: no heading or bold text matching it in " + agentsFile,
 		skill + ":11: § `nope` heading: no heading or bold text matching it in " + agentsFile,
 		skill + ":13: § Git Hooks**: no heading or bold text matching it in " + agentsFile,
-		skill + ":15: § Code**: no heading or bold text matching it in " + agentsFile,
-		skill + ":16: § Git hooks run: no heading or bold text matching it in " + agentsFile,
+		skill + ":14: § Code**: no heading or bold text matching it in " + agentsFile,
+		skill + ":15: § Git hooks run: no heading or bold text matching it in " + agentsFile,
+		skill + ":16: § Git, a read: a heading of " + agentsFile + ", link it instead of using §",
 		skill + ":17: § Git, then more: a heading of " + agentsFile + ", link it instead of using §",
-		skill + ":18: § Git, § Name a map: a heading of " + agentsFile + ", link it instead of using §",
+		skill + ":18: § Structure: a heading of " + planSkill + ", link it instead of using §",
+		skill + ":20: § Own: a heading of " + skill + ", link it instead of using §",
 		goSource + ":1: § Oddities: no heading or bold text matching it in " + pkgSpec,
+		goSource + ":2: § Git: a heading of " + agentsFile + ", link it instead of using §",
 		goSource + ":3: § Behaviour: a code comment has no headings, name the target file",
 		dependabotConfig + ":1: § Gitt: no heading or bold text matching it in " + agentsFile,
+		dependabotConfig + ":2: § Code Style: a heading of " + agentsFile + ", link it instead of using §",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

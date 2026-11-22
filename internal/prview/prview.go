@@ -85,7 +85,7 @@ func (pr PR) MergeBlockers() []MergeBlocker {
 		return nil
 	}
 	var mergeBlockers []MergeBlocker
-	// An unapproved PR's check status is never fetched. See prview.spec.md § Oddities
+	// An unapproved PR's check status is never fetched. See [prview.spec.md § Oddities](prview.spec.md#oddities)
 	if pr.isApproved() && pr.isFailingRequiredChecks() {
 		mergeBlockers = append(mergeBlockers, MergeBlockerFailingChecks)
 	}
@@ -95,7 +95,7 @@ func (pr PR) MergeBlockers() []MergeBlocker {
 	return mergeBlockers
 }
 
-// Asks stale approvers to approve again only on a PR waiting for review. See prview.spec.md § Behaviour
+// Asks stale approvers to approve again only on a PR waiting for review. See [prview.spec.md § Behaviour](prview.spec.md#behaviour)
 func (pr PR) ReviewerGroupsForOpenRow() (staleApprovers, commenters []Collaborator) {
 	if pr.GetNextAction() == NextActionWaitingForReview {
 		return pr.StaleApprovers, pr.Commenters

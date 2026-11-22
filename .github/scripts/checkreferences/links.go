@@ -24,12 +24,12 @@ type linkTarget struct {
 }
 
 var (
-	// Matches [text](target), ![alt](target), <target> in angle brackets, and an optional "title".
+	// Matches `[text](target)`, `![alt](target)`, `<target>` in angle brackets, and an optional "title".
 	// Groups: the leading "!", the text, the target.
 	markdownLink    = regexp.MustCompile(`(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)`)
 	urlWithScheme   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 	markdownHeading = regexp.MustCompile(`^\s{0,3}#{1,6}\s+(.+?)\s*$`)
-	// Release tags here start with `v`, such as v3.9.0. See checkreferences.spec.md § Oddities
+	// Release tags here start with `v`, such as v3.9.0. See [checkreferences.spec.md § Oddities](checkreferences.spec.md#oddities)
 	commitOrTagRef = regexp.MustCompile(`^(?:[0-9a-f]{7,40}|v\d[^/]*)/`)
 )
 
@@ -42,13 +42,13 @@ type writtenLink struct {
 
 func brokenLinks(paths []string, r repo) ([]string, error) {
 	var broken []string
-	for _, markdownPath := range pathsWithStyle(paths, markdownProse) {
-		content, err := os.ReadFile(markdownPath)
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
+			return nil, fmt.Errorf("reading %s: %w", path, err)
 		}
-		for _, link := range linkTargetsInRepo(string(content), r.knownBranchBlobURLPrefixes) {
-			finding, err := checkLink(markdownPath, link, r.root)
+		for _, link := range linkTargetsInRepo(string(content), commentStyleOf(path), r.knownBranchBlobURLPrefixes) {
+			finding, err := checkLink(path, link, r.root)
 			if err != nil {
 				return nil, err
 			}
@@ -71,7 +71,7 @@ func blobURLsOnOtherBranches(paths []string, r repo) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", markdownPath, err)
 		}
-		for _, link := range writtenLinks(string(content)) {
+		for _, link := range writtenLinks(string(content), markdownProse) {
 			if isBlobURLOnOtherBranch(link.target, r) {
 				found = append(found, fmt.Sprintf("%s:%d: %s: not on main or the current branch", markdownPath, link.line, link.target))
 			}
@@ -92,6 +92,9 @@ func checkLink(holdingPath string, link linkTarget, repoRoot string) (string, er
 		written += "#" + link.fragment
 	}
 	location := fmt.Sprintf("%s:%d: %s", holdingPath, link.line, written)
+	if link.path == "" && commentStyleOf(holdingPath) != markdownProse {
+		return location + ": " + commentHasNoHeadings, nil
+	}
 	targetPath := holdingPath
 	switch {
 	case link.isPathFromRepoRoot:
@@ -120,13 +123,25 @@ func checkLink(holdingPath string, link linkTarget, repoRoot string) (string, er
 	return "", nil
 }
 
-// `file.md § Heading` for a heading of another file, `§ Heading` for one of the file holding the link.
+// `file.md § Heading` for a heading of another file, `plan skill § Heading` for one of a skill or agent, `§ Heading` for one of the file holding the link.
 func linkTextForHeading(holdingPath, targetPath, headingText string) string {
 	text := sectionSign + " " + factsEntryDateTail.ReplaceAllString(headingText, "")
 	if filepath.Clean(holdingPath) == filepath.Clean(targetPath) {
 		return text
 	}
-	return filepath.Base(targetPath) + " " + text
+	return fileNameInLinkText(targetPath) + " " + text
+}
+
+// Every skill's file is a SKILL.md, so a skill or agent goes by its name instead.
+func fileNameInLinkText(targetPath string) string {
+	slashedPath := filepath.ToSlash(targetPath)
+	if match := skillDefinitionPath.FindStringSubmatch(slashedPath); match != nil {
+		return match[2] + " skill"
+	}
+	if match := agentDefinitionPath.FindStringSubmatch(slashedPath); match != nil {
+		return match[2] + " agent"
+	}
+	return filepath.Base(targetPath)
 }
 
 // README is for users: its links may read freely, as long as they don't use the `§` form wrongly.
@@ -141,20 +156,26 @@ func isLinkTextAccepted(holdingPath string, link linkTarget, wantText string) bo
 	return false
 }
 
-func writtenLinks(markdown string) []writtenLink {
+// Matches with code spans blanked, so a link inside one is skipped. Reads the text from the written line, since link text may hold a code span.
+func writtenLinks(content string, style commentStyle) []writtenLink {
 	var links []writtenLink
-	for i, line := range linesOutsideCodeBlocks(markdown) {
-		for _, match := range markdownLink.FindAllStringSubmatch(withoutCodeSpans(line), -1) {
-			links = append(links, writtenLink{line: i + 1, target: match[3], text: match[2], isImage: match[1] == "!"})
+	for i, line := range proseLines(content, style) {
+		for _, match := range markdownLink.FindAllStringSubmatchIndex(withoutCodeSpans(line), -1) {
+			links = append(links, writtenLink{
+				line:    i + 1,
+				isImage: line[match[2]:match[3]] == "!",
+				text:    line[match[4]:match[5]],
+				target:  line[match[6]:match[7]],
+			})
 		}
 	}
 	return links
 }
 
 // Relative links, and blob URLs starting with one of knownBranchBlobURLPrefixes.
-func linkTargetsInRepo(markdown string, knownBranchBlobURLPrefixes []string) []linkTarget {
+func linkTargetsInRepo(content string, style commentStyle, knownBranchBlobURLPrefixes []string) []linkTarget {
 	var targets []linkTarget
-	for _, link := range writtenLinks(markdown) {
+	for _, link := range writtenLinks(content, style) {
 		if target, isInRepo := linkTargetInRepo(link.target, knownBranchBlobURLPrefixes); isInRepo {
 			target.line, target.text, target.isImage = link.line, link.text, link.isImage
 			targets = append(targets, target)
@@ -209,7 +230,7 @@ func headingTextByAnchor(markdown string) map[string]string {
 	return headingTextByAnchor
 }
 
-// See docs/third-party-facts.md § GitHub builds a heading's anchor by lowercasing it, dropping punctuation and turning spaces into hyphens
+// See [third-party-facts.md § GitHub builds a heading's anchor by lowercasing it, dropping punctuation and turning spaces into hyphens](../../../docs/third-party-facts.md#github-builds-a-headings-anchor-by-lowercasing-it-dropping-punctuation-and-turning-spaces-into-hyphens-2026-09-26)
 func githubAnchor(heading string) string {
 	var anchor strings.Builder
 	for _, char := range strings.ToLower(heading) {

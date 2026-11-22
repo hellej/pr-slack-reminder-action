@@ -92,7 +92,7 @@ type PR struct {
 	Repository       models.Repository
 	ApprovedByUsers  []Collaborator
 	CommentedByUsers []Collaborator // reviewers who commented the PR, neither approving it nor a stale approver
-	// Users whose approval was dismissed. See githubclient.spec.md § Oddities
+	// Users whose approval was dismissed. See [githubclient.spec.md § Oddities](githubclient.spec.md#oddities)
 	StaleApprovedByUsers []Collaborator `json:",omitempty"`
 	SnoozedUntil         *time.Time
 	// An unresolved review thread whose last comment is neither the author's nor a bot's. A
@@ -100,15 +100,15 @@ type PR struct {
 	HasThreadWaitingForAuthor    bool
 	Conflicting                  bool // cannot be merged as it stands
 	HasOutstandingChangesRequest bool
-	// False for PRs from GetPRs. See githubclient.spec.md § Behaviour
+	// False for PRs from GetPRs. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 	IsInMergeQueue bool `json:",omitempty"`
-	// Nil without a draft-to-ready switch. See githubclient.spec.md § Behaviour
+	// Nil without a draft-to-ready switch. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 	FirstReadyForReviewEventAt *time.Time
-	// Nil without a submitted review by a person other than the author. See githubclient.spec.md § Behaviour
+	// Nil without a submitted review by a person other than the author. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 	FirstReviewAt *time.Time
-	// False after a failed enrichment. See githubclient.spec.md § Behaviour
+	// False after a failed enrichment. See [githubclient.spec.md § Behaviour](githubclient.spec.md#behaviour)
 	HasCompleteReviewerInfo bool
-	// Never saved in a merged PR cache. See githubclient.spec.md § Oddities
+	// Never saved in a merged PR cache. See [githubclient.spec.md § Oddities](githubclient.spec.md#oddities)
 	RequiredChecksStatus RequiredChecksStatus `json:",omitempty"`
 }
 

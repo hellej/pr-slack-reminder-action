@@ -18,7 +18,7 @@ import (
 )
 
 // GitHub answers a name no artifact has with an empty list, not an error. See
-// docs/third-party-facts.md § GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches
+// [third-party-facts.md § GitHub's "List artifacts" with a `name` filter returns 200 and an empty list when nothing matches](../../../docs/third-party-facts.md#githubs-list-artifacts-with-a-name-filter-returns-200-and-an-empty-list-when-nothing-matches-2026-09-26)
 var ErrNoArtifactFound = errors.New("no artifacts found")
 
 // FetchLatestArtifactByName downloads the most recent GitHub Actions artifact by name,
@@ -111,7 +111,7 @@ func (client *client) listArtifacts(
 }
 
 // Gets a fresh download URL, since one expires after a minute, and reads the whole zip under the
-// same ctx. See docs/third-party-facts.md § `go-github` v78 `DownloadArtifact` returns a plain error on a non-302, with the `*Response`
+// same ctx. See [third-party-facts.md § `go-github` v78 `DownloadArtifact` returns a plain error on a non-302, with the `*Response`](../../../docs/third-party-facts.md#go-github-v78-downloadartifact-returns-a-plain-error-on-a-non-302-with-the-response-2026-09-26)
 func (client *client) downloadArtifactZip(
 	ctx context.Context, owner, repo string, artifactID int64,
 ) retry.AttemptResult[[]byte] {
@@ -149,7 +149,7 @@ func (client *client) downloadArtifactZip(
 
 // The status is read off the *Response, since DownloadArtifact reports a failed status as a
 // plain error. A 2xx with an error is, on the list call, a body read or decode that failed, as
-// when the attempt deadline cuts it off. See docs/third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails
+// when the attempt deadline cuts it off. See [third-party-facts.md § `go-github` v78 returns the 2xx `*Response` with the error when reading or decoding the body fails](../../../docs/third-party-facts.md#go-github-v78-returns-the-2xx-response-with-the-error-when-reading-or-decoding-the-body-fails-2026-09-26)
 // On DownloadArtifact it is a 2xx where a 302 was expected, retried as well.
 func isTransientGitHubFailure(resp *github.Response) bool {
 	gotNoResponse := resp == nil || resp.Response == nil

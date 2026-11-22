@@ -15,15 +15,15 @@ Before writing or editing any `.go` file, re-read these [AGENTS.md](../../../AGE
 
 ## Mandatory Implementation Steps
 
-Implement only what was asked, plus the small refactors in scope under AGENTS.md § Code Style.
+Implement only what was asked, plus the small refactors in scope under [AGENTS.md § Code Style](../../../AGENTS.md#code-style).
 
-1. Bring the branch up to date with `origin/main`, per AGENTS.md § Git
-2. Write a failing test for the change, per AGENTS.md § Testing (TDD, and the snapshot exception)
+1. Bring the branch up to date with `origin/main`, per [AGENTS.md § Git](../../../AGENTS.md#git)
+2. Write a failing test for the change, per [AGENTS.md § Testing](../../../AGENTS.md#testing) (TDD, and the snapshot exception)
 3. Implement the minimal code to make it pass
-4. Run `make test`, then refactor: re-read each function you added or grew against AGENTS.md § Code Style, refactor any that takes decoding to follow, and run `make test` again
-5. Update the package's `.spec.md` in the same change if behaviour changed, Oddities included, per AGENTS.md § Package Specs (use [spec-writer skill](../spec-writer/SKILL.md))
-6. For each comment you added, name the fact it states, per AGENTS.md § Code Style's comment rule. If there is none, rename or refactor the code and delete the comment
-7. Last, re-read the prose you wrote: `git diff -- '*.md'` and the remaining comments. Apply AGENTS.md § Output Style, then see if anything can be clearer or cut
+4. Run `make test`, then refactor: re-read each function you added or grew against [AGENTS.md § Code Style](../../../AGENTS.md#code-style), refactor any that takes decoding to follow, and run `make test` again
+5. Update the package's `.spec.md` in the same change if behaviour changed, Oddities included, per [AGENTS.md § Package Specs](../../../AGENTS.md#package-specs) (use [spec-writer skill](../spec-writer/SKILL.md))
+6. For each comment you added, name the fact it states, per the comment rule in [AGENTS.md § Code Style](../../../AGENTS.md#code-style). If there is none, rename or refactor the code and delete the comment
+7. Last, re-read the prose you wrote: `git diff -- '*.md'` and the remaining comments. Apply [AGENTS.md § Output Style](../../../AGENTS.md#output-style), then see if anything can be clearer or cut
 
 ## Implementing a Plan
 
