@@ -1252,3 +1252,17 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - Source: [managing a merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue): "the special prefix `gh-readonly-queue/{base_branch}` ... These are the temporary branches that are created on your behalf by a merge queue and contain a different `sha` from the pull request."
 - The schema describes `PullRequest.statusCheckRollup` as "Check and Status rollup information for the PR's head ref."
 - So a failed merge group check never shows in the PR's own rollup. The queue removes the PR, "Configured CI service is reporting test failures for a merge group" being one documented removal reason (`data/reusables/pull_requests/merge-queue-removal-reasons.md`)
+
+## Scorecard's Signed-Releases matches release asset names only, and a GitHub immutable release scores 10 like provenance [2026-11-22]
+
+- Source: Scorecard `main` source: `probes/releasesAreSigned/impl.go`, `probes/releasesHaveProvenance/impl.go`, `probes/releasesAreImmutable/impl.go`, `checks/evaluation/signed_releases.go`
+- An asset name is matched by suffix. Nothing is downloaded or verified
+  - Signature: `.asc`, `.minisig`, `.sig`, `.sign`, `.sigstore`, `.sigstore.json`: 8 points for the release
+  - Provenance: `.intoto.jsonl`: 10 points
+  - A release with GitHub's immutable flag set: 10 points, scored as provenance
+- The check takes the first 5 releases `ListReleases` returns. A release without assets uses one of the 5 slots but is not scored
+  - With no scored release, the check reports "no releases found" and is left out of the overall score
+- Score: the floor of the average points over the scored releases
+- Scorecard never queries GitHub's artifact attestations API, so `actions/attest-build-provenance` alone scores nothing
+  - Its bundle uploaded as a `.sigstore.json` asset scores 8, not 10
+- Unchecked: whether an immutable release without assets is scored
