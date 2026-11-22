@@ -13,7 +13,7 @@ Improve a software team's development velocity and flow.
 
 ## Reference Deployment
 
-One known setup as an example. It's not the only supported one. Use it to weigh a change against § Purpose, never to drop support for setups it doesn't cover.
+One known setup as an example. It's not the only supported one. Use it to weigh a change against [§ Purpose](#purpose), never to drop support for setups it doesn't cover.
 
 Most users run the action on private repositories. Docs and examples assume a private repository: a significant public-only difference is an optional side note.
 
@@ -30,7 +30,7 @@ Most users run the action on private repositories. Docs and examples assume a pr
 ## GitHub API Budget
 
 - Target: a run over 20 open PRs costs at most 80 GraphQL points, so 60 runs an hour fit in a token's 5,000-point hourly limit
-  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See docs/third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`. The required check status fetch is not in that figure: it adds one request per 25 approved PRs. A Build E2E log showed a request of one PR costing 1 point. The cost at 25 PRs is not read yet
+  - Now about 30: about 1 point per enriched PR, plus 1 per repository for each listing. See [third-party-facts.md § The GraphQL cost formula overestimated a search, but matches the enrichment query's logged cost of about 1 per PR: read `rateLimit.cost`](docs/third-party-facts.md#the-graphql-cost-formula-overestimated-a-search-but-matches-the-enrichment-querys-logged-cost-of-about-1-per-pr-read-ratelimitcost-2026-10-03). The required check status fetch is not in that figure: it adds one request per 25 approved PRs. A Build E2E log showed a request of one PR costing 1 point. The cost at 25 PRs is not read yet
 - The limit is shared: `GITHUB_TOKEN`'s with the whole repository, a personal token's with everything its owner runs
 - Adding or widening a workflow trigger is the user's call: ask first. An event firing for every commit, such as `workflow_run` completed, multiplies the runs an hour
 - A change to a GraphQL query compares `rateLimit.cost` in the Build E2E job log against the last run on `main`, and states the difference in its plan or PR
@@ -112,9 +112,13 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 
 ## References
 
-- Agent files, specs, code comments, e.g.: `AGENTS.md § Testing`, `AGENTS.md § Git and § Testing`, `` the `plan` skill § Structure ``, `` the `coding` skill ``, `` `internal/state/` ``, `` `make test` ``
-- Facts file: `See docs/third-party-facts.md § <full heading, date left out>`
-- Docs read on GitHub: `[AGENTS.md § Testing](AGENTS.md#testing)`, `[§ Oddities](#oddities)`. `README.md` may use free text: `[tips](#-tips)`
+- Markdown files and code comments link a heading: `[AGENTS.md § Testing](AGENTS.md#testing)`. A path is relative to the file holding the link
+  - A heading of the same Markdown file: `[§ Oddities](#oddities)`. A code comment names the target file too: `[state.spec.md § Oddities](state.spec.md#oddities)`
+  - A skill or agent goes by its name: `[plan skill § Structure](.agents/skills/plan/SKILL.md#structure)`, `[reviewer agent § Verify, Don't Trust](.agents/agents/reviewer.md#verify-dont-trust)`
+  - Facts file: `[third-party-facts.md § <full heading, date left out>](docs/third-party-facts.md#<anchor>)`
+  - A plain pointer only for a bold label, which has no anchor: `AGENTS.md § <bold label>`
+  - `README.md` may use free text: `[tips](#-tips)`
+- Anywhere: `` the `coding` skill ``, `` `internal/state/` ``, `` `make test` ``
 - `make check-style` checks these. What it skips: [checkreferences.spec.md](.github/scripts/checkreferences/checkreferences.spec.md)
 
 ## README
@@ -145,7 +149,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - Grep its `##` headings before verifying such a claim yourself. Each heading carries the whole claim, so read a body only when it bears on your work
 - Add to it whenever you confirm such a fact, or rule an approach out
   - File only what outlives the task: a method's shape, a scope, a limit. Dead ends above all: nothing else records them
-- Plans and code may cite an entry by its heading, e.g. `See docs/third-party-facts.md § <heading>`, or the source it names
+- Plans and code may cite an entry by its heading, per [§ References](#references), or the source it names
 
 ## Third-party Tools
 
@@ -153,7 +157,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
   - GitHub Actions: the full commit SHA, with the version in a trailing comment
   - Go dev tools: `tool` directives in `tools/go.mod`, a module apart from the action binary's `go.mod`. `tools/go.sum` hashes lock the versions
   - Add one with `go get -modfile=tools/go.mod -tool <package>@<version>`, run it with `go tool -modfile=tools/go.mod <tool>` (`GO_TOOL` in the Makefile)
-- Dependabot updates the pins weekly. A new Go tool also needs an `allow` entry in `.github/dependabot.yml`. See docs/third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed
+- Dependabot updates the pins weekly. A new Go tool also needs an `allow` entry in `.github/dependabot.yml`. See [third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed](docs/third-party-facts.md#dependabot-skips-go-tool-directive-modules-unless-allow-listed-2026-09-26)
 
 ## Git
 
@@ -184,7 +188,7 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
   - Name a variable for the value it holds, not for where it came from: the previous post's `state.State` is `previousPostState`, not `previousPost`
   - Short-lived names may be short: receivers, loop variables, a value used within a few lines. Maps still follow `<value>By<key>`
 - **A comment must state something the code cannot:** an external fact earns its place, such as an API's behaviour, a measured limit, or why a decision went one way. A comment that restates what the code says means the code needs a better name. A comment decoding an expression, a double negative above all, means the expression should be written the other way round.
-  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the pointer, e.g. `// An artifact saved before this field decodes an empty hash. See state.spec.md § Oddities`
+  - When the fact is already in the package's `.spec.md`, point to it instead of repeating it: at most one short line of the fact, then the link, e.g. `// An artifact saved before this field decodes an empty hash. See [state.spec.md § Oddities](state.spec.md#oddities)`
 - **Declarative slice transformations:** Prefer `./internal/utilities` (`Map`, `Filter`, `Find` etc), `slices` and `maps` over manual `for` loops and index management when transforming data. Extend `utilities` when no helper fits. A plain loop is fine where a helper reads worse, such as one building several values at once.
 - **Pure functions:** Prefer pure, side-effect-free functions. Return new slices or structs rather than mutating input pointers or package-level state.
 - **Flat structure:** Use early returns and guard clauses. Do not nest `if` blocks deeper than 2 levels.
@@ -219,13 +223,13 @@ Don't use a bare noun when two of its kind exist, or a count that doesn't add up
 - `gh workflow run pr-reminder.yml --ref <branch> -f run-mode=post -f build-first=true`: try a branch's own code against the real Slack workspace, a dev channel, so WIP work is safe to run. Without `build-first` the job runs the committed `dist/` binary that `invoke-binary.js` pins by version, so it goes green without ever executing the change
 - The Build workflow's "Smoke/E2E test" step (`.github/actions/e2e-tests/`): runs each PR's own build against the real GitHub API and the dev Slack channels, in post and update mode. Its job log shows a query or Slack call working live
   - It uses a GitHub App token, not `GITHUB_TOKEN`. Fork PRs skip it
-  - It lists PRs from `hellej/pr-slack-reminder-test-repo-1` and `-2`, both private, so its log checks a new GitHub field against a private repository (§ Reference Deployment)
+  - It lists PRs from `hellej/pr-slack-reminder-test-repo-1` and `-2`, both private, so its log checks a new GitHub field against a private repository ([§ Reference Deployment](#reference-deployment))
   - Its grouped canvas runs ("Run with filters, canvas link and merge stats: post" and its update) also list the public `hellej/pr-slack-reminder-test-repo-3`. Its standing PR 14 is approved and fails a check that a ruleset makes required
 - `make check-fmt`: fail if any file needs `gofmt`
 - `make check-vet`: run `go vet` over `./...` and `.github/scripts/`
 - `make check-dead-code`: fail if `deadcode` finds an unreachable function under `./cmd/...`
 - `make check-vulnerabilities`: run `govulncheck ./...`
-- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see § References), a map not named `<value>By<Key>`, or a package missing its spec
+- `make check-style`: fail on a dash used as punctuation in `AGENTS.md`, agent skills and agents, spec files, `README.md`, `docs/third-party-facts.md` and Go comments, a broken reference (see [§ References](#references)), a map not named `<value>By<Key>`, or a package missing its spec
 - `make check-pr-description FILE=<path>`: fail on a PR description over the [pr skill](.agents/skills/pr/SKILL.md)'s limits, or with a link into this repo that doesn't resolve
 - `make install-hooks`: point git at `githooks/`, a pre-commit hook running `check-fmt`, `check-vet`, `check-style` and `check_inputs.go`. One-time opt-in per clone
 - Claude Code web sessions run `make install-hooks` at start (`.claude/hooks/session-start.sh`)

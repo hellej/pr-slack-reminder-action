@@ -14,7 +14,7 @@ const (
 	maxHeadingSummaryWords = 8
 	maxBulletWords         = 15
 	maxSummaryWords        = 80
-	// The GitHub MCP tools wrap a longer URL in backticks. `gh` has no such limit. See docs/third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link
+	// The GitHub MCP tools wrap a longer URL in backticks. `gh` has no such limit. See [third-party-facts.md § The GitHub MCP tools wrap a PR description URL over about 150 characters in backticks, breaking the link](../../../docs/third-party-facts.md#the-github-mcp-tools-wrap-a-pr-description-url-over-about-150-characters-in-backticks-breaking-the-link-2026-10-31)
 	maxLinkLength = 150
 )
 

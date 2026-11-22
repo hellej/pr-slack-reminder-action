@@ -22,8 +22,8 @@ Check it against:
 - The `coding` skill's rules: is there a test that fails without the change? Is the
   touched package's `.spec.md` updated if behaviour changed? The tree holds one end
   state, so whether the test came first is unverifiable: skip it.
-- AGENTS.md § Code Style
-- Readability of each function the change added or grew, per AGENTS.md § Code Style: can
+- [AGENTS.md § Code Style](../../AGENTS.md#code-style)
+- Readability of each function the change added or grew, per [AGENTS.md § Code Style](../../AGENTS.md#code-style): can
   a reader follow it without decoding it? A pattern repeated inline, or steps mixed with
   their low-level detail, is a `medium` Fix. Name the refactor: the helper to extract and
   its name, the reorder. A short, plain function needs none
@@ -36,14 +36,14 @@ Check it against:
   spec, comment and doc claim against the code, references and stale claims included
 - How Markdown and YAML prose reads is not yours either: `prose-clarity-checker` checks it
 - Go comments and docstrings the change wrote stay yours for wording, since
-  `prose-clarity-checker` doesn't read Go. An Output Style breach (AGENTS.md § Output Style) is a `nit`. A
+  `prose-clarity-checker` doesn't read Go. An Output Style breach ([AGENTS.md § Output Style](../../AGENTS.md#output-style)) is a `nit`. A
   sentence with two readings is a `medium` Fix. The comment rule
   below stays yours too
 - Live coverage: a new GitHub or Slack API path the Build E2E runs never execute, such as
   one behind an input or a weekday, is a `medium` Fix naming the E2E scenario and the input
   to set
 - Every comment the change added, production and test code, each with a verdict against
-  AGENTS.md § Code Style's comment rule: keep, or what to rename or refactor so it can
+  the comment rule in [AGENTS.md § Code Style](../../AGENTS.md#code-style): keep, or what to rename or refactor so it can
   go. List them all, never a sample
   - When the verdict is not keep, the finding is the code: the clearer name for a func,
     field, fixture or test case, the extracted helper, or the expression written the other
@@ -58,7 +58,7 @@ Check it against:
   checkpoint review, skip dead code, the comment list, and spec and plan consistency: the
   final review runs them
 - The plan file's own diff, when the change came from a committed plan file, against the
-  `coding` skill § Implementing a Plan. Code deviating from the step with no matching
+  [coding skill § Implementing a Plan](../skills/coding/SKILL.md#implementing-a-plan). Code deviating from the step with no matching
   plan edit is a finding
 
 ## Verify, Don't Trust
@@ -144,7 +144,7 @@ Classify every finding before reporting it:
 Give every Fix a severity:
 
 - **high**: wrong behaviour, a failing or missing test, or a mandatory rule skipped
-- **medium**: works, but violates AGENTS.md § Code Style, including a comment that fails its
+- **medium**: works, but violates [AGENTS.md § Code Style](../../AGENTS.md#code-style), including a comment that fails its
   comment rule, or leaves dead code
 - **nit**: naming, wording, formatting
 

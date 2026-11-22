@@ -19,7 +19,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// See slackclient.spec.md § Behaviour.
+// See [slackclient.spec.md § Behaviour](slackclient.spec.md#behaviour).
 var ErrMessageNotEditable = errors.New("message cannot be edited")
 
 var notEditableMessageErrorCodes = []string{"message_not_found", "cant_update_message", "edit_window_closed"}
@@ -188,7 +188,7 @@ func (c *client) UpdateMessage(
 	}, nil
 }
 
-// See slackclient.spec.md § Oddities.
+// See [slackclient.spec.md § Oddities](slackclient.spec.md#oddities).
 func WrapUpdateMessageError(err error) error {
 	var slackError slack.SlackErrorResponse
 	if errors.As(err, &slackError) && slices.Contains(notEditableMessageErrorCodes, slackError.Err) {
@@ -241,7 +241,7 @@ func (c *client) ReplaceCanvasContent(canvasID string, markdown string) error {
 	return nil
 }
 
-// See slackclient.spec.md § Behaviour.
+// See [slackclient.spec.md § Behaviour](slackclient.spec.md#behaviour).
 func MarshalBlocksAsSent(message slack.Message) (json.RawMessage, error) {
 	blocks, err := json.Marshal(message.Blocks.BlockSet)
 	if err != nil {
@@ -284,7 +284,7 @@ func (c *client) retryIdempotentCall(apiName string, call func(attemptCtx contex
 	return err
 }
 
-// See slackclient.spec.md § Behaviour.
+// See [slackclient.spec.md § Behaviour](slackclient.spec.md#behaviour).
 var errorCodesSlackRejectsUnprocessed = []string{"ratelimited"}
 
 var errorCodesWorthRetryingAnIdempotentCall = []string{"internal_error", "fatal_error", "service_unavailable", "request_timeout"}

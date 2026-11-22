@@ -2694,7 +2694,7 @@ func TestHiddenMergedSectionStillFetchesMergedPRsForTheCanvas(t *testing.T) {
 	}
 }
 
-// The canvas is on, so the merged fetch runs. See run.spec.md § Behaviour.
+// The canvas is on, so the merged fetch runs. See [run.spec.md § Behaviour](run.spec.md#behaviour).
 func TestHiddenMergedSectionLeavesNothingToShowWithoutOpenPRs(t *testing.T) {
 	testCases := []struct {
 		name                 string

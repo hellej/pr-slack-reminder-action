@@ -20,7 +20,7 @@ findings.
   - A follow-up run on a branch whose earlier commits were already reviewed too: the base is
     the branch's base, such as `main`, never `HEAD`. The new change can make earlier prose false
 - Confirm the planned scope of the run with the user before starting
-- Branch per AGENTS.md § Git, a mandatory read, unless the plan says otherwise. If it is silent and the user
+- Branch per [AGENTS.md § Git](../../../AGENTS.md#git), a mandatory read, unless the plan says otherwise. If it is silent and the user
   has not said, ask it with that same confirmation, never once the work is under way
 - `git status` before round 1. Name any unrelated work to every agent as off-limits: do
   not stage it, revert it, or fold it into the change
@@ -33,7 +33,7 @@ Write one. The rest of this skill reads a plan.
 
 - Draft the task to `.local/implement-<slug>.md`, already gitignored
 - Give it what this skill reads: brief motivation, what to change, the acceptance criteria, what it must not do, and the test cases
-- Verify its claims against the tree before showing it, per § Acceptance Criteria, below
+- Verify its claims against the tree before showing it, per [§ Acceptance Criteria](#acceptance-criteria), below
 - Confirm it with the user before round 1
 - If drafting turns up a design decision, stop and hand back to the [plan skill](../plan/SKILL.md)
 
@@ -50,8 +50,8 @@ the whole plan:
 - What the plan must **not** do: its non-goals
 - Test cases the plan lists are a minimum. A guard they don't cover needs one too
 
-The names the plan gives new types, fields and funcs are not criteria: AGENTS.md § Code
-Style's naming rules outrank them. Say so to the implementer and the reviewer.
+The names the plan gives new types, fields and funcs are not criteria: the naming rules in
+[AGENTS.md § Code Style](../../../AGENTS.md#code-style) outrank them. Say so to the implementer and the reviewer.
 
 Name the trap alongside an "unchanged" criterion. An unchanged snapshot means diagnose
 the diff, never re-record it.
@@ -79,7 +79,7 @@ implementer where the plan has gone stale.
    - Findings carried forward from a checkpoint review
 2. At the final review only: when the implementer reports, spawn `prose-clarity-checker` and
    give it the base. Send its medium findings to the implementer and wait for the fixes.
-   Its nits wait for § Nits On a Pass. This does not spend a round
+   Its nits wait for [§ Nits On a Pass](#nits-on-a-pass). This does not spend a round
 3. Spawn the reviewing agents in parallel, in one message:
    - At a checkpoint, the `reviewer` only
    - At the final review, the `reviewer`, a new `prose-truth-checker`, and the
@@ -92,11 +92,11 @@ implementer where the plan has gone stale.
      built, so a later change never makes it stale. Brief `prose-clarity-checker` with the
      base again
 4. Merge the reports into one verdict. It is `CHANGES NEEDED` when any report holds a high
-   or medium Fix, or a Document finding, else `PASS`. Every report's nits go to § Nits On a
-   Pass. Each claim `prose-truth-checker` marks `unverifiable` goes to the hand-back
+   or medium Fix, or a Document finding, else `PASS`. Every report's nits go to
+   [§ Nits On a Pass](#nits-on-a-pass). Each claim `prose-truth-checker` marks `unverifiable` goes to the hand-back
    - `PASS`: clear any open nits as below, then stop
    - `CHANGES NEEDED`: send every high and medium Fix and Document finding to the
-     implementer in one batch. Nits wait for § Nits On a Pass. Then ask each agent of
+     implementer in one batch. Nits wait for [§ Nits On a Pass](#nits-on-a-pass). Then ask each agent of
      step 3 to re-review. Give each agent the implementer's answers, including any finding
      the implementer rejected and why. Otherwise nothing surfaces a deadlock. That is one
      more round
@@ -121,7 +121,7 @@ On a wording nit, name what is wrong and add no wording of your own. Replacement
 you write outranks the style rules the implementer already carries, so a nit answered
 literally can breach them. A prose agent's sketches are the exception: forward every one
 unchanged, with its label. The implementer chooses among them, and applies
-AGENTS.md § Output Style, to the sentence it writes.
+[AGENTS.md § Output Style](../../../AGENTS.md#output-style) to the sentence it writes.
 
 The size of the fix decides what follows, not whether to make it.
 
@@ -138,7 +138,7 @@ The size of the fix decides what follows, not whether to make it.
   with `SendMessage`
 - A fresh spawn starts cold. The implementer re-derives the plan and often redoes work.
   The reviewer re-raises findings it already got fixed
-- One exception, an agent that cannot resume at all. See § Interruptions
+- One exception, an agent that cannot resume at all. See [§ Interruptions](#interruptions)
 
 ## Interruptions
 

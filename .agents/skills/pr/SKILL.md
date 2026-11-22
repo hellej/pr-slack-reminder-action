@@ -6,7 +6,7 @@ argument-hint: "Optional: draft, or what the PR is for"
 
 # Open or Update a Pull Request
 
-1. Merge the latest `main` (AGENTS.md § Git)
+1. Merge the latest `main` ([AGENTS.md § Git](../../../AGENTS.md#git))
 2. Write the description to `.local/pr/<branch>.md`, each `/` in the branch name as `-`, following the `writing` skill:
    - New PR: start from [the PR template](../../../.github/pull_request_template.md)
    - Open PR: start from its stored description, never an earlier local file, which misses edits made on GitHub: `mkdir -p .local/pr && gh pr view --json body -q .body > .local/pr/<branch>.md`, or the body the GitHub MCP tools return when reading the PR

@@ -30,7 +30,7 @@ const (
 )
 
 // Slack rejects a message of more than 50 blocks. For when grouping by
-// repository reaches it, see messagebuilder.spec.md § Oddities.
+// repository reaches it, see [messagebuilder.spec.md § Oddities](messagebuilder.spec.md#oddities).
 const maximumBlocksInSlackMessage = 50
 
 const (
@@ -194,7 +194,7 @@ func buildUpdateTimeFooterBlock(generatedAt time.Time) slack.Block {
 }
 
 // The stored blocks re-send as stored, so none has to survive a round trip through slack-go's
-// block types. No cap: see messagebuilder.spec.md § Doesn't Do.
+// block types. No cap: see [messagebuilder.spec.md § Doesn't Do](messagebuilder.spec.md#doesnt-do).
 func BuildMessageMarkedStale(sentBlocks json.RawMessage, generatedAt time.Time) (slack.Message, error) {
 	var sentBlockList []json.RawMessage
 	if err := json.Unmarshal(sentBlocks, &sentBlockList); err != nil {
@@ -225,7 +225,7 @@ func blockFromJSON(sentBlock json.RawMessage) (slack.Block, error) {
 	return slack.BlockFromJSON(string(sentBlock))
 }
 
-// See messagebuilder.spec.md § Behaviour. A message marked stale is read days later, so the
+// See [messagebuilder.spec.md § Behaviour](messagebuilder.spec.md#behaviour). A message marked stale is read days later, so the
 // fallback names the date too.
 func buildStalenessWarningBlock(generatedAt time.Time) slack.Block {
 	stalenessWarningText := fmt.Sprintf(

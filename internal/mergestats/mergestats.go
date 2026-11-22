@@ -12,7 +12,7 @@ import (
 	"github.com/hellej/pr-slack-reminder-action/internal/utilities"
 )
 
-// See mergestats.spec.md § Behaviour.
+// See [mergestats.spec.md § Behaviour](mergestats.spec.md#behaviour).
 type MergeStats struct {
 	MergedCount             int            `json:"mergedCount"`
 	MedianTimeToFirstReview *time.Duration `json:"medianTimeToFirstReview,omitempty"`
@@ -39,7 +39,7 @@ func isCountedInMedians(pr githubclient.PR) bool {
 	return pr.HasCompleteReviewerInfo && pr.HasReadyForReviewTime() && pr.GetMergedAt() != nil
 }
 
-// A review before the PR turned ready for review counts as 0. See mergestats.spec.md § Behaviour
+// A review before the PR turned ready for review counts as 0. See [mergestats.spec.md § Behaviour](mergestats.spec.md#behaviour)
 func timeToFirstReview(pr githubclient.PR) time.Duration {
 	return prview.WeekdayTimeBetween(pr.ReadyForReviewAt(), *pr.FirstReviewAt)
 }
@@ -61,7 +61,7 @@ func median(durations []time.Duration) *time.Duration {
 	return &mean
 }
 
-// See mergestats.spec.md § Behaviour.
+// See [mergestats.spec.md § Behaviour](mergestats.spec.md#behaviour).
 func PercentChanges(shown, weekBefore MergeStats) (firstReviewChange, mergeChange *int) {
 	return percentChange(shown.MedianTimeToFirstReview, weekBefore.MedianTimeToFirstReview),
 		percentChange(shown.MedianTimeToMerge, weekBefore.MedianTimeToMerge)

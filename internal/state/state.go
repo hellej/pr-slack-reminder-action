@@ -34,7 +34,7 @@ type State struct {
 	PRsWithFailingRequiredChecks  []models.PullRequestRef `json:"prsWithFailingRequiredChecks,omitempty"`
 }
 
-// Falls back to the keys older releases wrote. See state.spec.md § Oddities.
+// Falls back to the keys older releases wrote. See [state.spec.md § Oddities](state.spec.md#oddities).
 func (s *State) UnmarshalJSON(data []byte) error {
 	type stateWithDefaultDecoding State
 	var decoded struct {
@@ -179,7 +179,7 @@ func RefsOfPRsWithFailingRequiredChecks(prs []githubclient.PR) []models.PullRequ
 
 const daysInAWeek = 7
 
-// Oldest first. See state.spec.md § Behaviour.
+// Oldest first. See [state.spec.md § Behaviour](state.spec.md#behaviour).
 type RecentMergeStats []mergestats.MergeStats
 
 func (r RecentMergeStats) WithAdded(newMergeStats *mergestats.MergeStats, asOf time.Time) RecentMergeStats {
@@ -194,7 +194,7 @@ func (r RecentMergeStats) WithAdded(newMergeStats *mergestats.MergeStats, asOf t
 }
 
 // A date's first entry wins, as a later post that day covers only the hours since the first.
-// See state.spec.md § Behaviour
+// See [state.spec.md § Behaviour](state.spec.md#behaviour)
 func (r RecentMergeStats) WeekBefore(shown *mergestats.MergeStats) *mergestats.MergeStats {
 	if shown == nil {
 		return nil

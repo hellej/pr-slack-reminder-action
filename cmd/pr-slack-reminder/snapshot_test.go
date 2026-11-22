@@ -1089,7 +1089,7 @@ func TestSnapshotsUpdateMode(t *testing.T) {
 			mergeStatsOfState: mergeStatsOfAPostADayBeforeTheRun,
 		},
 		{
-			// Saved state: see run.spec.md § Oddities.
+			// Saved state: see [run.spec.md § Oddities](run.spec.md#oddities).
 			name: "one open PR and a tracked PR merged since the post, merged section hidden",
 			configOverrides: map[string]any{
 				config.InputShowMergedPRsInMessage: false,

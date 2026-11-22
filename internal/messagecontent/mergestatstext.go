@@ -68,7 +68,7 @@ func percentChangeText(percentChange int) string {
 	return fmt.Sprintf("%d %%", percentChange)
 }
 
-// A window under 12 hours rounds to 0 and reads as 1 day. See messagecontent.spec.md § Oddities
+// A window under 12 hours rounds to 0 and reads as 1 day. See [messagecontent.spec.md § Oddities](messagecontent.spec.md#oddities)
 func mergeStatsWindowText(stats *mergestats.MergeStats) string {
 	windowDays := max(1, int(math.Round(stats.ComputedAt.Sub(stats.MergedSince).Hours()/24)))
 	if windowDays == 1 {
@@ -77,7 +77,7 @@ func mergeStatsWindowText(stats *mergestats.MergeStats) string {
 	return fmt.Sprintf("Last %d days", windowDays)
 }
 
-// For the rounding at each switch, see messagecontent.spec.md § Oddities.
+// For the rounding at each switch, see [messagecontent.spec.md § Oddities](messagecontent.spec.md#oddities).
 func mergeStatsDurationText(duration time.Duration) string {
 	switch {
 	case duration < time.Hour:

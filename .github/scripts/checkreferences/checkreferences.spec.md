@@ -9,19 +9,21 @@
   - Skips the repository path check: a description may name a path the PR deletes
   - Reports a blob URL into this repository on a branch other than `main` or the current branch, likely a typo. A blob URL on a commit SHA or a tag is not reported
   - Prints a note on stderr, without failing, when `origin` is missing or not a GitHub URL it recognises: blob URLs then go unchecked
-- Section pointers, preferred in agent files, specs and code comments:
-  - `AGENTS.md § Testing`: `AGENTS.md` has a heading or bold label that the text after `§` starts with, here "Testing", and the label ends at a separator or where the pointer's text ends
-  - A separator after the name: `,` `;` `:` `)` `?` `!`, a `.` before a space or the end, `**`, `'s`, ` (`, or ` §`, ` and §`, ` or §` for chained pointers. `§ Git hooks run` fails against `## Git`. Bold the pointer to end it mid-sentence: `**AGENTS.md § Git** runs first`
+- Section pointers, for a bold label only:
+  - `AGENTS.md § Testing`: fails when `AGENTS.md` has no heading or bold label that the text after `§` starts with, here "Testing", ending at a separator or where the pointer's text ends
+  - A pointer whose name matches a heading fails too. Write a link instead: `[AGENTS.md § Testing](AGENTS.md#testing)`. It passes when the name matches only bold text, which has no anchor. `[AGENTS.md](AGENTS.md) § Testing` counts as a pointer
+  - A separator after the name: `,` `;` `:` `)` `?` `!`, a `.` before a space or the end, `**`, `'s`, ` (`, or ` §`, ` and §`, ` or §` for chained pointers. `§ Git hooks run` doesn't match the label "Git": a space alone isn't a separator. Bold the pointer to end it mid-sentence: `**AGENTS.md § Git** runs first`
   - A pointer's text runs to the blank line, so a name ending its line ends there too, however the next line goes on
   - `AGENTS.md § Git and § Testing`: the second pointer reuses the file
   - `` the `plan` skill § Structure ``: looks in `.agents/skills/plan/SKILL.md`. `` the `reviewer` agent § … `` looks in `.agents/agents/reviewer.md`
-  - `§ Oddities` alone: a heading of the file holding it. In a code comment this fails, since a comment must name its file
-  - `See docs/third-party-facts.md § <full heading>`: the heading's ` [YYYY-MM-DD]` tail is left out
-  - `[AGENTS.md](AGENTS.md) § Testing`: fails when the name matches a heading, which a link can reach: `[AGENTS.md § Testing](AGENTS.md#testing)`. Passes when it matches only bold text, which has no anchor
+  - `§ Oddities` alone: a label of the file holding it. In a code comment this fails: a comment must name the file holding the label
   - A named file resolves next to the file holding the pointer, then from the repository root
-- Links, preferred in docs read on GitHub, such as `README.md`:
+- Links, for any heading:
   - `[spec](../state/state.spec.md)`: the file exists
   - `[AGENTS.md § Testing](AGENTS.md#testing)`: a heading with that GitHub anchor exists, and the text is `<file name> § <heading>`, with the heading's ` [YYYY-MM-DD]` tail left out. A heading of the file holding the link reads `[§ Oddities](#oddities)`
+  - A skill's or agent's heading reads `<name> skill § <heading>` or `<name> agent § <heading>`: `[plan skill § Structure](.agents/skills/plan/SKILL.md#structure)`
+  - In a code comment, an anchor-only link such as `[§ Oddities](#oddities)` fails: a comment must name the file holding the heading
+  - A code span in the link text is kept: `` [third-party-facts.md § `go-github` retries](…) ``
   - Free text such as `[tips](#-tips)` is allowed in `README.md`, but not text with a `§` that isn't in that form. Images and blob URLs are free too
   - A blob URL into this repository on `main` or the current branch, such as `https://github.com/<owner>/<repo>/blob/main/README.md#-tips`: checked the same way, its path read from the repository root in the working tree. `<owner>/<repo>` comes from the `origin` remote: `git@github.com:`, `ssh://git@github.com/` or `https://github.com/`, with or without credentials before the host
 - Repository paths: `` `internal/state/` `` exists in the files git lists. An untracked new file counts, a gitignored one doesn't
@@ -35,7 +37,7 @@
   - Markdown: everything outside code blocks
   - Go: full-line `//` comments
   - Any other file: full-line `#` comments
-  - Links and skill and agent names: Markdown only
+  - Skill and agent names are checked in Markdown only
 
 ## Doesn't Do
 

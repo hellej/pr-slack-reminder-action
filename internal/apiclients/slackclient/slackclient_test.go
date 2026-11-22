@@ -363,7 +363,7 @@ func TestUpdateMessage(t *testing.T) {
 	}
 }
 
-// See slackclient.spec.md § Oddities.
+// See [slackclient.spec.md § Oddities](slackclient.spec.md#oddities).
 func TestSentMessageInfoRecordsTheBlockArrayAsSent(t *testing.T) {
 	message := slack.NewBlockMessage(
 		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "*Open PRs*", false, false), nil, nil),
@@ -695,7 +695,7 @@ func netOpError(op string) error {
 	}
 }
 
-// See slackclient.spec.md § Behaviour.
+// See [slackclient.spec.md § Behaviour](slackclient.spec.md#behaviour).
 func TestSendMessageRetriesOnlyFailuresWhereSlackDidNotPost(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -775,7 +775,7 @@ func TestUpdateMessageDoesNotRetryANotEditableMessage(t *testing.T) {
 	}
 }
 
-// See slackclient.spec.md § Oddities.
+// See [slackclient.spec.md § Oddities](slackclient.spec.md#oddities).
 func TestDeleteMessageTreatsMessageNotFoundAfterATransientFailureAsDeleted(t *testing.T) {
 	mockAPI := &mockSlackAPI{deleteMessageErrors: []error{
 		slack.StatusCodeError{Code: 502, Status: "502 Bad Gateway"},

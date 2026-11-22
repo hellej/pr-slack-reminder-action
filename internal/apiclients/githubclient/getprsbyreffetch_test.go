@@ -126,7 +126,7 @@ func TestGetPRsByRefFailsOnAnUnfetchedPullRequest(t *testing.T) {
 	}
 }
 
-// See githubclient.spec.md § Oddities.
+// See [githubclient.spec.md § Oddities](githubclient.spec.md#oddities).
 func TestGetPRsFetchesOnlyTheFirstMaxPRsToFetchRefs(t *testing.T) {
 	transport := &fakeEnrichTransport{}
 	testClient := &client{graphql: graphqlClient{transport: transport, retryPolicy: retry.DefaultPolicy()}}

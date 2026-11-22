@@ -26,7 +26,7 @@ Ask the user what no amount of reading can supply:
 
 - The problem, and who has it
 - What is out of scope
-- Whether the work lands on `main` or on a feature branch and a PR. AGENTS.md § Git, a
+- Whether the work lands on `main` or on a feature branch and a PR. [AGENTS.md § Git](../../../AGENTS.md#git), a
   mandatory read, defaults to `main`, so ask whenever the request leaves it open, and record the answer in the plan
 - Constraints already settled: input names, "no new inputs", must land before another plan
 - Where the plan file goes: `.local/plans/` (gitignored) or `docs/plans/` (committed)
@@ -41,7 +41,7 @@ They become the plan's first section.
 ## The Facts File
 
 [`docs/third-party-facts.md`](../../../docs/third-party-facts.md) follows
-AGENTS.md § Third-party Facts. Reading that section is mandatory.
+[AGENTS.md § Third-party Facts](../../../AGENTS.md#third-party-facts). Reading that section is mandatory.
 
 - Check it before fanning out. An entry answers a question, or narrows it to "confirm this
   still holds at the version `go.mod` pins now"
@@ -62,17 +62,17 @@ parallel, one question area each:
 Don't fan out what one grep answers.
 
 Never brief a researcher to read past plans for how a plan looks. See
-the `plan` skill § Past Plans Are Not Examples.
+the [plan skill § Past Plans Are Not Examples](../plan/SKILL.md#past-plans-are-not-examples).
 
 ## Draft
 
-Write the plan file per the `plan` skill § Structure.
+Write the plan file per the [plan skill § Structure](../plan/SKILL.md#structure).
 
 Cite every third-party claim in the plan itself, at the point that depends on it, per the
-`plan` skill § Mandatory Pre-Plan Read Sequence. The critic takes a cited claim as settled, so citing is what keeps
+[plan skill § Mandatory Pre-Plan Read Sequence](../plan/SKILL.md#mandatory-pre-plan-read-sequence). The critic takes a cited claim as settled, so citing is what keeps
 rounds cheap.
 
-Before spawning the critic, re-read the draft against the `plan` skill § Structure and § Style.
+Before spawning the critic, re-read the draft against the [plan skill § Structure](../plan/SKILL.md#structure) and [plan skill § Style](../plan/SKILL.md#style).
 
 ## Rounds
 
@@ -93,7 +93,7 @@ Before spawning the critic, re-read the draft against the `plan` skill § Struct
    - Apply its medium findings yourself, then continue it with `SendMessage` to re-check the
      rewritten sentences. No `plan-critic` re-review and no round spent, unless a rewrite
      changes a step's scope, size or order. Then it is a `Fix`: re-review, one more round
-   - Its nits go to § Nits On a Pass
+   - Its nits go to [§ Nits On a Pass](#nits-on-a-pass)
 5. Three rounds maximum. At the cap, hand back with the open findings named and the plan
    as it stands
 

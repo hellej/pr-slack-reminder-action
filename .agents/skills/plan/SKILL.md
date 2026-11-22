@@ -6,20 +6,20 @@ argument-hint: "Optional: what you're about to plan"
 
 # Mandatory Pre-Plan Read Sequence
 
-Before drafting an implementation plan, bring the branch up to date with `origin/main`, per AGENTS.md § Git. Then read the following. Each read is mandatory:
+Before drafting an implementation plan, bring the branch up to date with `origin/main`, per [AGENTS.md § Git](../../../AGENTS.md#git). Then read the following. Each read is mandatory:
 
-- **AGENTS.md § Package Specs**, then every touched package's `<package>.spec.md` in full
-- **AGENTS.md § Purpose, § Reference Deployment, § Code Style, § Testing and § Third-party Facts**
+- **[AGENTS.md § Package Specs](../../../AGENTS.md#package-specs)**, then every touched package's `<package>.spec.md` in full
+- **[AGENTS.md § Purpose](../../../AGENTS.md#purpose), [AGENTS.md § Reference Deployment](../../../AGENTS.md#reference-deployment), [AGENTS.md § Code Style](../../../AGENTS.md#code-style), [AGENTS.md § Testing](../../../AGENTS.md#testing) and [AGENTS.md § Third-party Facts](../../../AGENTS.md#third-party-facts)**
 - **Code**: only the parts still unclear after reading the specs
 - **Third-party APIs and libraries**: verify any method, capability, documented behavior, or required permission/scope the plan relies on (`github.com/google/go-github`, `github.com/slack-go/slack`, GitHub token permissions, Slack OAuth scopes, etc.) against the library's source or the provider's official docs. Check the local module cache, a vendor dir, or a local checkout (ask the user for its path, or search near the repo). Link the confirming doc page, or cite the facts entry or its source, at the point in the plan that depends on it. Never assume or guess
 - **Other runs of the action**: when a change makes a run mode read or write something new (state, artifacts, messages), list every workflow and composite action that runs it (`.github/workflows/`, `.github/actions/`) and what each reads and writes
-- **What starts a run**: when a change makes a run's output depend on time or on earlier runs, list the events that start a run (the README's trigger examples, `.github/workflows/`) and what the message and canvas show between two consecutive runs. Adding or widening a trigger is a question for the user (AGENTS.md § GitHub API Budget)
+- **What starts a run**: when a change makes a run's output depend on time or on earlier runs, list the events that start a run (the README's trigger examples, `.github/workflows/`) and what the message and canvas show between two consecutive runs. Adding or widening a trigger is a question for the user ([AGENTS.md § GitHub API Budget](../../../AGENTS.md#github-api-budget))
 - **Unverified third-party claims**: a claim research came back marked unverified cannot carry a step. Verify it, or design so nothing depends on it, before drafting
   - Unless the PR's Build E2E checks it, such as a new GitHub field read on the private test repositories. Then make the step that relies on it a checkpoint, done when the E2E log shows the claim holds. The implementation stops if it doesn't
 
 ## Past Plans Are Not Examples
 
-- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. For how a plan looks, use only this skill and AGENTS.md § Output Style
+- Never read a past plan in `docs/plans/` or `.local/plans/` for its format, structure, level of detail or wording. Past plans follow older, weaker rules. For how a plan looks, use only this skill and [AGENTS.md § Output Style](../../../AGENTS.md#output-style)
 - Read a past plan only for its content: when the new plan builds on it, depends on it, or the user points to it. Even then, copy nothing of its shape
 - Listing a plans directory for the next sequence number is fine
 
@@ -34,7 +34,7 @@ Before drafting an implementation plan, bring the branch up to date with `origin
 
 ## Style
 
-- Apply AGENTS.md § Output Style. Reading it in full is mandatory
+- Apply [AGENTS.md § Output Style](../../../AGENTS.md#output-style). Reading it in full is mandatory
 - A plan instructs, it doesn't argue for itself
 - Justify a choice in one sentence, only where the other choice is reasonable. If it needs more,
   it goes in Justification and the step links to it
@@ -56,21 +56,21 @@ A plan is not a diff. State what each step touches, how big it is, and what it r
 ## Structure
 
 1. Requirements/goals/non-goals: a short bullet list, or a reference to another document that already states them, incl. motivation for the change (what problem this solves and for whom), if not obvious from the requirements
-   - Say in one line how the change serves AGENTS.md § **Purpose**, sized against § **Reference Deployment**.
+   - Say in one line how the change serves [AGENTS.md § Purpose](../../../AGENTS.md#purpose), sized against [AGENTS.md § Reference Deployment](../../../AGENTS.md#reference-deployment).
 2. The target shape: the resulting architecture/feature, if not already fully covered by the requirements. Always call out changes to action inputs (`action.yml`) here, and any new/changed required permissions (GitHub token permissions, third-party OAuth scopes) here too
    - Name each new concept once, here. Code, JSON keys and docs use exactly these names
    - For a change users see in Slack, sketch each affected message state as rendered text: posted, edited by `update`, marked stale. The user confirms the sketches. Offer the [slack-message-probe skill](../slack-message-probe/SKILL.md) for anything uncertain
-3. Whether the change is breaking or non-breaking, per the `release` skill § 1. Determine Semver Bump (patch/minor/major)
+3. Whether the change is breaking or non-breaking, per the [release skill § 1. Determine Semver Bump](../release/SKILL.md#1-determine-semver-bump) (patch/minor/major)
    - For persisted state or artifacts, say what the first run after upgrading does with what the previous version wrote. Mention a downgrade only if it breaks
 4. A short summary listing the steps
 5. The full steps, each naming the files/packages it touches, in that same order: the order they're written is the suggested implementation order, never a separate order/sequence table. The [implement skill](../implement/SKILL.md) runs all steps in one go and reviews the whole diff. Refactor steps (if any) are numbered `R1`, `R2`, ...; real implementation steps restart at `1`
    - Order by dependency. A step calling an external API the repo hasn't used goes early, before the code built on it
    - Mark a step `(checkpoint)` only when the rest builds on it and it earns its own review, such as that external API step
    - Reordering steps means renumbering the headings and remapping every `Step N` reference. References to another plan's steps stay as they are
-   - Don't plan tests as their own step, unless the feature is complex enough to need its own test-suite shape/refactor planned up front. Writing tests is a natural, inherent part of implementing each step (see AGENTS.md § Testing)
+   - Don't plan tests as their own step, unless the feature is complex enough to need its own test-suite shape/refactor planned up front. Writing tests is a natural, inherent part of implementing each step (see [AGENTS.md § Testing](../../../AGENTS.md#testing))
    - If a step isn't verified by tests (tooling, CI config, docs, live-API checks), state inline what verifying it done means
    - A live check names the exact dispatch or edit that sets it up. Check the workflow can actually take it
-   - Before planning a live check, see whether the Build workflow's E2E runs already cover it (AGENTS.md § Development Commands). Plan one only for what they miss, such as `GITHUB_TOKEN`
+   - Before planning a live check, see whether the Build workflow's E2E runs already cover it ([AGENTS.md § Development Commands](../../../AGENTS.md#development-commands)). Plan one only for what they miss, such as `GITHUB_TOKEN`
      - A new GitHub or Slack API path gets an E2E scenario that executes it. When it runs only on a condition CI won't meet, such as a weekday, plan the input an E2E scenario sets to reach it
      - When a check needs a situation the E2E setup lacks, such as a PR in a given review state, ask the user whether they can add it to the test repositories or the E2E inputs. The E2E runs then cover it on every PR
 6. Consequences, after the steps: subsections **Positive**, **Negative**, **Caveats**, **Neutral**, in that order, each a short bullet list. Always include all four, writing `None` under one that has nothing

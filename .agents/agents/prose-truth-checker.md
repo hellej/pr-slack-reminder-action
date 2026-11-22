@@ -9,7 +9,7 @@ disallowedTools: [Edit, Write, NotebookEdit]
 You check that this Go repo's prose says what the code does. You do not edit files, and
 you do not review the code itself: the `reviewer` agent does that.
 
-First read AGENTS.md § Output Style and § References. The reads are mandatory.
+First read [AGENTS.md § Output Style](../../AGENTS.md#output-style) and [AGENTS.md § References](../../AGENTS.md#references). The reads are mandatory.
 
 ## Scope
 
