@@ -77,15 +77,18 @@ implementer where the plan has gone stale.
    - The plan file path, the checkpoints, and the acceptance criteria
    - What is already landed, by file and symbol
    - Findings carried forward from a checkpoint review
-2. At the final review only: when the implementer reports, spawn `prose-clarity-checker` and
-   give it the base. Send its medium findings to the implementer and wait for the fixes.
+2. At the final review only, and only when the diff adds or edits Markdown or `action.yml`:
+   when the implementer reports, spawn `prose-clarity-checker` and give it the base. Send its medium findings to the implementer and wait for the fixes.
    Its nits wait for [§ Nits On a Pass](#nits-on-a-pass). This does not spend a round
 3. Spawn the reviewing agents in parallel, in one message:
    - At a checkpoint, the `reviewer` only
-   - At the final review, the `reviewer`, a new `prose-truth-checker`, and the
-     `prose-clarity-checker` from step 2, continued with `SendMessage`
-   - Brief the `reviewer` with the plan, the implementer's report, and the blind spots
-     above. Tell it to check the report's claims against the tree. A mock renders
+   - At the final review, the `reviewer`, a new `prose-truth-checker`, and, when step 2
+     spawned it, the `prose-clarity-checker`, continued with `SendMessage`. The truth checker
+     always runs: a code-only change can still make prose stale
+   - Brief the `reviewer` with the plan, the implementer's report, the blind spots above,
+     and whether this is a checkpoint or the final review. Its mutation cap depends on it,
+     see the [reviewer agent § Verify, Don't Trust](../../agents/reviewer.md#verify-dont-trust).
+     Tell it to check the report's claims against the tree. A mock renders
      whatever the code asks it for, so a wrong query shape or page size passes it
    - Brief `prose-truth-checker` with the base, the behaviours the change alters, and the
      plan file being implemented. Never name a merged plan to sweep: it records what it
@@ -97,7 +100,8 @@ implementer where the plan has gone stale.
    - `PASS`: clear any open nits as below, then stop
    - `CHANGES NEEDED`: send every high and medium Fix and Document finding to the
      implementer in one batch. Nits wait for [§ Nits On a Pass](#nits-on-a-pass). Then ask each agent of
-     step 3 to re-review. Give each agent the implementer's answers, including any finding
+     step 3 to re-review. The reviewer re-checks the fixes and re-runs only the mutants
+     that survived. Give each agent the implementer's answers, including any finding
      the implementer rejected and why. Otherwise nothing surfaces a deadlock. That is one
      more round
 5. Four rounds maximum. At the cap, hand back with the open findings named and the code
