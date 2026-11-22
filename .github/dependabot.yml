@@ -3,6 +3,9 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# Cooldown delays version updates only. Security updates skip it and open at once.
+# See [third-party-facts.md § Dependabot cooldown delays version updates only, never security updates](../docs/third-party-facts.md#dependabot-cooldown-delays-version-updates-only-never-security-updates-2026-11-22)
+
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -11,6 +14,8 @@ updates:
       - ".github/actions/*"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]
@@ -18,6 +23,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
   # Go records a tool module as // indirect, which version updates skip by default.
   # Keep this list in sync with the tool block of tools/go.mod.
   # See [third-party-facts.md § Dependabot skips Go tool directive modules unless allow-listed](../docs/third-party-facts.md#dependabot-skips-go-tool-directive-modules-unless-allow-listed-2026-09-26)
@@ -25,6 +35,11 @@ updates:
     directory: "/tools"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     allow:
       - dependency-name: "golang.org/x/tools"
         dependency-type: "all"

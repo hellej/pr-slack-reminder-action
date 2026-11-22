@@ -745,6 +745,15 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `govulncheck` in CI is the only signal: it fails on a standard library vulnerability fixed in a newer patch release
 - `actions/setup-go` v7 with `go-version-file: go.mod` installs the `toolchain` version and sets `GOTOOLCHAIN: local` (CI job log, run 40186074161)
 
+## Dependabot cooldown delays version updates only, never security updates [2026-11-22]
+
+- Source: [Dependabot options reference § cooldown](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference), read 2026-11-22
+- A new release isn't offered as a version update until its cooldown, counted from the release, has passed. Without a `cooldown` key the default is 3 days
+- Keys: `default-days`, `semver-major-days`, `semver-minor-days`, `semver-patch-days`, `include`, `exclude` (up to 150 names each, `*` wildcards). `exclude` beats `include`
+- `gomod` and `npm` support the `semver-*-days` keys. `github-actions` supports `default-days` only
+- Security updates ignore cooldown. They need Dependabot alerts and security updates turned on in the repository settings
+- A group with `applies-to: security-updates` bundles security PRs. Without one each security fix gets its own PR
+
 ## `go-github` v78 never retries a 5xx or network error, and sets no HTTP timeout [2026-09-26]
 
 - Source: `go-github/v78@v78.0.0/github/github.go` in the module cache: `bareDo`, `NewClient`
