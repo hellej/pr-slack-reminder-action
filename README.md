@@ -2,7 +2,7 @@
 
 # PR Slack Reminder Action
 
-This GitHub Action sends a friendly Slack reminder about open Pull Requests. The Slack message groups the PRs by status (waiting for review, waiting for author, ready to merge, in merge queue), lists the ones that recently merged, and can be set to auto-update as PRs get opened, reviewed or merged.
+This GitHub Action sends a friendly Slack reminder about open Pull Requests. The message groups the PRs by status (waiting for review, waiting for author, ready to merge, recently merged) and can be set to auto-update as statuses of the PRs change.
 
 ### Example Output
 
