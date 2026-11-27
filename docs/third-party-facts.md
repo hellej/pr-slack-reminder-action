@@ -1129,6 +1129,15 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `previousReviewState: PullRequestReviewState!`
 - No page says when `review` is null
 
+## GitHub's docs don't say required approvals read only each reviewer's latest review, but an approval was reported to stop counting once the same reviewer's later review was dismissed [2026-11-27]
+
+- Source: [about pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews), [about protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches), [dismissing a pull request review](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/dismissing-a-pull-request-review) and the GraphQL pulls reference, read 2026-11-27; [issue 124](https://github.com/hellej/pr-slack-reminder-action/issues/124)
+- No page says that required approvals or `reviewDecision` read each reviewer's latest review, that a `COMMENTED` review is skipped, or that a later approval clears the same reviewer's changes request
+- The closest rule, on about protected branches: "If a person with admin permissions chooses the Request changes option in a review, then that person must approve the pull request before the pull request can be merged"
+- GraphQL `PullRequest.latestReviews` is described as "A list of latest reviews per user associated with the pull request that are not also pending review". It doesn't say how a `COMMENTED` review is treated
+- Reported in issue 124, not probed here: a reviewer approved, then submitted a later review that was dismissed. The report says GitHub then read `reviewDecision: REVIEW_REQUIRED` and blocked the merge, and the earlier review kept state `APPROVED`. The issue doesn't say what kind of review was dismissed
+- Unverified: whether a later `COMMENTED` review keeps an approval, and whether a later approval clears the same reviewer's changes request
+
 ## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
 
 - Source: Build workflow E2E job logs, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token

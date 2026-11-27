@@ -30,7 +30,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 - `IsOpen` and `IsDraft` are inverse views of `GetDraft()`
 - `LastActivityAt` returns `UpdatedAt` as a pointer, nil when it's zero, the nil convention `SortPRsNewestFirst` expects for unknown activity
 - `GetNextAction()` says what a PR needs next, as the first of four ordered checks that matches: `IsInMergeQueue` is `NextActionInMergeQueue`, whatever else is true of the PR; approved with no waiting thread, no conflict and no failing required check is `NextActionReadyToMerge`; an approval, an outstanding changes request or a thread waiting for the author is `NextActionWaitingForAuthor`; anything else is `NextActionWaitingForReview`. A `PRNextAction` is an identifier, not a heading: each renderer supplies its own wording
-- The checks being ordered is what settles the overlaps: a reviewer who requested changes and then approved leaves the PR ready to merge, since the approval is read before the changes request
+- The checks being ordered is what settles the overlaps: one reviewer's approval beside another reviewer's outstanding changes request leaves the PR ready to merge, since the approval is read before the changes request
 - A conflict only demotes. It keeps an approved PR out of `NextActionReadyToMerge`, while an unreviewed conflicting PR stays in `NextActionWaitingForReview`, where reviewing around a coming rebase is not wasted work
 - A failing required check (`RequiredChecksStatus` is `RequiredChecksFailing`) also only demotes: it keeps an approved PR out of `NextActionReadyToMerge` and moves an unapproved one nowhere
 - A `MergeBlocker` names one thing blocking a PR's merge, its value the text the row shows. The values are `MergeBlockerFailingChecks` (`"CI failing"`) and `MergeBlockerConflicts` (`"conflicts"`)
@@ -64,8 +64,7 @@ Enriches fetched PRs with display-ready metadata, and owns the section model bot
 
 ## Oddities
 
-- `GetNextAction` inherits `githubclient`'s reading of an approval: a user with any `APPROVED` review counts as an approver, so a PR approved and then changes-requested by the same person, with every thread answered, no conflict and no failing required check, files as ready to merge
-- Likewise, one reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered, no conflict and no failing required check
+- One reviewer's approval files a PR as ready to merge over another reviewer's outstanding changes request, with every thread answered, no conflict and no failing required check
 - A failing required check on an unapproved PR moves nothing: it stays in `NextActionWaitingForReview` with no `CI failing`. The check status of an unapproved PR is never fetched, so a failing status on such a PR is only one the state remembers
 - A PR the merge queue removed, such as for a failing merge group check, gets the next action its own state gives it, often `NextActionReadyToMerge`: a merge group's checks never reach the PR's head commit. The PR leaves that action when its own checks or reviews change. See [third-party-facts.md § Merge queue checks run on a temporary `gh-readonly-queue/<base branch>` branch with its own SHA, apart from the PR head that `statusCheckRollup` reads](../../docs/third-party-facts.md#merge-queue-checks-run-on-a-temporary-gh-readonly-queuebase-branch-branch-with-its-own-sha-apart-from-the-pr-head-that-statuscheckrollup-reads-2026-11-21)
 - `GetNextAction` on a PR without its fetched half, a nil embedded `githubclient.PR`, reports `NextActionWaitingForReview`. It carries no signal to read, and keeping it in the review queue beats panicking a canvas render
