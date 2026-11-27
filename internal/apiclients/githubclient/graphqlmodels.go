@@ -27,6 +27,8 @@ const approvedReviewState = "APPROVED"
 
 const changesRequestedReviewState = "CHANGES_REQUESTED"
 
+const commentedReviewState = "COMMENTED"
+
 const conflictingMergeableState = "CONFLICTING"
 
 const pendingReviewState = "PENDING"
@@ -184,7 +186,8 @@ func prWithReviewers(
 	pullRequest *PullRequest, repository models.Repository, node pullRequestNode,
 ) PR {
 	submittedReviews := utilities.Filter(node.Reviews.Nodes, isSubmittedUserReview)
-	approvingReviews := utilities.Filter(submittedReviews, isApprovingReviewNode)
+	latestNonCommentReviews := latestNonCommentReviewPerReviewer(submittedReviews)
+	approvingReviews := utilities.Filter(latestNonCommentReviews, isApprovingReviewNode)
 	dismissedApprovals := utilities.Filter(node.ReviewDismissals.Nodes, isDismissedUserApproval)
 	commentsFromUsers := utilities.Filter(node.Comments.Nodes, hasValidCommentAuthor)
 	timelineComments := utilities.Map(node.Comments.Nodes, timelineCommentFromNode)
@@ -210,11 +213,29 @@ func prWithReviewers(
 		Conflicting:    node.Mergeable == conflictingMergeableState,
 		IsInMergeQueue: node.IsInMergeQueue,
 		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
-			submittedReviews, node.ReviewRequests.Nodes, pullRequest.Author,
+			latestNonCommentReviews, node.ReviewRequests.Nodes, pullRequest.Author,
 		),
 		FirstReadyForReviewEventAt: firstReadyForReviewEventAt(node),
 		FirstReviewAt:              firstReviewAt(submittedReviews, pullRequest.Author),
 	}
+}
+
+// Each reviewer's latest review, skipping COMMENTED ones. GitHub doesn't document this rule.
+// See [third-party-facts.md § GitHub's docs don't say required approvals read only each reviewer's latest review, but an approval was reported to stop counting once the same reviewer's later review was dismissed](../../../docs/third-party-facts.md#githubs-docs-dont-say-required-approvals-read-only-each-reviewers-latest-review-but-an-approval-was-reported-to-stop-counting-once-the-same-reviewers-later-review-was-dismissed-2026-11-27)
+// The latest by time, not the last entry: GitHub doesn't document the order of reviews(last: 100).
+// Two same-time reviews by one reviewer are both kept. See [githubclient.spec.md § Oddities](githubclient.spec.md#oddities)
+func latestNonCommentReviewPerReviewer(submittedReviews []reviewNode) []reviewNode {
+	nonCommentReviews := utilities.Filter(submittedReviews, isNonCommentReview)
+	return utilities.Filter(nonCommentReviews, func(review reviewNode) bool {
+		return !hasLaterReviewBySameReviewer(review, nonCommentReviews)
+	})
+}
+
+func hasLaterReviewBySameReviewer(review reviewNode, reviews []reviewNode) bool {
+	return slices.ContainsFunc(reviews, func(other reviewNode) bool {
+		return reviewAuthor(other).Login == reviewAuthor(review).Login &&
+			other.submittedOrCreatedAt().After(review.submittedOrCreatedAt())
+	})
 }
 
 // The minimum, never the first node: reviews(last: 100) comes in an order GitHub doesn't document.
@@ -264,10 +285,10 @@ func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
 
 // Compares logins: the selection reads a name off a review's author, not off a requested reviewer.
 func hasOutstandingChangesRequest(
-	submittedReviews []reviewNode, reviewRequests []reviewRequestNode, prAuthor Collaborator,
+	latestNonCommentReviews []reviewNode, reviewRequests []reviewRequestNode, prAuthor Collaborator,
 ) bool {
 	requestedLogins := utilities.Map(reviewRequests, requestedReviewerLogin)
-	return slices.ContainsFunc(submittedReviews, func(review reviewNode) bool {
+	return slices.ContainsFunc(latestNonCommentReviews, func(review reviewNode) bool {
 		reviewerLogin := reviewAuthor(review).Login
 		return review.State == changesRequestedReviewState &&
 			reviewerLogin != prAuthor.Login &&
@@ -277,6 +298,10 @@ func hasOutstandingChangesRequest(
 
 func isSubmittedUserReview(review reviewNode) bool {
 	return review.State != pendingReviewState && hasKnownNonBotAuthorNode(review.Author)
+}
+
+func isNonCommentReview(review reviewNode) bool {
+	return review.State != commentedReviewState
 }
 
 func isApprovingReviewNode(review reviewNode) bool {

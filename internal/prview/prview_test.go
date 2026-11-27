@@ -823,8 +823,7 @@ func TestGetNextAction(t *testing.T) {
 			expected: prview.NextActionWaitingForReview,
 		},
 		{
-			// The reviewer requested changes and then approved, which leaves both signals set.
-			name:           "approved by the reviewer who requested changes",
+			name:           "approved by one reviewer while another has an outstanding changes request",
 			approverLogins: []string{"dave"},
 			prFlags:        githubclient.PR{HasOutstandingChangesRequest: true},
 			expected:       prview.NextActionReadyToMerge,

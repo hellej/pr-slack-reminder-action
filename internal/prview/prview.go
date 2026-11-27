@@ -50,10 +50,10 @@ const (
 )
 
 // Returns the next action of the first check that matches, so an earlier check wins every
-// overlap: a reviewer who requested changes and then approved leaves the PR ready to merge. A
-// conflict or a failing required check keeps an approved PR in NextActionWaitingForAuthor (vs
-// NextActionReadyToMerge), while an unreviewed one stays in the review queue (neither should
-// block review).
+// overlap: one reviewer's approval beside another's outstanding changes request leaves the PR
+// ready to merge. A conflict or a failing required check keeps an approved PR in
+// NextActionWaitingForAuthor (vs NextActionReadyToMerge), while an unreviewed one stays in the
+// review queue (neither should block review).
 func (pr PR) GetNextAction() PRNextAction {
 	// defensive nil check, should not happen
 	if pr.PR == nil {

@@ -358,6 +358,22 @@ func teamReviewerNode() *authorNode {
 	return &authorNode{Typename: "Team"}
 }
 
+func reviewSubmittedAtHour(state, login string, hour int) reviewNode {
+	submittedAt := time.Date(2026, 10, 6, hour, 0, 0, 0, time.UTC)
+	return reviewNode{State: state, SubmittedAt: &submittedAt, CreatedAt: submittedAt, Author: userAuthorNode(login)}
+}
+
+func reviewCreatedAtHourWithoutSubmittedAt(state, login string, hour int) reviewNode {
+	return reviewNode{State: state, CreatedAt: time.Date(2026, 10, 6, hour, 0, 0, 0, time.UTC), Author: userAuthorNode(login)}
+}
+
+func dismissalOf(previousReviewState, login string) reviewDismissedEventNode {
+	return reviewDismissedEventNode{
+		PreviousReviewState: previousReviewState,
+		Review:              &dismissedReviewNode{Author: userAuthorNode(login)},
+	}
+}
+
 func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -420,12 +436,64 @@ func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 			expected:           true,
 		},
 		{
-			// The approval is GetNextAction's to read, ahead of this flag.
+			// Only each reviewer's latest review counts, so the approval replaces the request.
 			name:   "the reviewer requested changes and then approved",
 			author: userAuthorNode("alice"),
 			reviews: []reviewNode{
-				{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")},
-				{State: "APPROVED", Author: userAuthorNode("carol")},
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+			},
+		},
+		{
+			name:   "the reviewer requested changes and then commented",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+				reviewSubmittedAtHour("COMMENTED", "carol", 10),
+			},
+			expected: true,
+		},
+		{
+			name:   "the reviewer's later changes request was dismissed",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+				reviewSubmittedAtHour("DISMISSED", "carol", 10),
+			},
+		},
+		{
+			name:   "the reviewer approved and then requested changes, listed in reverse",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+			},
+			expected: true,
+		},
+		{
+			name:   "a changes request without a submittedAt, created after the approval",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewCreatedAtHourWithoutSubmittedAt("CHANGES_REQUESTED", "carol", 11),
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+			},
+			expected: true,
+		},
+		{
+			name:   "the reviewer approved and requested changes at the same time",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			},
+			expected: true,
+		},
+		{
+			name:   "another reviewer's later approval",
+			author: userAuthorNode("alice"),
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+				reviewSubmittedAtHour("APPROVED", "bob", 10),
 			},
 			expected: true,
 		},
@@ -738,5 +806,136 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 	expectedFirstReviewAt := timePtr(time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC))
 	if !reflect.DeepEqual(pr.FirstReviewAt, expectedFirstReviewAt) {
 		t.Errorf("FirstReviewAt = %v, expected %v", pr.FirstReviewAt, expectedFirstReviewAt)
+	}
+}
+
+// A reviewer's latest review decides. COMMENTED reviews are skipped when picking it.
+func TestPRWithReviewersCountsEachReviewersLatestReviewAsTheirApproval(t *testing.T) {
+	tests := []struct {
+		name                    string
+		reviews                 []reviewNode
+		dismissals              []reviewDismissedEventNode
+		expectedApprovedBy      []string
+		expectedStaleApprovedBy []string
+		expectedCommentedBy     []string
+	}{
+		{
+			name: "an approval followed by a review dismissed as an approval",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+				reviewSubmittedAtHour("DISMISSED", "carol", 10),
+			},
+			dismissals:              []reviewDismissedEventNode{dismissalOf("APPROVED", "carol")},
+			expectedStaleApprovedBy: []string{"carol"},
+		},
+		{
+			name: "an approval followed by a changes request that was dismissed",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+				reviewSubmittedAtHour("DISMISSED", "carol", 10),
+			},
+			dismissals:          []reviewDismissedEventNode{dismissalOf("CHANGES_REQUESTED", "carol")},
+			expectedCommentedBy: []string{"carol"},
+		},
+		{
+			name: "an approval followed by a changes request",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			},
+			expectedCommentedBy: []string{"carol"},
+		},
+		{
+			name: "an approval followed by a comment",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+				reviewSubmittedAtHour("COMMENTED", "carol", 10),
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+		{
+			name: "a changes request followed by an approval",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+		{
+			name: "a later changes request listed before the approval",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+			},
+			expectedCommentedBy: []string{"carol"},
+		},
+		{
+			name: "a later approval listed before the changes request",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+		{
+			name: "a changes request without a submittedAt, created after the approval",
+			reviews: []reviewNode{
+				reviewCreatedAtHourWithoutSubmittedAt("CHANGES_REQUESTED", "carol", 11),
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+			},
+			expectedCommentedBy: []string{"carol"},
+		},
+		{
+			name: "an approval created earlier but submitted later than the changes request",
+			reviews: []reviewNode{
+				{
+					State:       "APPROVED",
+					SubmittedAt: timePtr(time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)),
+					CreatedAt:   time.Date(2026, 10, 6, 8, 0, 0, 0, time.UTC),
+					Author:      userAuthorNode("carol"),
+				},
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+		{
+			name: "an approval and a changes request at the same time",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 10),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+		{
+			name: "another reviewer's later changes request",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "bob", 9),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			},
+			expectedApprovedBy:  []string{"bob"},
+			expectedCommentedBy: []string{"carol"},
+		},
+		{
+			name: "a later pending review and a bot's approval",
+			reviews: []reviewNode{
+				reviewSubmittedAtHour("APPROVED", "carol", 9),
+				{State: "PENDING", CreatedAt: time.Date(2026, 10, 6, 10, 0, 0, 0, time.UTC), Author: userAuthorNode("carol")},
+				{State: "APPROVED", Author: botAuthorNode("reviewer-app")},
+			},
+			expectedApprovedBy: []string{"carol"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := prWithReviewersOfNode(userAuthorNode("alice"), pullRequestNode{
+				Reviews:          connection[reviewNode]{Nodes: tt.reviews},
+				ReviewDismissals: connection[reviewDismissedEventNode]{Nodes: tt.dismissals},
+			})
+
+			assertLogins(t, "ApprovedByUsers", pr.ApprovedByUsers, tt.expectedApprovedBy)
+			assertLogins(t, "StaleApprovedByUsers", pr.StaleApprovedByUsers, tt.expectedStaleApprovedBy)
+			assertLogins(t, "CommentedByUsers", pr.CommentedByUsers, tt.expectedCommentedBy)
+		})
 	}
 }
