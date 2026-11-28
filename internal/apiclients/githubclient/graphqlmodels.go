@@ -27,8 +27,6 @@ const approvedReviewState = "APPROVED"
 
 const changesRequestedReviewState = "CHANGES_REQUESTED"
 
-const commentedReviewState = "COMMENTED"
-
 const conflictingMergeableState = "CONFLICTING"
 
 const pendingReviewState = "PENDING"
@@ -56,6 +54,13 @@ func (review reviewNode) submittedOrCreatedAt() time.Time {
 		return *review.SubmittedAt
 	}
 	return review.CreatedAt
+}
+
+// Each user's latest review that is not COMMENTED, picked by GitHub. A user whose latest such
+// review is DISMISSED has none. See [third-party-facts.md § `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED`](../../../docs/third-party-facts.md#reviewdecision-reads-only-each-reviewers-latest-review-skipping-commented-ones-and-a-manually-dismissed-review-reads-dismissed-2026-11-28)
+type latestOpinionatedReviewNode struct {
+	State  string      `json:"state"`
+	Author *authorNode `json:"author"`
 }
 
 type commentNode struct {
@@ -107,6 +112,8 @@ type pullRequestNode struct {
 	Labels    connection[labelNode]   `json:"labels"`
 	Reviews   connection[reviewNode]  `json:"reviews"`
 	Comments  connection[commentNode] `json:"comments"`
+
+	LatestOpinionatedReviews connection[latestOpinionatedReviewNode] `json:"latestOpinionatedReviews"`
 
 	Mergeable      string                        `json:"mergeable"`
 	IsInMergeQueue bool                          `json:"isInMergeQueue"`
@@ -186,15 +193,17 @@ func prWithReviewers(
 	pullRequest *PullRequest, repository models.Repository, node pullRequestNode,
 ) PR {
 	submittedReviews := utilities.Filter(node.Reviews.Nodes, isSubmittedUserReview)
-	latestNonCommentReviews := latestNonCommentReviewPerReviewer(submittedReviews)
-	approvingReviews := utilities.Filter(latestNonCommentReviews, isApprovingReviewNode)
+	latestOpinionatedReviewsByOthers := utilities.Filter(
+		node.LatestOpinionatedReviews.Nodes, isByPersonOtherThan(pullRequest.Author),
+	)
+	approvingReviews := utilities.Filter(latestOpinionatedReviewsByOthers, isApproval)
 	dismissedApprovals := utilities.Filter(node.ReviewDismissals.Nodes, isDismissedUserApproval)
 	commentsFromUsers := utilities.Filter(node.Comments.Nodes, hasValidCommentAuthor)
 	timelineComments := utilities.Map(node.Comments.Nodes, timelineCommentFromNode)
 
 	approvedByUsers, staleApprovedByUsers, commentedByUsers := deriveReviewers(
 		pullRequest.Author.Login,
-		utilities.Map(approvingReviews, reviewAuthor),
+		utilities.Map(approvingReviews, latestOpinionatedReviewAuthor),
 		utilities.Map(dismissedApprovals, dismissedReviewAuthor),
 		utilities.Map(submittedReviews, reviewAuthor),
 		utilities.Map(commentsFromUsers, commentAuthor),
@@ -213,29 +222,11 @@ func prWithReviewers(
 		Conflicting:    node.Mergeable == conflictingMergeableState,
 		IsInMergeQueue: node.IsInMergeQueue,
 		HasOutstandingChangesRequest: hasOutstandingChangesRequest(
-			latestNonCommentReviews, node.ReviewRequests.Nodes, pullRequest.Author,
+			latestOpinionatedReviewsByOthers, node.ReviewRequests.Nodes,
 		),
 		FirstReadyForReviewEventAt: firstReadyForReviewEventAt(node),
 		FirstReviewAt:              firstReviewAt(submittedReviews, pullRequest.Author),
 	}
-}
-
-// Each reviewer's latest review, skipping COMMENTED ones. GitHub doesn't document this rule.
-// See [third-party-facts.md § GitHub's docs don't say required approvals read only each reviewer's latest review, but an approval was reported to stop counting once the same reviewer's later review was dismissed](../../../docs/third-party-facts.md#githubs-docs-dont-say-required-approvals-read-only-each-reviewers-latest-review-but-an-approval-was-reported-to-stop-counting-once-the-same-reviewers-later-review-was-dismissed-2026-11-27)
-// The latest by time, not the last entry: GitHub doesn't document the order of reviews(last: 100).
-// Two same-time reviews by one reviewer are both kept. See [githubclient.spec.md § Oddities](githubclient.spec.md#oddities)
-func latestNonCommentReviewPerReviewer(submittedReviews []reviewNode) []reviewNode {
-	nonCommentReviews := utilities.Filter(submittedReviews, isNonCommentReview)
-	return utilities.Filter(nonCommentReviews, func(review reviewNode) bool {
-		return !hasLaterReviewBySameReviewer(review, nonCommentReviews)
-	})
-}
-
-func hasLaterReviewBySameReviewer(review reviewNode, reviews []reviewNode) bool {
-	return slices.ContainsFunc(reviews, func(other reviewNode) bool {
-		return reviewAuthor(other).Login == reviewAuthor(review).Login &&
-			other.submittedOrCreatedAt().After(review.submittedOrCreatedAt())
-	})
 }
 
 // The minimum, never the first node: reviews(last: 100) comes in an order GitHub doesn't document.
@@ -285,26 +276,29 @@ func isWaitingForPRAuthor(thread reviewThreadNode, prAuthor Collaborator) bool {
 
 // Compares logins: the selection reads a name off a review's author, not off a requested reviewer.
 func hasOutstandingChangesRequest(
-	latestNonCommentReviews []reviewNode, reviewRequests []reviewRequestNode, prAuthor Collaborator,
+	latestOpinionatedReviewsByOthers []latestOpinionatedReviewNode,
+	reviewRequests []reviewRequestNode,
 ) bool {
 	requestedLogins := utilities.Map(reviewRequests, requestedReviewerLogin)
-	return slices.ContainsFunc(latestNonCommentReviews, func(review reviewNode) bool {
-		reviewerLogin := reviewAuthor(review).Login
+	isUnrequestedChangesRequest := func(review latestOpinionatedReviewNode) bool {
 		return review.State == changesRequestedReviewState &&
-			reviewerLogin != prAuthor.Login &&
-			!slices.Contains(requestedLogins, reviewerLogin)
-	})
+			!slices.Contains(requestedLogins, latestOpinionatedReviewAuthor(review).Login)
+	}
+	return slices.ContainsFunc(latestOpinionatedReviewsByOthers, isUnrequestedChangesRequest)
 }
 
 func isSubmittedUserReview(review reviewNode) bool {
 	return review.State != pendingReviewState && hasKnownNonBotAuthorNode(review.Author)
 }
 
-func isNonCommentReview(review reviewNode) bool {
-	return review.State != commentedReviewState
+func isByPersonOtherThan(prAuthor Collaborator) func(review latestOpinionatedReviewNode) bool {
+	return func(review latestOpinionatedReviewNode) bool {
+		return hasKnownNonBotAuthorNode(review.Author) &&
+			latestOpinionatedReviewAuthor(review).Login != prAuthor.Login
+	}
 }
 
-func isApprovingReviewNode(review reviewNode) bool {
+func isApproval(review latestOpinionatedReviewNode) bool {
 	return review.State == approvedReviewState
 }
 
@@ -321,6 +315,10 @@ func dismissedReviewAuthor(dismissal reviewDismissedEventNode) Collaborator {
 }
 
 func reviewAuthor(review reviewNode) Collaborator {
+	return collaboratorFromAuthorNode(review.Author)
+}
+
+func latestOpinionatedReviewAuthor(review latestOpinionatedReviewNode) Collaborator {
 	return collaboratorFromAuthorNode(review.Author)
 }
 

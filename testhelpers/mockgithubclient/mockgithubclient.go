@@ -208,7 +208,7 @@ func (t GraphQLTransport) Post(ctx context.Context, body []byte) (int, json.RawM
 	}
 	if strings.Contains(request.Query, "pullRequest(number:") {
 		t.recordPullRequestsRequest(request.Query, request.Variables)
-		return t.enrichedPRsResponse(request.Variables, selectsIsInMergeQueue(request.Query))
+		return t.enrichedPRsResponse(request.Variables, optionalFieldsSelectedBy(request.Query))
 	}
 	if strings.Contains(request.Query, "search(") {
 		return t.mergedPRsResponse(request.Variables)
@@ -275,7 +275,7 @@ func (t GraphQLTransport) openPRsResponse(variables map[string]any) (int, json.R
 // An ErrByPRNumber entry renders as a PR-level error, a reference with no PR fixture as a
 // PR-level NOT_FOUND, and an IssueServiceError as a field error on every PR's comments connection.
 func (t GraphQLTransport) enrichedPRsResponse(
-	variables map[string]any, answersIsInMergeQueue bool,
+	variables map[string]any, selected optionalFields,
 ) (int, json.RawMessage, error) {
 	response := renderedResponse{Data: map[string]any{"rateLimit": rateLimitJSON()}}
 	for index, ref := range postedPullRequestRefs(variables) {
@@ -300,7 +300,7 @@ func (t GraphQLTransport) enrichedPRsResponse(
 			continue
 		}
 		response.Data[alias] = map[string]any{"pullRequest": t.enrichedPullRequestNodeJSON(
-			pr, ref.number, answersIsInMergeQueue,
+			pr, ref.number, selected,
 		)}
 		if t.opts.IssueServiceError != nil {
 			response.Errors = append(response.Errors, renderedError{
@@ -430,7 +430,7 @@ func (t GraphQLTransport) findPullRequest(ref pullRequestRef) *github.PullReques
 
 // GetPRs selects state, merged and labels alongside the scalars both phases share.
 func (t GraphQLTransport) enrichedPullRequestNodeJSON(
-	pr *github.PullRequest, number int, answersIsInMergeQueue bool,
+	pr *github.PullRequest, number int, selected optionalFields,
 ) map[string]any {
 	node := pullRequestScalarsJSON(pr)
 	node["number"] = number
@@ -450,10 +450,50 @@ func (t GraphQLTransport) enrichedPullRequestNodeJSON(
 	if slices.Contains(t.opts.ConflictingPRNumbers, number) {
 		node["mergeable"] = "CONFLICTING"
 	}
-	if answersIsInMergeQueue {
+	if selected.isInMergeQueue {
 		node["isInMergeQueue"] = slices.Contains(t.opts.InMergeQueuePRNumbers, number)
 	}
+	if selected.latestOpinionatedReviews {
+		node["latestOpinionatedReviews"] = connectionJSON(utilities.Map(
+			latestOpinionatedReviews(t.opts.ReviewsByPRNumber[number]), latestOpinionatedReviewNodeJSON,
+		))
+	}
 	return node
+}
+
+// Emulates GitHub: each user's latest review that is neither COMMENTED nor PENDING, leaving out a
+// user whose latest such review is DISMISSED. Bots are kept. Of two such reviews at the same time,
+// the later one in the fixture list wins.
+func latestOpinionatedReviews(reviews []*github.PullRequestReview) []*github.PullRequestReview {
+	opinionatedReviews := utilities.Filter(reviews, isOpinionatedReview)
+	latestReviews := []*github.PullRequestReview{}
+	for index, review := range opinionatedReviews {
+		if !isSupersededBySameUser(opinionatedReviews, index) {
+			latestReviews = append(latestReviews, review)
+		}
+	}
+	return utilities.Filter(latestReviews, func(review *github.PullRequestReview) bool {
+		return review.GetState() != "DISMISSED"
+	})
+}
+
+func isOpinionatedReview(review *github.PullRequestReview) bool {
+	return review.GetState() != "COMMENTED" && review.GetState() != "PENDING"
+}
+
+func isSupersededBySameUser(reviews []*github.PullRequestReview, index int) bool {
+	review := reviews[index]
+	for otherIndex, other := range reviews {
+		if otherIndex == index || other.GetUser().GetLogin() != review.GetUser().GetLogin() {
+			continue
+		}
+		submittedAt, otherSubmittedAt := review.GetSubmittedAt().Time, other.GetSubmittedAt().Time
+		isLaterInFixtureList := otherIndex > index
+		if otherSubmittedAt.After(submittedAt) || otherSubmittedAt.Equal(submittedAt) && isLaterInFixtureList {
+			return true
+		}
+	}
+	return false
 }
 
 // A PR with no entry was never marked ready for review, which GitHub reports as no nodes.
@@ -540,6 +580,10 @@ func reviewNodeJSON(review *github.PullRequestReview) map[string]any {
 	}
 }
 
+func latestOpinionatedReviewNodeJSON(review *github.PullRequestReview) map[string]any {
+	return map[string]any{"state": review.GetState(), "author": authorNodeJSON(review.GetUser())}
+}
+
 func reviewDismissedEventNodeJSON(dismissal ReviewDismissal) map[string]any {
 	return map[string]any{
 		"previousReviewState": dismissal.PreviousReviewState,
@@ -602,10 +646,19 @@ type pullRequestRef struct {
 	number    int
 }
 
-// Unlike the other fields, isInMergeQueue is answered only when the query selects it, so a query
-// that forgets it reads false.
-func selectsIsInMergeQueue(query string) bool {
-	return strings.Contains(query, "isInMergeQueue")
+// Unlike the other fields, these are answered only when the query selects them, so a query that
+// forgets isInMergeQueue reads false, and one that forgets latestOpinionatedReviews or its
+// writersOnly argument reads no approvals.
+type optionalFields struct {
+	isInMergeQueue           bool
+	latestOpinionatedReviews bool
+}
+
+func optionalFieldsSelectedBy(query string) optionalFields {
+	return optionalFields{
+		isInMergeQueue:           strings.Contains(query, "isInMergeQueue"),
+		latestOpinionatedReviews: strings.Contains(query, "latestOpinionatedReviews(last: 100, writersOnly: true)"),
+	}
 }
 
 // Both GetPRs and the enrichment phase select a PR by number; only GetPRs spreads the fullPr

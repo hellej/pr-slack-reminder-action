@@ -251,6 +251,7 @@ func TestBuildEnrichPRsQuery(t *testing.T) {
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 		testReadyForReviewEventSelection,
 		testReviewDismissalsSelection,
+		testLatestOpinionatedReviewsSelection,
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {
@@ -326,8 +327,9 @@ func reviewedAndCommentedFixtures(count int, overrides map[int]enrichFixture) ma
 	fixtures := map[int]enrichFixture{}
 	for number := 1; number <= count; number++ {
 		fixtures[number] = enrichFixture{
-			reviews:  []map[string]any{reviewNodeJSON("APPROVED", "approver")},
-			comments: []map[string]any{commentNodeJSON("commenter", "nice", time.Now())},
+			reviews:                  []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+			latestOpinionatedReviews: []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+			comments:                 []map[string]any{commentNodeJSON("commenter", "nice", time.Now())},
 		}
 	}
 	maps.Copy(fixtures, overrides)
@@ -388,6 +390,10 @@ func TestEnrichPRs(t *testing.T) {
 						reviewNodeJSON("APPROVED", "approver"),
 						reviewNodeJSON("CHANGES_REQUESTED", "change-requester"),
 					},
+					latestOpinionatedReviews: []map[string]any{
+						reviewNodeJSON("APPROVED", "approver"),
+						reviewNodeJSON("CHANGES_REQUESTED", "change-requester"),
+					},
 					comments: []map[string]any{commentNodeJSON("timeline-commenter", "looks good", time.Now())},
 				},
 			},
@@ -423,10 +429,11 @@ func TestEnrichPRs(t *testing.T) {
 			prCount: 25,
 			fixtureByNumber: reviewedAndCommentedFixtures(25, map[int]enrichFixture{
 				3: {
-					reviews:      []map[string]any{reviewNodeJSON("APPROVED", "approver")},
-					errorType:    "RESOURCE_LIMITS_EXCEEDED",
-					errorPath:    []any{"pullRequest", "comments"},
-					errorMessage: "resource limit exceeded",
+					reviews:                  []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+					latestOpinionatedReviews: []map[string]any{reviewNodeJSON("APPROVED", "approver")},
+					errorType:                "RESOURCE_LIMITS_EXCEEDED",
+					errorPath:                []any{"pullRequest", "comments"},
+					errorMessage:             "resource limit exceeded",
 				},
 			}),
 			expectedRequests: 1,
