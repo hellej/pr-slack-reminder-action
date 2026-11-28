@@ -1153,6 +1153,10 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `writersOnly` description: "Only return reviews from user who have write access to the repository" (schema introspection, 2026-11-28)
 - Bots kept: `gh api graphql` on public `hellej/pr-slack-reminder-test-repo-3` PR 6 returned `github-actions`' review both with and without `writersOnly: true`
 - Unverified: that `writersOnly` drops a reviewer without write access. No test repository has such a reviewer
+- A push-dismissed approval drops its reviewer, as a manual dismissal does. `gh api graphql` on public `hellej/pr-slack-reminder-test-repo-3`, 2026-11-28, `writersOnly: true`:
+  - PR 10, push-dismissed, and PR 11, manually dismissed: no node, `reviewDecision` `REVIEW_REQUIRED`
+  - PR 13, re-approved after a push: the reviewer's node reads `APPROVED`, `reviewDecision` `APPROVED`
+  - PRs 12 and 14, a current approval: `APPROVED`, `reviewDecision` `APPROVED`
 - Which review it picks per user, and its match with `reviewDecision` on 4 PRs: see [§ `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED`](#reviewdecision-reads-only-each-reviewers-latest-review-skipping-commented-ones-and-a-manually-dismissed-review-reads-dismissed-2026-11-28)
 - E2E: Build workflow run 46129729589, job 140932027598, PR 126's branch. Under the E2E GitHub App installation token, the enrichment and `GetPRs` queries selecting `latestOpinionatedReviews(last: 100, writersOnly: true)` returned no error on private `hellej/pr-slack-reminder-test-repo-1` and `-2`. The field needs nothing beyond the App's current permissions
   - Total logged `rateLimit.cost` over the E2E runs: 205, against 213 on merged PR 125's last Build run (45972553178). Each scenario cost the same or less. The gap comes from a different PR count between the runs, not from the field
