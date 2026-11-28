@@ -1136,7 +1136,26 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - The closest rule, on about protected branches: "If a person with admin permissions chooses the Request changes option in a review, then that person must approve the pull request before the pull request can be merged"
 - GraphQL `PullRequest.latestReviews` is described as "A list of latest reviews per user associated with the pull request that are not also pending review". It doesn't say how a `COMMENTED` review is treated
 - Reported in issue 124, not probed here: a reviewer approved, then submitted a later review that was dismissed. The report says GitHub then read `reviewDecision: REVIEW_REQUIRED` and blocked the merge, and the earlier review kept state `APPROVED`. The issue doesn't say what kind of review was dismissed
-- Unverified: whether a later `COMMENTED` review keeps an approval, and whether a later approval clears the same reviewer's changes request
+- Measured since: see [§ `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED`](#reviewdecision-reads-only-each-reviewers-latest-review-skipping-commented-ones-and-a-manually-dismissed-review-reads-dismissed-2026-11-28)
+
+## `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED` [2026-11-28]
+
+- Source: `gh api graphql` on public `hellej/pr-slack-reminder-test-repo-3` PRs 18 to 21, under ruleset 26307879 (1 approval required). PRs by `github-actions[bot]`, every review by one user, 2 seconds apart
+- PR 18, approve then comment: `reviewDecision` stays `APPROVED`, merge state `CLEAN`
+- PR 19, changes request then approve: `reviewDecision` `APPROVED`, merge state `CLEAN`. The earlier review keeps state `CHANGES_REQUESTED`
+- PR 20, changes request then manual dismissal: the review reads `DISMISSED`, `reviewDecision` `REVIEW_REQUIRED`
+- PR 21, approve, changes request, then manual dismissal of the changes request: `reviewDecision` `REVIEW_REQUIRED`, merge state `BLOCKED`. The earlier approval keeps state `APPROVED` but no longer counts. This is issue 124's case
+- `latestReviews` returns the latest review of any state, a `COMMENTED` one included
+- `latestOpinionatedReviews` returns the latest non-`COMMENTED` review per user, and leaves out a user whose latest such review is `DISMISSED`. Its entries matched `reviewDecision` in all four PRs
+
+## `latestOpinionatedReviews` returns bots' reviews with or without `writersOnly`, and populates on a private repository under the E2E App token at no added cost [2026-11-28]
+
+- `writersOnly` description: "Only return reviews from user who have write access to the repository" (schema introspection, 2026-11-28)
+- Bots kept: `gh api graphql` on public `hellej/pr-slack-reminder-test-repo-3` PR 6 returned `github-actions`' review both with and without `writersOnly: true`
+- Unverified: that `writersOnly` drops a reviewer without write access. No test repository has such a reviewer
+- Which review it picks per user, and its match with `reviewDecision` on 4 PRs: see [§ `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED`](#reviewdecision-reads-only-each-reviewers-latest-review-skipping-commented-ones-and-a-manually-dismissed-review-reads-dismissed-2026-11-28)
+- E2E: Build workflow run 46129729589, job 140932027598, PR 126's branch. Under the E2E GitHub App installation token, the enrichment and `GetPRs` queries selecting `latestOpinionatedReviews(last: 100, writersOnly: true)` returned no error on private `hellej/pr-slack-reminder-test-repo-1` and `-2`. The field needs nothing beyond the App's current permissions
+  - Total logged `rateLimit.cost` over the E2E runs: 205, against 213 on merged PR 125's last Build run (45972553178). Each scenario cost the same or less. The gap comes from a different PR count between the runs, not from the field
 
 ## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
 

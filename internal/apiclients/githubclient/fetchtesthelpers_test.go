@@ -21,6 +21,9 @@ var testRepositories = []models.Repository{
 const testReviewsSelection = "reviews(last: 100){ nodes { state submittedAt createdAt " +
 	"author { login __typename ... on User { name } } } }"
 
+const testLatestOpinionatedReviewsSelection = "latestOpinionatedReviews(last: 100, writersOnly: true)" +
+	"{ nodes { state author { login __typename ... on User { name } } } }"
+
 const testReadyForReviewEventSelection = "timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], first: 1)" +
 	"{ nodes { ... on ReadyForReviewEvent { createdAt } } }"
 
@@ -29,13 +32,14 @@ const testReviewDismissalsSelection = "reviewDismissals: timelineItems(itemTypes
 	"review { author { login __typename ... on User { name } } } } } }"
 
 type enrichFixture struct {
-	reviews         []map[string]any
-	comments        []map[string]any
-	nullPullRequest bool
-	errorType       string
-	errorPath       []any // path suffix after the alias; the field it points at comes back null
-	errorMessage    string
-	requestStatus   int // non-zero: the whole request carrying this PR fails with this status
+	reviews                  []map[string]any
+	latestOpinionatedReviews []map[string]any
+	comments                 []map[string]any
+	nullPullRequest          bool
+	errorType                string
+	errorPath                []any // path suffix after the alias; the field it points at comes back null
+	errorMessage             string
+	requestStatus            int // non-zero: the whole request carrying this PR fails with this status
 }
 
 func (f enrichFixture) aliasResponse(number int) any {
@@ -46,9 +50,10 @@ func (f enrichFixture) aliasResponse(number int) any {
 		return map[string]any{"pullRequest": nil}
 	}
 	pullRequest := map[string]any{
-		"number":   number,
-		"reviews":  map[string]any{"nodes": f.reviews},
-		"comments": map[string]any{"nodes": f.comments},
+		"number":                   number,
+		"reviews":                  map[string]any{"nodes": f.reviews},
+		"latestOpinionatedReviews": map[string]any{"nodes": f.latestOpinionatedReviews},
+		"comments":                 map[string]any{"nodes": f.comments},
 	}
 	if len(f.errorPath) > 1 {
 		pullRequest[f.errorPath[len(f.errorPath)-1].(string)] = nil

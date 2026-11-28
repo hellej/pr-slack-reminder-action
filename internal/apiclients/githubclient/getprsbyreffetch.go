@@ -19,6 +19,7 @@ const fullPullRequestSelection = `  number title url isDraft createdAt updatedAt
   author { login __typename ... on User { name } }
   labels(first: 100){ nodes { name } }
   reviews(last: 100){ nodes { state submittedAt createdAt author { login __typename ... on User { name } } } }
+  latestOpinionatedReviews(last: 100, writersOnly: true){ nodes { state author { login __typename ... on User { name } } } }
   comments(last: 100){ nodes { createdAt body author { login __typename ... on User { name } } } }
   reviewThreads(last: 100){ nodes { isResolved comments(last: 1){ nodes { author { login __typename } } } } }
   reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }

@@ -166,12 +166,10 @@ func (c Collaborator) GetGitHubName() string {
 	return cmp.Or(c.Name, c.Login)
 }
 
-func deriveReviewers(
+func deriveStaleApproversAndCommenters(
 	authorLogin string,
-	approvers, dismissedApprovers, reviewAuthors, timelineCommenters []Collaborator,
-) (approvedBy, staleApprovedBy, commentedBy []Collaborator) {
-	approvedBy = utilities.UniqueFunc(approvers, isUniqueCollaborator)
-
+	approvedBy, dismissedApprovers, reviewAuthors, timelineCommenters []Collaborator,
+) (staleApprovedBy, commentedBy []Collaborator) {
 	staleApprovedBy = utilities.Filter(
 		utilities.UniqueFunc(dismissedApprovers, isUniqueCollaborator),
 		isNotAuthorOrListedReviewer(authorLogin, approvedBy),
@@ -182,7 +180,7 @@ func deriveReviewers(
 		utilities.UniqueFunc(allCommenters, isUniqueCollaborator),
 		isNotAuthorOrListedReviewer(authorLogin, slices.Concat(approvedBy, staleApprovedBy)),
 	)
-	return approvedBy, staleApprovedBy, commentedBy
+	return staleApprovedBy, commentedBy
 }
 
 func isUniqueCollaborator(a, b Collaborator) bool {

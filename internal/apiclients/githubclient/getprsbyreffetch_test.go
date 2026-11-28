@@ -40,6 +40,7 @@ func TestBuildGetPRsQuery(t *testing.T) {
 		"reviewRequests(first: 100){ nodes { requestedReviewer { __typename ... on User { login } } } }",
 		testReadyForReviewEventSelection,
 		testReviewDismissalsSelection,
+		testLatestOpinionatedReviewsSelection,
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(query.text, fragment) {

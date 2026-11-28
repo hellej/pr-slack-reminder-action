@@ -404,7 +404,8 @@ func TestFindRecentlyMergedPRsCarriesReviewersAndKeepsASnoozedPR(t *testing.T) {
 			map[string][]string{"s0": mergedNodesSinceJSON("2026-08-20T12:00:00Z")},
 		),
 		map[int]enrichFixture{1: {
-			reviews: []map[string]any{reviewNodeJSON("APPROVED", "approver-one")},
+			reviews:                  []map[string]any{reviewNodeJSON("APPROVED", "approver-one")},
+			latestOpinionatedReviews: []map[string]any{reviewNodeJSON("APPROVED", "approver-one")},
 			comments: []map[string]any{
 				commentNodeJSON("commenter-one", "nice", time.Now()),
 				commentNodeJSON("snoozer", "/snooze for 3 days", time.Now()),

@@ -363,10 +363,6 @@ func reviewSubmittedAtHour(state, login string, hour int) reviewNode {
 	return reviewNode{State: state, SubmittedAt: &submittedAt, CreatedAt: submittedAt, Author: userAuthorNode(login)}
 }
 
-func reviewCreatedAtHourWithoutSubmittedAt(state, login string, hour int) reviewNode {
-	return reviewNode{State: state, CreatedAt: time.Date(2026, 10, 6, hour, 0, 0, 0, time.UTC), Author: userAuthorNode(login)}
-}
-
 func dismissalOf(previousReviewState, login string) reviewDismissedEventNode {
 	return reviewDismissedEventNode{
 		PreviousReviewState: previousReviewState,
@@ -374,75 +370,30 @@ func dismissalOf(previousReviewState, login string) reviewDismissedEventNode {
 	}
 }
 
+func latestOpinionatedReviewOf(state, login string) latestOpinionatedReviewNode {
+	return latestOpinionatedReviewNode{State: state, Author: userAuthorNode(login)}
+}
+
+// Most cases leave the reviews empty or make them disagree with latestOpinionatedReviews. An
+// implementation still reading the reviews for changes requests fails those cases.
 func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 	tests := []struct {
-		name               string
-		author             *authorNode
-		reviews            []reviewNode
-		requestedReviewers []*authorNode
-		expected           bool
+		name                     string
+		author                   *authorNode
+		reviews                  []reviewNode
+		latestOpinionatedReviews []latestOpinionatedReviewNode
+		requestedReviewers       []*authorNode
+		expected                 bool
 	}{
 		{
-			name:    "no reviews at all",
-			author:  userAuthorNode("alice"),
-			reviews: nil,
-		},
-		{
-			name:    "a reviewer commented, which leaves the PR to the thread rule",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "COMMENTED", Author: userAuthorNode("bob")}},
-		},
-		{
-			name:     "a reviewer requested changes",
-			author:   userAuthorNode("alice"),
-			reviews:  []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			expected: true,
-		},
-		{
-			name:               "the author re-requested the reviewer who requested changes",
-			author:             userAuthorNode("alice"),
-			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			requestedReviewers: []*authorNode{requestedUserNode("carol")},
-		},
-		{
-			name:               "a different user is requested",
-			author:             userAuthorNode("alice"),
-			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			requestedReviewers: []*authorNode{requestedUserNode("bob")},
-			expected:           true,
-		},
-		{
-			name:               "a team is requested",
-			author:             userAuthorNode("alice"),
-			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			requestedReviewers: []*authorNode{teamReviewerNode()},
-			expected:           true,
-		},
-		{
-			name:               "a requested reviewer GitHub reports as null",
-			author:             userAuthorNode("alice"),
-			reviews:            []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			requestedReviewers: []*authorNode{nil},
-			expected:           true,
-		},
-		{
-			name:   "only one of two reviewers who requested changes is re-requested",
+			name:   "no latest opinionated reviews at all",
 			author: userAuthorNode("alice"),
-			reviews: []reviewNode{
-				{State: "CHANGES_REQUESTED", Author: userAuthorNode("bob")},
-				{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")},
-			},
-			requestedReviewers: []*authorNode{requestedUserNode("bob")},
-			expected:           true,
 		},
 		{
-			// Only each reviewer's latest review counts, so the approval replaces the request.
-			name:   "the reviewer requested changes and then approved",
-			author: userAuthorNode("alice"),
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
-				reviewSubmittedAtHour("APPROVED", "carol", 10),
-			},
+			name:                     "a reviewer requested changes",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			expected:                 true,
 		},
 		{
 			name:   "the reviewer requested changes and then commented",
@@ -451,10 +402,12 @@ func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
 				reviewSubmittedAtHour("COMMENTED", "carol", 10),
 			},
-			expected: true,
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			expected:                 true,
 		},
 		{
-			name:   "the reviewer's later changes request was dismissed",
+			// GitHub leaves out a reviewer whose latest opinionated review was dismissed.
+			name:   "the reviewer's changes request was dismissed",
 			author: userAuthorNode("alice"),
 			reviews: []reviewNode{
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
@@ -462,76 +415,105 @@ func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 			},
 		},
 		{
-			name:   "the reviewer approved and then requested changes, listed in reverse",
+			name:   "the reviewer requested changes and then approved",
 			author: userAuthorNode("alice"),
 			reviews: []reviewNode{
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
-				reviewSubmittedAtHour("APPROVED", "carol", 9),
-			},
-			expected: true,
-		},
-		{
-			name:   "a changes request without a submittedAt, created after the approval",
-			author: userAuthorNode("alice"),
-			reviews: []reviewNode{
-				reviewCreatedAtHourWithoutSubmittedAt("CHANGES_REQUESTED", "carol", 11),
+				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
 				reviewSubmittedAtHour("APPROVED", "carol", 10),
 			},
-			expected: true,
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("APPROVED", "carol")},
 		},
 		{
-			name:   "the reviewer approved and requested changes at the same time",
+			name:   "an approval and a changes request at the same time, GitHub picking the approval",
 			author: userAuthorNode("alice"),
 			reviews: []reviewNode{
 				reviewSubmittedAtHour("APPROVED", "carol", 10),
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
 			},
-			expected: true,
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("APPROVED", "carol")},
+		},
+		{
+			// writersOnly leaves out a reviewer without write access.
+			name:    "a changes request by a reviewer without write access",
+			author:  userAuthorNode("alice"),
+			reviews: []reviewNode{reviewSubmittedAtHour("CHANGES_REQUESTED", "outsider", 9)},
 		},
 		{
 			name:   "another reviewer's later approval",
 			author: userAuthorNode("alice"),
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
-				reviewSubmittedAtHour("APPROVED", "bob", 10),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{
+				latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol"),
+				latestOpinionatedReviewOf("APPROVED", "bob"),
 			},
 			expected: true,
 		},
 		{
-			name:    "a reviewer approved",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "APPROVED", Author: userAuthorNode("bob")}},
+			name:                     "the author re-requested the reviewer who requested changes",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			requestedReviewers:       []*authorNode{requestedUserNode("carol")},
 		},
 		{
-			// A dismissed review has been withdrawn, so it asks the author for nothing.
-			name:    "a reviewer's changes request was dismissed",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "DISMISSED", Author: userAuthorNode("dave")}},
+			name:                     "a different user is requested",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			requestedReviewers:       []*authorNode{requestedUserNode("bob")},
+			expected:                 true,
 		},
 		{
-			name:    "the author requested changes on their own PR",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("alice")}},
+			name:                     "a team is requested",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			requestedReviewers:       []*authorNode{teamReviewerNode()},
+			expected:                 true,
+		},
+		{
+			name:                     "a requested reviewer GitHub reports as null",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			requestedReviewers:       []*authorNode{nil},
+			expected:                 true,
+		},
+		{
+			name:   "only one of two reviewers who requested changes is re-requested",
+			author: userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{
+				latestOpinionatedReviewOf("CHANGES_REQUESTED", "bob"),
+				latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol"),
+			},
+			requestedReviewers: []*authorNode{requestedUserNode("bob")},
+			expected:           true,
+		},
+		{
+			name:                     "the author requested changes on their own PR",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "alice")},
 		},
 		{
 			// A review bot is not a person asking for changes.
-			name:    "a bot requested changes",
-			author:  userAuthorNode("alice"),
-			reviews: []reviewNode{{State: "CHANGES_REQUESTED", Author: botAuthorNode("linter")}},
+			name:                     "a bot requested changes",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{{State: "CHANGES_REQUESTED", Author: botAuthorNode("linter")}},
 		},
 		{
-			name:     "a reviewer requested changes on a bot's PR",
-			author:   botAuthorNode("dependabot"),
-			reviews:  []reviewNode{{State: "CHANGES_REQUESTED", Author: userAuthorNode("carol")}},
-			expected: true,
+			name:                     "a changes request by a deleted account",
+			author:                   userAuthorNode("alice"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{{State: "CHANGES_REQUESTED"}},
+		},
+		{
+			name:                     "a reviewer requested changes on a bot's PR",
+			author:                   botAuthorNode("dependabot"),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			expected:                 true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := prWithReviewersOfNode(tt.author, pullRequestNode{
-				Reviews:        connection[reviewNode]{Nodes: tt.reviews},
-				ReviewRequests: reviewRequestsOf(tt.requestedReviewers...),
+				Reviews:                  connection[reviewNode]{Nodes: tt.reviews},
+				LatestOpinionatedReviews: connection[latestOpinionatedReviewNode]{Nodes: tt.latestOpinionatedReviews},
+				ReviewRequests:           reviewRequestsOf(tt.requestedReviewers...),
 			})
 
 			if pr.HasOutstandingChangesRequest != tt.expected {
@@ -577,7 +559,7 @@ func TestPRWithReviewersDerivesFlagsFromDecodedJSON(t *testing.T) {
 			name: "PR whose author re-requested the reviewer who requested changes",
 			nodeJSON: `{
 				"author":{"login":"alice","__typename":"User","name":"Alice"},
-				"reviews":{"nodes":[
+				"latestOpinionatedReviews":{"nodes":[
 					{"state":"CHANGES_REQUESTED","author":{"login":"carol","__typename":"User","name":"Carol"}}
 				]},
 				"reviewRequests":{"nodes":[
@@ -590,7 +572,7 @@ func TestPRWithReviewersDerivesFlagsFromDecodedJSON(t *testing.T) {
 			name: "PR with a changes request whose reviewer is not requested",
 			nodeJSON: `{
 				"author":{"login":"alice","__typename":"User","name":"Alice"},
-				"reviews":{"nodes":[
+				"latestOpinionatedReviews":{"nodes":[
 					{"state":"CHANGES_REQUESTED","author":{"login":"carol","__typename":"User","name":"Carol"}}
 				]},
 				"reviewRequests":{"nodes":[
@@ -762,6 +744,9 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 			{"state":"APPROVED","submittedAt":"2026-10-08T09:00:00Z","createdAt":"2026-10-08T09:00:00Z",
 				"author":{"login":"erin","__typename":"User","name":"Erin"}}
 		]},
+		"latestOpinionatedReviews":{"nodes":[
+			{"state":"APPROVED","author":{"login":"erin","__typename":"User","name":"Erin"}}
+		]},
 		"reviewDismissals":{"nodes":[
 			{"previousReviewState":"APPROVED",
 				"review":{"author":{"login":"carol","__typename":"User","name":"Carol"}}},
@@ -809,26 +794,30 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 	}
 }
 
-// A reviewer's latest review decides. COMMENTED reviews are skipped when picking it.
-func TestPRWithReviewersCountsEachReviewersLatestReviewAsTheirApproval(t *testing.T) {
+// Here the reviews feed only CommentedByUsers. Most cases make them disagree with
+// latestOpinionatedReviews. An implementation still reading the reviews for approvals fails
+// those cases.
+func TestPRWithReviewersCountsEachReviewersLatestOpinionatedReviewAsTheirApproval(t *testing.T) {
 	tests := []struct {
-		name                    string
-		reviews                 []reviewNode
-		dismissals              []reviewDismissedEventNode
-		expectedApprovedBy      []string
-		expectedStaleApprovedBy []string
-		expectedCommentedBy     []string
+		name                     string
+		reviews                  []reviewNode
+		latestOpinionatedReviews []latestOpinionatedReviewNode
+		dismissals               []reviewDismissedEventNode
+		expectedApprovedBy       []string
+		expectedStaleApprovedBy  []string
+		expectedCommentedBy      []string
 	}{
 		{
-			name: "an approval followed by a review dismissed as an approval",
+			name: "an approval followed by a comment",
 			reviews: []reviewNode{
 				reviewSubmittedAtHour("APPROVED", "carol", 9),
-				reviewSubmittedAtHour("DISMISSED", "carol", 10),
+				reviewSubmittedAtHour("COMMENTED", "carol", 10),
 			},
-			dismissals:              []reviewDismissedEventNode{dismissalOf("APPROVED", "carol")},
-			expectedStaleApprovedBy: []string{"carol"},
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("APPROVED", "carol")},
+			expectedApprovedBy:       []string{"carol"},
 		},
 		{
+			// GitHub leaves out a reviewer whose latest opinionated review was dismissed.
 			name: "an approval followed by a changes request that was dismissed",
 			reviews: []reviewNode{
 				reviewSubmittedAtHour("APPROVED", "carol", 9),
@@ -838,20 +827,10 @@ func TestPRWithReviewersCountsEachReviewersLatestReviewAsTheirApproval(t *testin
 			expectedCommentedBy: []string{"carol"},
 		},
 		{
-			name: "an approval followed by a changes request",
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("APPROVED", "carol", 9),
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
-			},
-			expectedCommentedBy: []string{"carol"},
-		},
-		{
-			name: "an approval followed by a comment",
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("APPROVED", "carol", 9),
-				reviewSubmittedAtHour("COMMENTED", "carol", 10),
-			},
-			expectedApprovedBy: []string{"carol"},
+			name:                    "a dismissed approval",
+			reviews:                 []reviewNode{reviewSubmittedAtHour("DISMISSED", "carol", 9)},
+			dismissals:              []reviewDismissedEventNode{dismissalOf("APPROVED", "carol")},
+			expectedStaleApprovedBy: []string{"carol"},
 		},
 		{
 			name: "a changes request followed by an approval",
@@ -859,68 +838,54 @@ func TestPRWithReviewersCountsEachReviewersLatestReviewAsTheirApproval(t *testin
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
 				reviewSubmittedAtHour("APPROVED", "carol", 10),
 			},
-			expectedApprovedBy: []string{"carol"},
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("APPROVED", "carol")},
+			expectedApprovedBy:       []string{"carol"},
 		},
 		{
-			name: "a later changes request listed before the approval",
+			name: "an approval followed by a changes request",
 			reviews: []reviewNode{
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
 				reviewSubmittedAtHour("APPROVED", "carol", 9),
-			},
-			expectedCommentedBy: []string{"carol"},
-		},
-		{
-			name: "a later approval listed before the changes request",
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("APPROVED", "carol", 10),
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 9),
-			},
-			expectedApprovedBy: []string{"carol"},
-		},
-		{
-			name: "a changes request without a submittedAt, created after the approval",
-			reviews: []reviewNode{
-				reviewCreatedAtHourWithoutSubmittedAt("CHANGES_REQUESTED", "carol", 11),
-				reviewSubmittedAtHour("APPROVED", "carol", 10),
-			},
-			expectedCommentedBy: []string{"carol"},
-		},
-		{
-			name: "an approval created earlier but submitted later than the changes request",
-			reviews: []reviewNode{
-				{
-					State:       "APPROVED",
-					SubmittedAt: timePtr(time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)),
-					CreatedAt:   time.Date(2026, 10, 6, 8, 0, 0, 0, time.UTC),
-					Author:      userAuthorNode("carol"),
-				},
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
 			},
-			expectedApprovedBy: []string{"carol"},
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			expectedCommentedBy:      []string{"carol"},
 		},
 		{
-			name: "an approval and a changes request at the same time",
+			name: "an approval and a changes request at the same time, GitHub picking the changes request",
 			reviews: []reviewNode{
 				reviewSubmittedAtHour("APPROVED", "carol", 10),
 				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
 			},
-			expectedApprovedBy: []string{"carol"},
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol")},
+			expectedCommentedBy:      []string{"carol"},
+		},
+		{
+			// writersOnly leaves out a reviewer without write access.
+			name:                "an approval by a reviewer without write access",
+			reviews:             []reviewNode{reviewSubmittedAtHour("APPROVED", "outsider", 9)},
+			expectedCommentedBy: []string{"outsider"},
+		},
+		{
+			name:                     "an approval older than the newest 100 reviews",
+			reviews:                  []reviewNode{reviewSubmittedAtHour("COMMENTED", "carol", 10)},
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{latestOpinionatedReviewOf("APPROVED", "carol")},
+			expectedApprovedBy:       []string{"carol"},
 		},
 		{
 			name: "another reviewer's later changes request",
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("APPROVED", "bob", 9),
-				reviewSubmittedAtHour("CHANGES_REQUESTED", "carol", 10),
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{
+				latestOpinionatedReviewOf("APPROVED", "bob"),
+				latestOpinionatedReviewOf("CHANGES_REQUESTED", "carol"),
 			},
-			expectedApprovedBy:  []string{"bob"},
-			expectedCommentedBy: []string{"carol"},
+			expectedApprovedBy: []string{"bob"},
 		},
 		{
-			name: "a later pending review and a bot's approval",
-			reviews: []reviewNode{
-				reviewSubmittedAtHour("APPROVED", "carol", 9),
-				{State: "PENDING", CreatedAt: time.Date(2026, 10, 6, 10, 0, 0, 0, time.UTC), Author: userAuthorNode("carol")},
+			name: "approvals by a bot, the PR author and a deleted account",
+			latestOpinionatedReviews: []latestOpinionatedReviewNode{
 				{State: "APPROVED", Author: botAuthorNode("reviewer-app")},
+				latestOpinionatedReviewOf("APPROVED", "alice"),
+				{State: "APPROVED"},
+				latestOpinionatedReviewOf("APPROVED", "carol"),
 			},
 			expectedApprovedBy: []string{"carol"},
 		},
@@ -929,8 +894,9 @@ func TestPRWithReviewersCountsEachReviewersLatestReviewAsTheirApproval(t *testin
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pr := prWithReviewersOfNode(userAuthorNode("alice"), pullRequestNode{
-				Reviews:          connection[reviewNode]{Nodes: tt.reviews},
-				ReviewDismissals: connection[reviewDismissedEventNode]{Nodes: tt.dismissals},
+				Reviews:                  connection[reviewNode]{Nodes: tt.reviews},
+				LatestOpinionatedReviews: connection[latestOpinionatedReviewNode]{Nodes: tt.latestOpinionatedReviews},
+				ReviewDismissals:         connection[reviewDismissedEventNode]{Nodes: tt.dismissals},
 			})
 
 			assertLogins(t, "ApprovedByUsers", pr.ApprovedByUsers, tt.expectedApprovedBy)
