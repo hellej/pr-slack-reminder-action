@@ -1148,6 +1148,15 @@ complement of 1005, while `-Fix in:title` matched 1005, the same as no negation 
 - `latestReviews` returns the latest review of any state, a `COMMENTED` one included
 - `latestOpinionatedReviews` returns the latest non-`COMMENTED` review per user, and leaves out a user whose latest such review is `DISMISSED`. Its entries matched `reviewDecision` in all four PRs
 
+## `latestOpinionatedReviews` returns bots' reviews with or without `writersOnly`, and populates on a private repository under the E2E App token at no added cost [2026-11-28]
+
+- `writersOnly` description: "Only return reviews from user who have write access to the repository" (schema introspection, 2026-11-28)
+- Bots kept: `gh api graphql` on public `hellej/pr-slack-reminder-test-repo-3` PR 6 returned `github-actions`' review both with and without `writersOnly: true`
+- Unverified: that `writersOnly` drops a reviewer without write access. No test repository has such a reviewer
+- Which review it picks per user, and its match with `reviewDecision` on 4 PRs: see [§ `reviewDecision` reads only each reviewer's latest review, skipping `COMMENTED` ones, and a manually dismissed review reads `DISMISSED`](#reviewdecision-reads-only-each-reviewers-latest-review-skipping-commented-ones-and-a-manually-dismissed-review-reads-dismissed-2026-11-28)
+- E2E: Build workflow run 46129729589, job 140932027598, PR 126's branch. Under the E2E GitHub App installation token, the enrichment and `GetPRs` queries selecting `latestOpinionatedReviews(last: 100, writersOnly: true)` returned no error on private `hellej/pr-slack-reminder-test-repo-1` and `-2`. The field needs nothing beyond the App's current permissions
+  - Total logged `rateLimit.cost` over the E2E runs: 205, against 213 on merged PR 125's last Build run (45972553178). Each scenario cost the same or less. The gap comes from a different PR count between the runs, not from the field
+
 ## `PullRequest.statusCheckRollup` needs `checks: read` in a private repository: an App token without it gets `FORBIDDEN` on the field [2026-11-01]
 
 - Source: Build workflow E2E job logs, plan 019's branch, reading private `hellej/pr-slack-reminder-test-repo-1` PR 49 through the E2E GitHub App's installation token

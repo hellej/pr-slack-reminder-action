@@ -374,8 +374,8 @@ func latestOpinionatedReviewOf(state, login string) latestOpinionatedReviewNode 
 	return latestOpinionatedReviewNode{State: state, Author: userAuthorNode(login)}
 }
 
-// Each case feeds reviews that GitHub would have picked differently from, or no reviews at all,
-// so a rule still reading reviews gets a case wrong.
+// Most cases leave the reviews empty or make them disagree with latestOpinionatedReviews. An
+// implementation still reading the reviews for changes requests fails those cases.
 func TestPRWithReviewersDerivesOutstandingChangesRequest(t *testing.T) {
 	tests := []struct {
 		name                     string
@@ -794,8 +794,9 @@ func TestPRWithReviewersDerivesStaleApproversFromDecodedJSON(t *testing.T) {
 	}
 }
 
-// GitHub picks each reviewer's latest opinionated review. The reviews feed only CommentedByUsers
-// and differ from what GitHub picked, so a rule still reading reviews for approvals gets a case wrong.
+// Here the reviews feed only CommentedByUsers. Most cases make them disagree with
+// latestOpinionatedReviews. An implementation still reading the reviews for approvals fails
+// those cases.
 func TestPRWithReviewersCountsEachReviewersLatestOpinionatedReviewAsTheirApproval(t *testing.T) {
 	tests := []struct {
 		name                     string

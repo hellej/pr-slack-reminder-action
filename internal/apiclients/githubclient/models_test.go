@@ -124,7 +124,7 @@ func TestPRReadyForReviewAt(t *testing.T) {
 	}
 }
 
-func TestDeriveReviewers(t *testing.T) {
+func TestDeriveStaleApproversAndCommenters(t *testing.T) {
 	tests := []struct {
 		name                    string
 		authorLogin             string
@@ -132,7 +132,6 @@ func TestDeriveReviewers(t *testing.T) {
 		dismissedApprovers      []Collaborator
 		reviewAuthors           []Collaborator
 		timelineCommenters      []Collaborator
-		expectedApprovedBy      []Collaborator
 		expectedStaleApprovedBy []Collaborator
 		expectedCommentedBy     []Collaborator
 	}{
@@ -142,7 +141,6 @@ func TestDeriveReviewers(t *testing.T) {
 			approvers:          []Collaborator{{Login: "approver"}},
 			reviewAuthors:      []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
 			timelineCommenters: []Collaborator{{Login: "timeline-commenter"}},
-			expectedApprovedBy: []Collaborator{{Login: "approver"}},
 			expectedCommentedBy: []Collaborator{
 				{Login: "reviewer"},
 				{Login: "timeline-commenter"},
@@ -151,10 +149,9 @@ func TestDeriveReviewers(t *testing.T) {
 		{
 			name:               "duplicate logins appear once",
 			authorLogin:        "author",
-			approvers:          []Collaborator{{Login: "approver"}, {Login: "approver"}},
+			approvers:          []Collaborator{{Login: "approver"}},
 			reviewAuthors:      []Collaborator{{Login: "approver"}, {Login: "reviewer"}},
 			timelineCommenters: []Collaborator{{Login: "reviewer"}, {Login: "timeline-commenter"}},
-			expectedApprovedBy: []Collaborator{{Login: "approver"}},
 			expectedCommentedBy: []Collaborator{
 				{Login: "reviewer"},
 				{Login: "timeline-commenter"},
@@ -175,12 +172,11 @@ func TestDeriveReviewers(t *testing.T) {
 			expectedCommentedBy:     []Collaborator{{Login: "reviewer"}},
 		},
 		{
-			name:                    "a stale approver who approved again is an approver only",
+			name:                    "a stale approver who approved again is left out of the stale approvers",
 			authorLogin:             "author",
 			approvers:               []Collaborator{{Login: "re-approver"}},
 			dismissedApprovers:      []Collaborator{{Login: "re-approver"}, {Login: "stale-approver"}},
 			reviewAuthors:           []Collaborator{{Login: "re-approver"}, {Login: "stale-approver"}},
-			expectedApprovedBy:      []Collaborator{{Login: "re-approver"}},
 			expectedStaleApprovedBy: []Collaborator{{Login: "stale-approver"}},
 		},
 		{
@@ -193,12 +189,9 @@ func TestDeriveReviewers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			approvedBy, staleApprovedBy, commentedBy := deriveReviewers(
+			staleApprovedBy, commentedBy := deriveStaleApproversAndCommenters(
 				tt.authorLogin, tt.approvers, tt.dismissedApprovers, tt.reviewAuthors, tt.timelineCommenters,
 			)
-			if !reflect.DeepEqual(approvedBy, tt.expectedApprovedBy) {
-				t.Errorf("approvedBy = %+v, expected %+v", approvedBy, tt.expectedApprovedBy)
-			}
 			if !reflect.DeepEqual(staleApprovedBy, tt.expectedStaleApprovedBy) {
 				t.Errorf("staleApprovedBy = %+v, expected %+v", staleApprovedBy, tt.expectedStaleApprovedBy)
 			}

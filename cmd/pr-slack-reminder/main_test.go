@@ -608,7 +608,7 @@ func TestScenarios(t *testing.T) {
 					mockgithubclient.NewReview("reviewer3", "", "COMMENTED"),
 					mockgithubclient.NewReview("reviewer3", "", "COMMENTED"), // duplicate review by reviewer3 should be omitted
 					mockgithubclient.NewReview("reviewer2", "", "APPROVED"),
-					mockgithubclient.NewReview("reviewer2", "", "APPROVED"), // duplicate approval by reviewer2 should be omitted
+					mockgithubclient.NewReview("reviewer2", "", "APPROVED"), // GitHub returns only reviewer2's latest approval
 				},
 			},
 			expectedSummary: "2 PRs to review, 2 to merge 👀",

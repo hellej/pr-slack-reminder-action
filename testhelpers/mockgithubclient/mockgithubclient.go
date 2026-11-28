@@ -488,8 +488,8 @@ func isSupersededBySameUser(reviews []*github.PullRequestReview, index int) bool
 			continue
 		}
 		submittedAt, otherSubmittedAt := review.GetSubmittedAt().Time, other.GetSubmittedAt().Time
-		isLaterInFixtureList := otherIndex > index
-		if otherSubmittedAt.After(submittedAt) || otherSubmittedAt.Equal(submittedAt) && isLaterInFixtureList {
+		isSameTimeButLaterInFixtureList := otherSubmittedAt.Equal(submittedAt) && otherIndex > index
+		if otherSubmittedAt.After(submittedAt) || isSameTimeButLaterInFixtureList {
 			return true
 		}
 	}
@@ -646,9 +646,9 @@ type pullRequestRef struct {
 	number    int
 }
 
-// Unlike the other fields, these are answered only when the query selects them, so a query that
-// forgets isInMergeQueue reads false, and one that forgets latestOpinionatedReviews or its
-// writersOnly argument reads no approvals.
+// Unlike the other fields, isInMergeQueue and latestOpinionatedReviews are answered only when the
+// query selects them. A query that forgets isInMergeQueue reads false. One that forgets
+// latestOpinionatedReviews or its writersOnly argument reads no approvals.
 type optionalFields struct {
 	isInMergeQueue           bool
 	latestOpinionatedReviews bool
